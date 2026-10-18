@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import db from '../data/banners.snapshot.json';
 import { analyze } from './analyze';
 import { canonicalPoolId, categoryOf, patchOf } from './banners';
@@ -91,9 +91,15 @@ describe('import + merge', () => {
 
 const FIXTURE = new URL('../../fixtures/pull_history.json', import.meta.url);
 
+// fixtures/ is gitignored personal data, so CI won't have it. The describe body runs even
+// when skipped, so the file is only read in beforeAll.
 describe.runIf(existsSync(FIXTURE))('real pull history fixture', () => {
-  const history: PullHistory = parseHistoryJson(readFileSync(FIXTURE, 'utf8'));
-  const result = analyze(history, bannerDb);
+  let history: PullHistory;
+  let result: ReturnType<typeof analyze>;
+  beforeAll(() => {
+    history = parseHistoryJson(readFileSync(FIXTURE, 'utf8'));
+    result = analyze(history, bannerDb);
+  });
 
   it('counts every non-dossier record', () => {
     const pulls = result.banners.reduce((n, b) => n + b.pulls.length, 0);
