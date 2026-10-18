@@ -23,14 +23,25 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   `banners.ts` (pool ids → category/patch/rate-up, asset URLs), `pity.ts`
   (probability model), `analyze.ts` (per-banner pity/guarantee/luck),
   `patches.ts` (patch + weekly aggregation). Covered by `domain.test.ts`.
-- `src/state.ts`: app state + `subscribe`; any change re-renders the app.
+- `src/state.ts`: app state + `subscribe`.
 - `src/store.ts`: persistence (localStorage, IndexedDB, ef-assets fetch).
-- `src/ui/`: views as `html` tagged templates (`ui/html.ts` escapes every
-  interpolation; use `raw()` only for trusted markup). Events are delegated
-  from the root via `data-action` attributes in `ui/app.ts`.
-- `scripts/export-pulls.ps1`: the PowerShell exporter, embedded verbatim on the
-  "Get data" page via `?raw`. Keep it readable and dependency-free.
-  Its only network target must stay `ef-webview.gryphline.com`.
+- UI deliberately reproduces the old eftracker look exactly:
+  - `index.html` is eftracker's page shell (same ids); `src/legacy.css` is its
+    stylesheet copied verbatim. Put changes and the light variant in
+    `src/style.css` rather than editing legacy.css.
+  - `src/ui/model.ts` adapts the domain Analysis into the shapes eftracker's
+    renderers used (category names, 10-pull weapon blocks, FREE/TOKEN summary
+    items). `dashboard.ts`, `summary.ts`, `stats.ts`, `planner.ts`,
+    `settings.ts` are ports of the matching eftracker `js/render-*.js` files.
+  - `ui/app.ts` is the controller (tab slide animation, expand/filters, luck
+    drawers, imports). Events are delegated via `data-action`/`data-tab`.
+  - Pull rows and banner-box skeletons must stay whitespace-free between tags
+    (`tight()` in dashboard.ts): the old CSS renders that whitespace.
+  - Escape every user/game string with `escape` from `ui/html.ts`.
+- `scripts/export-pulls.ps1`: the PowerShell exporter, shown in Settings → Get
+  your data via `?raw`. Keep it readable and dependency-free. Its only network
+  target must stay `ef-webview.gryphline.com`. Character pool types are a fixed
+  list; the server stopped listing valid values in its error message.
 
 ## Domain rules worth knowing
 

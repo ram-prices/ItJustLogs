@@ -17,9 +17,27 @@ export interface Settings {
   theme: ThemePref;
   displayName: string;
   showTimestamps: boolean;
+  /** Rows the 6★ summary strip may grow to when expanded. */
+  summaryMaxRows: number;
+  /** Only show 6★s from the last N banners in the summary strip (50+ = all). */
+  summaryBannerLimit: number;
+  summaryExpandedByDefault: boolean;
+  /** Header image backdrop blur in px. */
+  bannerBlur: number;
+  /** Header image vertical position in %. */
+  bannerPos: number;
 }
 
-const DEFAULT_SETTINGS: Settings = { theme: 'system', displayName: '', showTimestamps: false };
+const DEFAULT_SETTINGS: Settings = {
+  theme: 'dark',
+  displayName: '',
+  showTimestamps: false,
+  summaryMaxRows: 3,
+  summaryBannerLimit: 50,
+  summaryExpandedByDefault: false,
+  bannerBlur: 12,
+  bannerPos: 50,
+};
 
 function readJson<T>(key: string): T | null {
   try {

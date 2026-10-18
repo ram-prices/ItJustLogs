@@ -10,176 +10,156 @@ import {
   rateUpPmf,
   type PityProfile,
 } from '../domain/pity';
-import { cdfChart } from './charts';
-import { fmtPct, html, render, type Html } from './html';
+import { escape as esc } from './html';
+import { cdfSparkline } from './model';
 
-type PlanType = 'chartered' | 'joint' | 'weapon';
+/** Pull Planner tab in eftracker's markup. */
+
+type PlanType = 'char' | 'joint' | 'weap';
+
+const PROFILES: Record<PlanType, { profile: PityProfile; guarantee: number | null; category: string }> = {
+  char: { profile: CHARTERED, guarantee: CHARTERED_GUARANTEE, category: 'chartered' },
+  joint: { profile: JOINT, guarantee: null, category: 'joint' },
+  weap: { profile: WEAPON, guarantee: WEAPON_GUARANTEE, category: 'limited' },
+};
+
+const NEXT = '__next';
+const CUSTOM = '__custom';
 
 interface Plan {
   type: PlanType;
-  bannerKey: string;
+  key: string;
   pity: number;
-  bannerPulls: number;
+  rateUpPity: number;
   have: boolean;
   pulls: number;
 }
 
-const PROFILES: Record<PlanType, { profile: PityProfile; guarantee: number | null; label: string }> = {
-  chartered: { profile: CHARTERED, guarantee: CHARTERED_GUARANTEE, label: 'Chartered Headhunting' },
-  joint: { profile: JOINT, guarantee: null, label: 'Joint Headhunting' },
-  weapon: { profile: WEAPON, guarantee: WEAPON_GUARANTEE, label: 'Arsenal Issue' },
-};
-
 let plan: Plan | null = null;
 
-function bannersFor(type: PlanType, analysis: Analysis): BannerSummary[] {
-  const cat = type === 'weapon' ? 'limited' : type;
-  return analysis.banners.filter((b) => b.category === cat).sort((a, b) => b.lastTs - a.lastTs);
-}
+const bannersFor = (type: PlanType, a: Analysis) =>
+  a.banners.filter((b) => b.category === PROFILES[type].category).sort((x, y) => y.lastTs - x.lastTs);
+const keyOf = (b: BannerSummary) => `${b.kind}:${b.poolId}`;
 
-const NEXT = 'next';
-
-/**
- * Fill pity from a real banner: its end-state is exactly where the player left off.
- * "Next banner" starts a fresh guarantee; Chartered 6★ pity carries over, the others don't.
- */
-function fromBanner(type: PlanType, key: string, analysis: Analysis, pulls: number): Plan {
-  const banners = bannersFor(type, analysis);
+/** Chartered 6★ pity carries into the next banner; joint and arsenal pity don't. */
+function fromKey(type: PlanType, key: string, a: Analysis, pulls: number): Plan {
+  const banners = bannersFor(type, a);
   if (key === NEXT) {
-    const live = type === 'chartered' ? (banners.find((b) => b.isLatest)?.pity.value ?? 0) : 0;
-    return { type, bannerKey: NEXT, pity: live, bannerPulls: 0, have: false, pulls };
+    const live = type === 'char' ? (banners.find((b) => b.isLatest)?.pity.value ?? 0) : 0;
+    return { type, key, pity: live, rateUpPity: 0, have: false, pulls };
   }
-  const b = banners.find((x) => `${x.kind}:${x.poolId}` === key);
+  const b = banners.find((x) => keyOf(x) === key);
+  if (!b) return { type, key: CUSTOM, pity: 0, rateUpPity: 0, have: false, pulls };
   return {
     type,
-    bannerKey: b ? key : '',
-    pity: b?.pity.value ?? 0,
-    bannerPulls: b && type !== 'joint' ? Math.min(b.paidPulls, PROFILES[type].guarantee ?? 0) : 0,
-    have: !!b && b.rateUpCopies > 0,
+    key,
+    pity: b.pity.value,
+    rateUpPity: type === 'joint' ? 0 : Math.min(b.paidPulls, PROFILES[type].guarantee ?? 0),
+    have: b.rateUpCopies > 0,
     pulls,
   };
 }
 
-/** Default: keep chasing the current banner if its rate-up is still missing, otherwise plan the next one. */
-function defaultPlan(type: PlanType, analysis: Analysis, pulls: number): Plan {
-  const current = bannersFor(type, analysis).find((b) => b.isLatest);
-  const key = current && current.rateUpCopies === 0 && type !== 'joint' ? `${current.kind}:${current.poolId}` : NEXT;
-  return fromBanner(type, key, analysis, pulls);
+function defaultPlan(type: PlanType, a: Analysis, pulls: number): Plan {
+  const current = bannersFor(type, a).find((b) => b.isLatest);
+  return fromKey(type, current && current.rateUpCopies === 0 && type !== 'joint' ? keyOf(current) : NEXT, a, pulls);
 }
 
-export function plannerView(analysis: Analysis): Html {
-  plan ??= defaultPlan('chartered', analysis, 80);
-  return html`
-    <div class="page-head">
-      <div>
-        <h1>Planner</h1>
-        <p>What are the odds of getting the rate-up if you pull N more times? Starts from your real pity.</p>
-      </div>
-    </div>
-    <div class="planner">
-      <form class="card card-pad planner-form" data-planner onsubmit="return false">${form(analysis)}</form>
-      <div class="card card-pad planner-result" data-planner-result>${result()}</div>
-    </div>
-  `;
-}
-
-function form(analysis: Analysis): Html {
-  const p = plan!;
+function compute(p: Plan): { probability: number; pmf: Float64Array | null } {
+  if (p.have) return { probability: 1, pmf: null };
   const cfg = PROFILES[p.type];
-  const banners = bannersFor(p.type, analysis);
-  return html`
-    <label class="field"><span>Banner type</span>
-      <select class="input" name="type">
-        ${(Object.keys(PROFILES) as PlanType[]).map(
-          (t) => html`<option value="${t}" ${t === p.type ? 'selected' : ''}>${PROFILES[t].label}</option>`,
-        )}
-      </select>
-    </label>
-    <label class="field"><span>Start from</span>
-      <select class="input" name="banner">
-        <option value="${NEXT}" ${p.bannerKey === NEXT ? 'selected' : ''}>
-          Next new banner${p.type === 'chartered' ? ' (keeps your current pity)' : ''}
-        </option>
-        <option value="" ${p.bannerKey === '' ? 'selected' : ''}>Fresh start (0 pity)</option>
-        ${banners.map(
-          (b) =>
-            html`<option value="${b.kind}:${b.poolId}" ${p.bannerKey === `${b.kind}:${b.poolId}` ? 'selected' : ''}>
-              ${b.name}${b.isLatest ? ' (current)' : ''}
-            </option>`,
-        )}
-      </select>
-    </label>
-    <label class="field"><span>6★ pity so far (0–${cfg.profile.hardPity - 1})</span>
-      <input class="input num" type="number" name="pity" min="0" max="${cfg.profile.hardPity - 1}" value="${p.pity}" inputmode="numeric" />
-    </label>
-    ${cfg.guarantee
-      ? html`<label class="field"><span>Pulls already on this banner (guarantee at ${cfg.guarantee})</span>
-          <input class="input num" type="number" name="bannerPulls" min="0" max="${cfg.guarantee}" value="${p.bannerPulls}" inputmode="numeric" />
-        </label>`
-      : ''}
-    <label class="inline-check"><input class="switch" type="checkbox" name="have" ${p.have ? 'checked' : ''} /> Already have the rate-up</label>
-    <label class="field"><span>Pulls you plan to make</span>
-      <input class="input num" type="number" name="pulls" min="0" max="${MAX_PULLS}" value="${p.pulls}" inputmode="numeric" />
-    </label>
-  `;
-}
-
-function compute(p: Plan): { chance: number; pmf: Float64Array | null } {
-  if (p.have) return { chance: 1, pmf: null };
-  const cfg = PROFILES[p.type];
-  const guaranteeAt = cfg.guarantee ? Math.max(1, cfg.guarantee - Math.min(p.bannerPulls, cfg.guarantee)) : null;
+  const guaranteeAt = cfg.guarantee ? Math.max(1, cfg.guarantee - Math.min(p.rateUpPity, cfg.guarantee)) : null;
   const pmf = rateUpPmf(cfg.profile, { startPity: p.pity, guaranteeAt });
-  return { chance: cdfAt(pmf, p.pulls), pmf };
+  return { probability: cdfAt(pmf, p.pulls), pmf };
 }
 
-function result(): Html {
-  const p = plan!;
-  const { chance, pmf } = compute(p);
-  return html`
-    <div class="big num">${fmtPct(chance)}</div>
-    <p class="dim" style="margin-top:8px">
-      ${p.have
-        ? 'You already own this banner’s rate-up. The guarantee no longer applies, so more pulls are a fresh chase.'
-        : `chance of getting the rate-up within ${p.pulls} pulls`}
-    </p>
-    ${pmf ? html`<div style="margin-top:20px">${cdfChart(pmf, { at: Math.min(p.pulls, MAX_PULLS) })}</div>` : ''}
-  `;
+export function renderPlanner(a: Analysis): string {
+  plan ??= defaultPlan('char', a, 80);
+  const p = plan;
+  const cfg = PROFILES[p.type];
+  const opt = (v: string, label: string) => `<option value="${esc(v)}" ${p.key === v ? 'selected' : ''}>${esc(label)}</option>`;
+  return `
+    <div class="banner-box planner-box">
+      <h3>Chance Calculator</h3>
+      <div class="pity-box planner-row">
+        <div class="planner-field">
+          <label class="planner-label">Banner Type</label>
+          <select id="plannerType" class="planner-input" data-plan="type">
+            <option value="char" ${p.type === 'char' ? 'selected' : ''}>Character (Chartered)</option>
+            <option value="joint" ${p.type === 'joint' ? 'selected' : ''}>Character (Joint)</option>
+            <option value="weap" ${p.type === 'weap' ? 'selected' : ''}>Arsenal</option>
+          </select>
+        </div>
+        <div class="planner-field planner-field-wide">
+          <label class="planner-label">Auto-Fill From Banner</label>
+          <select id="plannerBannerSelect" class="planner-input" data-plan="key">
+            ${opt(NEXT, p.type === 'char' ? 'Next new banner (keeps current pity)' : 'Next new banner')}
+            ${opt(CUSTOM, 'Custom (start from 0)')}
+            ${bannersFor(p.type, a).map((b) => opt(keyOf(b), b.name + (b.isLatest ? ' (current)' : ''))).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="pity-box planner-row">
+        <div class="planner-field">
+          <label class="planner-label">Starting Pity</label>
+          <input id="plannerPity" type="number" min="0" max="${cfg.profile.hardPity - 1}" class="planner-input" value="${p.pity}" data-plan="pity">
+        </div>
+        ${
+          cfg.guarantee
+            ? `<div class="planner-field" id="plannerRateUpPityField">
+                <label class="planner-label">Rate-Up Pity (of ${cfg.guarantee})</label>
+                <input id="plannerRateUpPity" type="number" min="0" max="${cfg.guarantee}" class="planner-input" value="${p.rateUpPity}" data-plan="rateUpPity">
+              </div>`
+            : ''
+        }
+        <div class="planner-field">
+          <label class="planner-label">Already Have It</label>
+          <input id="plannerAlreadyHave" type="checkbox" class="planner-checkbox" ${p.have ? 'checked' : ''} data-plan="have">
+        </div>
+        <div class="planner-field">
+          <label class="planner-label">Pulls To Simulate</label>
+          <input id="plannerPulls" type="number" min="0" max="${MAX_PULLS}" class="planner-input" value="${p.pulls}" data-plan="pulls">
+        </div>
+      </div>
+      <div class="planner-output" id="plannerOutput">${renderOutput()}</div>
+    </div>`;
+}
+
+function renderOutput(): string {
+  const { probability, pmf } = compute(plan!);
+  return `
+    <div class="planner-output-value" id="plannerResult">${(probability * 100).toFixed(1)}%</div>
+    <div class="planner-output-label">chance of getting the rate-up within that many pulls</div>
+    <div id="plannerGraph" class="planner-graph">${pmf ? cdfSparkline(pmf, Math.min(plan!.pulls, MAX_PULLS)) : ''}</div>`;
 }
 
 const clampInt = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(v) || 0)));
 
-export function handlePlannerInput(target: HTMLElement, analysis: Analysis): boolean {
-  const formEl = target.closest<HTMLFormElement>('[data-planner]');
-  if (!formEl || !plan) return false;
-  const el = target as HTMLInputElement;
+/** Returns true when the whole planner must be re-rendered (type or banner changed). */
+export function handlePlannerInput(el: HTMLInputElement | HTMLSelectElement, a: Analysis): 'all' | 'output' | null {
+  if (!plan) return null;
   const cfg = PROFILES[plan.type];
-  switch (el.name) {
-    case 'type': {
-      const type = el.value as PlanType;
-      plan = defaultPlan(type, analysis, plan.pulls);
-      render(formEl, form(analysis));
-      break;
-    }
-    case 'banner': {
-      plan = fromBanner(plan.type, el.value, analysis, plan.pulls);
-      render(formEl, form(analysis));
-      break;
-    }
+  switch (el.dataset.plan) {
+    case 'type':
+      plan = defaultPlan(el.value as PlanType, a, plan.pulls);
+      return 'all';
+    case 'key':
+      plan = fromKey(plan.type, el.value, a, plan.pulls);
+      return 'all';
     case 'pity':
       plan.pity = clampInt(el.value, 0, cfg.profile.hardPity - 1);
-      break;
-    case 'bannerPulls':
-      plan.bannerPulls = clampInt(el.value, 0, cfg.guarantee ?? 0);
-      break;
+      return 'output';
+    case 'rateUpPity':
+      plan.rateUpPity = clampInt(el.value, 0, cfg.guarantee ?? 0);
+      return 'output';
     case 'have':
-      plan.have = el.checked;
-      break;
+      plan.have = (el as HTMLInputElement).checked;
+      return 'output';
     case 'pulls':
       plan.pulls = clampInt(el.value, 0, MAX_PULLS);
-      break;
-    default:
-      return false;
+      return 'output';
   }
-  render(document.querySelector('[data-planner-result]')!, result());
-  return true;
+  return null;
 }
+
+export const plannerOutput = renderOutput;

@@ -1,5 +1,4 @@
 import type { TimelineBucket } from '../domain/patches';
-import { cumulative } from '../domain/pity';
 import { escape, fmtInt, html, raw, type Html } from './html';
 
 /**
@@ -25,75 +24,6 @@ function column(x: number, y: number, w: number, h: number, r = 4): string {
   if (h <= 0) return '';
   const rr = Math.min(r, h, w / 2);
   return `M${x},${y + h}V${y + rr}Q${x},${y} ${x + rr},${y}H${x + w - rr}Q${x + w},${y} ${x + w},${y + rr}V${y + h}Z`;
-}
-
-// ---------------------------------------------------------------------------
-// Cumulative chance: P(rate-up within n pulls)
-// ---------------------------------------------------------------------------
-
-export interface CdfOptions {
-  /** Pull count to mark on the curve. */
-  at: number;
-  height?: number;
-  /** Compact sparkline-style version for pull rows. */
-  compact?: boolean;
-  unit?: string;
-}
-
-export function cdfChart(pmf: Float64Array, opts: CdfOptions): Html {
-  const cdf = cumulative(pmf);
-  let end = cdf.findIndex((v) => v >= 0.999);
-  if (end < 0) end = cdf.length - 1;
-  end = Math.max(end, opts.at, 10);
-  end = Math.ceil(end / 10) * 10;
-
-  const W = 640;
-  const H = opts.height ?? (opts.compact ? 120 : 240);
-  const m = { t: 12, r: 16, b: 26, l: 40 };
-  const iw = W - m.l - m.r;
-  const ih = H - m.t - m.b;
-  const x = (n: number) => m.l + (n / end) * iw;
-  const y = (p: number) => m.t + (1 - p) * ih;
-
-  const pts: string[] = [];
-  for (let n = 0; n <= end; n++) pts.push(`${x(n).toFixed(1)},${y(cdf[n] ?? 1).toFixed(1)}`);
-  const line = `M${pts.join('L')}`;
-  const area = `${line}L${x(end)},${y(0)}L${x(0)},${y(0)}Z`;
-
-  const yTicks = [0, 0.25, 0.5, 0.75, 1];
-  const xStep = niceStep(end, opts.compact ? 3 : 6);
-  const xTicks: number[] = [];
-  for (let t = 0; t <= end; t += xStep) xTicks.push(t);
-
-  const at = Math.min(opts.at, end);
-  const atP = cdf[at] ?? 1;
-  const unit = opts.unit ?? 'pulls';
-
-  // Hover bands: one per ~1% of width so the tooltip tracks the pointer.
-  const bands = Math.min(end, 80);
-  const bandW = iw / bands;
-  const hits: string[] = [];
-  for (let i = 0; i < bands; i++) {
-    const n = Math.round(((i + 0.5) / bands) * end);
-    hits.push(
-      `<rect class="hit" x="${(m.l + i * bandW).toFixed(1)}" y="${m.t}" width="${(bandW + 0.5).toFixed(1)}" height="${ih}" data-tip="${escape(
-        tip(`Within ${n} ${unit}`, [tipRow('Chance', `${((cdf[n] ?? 1) * 100).toFixed(1)}%`)]),
-      )}"/>`,
-    );
-  }
-
-  return html`<div class="chart">
-    ${raw(`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance of the rate-up by number of ${unit}: ${(atP * 100).toFixed(1)}% within ${at}">
-      <g class="grid">${yTicks.map((t) => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/>`).join('')}</g>
-      ${yTicks.map((t) => `<text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t * 100}%</text>`).join('')}
-      ${xTicks.map((t) => `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}</text>`).join('')}
-      <path d="${area}" fill="var(--ars)" opacity="0.1"/>
-      <path d="${line}" fill="none" stroke="var(--ars)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <line x1="${x(at)}" x2="${x(at)}" y1="${y(atP)}" y2="${y(0)}" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="3 3"/>
-      <circle cx="${x(at)}" cy="${y(atP)}" r="5" fill="var(--ars)" stroke="var(--surface)" stroke-width="2"/>
-      ${hits.join('')}
-    </svg>`)}
-  </div>`;
 }
 
 // ---------------------------------------------------------------------------
