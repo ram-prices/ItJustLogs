@@ -2,9 +2,12 @@
 
 Client-side pull-history tracker for Arknights: Endfield, a rewrite of
 `ram-prices/eftracker`. Vite + TypeScript, no framework, no backend: everything
-lives in the visitor's browser (localStorage for pulls/settings, IndexedDB for
-avatar/header images). Deploys as static files (`npm run build` → `dist/`,
-`base: './'` so any GitHub Pages sub-path works).
+lives in the visitor's browser: IndexedDB for pull history and avatar/header
+images, localStorage only for small settings and the banner cache. Keep it that
+way: localStorage's ~5 MB is shared with every site on `ram-prices.github.io`
+(the old eftracker filled it with base64 images, which broke imports).
+Deploys as static files via `.github/workflows/deploy.yml` on push to `main`
+(`npm run build` → `dist/`, `base: './'` so any GitHub Pages sub-path works).
 
 ## Commands
 

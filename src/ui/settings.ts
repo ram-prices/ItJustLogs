@@ -126,7 +126,7 @@ export async function importText(text: string, source: string): Promise<void> {
   }
   if (data && typeof data === 'object' && (data as Backup).app === 'itjustlogs') {
     const b = data as Backup;
-    if (b.history) importHistory(b.history);
+    if (b.history) await importHistory(b.history);
     if (b.settings) updateSettings(b.settings);
     for (const slot of ['avatar', 'header'] as const) {
       const img = b.images?.[slot];
@@ -135,7 +135,7 @@ export async function importText(text: string, source: string): Promise<void> {
     toast('Backup restored.');
     return;
   }
-  const added = importHistory(parseHistoryJson(text));
+  const added = await importHistory(parseHistoryJson(text));
   const total = added.char + added.weap;
   toast(
     total

@@ -3,9 +3,11 @@ import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
 import type { BannerDb, PullHistory } from './domain/types';
 
 /**
- * Everything lives in this browser. Pull history and settings go in
- * localStorage (small, synchronous at startup); images go in IndexedDB, which
- * stores binary files without localStorage's ~5 MB cap.
+ * Everything lives in this browser. Pull history and images go in IndexedDB,
+ * which has room for far more than localStorage's ~5 MB. That budget is shared
+ * by every site on ram-prices.github.io, including the old eftracker, which may
+ * already have filled it. Only small settings and the banner cache use
+ * localStorage, because the theme has to be readable synchronously at startup.
  */
 const KEYS = { history: 'ijl.history', settings: 'ijl.settings', bannerDb: 'ijl.bannerDb' } as const;
 
@@ -28,24 +30,47 @@ function readJson<T>(key: string): T | null {
   }
 }
 
+/** Best effort: a full localStorage must not break the app over a theme preference. */
 function writeJson(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
-    console.warn(`Could not save ${key}`, e);
-    throw new Error('Your browser refused to save data (storage full or disabled).');
+    console.warn(`Could not save ${key} to localStorage`, e);
   }
 }
 
-export const loadHistory = (): PullHistory | null => readJson<PullHistory>(KEYS.history);
-export const saveHistory = (h: PullHistory): void => writeJson(KEYS.history, h);
+export async function loadHistory(): Promise<PullHistory | null> {
+  const saved = await idb<PullHistory | undefined>('data', 'readonly', (s) => s.get('history'));
+  if (saved) return saved;
+  // Earlier builds kept history in localStorage; move it over once.
+  const legacy = readJson<PullHistory>(KEYS.history);
+  if (legacy) {
+    await saveHistory(legacy);
+    localStorage.removeItem(KEYS.history);
+  }
+  return legacy;
+}
+
+export async function saveHistory(h: PullHistory): Promise<void> {
+  try {
+    await idb('data', 'readwrite', (s) => s.put(h, 'history'));
+  } catch (e) {
+    console.warn('Could not save pull history', e);
+    throw new Error(
+      'Your browser refused to save your pull history. Private browsing or blocked site data can cause this.',
+    );
+  }
+}
 
 export const loadSettings = (): Settings => ({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) });
 export const saveSettings = (s: Settings): void => writeJson(KEYS.settings, s);
 
-export function clearAll(): Promise<void> {
+export async function clearAll(): Promise<void> {
   Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
-  return Promise.all([deleteImage('avatar'), deleteImage('header')]).then(() => undefined);
+  await Promise.all([
+    idb('data', 'readwrite', (s) => s.clear()).catch(() => undefined),
+    idb('images', 'readwrite', (s) => s.clear()).catch(() => undefined),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +91,11 @@ export async function refreshBannerDb(): Promise<BannerDb | null> {
       const before = localStorage.getItem(KEYS.bannerDb);
       const after = JSON.stringify(db);
       if (before === after) return null;
-      localStorage.setItem(KEYS.bannerDb, after);
+      try {
+        localStorage.setItem(KEYS.bannerDb, after);
+      } catch {
+        /* cache is optional; the bundled snapshot covers offline use */
+      }
       return db;
     } catch {
       /* try the next mirror */
@@ -76,34 +105,49 @@ export async function refreshBannerDb(): Promise<BannerDb | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Images (IndexedDB)
+// IndexedDB: "data" holds pull history, "images" holds avatar/header blobs
 // ---------------------------------------------------------------------------
 
 export type ImageSlot = 'avatar' | 'header';
+type StoreName = 'data' | 'images';
+
+let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('itjustlogs', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('images');
+  dbPromise ??= new Promise((resolve, reject) => {
+    const req = indexedDB.open('itjustlogs', 2);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      for (const name of ['images', 'data'] as const) {
+        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+      }
+    };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
   });
+  return dbPromise;
 }
 
-async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest): Promise<T> {
+async function idb<T>(store: StoreName, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest): Promise<T> {
   const db = await openDb();
   return new Promise<T>((resolve, reject) => {
-    const req = fn(db.transaction('images', mode).objectStore('images'));
-    req.onsuccess = () => resolve(req.result as T);
-    req.onerror = () => reject(req.error);
+    const t = db.transaction(store, mode);
+    const req = fn(t.objectStore(store));
+    // Resolve on commit so a write is durable before callers move on.
+    t.oncomplete = () => resolve(req.result as T);
+    t.onerror = t.onabort = () => reject(t.error ?? req.error);
   });
 }
 
 export const loadImage = (slot: ImageSlot): Promise<Blob | undefined> =>
-  tx<Blob | undefined>('readonly', (s) => s.get(slot)).catch(() => undefined);
-export const saveImage = (slot: ImageSlot, blob: Blob): Promise<void> => tx('readwrite', (s) => s.put(blob, slot));
+  idb<Blob | undefined>('images', 'readonly', (s) => s.get(slot)).catch(() => undefined);
+export const saveImage = (slot: ImageSlot, blob: Blob): Promise<void> =>
+  idb('images', 'readwrite', (s) => s.put(blob, slot));
 export const deleteImage = (slot: ImageSlot): Promise<void> =>
-  tx<void>('readwrite', (s) => s.delete(slot)).catch(() => undefined);
+  idb<void>('images', 'readwrite', (s) => s.delete(slot)).catch(() => undefined);
 
 export function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {

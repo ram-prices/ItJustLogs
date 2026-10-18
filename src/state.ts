@@ -17,7 +17,7 @@ interface State {
 }
 
 export const state: State = {
-  history: store.loadHistory(),
+  history: null,
   db: store.cachedBannerDb(),
   analysis: null,
   settings: store.loadSettings(),
@@ -32,13 +32,22 @@ function recompute(): void {
   const h = state.history;
   state.analysis = h && (h.characters.length || h.weapons.length) ? analyze(h, state.db) : null;
 }
-recompute();
+
+/** Loads saved history from IndexedDB. Call once before the first render. */
+export async function loadSavedHistory(): Promise<void> {
+  try {
+    state.history = await store.loadHistory();
+  } catch (e) {
+    console.warn('Could not read saved history', e);
+  }
+  recompute();
+}
 
 /** Merges an imported file onto saved history. Returns how many new pulls it added. */
-export function importHistory(incoming: PullHistory): { char: number; weap: number } {
+export async function importHistory(incoming: PullHistory): Promise<{ char: number; weap: number }> {
   const base = state.history ?? { characters: [], weapons: [] };
   const { history, added } = mergeHistories(base, incoming);
-  store.saveHistory(history);
+  await store.saveHistory(history);
   state.history = history;
   recompute();
   emit();
