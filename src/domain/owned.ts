@@ -53,6 +53,17 @@ export const EXTRA_PRESETS: { key: string; label: string; extras: ExtraCopy[] }[
 
 export const extraKind = (id: string): Kind => (id.startsWith('wpn_') ? 'weap' : 'char');
 
+/**
+ * The two Endministrators (the player picks one at the start). They're one
+ * operator: copies of either count for both, and the player keeps one of them
+ * in their extras.
+ */
+export const ENDMINISTRATORS = ['chr_0003_endminf', 'chr_0002_endminm'];
+export const isEndministrator = (id: string): boolean => ENDMINISTRATORS.includes(id);
+
+/** The Endministrator the player's extras name, if any. */
+export const endministratorOf = (extras: ExtraCopy[]): string | null => extras.find((x) => isEndministrator(x.id))?.id ?? null;
+
 /** The player's extras: their list, or the story operators until they've edited it. */
 export const extrasOf = (settings: { extras?: ExtraCopy[] }): ExtraCopy[] => settings.extras ?? DEFAULT_EXTRAS;
 
@@ -139,7 +150,11 @@ export function ownedItems(a: Analysis | null, kind: Kind, extras: ExtraCopy[] =
   const get = (id: string) => {
     const key = wikiId(id);
     let o = out.get(key);
-    if (!o) out.set(key, (o = empty()));
+    if (!o) {
+      o = empty();
+      // Both Endministrators share one record, so either page shows the same copies.
+      for (const k of isEndministrator(key) ? ENDMINISTRATORS : [key]) out.set(k, o);
+    }
     return o;
   };
 
@@ -184,7 +199,7 @@ export function ownedItems(a: Analysis | null, kind: Kind, extras: ExtraCopy[] =
     get(id).acquisitions.push({ ts: g.ts, seq: g.seq, poolId, bannerName: b?.name ?? g.poolId, pull: null, reward: REWARD_LABEL[kind], copy: 0 });
   }
 
-  for (const o of out.values()) {
+  for (const o of new Set(out.values())) {
     o.acquisitions.sort((x, y) => x.ts - y.ts || x.seq - y.seq);
     o.acquisitions.forEach((acq, i) => (acq.copy = i + 1));
     o.copies = o.acquisitions.length;

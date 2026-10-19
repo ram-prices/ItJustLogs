@@ -18,7 +18,7 @@ import scheduleSnapshot from '../data/schedule.snapshot.json';
 import { discordText, guessServer, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
 import type { BannerDb, PullHistory } from './types';
 import { fmtSkillValue, parseMarkup, skillSets, splitPlaceholders, wikiId } from './wiki';
-import { extrasOf, ownedItems } from './owned';
+import { endministratorOf, extrasOf, ownedItems } from './owned';
 import { unpulledBanners } from './catalog';
 import type { Analysis } from './analyze';
 
@@ -451,6 +451,16 @@ describe('owned copies and potential', () => {
     expect(ownedItems(a, 'char', extras).has('wpn_e')).toBe(false);
     // Without an import the extras still count: a maxed event weapon.
     expect(ownedItems(null, 'weap', extras).get('wpn_e')).toMatchObject({ copies: 6, pulled: 0, extra: 6, potential: 5, spare: 0 });
+  });
+
+  it('counts both Endministrators as one operator', () => {
+    const extras = [{ id: 'chr_0002_endminm', copies: 2, note: 'Story' }];
+    const owned = ownedItems(null, 'char', extras);
+    expect(owned.get('chr_0002_endminm')).toMatchObject({ copies: 2, potential: 1 });
+    // The female page shows the same record, not a second count.
+    expect(owned.get('chr_0003_endminf')).toBe(owned.get('chr_0002_endminm'));
+    expect(endministratorOf(extras)).toBe('chr_0002_endminm');
+    expect(endministratorOf([{ id: 'chr_x', copies: 1, note: '' }])).toBeNull();
   });
 
   it('starts everyone with the story operators until the list is edited', () => {

@@ -1,5 +1,6 @@
 import type { Analysis } from '../../domain/analyze';
-import type { Owned } from '../../domain/owned';
+import { endministratorOf, ENDMINISTRATORS, extrasOf, isEndministrator, type Owned } from '../../domain/owned';
+import { state } from '../../state';
 import { operatorDiscord, operatorSkillDiscord } from '../../domain/share';
 import { skillSets, wikiId, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
@@ -29,7 +30,10 @@ export const operatorInfoHref = (id?: string): string => infoHref('char', id);
 function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html {
   // Endministrator is two ids on one wiki page; list each page once.
   const seen = new Set<string>();
+  // That one is the player's Endministrator (from their extra copies), or the female by default.
+  const endmin = endministratorOf(extrasOf(state.settings)) ?? ENDMINISTRATORS[0];
   const ops = Object.entries(f.operators)
+    .filter(([id]) => !isEndministrator(id) || id === endmin)
     .filter(([, o]) => !seen.has(o.page) && !!seen.add(o.page))
     .sort(([, a], [, b]) => b.rarity - a.rarity || a.name.localeCompare(b.name));
   const have = owned ? ops.filter(([id]) => owned.get(id)?.copies).length : 0;

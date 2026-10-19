@@ -1,4 +1,4 @@
-import { EXTRA_PRESETS, extraKind, extrasOf, MAX_COPIES, type ExtraCopy } from '../../domain/owned';
+import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator, MAX_COPIES, type ExtraCopy } from '../../domain/owned';
 import { SERVER_LABEL } from '../../domain/schedule';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
@@ -91,11 +91,24 @@ function extrasCard(redraw: () => void): Html {
     const name = extraKind(id) === 'weap' ? weps?.weapons[id]?.name : ops?.operators[id]?.name;
     return name ? label(id, name) : id;
   };
-  const has = (x: ExtraCopy) => extras.some((e) => e.id === x.id && e.note === x.note);
+  // One Endministrator: whichever the player has counts as the preset's too.
+  const endmin = endministratorOf(extras);
+  const has = (x: ExtraCopy) => extras.some((e) => (e.id === x.id && e.note === x.note) || (isEndministrator(x.id) && e.id === endmin));
   const options = (items: [string, { name: string; rarity: number }][]) =>
     items
       .sort(([, p], [, q]) => q.rarity - p.rarity || p.name.localeCompare(q.name))
-      .map(([id, v]) => html`<option value="${id}">${label(id, v.name)} · ${v.rarity}★</option>`);
+      .map(([id, v]) => {
+        const other = endmin && isEndministrator(id) && id !== endmin;
+        return html`<option value="${id}" ${other ? 'disabled' : ''}>${label(id, v.name)} · ${v.rarity}★${other ? ' (you have the other one)' : ''}</option>`;
+      });
+  // The Endministrator row switches between the two instead of naming one.
+  const name = (x: ExtraCopy, i: number) =>
+    isEndministrator(x.id)
+      ? html`<select class="input extra-endmin" data-extra-id="${i}" aria-label="Which Endministrator">
+          <option value="chr_0003_endminf" ${x.id === 'chr_0003_endminf' ? 'selected' : ''}>Endministrator (female)</option>
+          <option value="chr_0002_endminm" ${x.id === 'chr_0002_endminm' ? 'selected' : ''}>Endministrator (male)</option>
+        </select>`
+      : html`<span class="extra-name ellipsis">${nameOf(x.id)}</span>`;
   return html`<section class="card" id="extras">
     <div class="card-body">
       <h2 class="heading-20">Extra copies</h2>
@@ -104,7 +117,7 @@ function extrasCard(redraw: () => void): Html {
         ? html`<div class="extras">${extras.map(
             (x, i) => html`<div class="extra">
               ${itemImg(extraKind(x.id), x.id, 'extra-icon')}
-              <span class="extra-name ellipsis">${nameOf(x.id)}</span>
+              ${name(x, i)}
               <input class="input extra-note" data-extra-note="${i}" value="${x.note}" maxlength="48" placeholder="Where from" aria-label="Where ${nameOf(x.id)} came from" />
               <label class="extra-copies"><input class="input" type="number" min="1" max="99" data-extra-copies="${i}" value="${x.copies}" aria-label="Copies of ${nameOf(x.id)}" /><span class="secondary">${x.copies >= MAX_COPIES ? 'max' : `P${x.copies - 1}`}</span></label>
               <button class="btn tertiary sm" data-action="extra-remove" data-value="${i}" aria-label="Remove ${nameOf(x.id)}">${icon('close')}</button>

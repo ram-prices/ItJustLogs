@@ -1,4 +1,4 @@
-import { EXTRA_PRESETS, extrasOf, type ExtraCopy } from '../domain/owned';
+import { endministratorOf, EXTRA_PRESETS, extrasOf, isEndministrator, type ExtraCopy } from '../domain/owned';
 import { RESERVED_PATHS } from '../domain/wiki';
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
@@ -349,6 +349,7 @@ function installProfile(): void {
       updateSettings({ extras: extrasOf(state.settings).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
     if (el.dataset?.extraCopies) editExtra(Number(el.dataset.extraCopies), { copies: Math.max(1, Math.min(99, Math.floor(Number(el.value)) || 1)) });
     if (el.dataset?.extraNote) editExtra(Number(el.dataset.extraNote), { note: el.value.trim() });
+    if (el.dataset?.extraId) editExtra(Number(el.dataset.extraId), { id: el.value });
   });
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLInputElement;
@@ -383,6 +384,12 @@ function navigate(e: MouseEvent): boolean {
 function addExtras(add: ExtraCopy[]): void {
   const list = [...extrasOf(state.settings)];
   for (const x of add) {
+    // Only one Endministrator: the other one is a different pick, not more copies.
+    const endmin = endministratorOf(list);
+    if (isEndministrator(x.id) && endmin && endmin !== x.id) {
+      toast('You already have the other Endministrator. Switch it in its row instead.', 'error');
+      continue;
+    }
     const i = list.findIndex((e) => e.id === x.id && e.note === x.note);
     if (i < 0) list.push({ ...x });
     else list[i] = { ...list[i], copies: Math.min(99, list[i].copies + x.copies) };
@@ -481,7 +488,8 @@ async function onClick(e: MouseEvent): Promise<void> {
       const preset = EXTRA_PRESETS.find((p) => p.key === el.dataset.value);
       // Only what's missing: a preset never stacks copies on entries already there.
       const have = extrasOf(state.settings);
-      if (preset) addExtras(preset.extras.filter((x) => !have.some((e) => e.id === x.id && e.note === x.note)));
+      const endmin = endministratorOf(have);
+      if (preset) addExtras(preset.extras.filter((x) => !have.some((e) => e.id === x.id && e.note === x.note) && !(isEndministrator(x.id) && endmin)));
       break;
     }
     case 'extra-remove':
