@@ -17,6 +17,7 @@ import {
   type Server,
 } from '../../domain/schedule';
 import { tip, tipRow } from '../charts';
+import { copyCardImage } from '../cardImage';
 import { toast } from '../common';
 import { heat, icon } from '../components';
 import { fmtInt, html, type Html } from '../html';
@@ -102,7 +103,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const src = artOf(b);
   const mine = summaryFor(b, a);
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
-  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}" data-link="${linkOf(b)}">
+  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}" data-link="${linkOf(b)}" data-card-image="${b.name}">
     <div class="banner-art">
       ${src ? html`<img src="${src}" alt="" loading="lazy" decoding="async" />` : ''}
       <div class="banner-art-text">
@@ -337,7 +338,7 @@ export function scrollTimelineToNow(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Copy to Discord: right-click, or long-press on touch screens
+// Copy to Discord, Copy link, Copy image: right-click, or long-press on touch screens
 // ---------------------------------------------------------------------------
 
 let menu: HTMLElement | null = null;
@@ -368,46 +369,63 @@ export async function copyText(text: string): Promise<boolean> {
   return ok;
 }
 
-/** The menu for a `data-discord` element; `data-discord-note` overrides the toast. */
+/**
+ * The menu for a copyable element: "Copy to Discord" for `data-discord` (its
+ * `data-discord-note` overrides the toast), "Copy link" for `data-link`, and
+ * "Copy image" for banner cards (`data-card-image`, the picture's name).
+ */
 function openMenu(x: number, y: number, el: HTMLElement): void {
-  const text = el.dataset.discord!;
   closeMenu();
   menu = document.createElement('div');
   menu.className = 'ctx-menu';
   menu.setAttribute('role', 'menu');
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.innerHTML = '<span class="icon" aria-hidden="true">content_copy</span>Copy to Discord';
-  btn.addEventListener('click', async () => {
-    closeMenu();
-    const ok = await copyText(text);
-    toast(ok ? (el.dataset.discordNote ?? 'Copied. Paste it in Discord to show the time for everyone.') : "Couldn't copy here.", ok ? 'info' : 'error');
-  });
-  menu.append(btn);
+  const item = (icon: string, label: string, run: () => Promise<void>) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('role', 'menuitem');
+    btn.innerHTML = `<span class="icon" aria-hidden="true">${icon}</span>${label}`;
+    btn.addEventListener('click', () => {
+      closeMenu();
+      void run();
+    });
+    menu!.append(btn);
+  };
+  const text = el.dataset.discord;
+  if (text) {
+    item('content_copy', 'Copy to Discord', async () => {
+      const ok = await copyText(text);
+      toast(ok ? (el.dataset.discordNote ?? 'Copied. Paste it in Discord to show the time for everyone.') : "Couldn't copy here.", ok ? 'info' : 'error');
+    });
+  }
   const link = el.dataset.link;
   if (link) {
-    const copyLink = document.createElement('button');
-    copyLink.type = 'button';
-    copyLink.setAttribute('role', 'menuitem');
-    copyLink.innerHTML = '<span class="icon" aria-hidden="true">link</span>Copy link';
-    copyLink.addEventListener('click', async () => {
-      closeMenu();
+    item('link', 'Copy link', async () => {
       const ok = await copyText(location.origin + link);
       toast(ok ? 'Link copied. Discord shows its preview when you paste it.' : "Couldn't copy here.", ok ? 'info' : 'error');
     });
-    menu.append(copyLink);
   }
+  const card = el.closest<HTMLElement>('[data-card-image]');
+  if (card) {
+    item('image', 'Copy image', async () => {
+      try {
+        const done = await copyCardImage(card, card.dataset.cardImage!);
+        toast(done === 'copied' ? 'Image copied.' : done === 'shared' ? 'Shared.' : 'Image saved to your downloads.', 'info');
+      } catch {
+        toast("Couldn't make the image here.", 'error');
+      }
+    });
+  }
+  const first = menu.querySelector('button');
   document.body.append(menu);
   // Keep the menu on screen.
   const r = menu.getBoundingClientRect();
   menu.style.left = `${Math.max(8, Math.min(x, innerWidth - r.width - 8))}px`;
   menu.style.top = `${Math.max(8, Math.min(y, innerHeight - r.height - 8))}px`;
-  btn.focus();
+  first?.focus();
 }
 
-/** Things that can be copied: Home's banners and events, and the operator and weapon info pages. */
-const copyable = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-discord]') : null);
+/** Things that can be copied: Home's banners and events, the info pages, and every banner card. */
+const copyable = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-discord], [data-card-image]') : null);
 
 export function installDiscordMenu(): void {
   document.addEventListener('contextmenu', (e) => {

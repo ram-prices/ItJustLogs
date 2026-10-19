@@ -57,15 +57,22 @@ const TOKEN_GLYPH = raw(
 const rewardIcon = (name: string): string =>
   name === 'Selector' ? 'deployed_code' : name === 'Rate-up copy' ? 'redeem' : 'stars';
 
-function artUrls(b: BannerSummary): { art: string; weapon: string } {
+/**
+ * A banner's art, its rate-up weapon's icon, and `item`: the icon its glow
+ * comes from when it has one rate-up (the weapon, or the operator), else ''.
+ */
+function artUrls(b: BannerSummary): { art: string; weapon: string; item: string } {
   const weaponId = b.info?.rateUpIds.find((id) => id.startsWith('wpn_'));
-  return { art: bannerArtUrl(b.poolId) ?? '', weapon: weaponId ? itemIconUrl('weap', weaponId) ?? '' : '' };
+  const weapon = weaponId ? itemIconUrl('weap', weaponId) ?? '' : '';
+  const operators = [...new Set((b.info?.rateUpIds ?? []).filter((id) => id.startsWith('chr_')).map((id) => itemIconUrl('char', id) ?? ''))].filter(Boolean);
+  const item = b.kind === 'weap' ? weapon : operators.length === 1 ? operators[0] : '';
+  return { art: bannerArtUrl(b.poolId) ?? '', weapon, item };
 }
 
 function art(b: BannerSummary): Html {
-  const { art: url, weapon } = artUrls(b);
-  // Arsenal cards take their glow from the weapon (see tintWeaponCards), so their art doesn't tint.
-  const tint = b.kind === 'weap' && weapon ? '' : raw('data-tint');
+  const { art: url, weapon, item } = artUrls(b);
+  // Cards with one rate-up take their glow from it (see tintWeaponCards), so their art doesn't tint.
+  const tint = item ? '' : raw('data-tint');
   if (url) return html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`;
   if (weapon) return html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`;
   return html``;
@@ -131,10 +138,12 @@ function sixStrip(kind: Kind, a: Analysis): Html {
           const title = `${p.name} · ${p.bannerName} · ${fmtDate(p.ts, true)}`;
           // Rate-ups are outlined in their banner card's colour: the art's for
           // Headhunting, the weapon's own for Arsenal (as the cards glow).
-          const tintUrl = p.isRateUp ? (p.kind === 'weap' ? itemIconUrl('weap', p.itemId) : bannerArtUrl(p.poolId)) : null;
+          // Chartered banners (one rate-up) glow in the operator's colour; Joint ones in their art's.
+          const byOperator = p.kind === 'char' && p.poolId.startsWith('special_');
+          const tintUrl = p.isRateUp ? (p.kind === 'weap' ? itemIconUrl('weap', p.itemId) : byOperator ? itemIconUrl('char', p.itemId) : bannerArtUrl(p.poolId)) : null;
           const known = tintUrl ? sixTintFor(tintUrl) : null;
           const tintAttrs = tintUrl
-            ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind}"${known ? ` style="--six-tint:${known}"` : ''}`)
+            ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"${known ? ` style="--six-tint:${known}"` : ''}`)
             : '';
           // Portraits open that operator's or weapon's info page.
           return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title}" ${tintAttrs}>${inner}</a>`;
@@ -167,7 +176,7 @@ function unpulledCard(c: CatalogBanner): Html {
       ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" data-fallback />`
       : '';
   const when = c.start ? `${fmtDate(c.start)} – ${c.end ? fmtDate(c.end) : 'open'}` : 'Permanent';
-  return html`<article class="card banner unpulled" ${c.poolId ? html`id="banner-${c.poolId}"` : ''}>
+  return html`<article class="card banner unpulled" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}">
     <div class="banner-art">
       ${img}
       <div class="banner-art-text">
@@ -317,12 +326,13 @@ function rewardProgress(b: BannerSummary): string {
 function bannerSection(b: BannerSummary): Html {
   const key = bannerKey(b);
   const pityColor = b.pity.done ? 'var(--gray-700)' : heat(b.pity.value, b.pity.max);
-  const { art: artSrc, weapon } = artUrls(b);
+  const { art: artSrc, weapon, item } = artUrls(b);
   const src = artSrc || weapon;
-  // Arsenal cards glow in the rate-up weapon's own colour, not the banner art's.
-  const byWeapon = b.kind === 'weap' && !!weapon;
+  // Cards with one rate-up glow in its own colour (the weapon's, or the
+  // operator's with skin left out), not the banner art's.
+  const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${b.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
   const open = expanded.has(key);
-  return html`<article class="card banner${open ? ' expanded' : ''}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" ${byWeapon ? raw(`data-tint-weapon="${weapon.replace(/"/g, '&quot;')}"`) : ''} style="--banner-tint:${tintFor(byWeapon ? weapon : src)}">
+  return html`<article class="card banner${open ? ' expanded' : ''}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)}">
     <div class="banner-summary">
       <div class="banner-art">
         ${art(b)}
@@ -372,7 +382,9 @@ const CROWDED_STYLE: 'tick' | 'dot' = 'tick';
  * are re-centred. `pcts` must be in ascending order.
  */
 function declutter(pcts: number[], his: number[]): number[] {
-  const lo = 3.5;
+  // The ruler's padding leaves room for half a pin past either end, so a pin
+  // at the very first or last pull sits straight over its spot.
+  const lo = 0;
   type Group = { first: number; n: number; sum: number; gap: number; left: number };
   const place = (g: Group) => {
     const hi = his[g.first + g.n - 1];
@@ -487,7 +499,7 @@ function pityRuler(b: BannerSummary): Html {
       ...items[side],
       ...list.map((p): Item => ({
         at: pct(posOf(p)),
-        hi: 96.5,
+        hi: 100,
         draw: (left, dx) => html`<div class="ruler-pin ${side}" style="left:${left}%;--dx:${dx}" title="${sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`}">
           <span class="ruler-pin-label">${posOf(p)}</span>
           <a href="${infoHref(p.kind, p.itemId)}" aria-label="${p.name} info">${itemImg(p.kind, p.itemId, 'ruler-portrait')}</a>

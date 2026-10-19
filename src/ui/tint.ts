@@ -28,11 +28,13 @@ function lift(r: number, g: number, b: number): string {
 }
 
 /**
- * A weapon icon's main colour: mostly grey metal on a transparent background,
- * so average only the dominant hue among its coloured pixels (Umbra's purple,
- * a gold trim...). Falls back to the plain average for colourless weapons.
+ * An icon's main colour. A weapon is mostly grey metal on a transparent
+ * background, so average only the dominant hue among its coloured pixels
+ * (Umbra's purple, a gold trim...); an operator's portrait does the same with
+ * skin left out (`skipSkin`), so their hair or outfit sets it (Laevatain's
+ * red, Camille's teal). Falls back to the plain average for colourless icons.
  */
-function weaponColour(img: HTMLImageElement): string {
+function weaponColour(img: HTMLImageElement, skipSkin = false): string {
   const N = 24;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = N;
@@ -52,6 +54,7 @@ function weaponColour(img: HTMLImageElement): string {
     if (sat < 0.25 || max < 40) continue; // grey metal and shadows
     const d = max - min;
     const hue = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    if (skipSkin && hue > 0.1 && hue < 0.45 && sat < 0.55 && max > 150) continue; // light, soft orange: skin
     const bin = bins[Math.floor((hue / 6) * BINS) % BINS];
     const w = sat * (max / 255);
     bin.w += w;
@@ -93,20 +96,21 @@ export const sixTintFor = (url: string): string | null => {
 /**
  * Works out the strip's banner colours itself: the cards further down lazy-load
  * their art, so the strip can't wait for them. Same maths as the cards: the
- * weapon's main colour for Arsenal, the art's average for Headhunting.
+ * weapon's or operator's main colour (`data-six-tint-kind` weap / op), else
+ * the art's average.
  */
 export function tintSixStrip(): void {
   for (const el of document.querySelectorAll<HTMLElement>('[data-six-tint]')) {
     const url = el.dataset.sixTint!;
     if (cache.has(url) || pending.has(url)) continue;
-    const weapon = el.dataset.sixTintKind === 'weap';
+    const kind = el.dataset.sixTintKind;
     pending.add(url);
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       let tint = DEFAULT_TINT;
       try {
-        tint = weapon ? weaponColour(img) : extract(img);
+        tint = kind === 'weap' || kind === 'op' ? weaponColour(img, kind === 'op') : extract(img);
       } catch {
         // not CORS-clean: keep the gold outline
       }
@@ -123,12 +127,15 @@ export function tintSixStrip(): void {
 }
 
 /**
- * Tints every Arsenal card from its rate-up weapon's icon (`data-tint-weapon`).
- * The icon is loaded off-page; call after each render.
+ * Tints each card that has one rate-up from that item's icon
+ * (`data-tint-item`): the weapon for Arsenal, the operator (skin left out,
+ * `data-tint-skin`) for Headhunting. The icon is loaded off-page; call after
+ * each render.
  */
 export function tintWeaponCards(): void {
-  for (const card of document.querySelectorAll<HTMLElement>('.banner[data-tint-weapon]')) {
-    const url = card.dataset.tintWeapon!;
+  for (const card of document.querySelectorAll<HTMLElement>('.banner[data-tint-item]')) {
+    const url = card.dataset.tintItem!;
+    const skipSkin = card.hasAttribute('data-tint-skin');
     if (cache.has(url) || pending.has(url)) continue;
     pending.add(url);
     const img = new Image();
@@ -136,15 +143,15 @@ export function tintWeaponCards(): void {
     img.onload = () => {
       let tint = DEFAULT_TINT;
       try {
-        tint = weaponColour(img);
+        tint = weaponColour(img, skipSkin);
       } catch {
         // not CORS-clean: keep the default glow
       }
       cache.set(url, tint);
       pending.delete(url);
       paintSix(url, tint);
-      for (const c of document.querySelectorAll<HTMLElement>('.banner[data-tint-weapon]')) {
-        if (c.dataset.tintWeapon === url) c.style.setProperty('--banner-tint', tint);
+      for (const c of document.querySelectorAll<HTMLElement>('.banner[data-tint-item]')) {
+        if (c.dataset.tintItem === url) c.style.setProperty('--banner-tint', tint);
       }
     };
     img.onerror = () => {

@@ -1,14 +1,39 @@
 import type { Analysis } from '../../domain/analyze';
-import { patchStats, weeklyTimeline } from '../../domain/patches';
+import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { state } from '../../state';
 import { weeklyChart } from '../charts';
-import { metric, metrics, pageHeader } from '../components';
+import { icon, metric, metrics, pageHeader } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 
 /** Stats: totals, pulls per week, and a per-patch breakdown table. */
 
+/** Patches whose row is open (showing their banners); kept across redraws. */
+const openPatches = new Set<string>();
+export function togglePatch(key: string): void {
+  if (!openPatches.delete(key)) openPatches.add(key);
+}
+
+/** An open patch's banners: every one, pulled on or not, in opening order. */
+function patchBanners(p: PatchStats): Html {
+  return html`<tr class="patch-banners"><td colspan="6"><div class="patch-banner-list">
+    ${p.banners.map((b) => {
+      const s = b.summary;
+      const six = s ? s.pulls.filter((x) => x.rarity === 6).length : 0;
+      const kind = b.kind === 'weap' ? 'Arsenal' : 'Headhunting';
+      const inner = html`${icon(b.kind === 'weap' ? 'swords' : 'inventory_2')}
+        <span class="patch-banner-name ellipsis">${b.name}</span>
+        <span class="patch-banner-when secondary">${b.start ? fmtDate(b.start) : kind}</span>
+        <span class="patch-banner-pulls num${s?.paidPulls ? '' : ' tertiary'}">${s?.paidPulls ? `${fmtInt(s.paidPulls)} pulls` : 'No pulls'}</span>
+        <span class="patch-banner-six num${six ? '' : ' tertiary'}">${six ? `${six} × 6★` : ''}</span>`;
+      return s?.paidPulls && b.poolId
+        ? html`<a class="patch-banner ${b.kind}" href="/${b.kind === 'weap' ? 'arsenal' : 'operators'}/${b.poolId}" title="${kind}">${inner}</a>`
+        : html`<div class="patch-banner ${b.kind} unpulled" title="${kind}">${inner}</div>`;
+    })}
+  </div></td></tr>`;
+}
+
 export function statsPage(a: Analysis): Html {
-  const patches = patchStats(a, state.db)
+  const patches = patchStats(a, state.db, state.schedule)
     .filter((p) => p.charPulls + p.weapPulls > 0)
     .sort((x, y) => (x.patch.major === -1 ? 1 : y.patch.major === -1 ? -1 : y.patch.major - x.patch.major || y.patch.minor - x.patch.minor));
   const maxPulls = Math.max(1, ...patches.map((p) => Math.max(p.charPulls, p.weapPulls)));
@@ -49,14 +74,15 @@ export function statsPage(a: Analysis): Html {
               const six = p.sixStars.filter((s) => s.pity !== null && s.kind === 'char');
               const avg = six.length ? (six.reduce((n, s) => n + s.pity!, 0) / six.length).toFixed(1) : '–';
               const pulled = p.banners.filter((b) => (b.summary?.paidPulls ?? 0) > 0).length;
-              return html`<tr>
-                <td class="label-14">${p.patch.major === -1 ? 'Permanent' : `Patch ${p.patch.key}`}</td>
+              const open = openPatches.has(p.patch.key);
+              return html`<tr class="patch-row${open ? ' open' : ''}">
+                <td class="label-14"><button type="button" class="patch-toggle" data-action="patch-toggle" data-value="${p.patch.key}" aria-expanded="${String(open)}">${icon('chevron_right')}${p.patch.major === -1 ? 'Permanent' : `Patch ${p.patch.key}`}</button></td>
                 <td>${bar(p.charPulls, 'var(--op)')}</td>
                 <td>${bar(p.weapPulls, 'var(--ars)')}</td>
                 <td class="right num">${p.sixStars.length}</td>
                 <td class="right num secondary hide-sm">${avg}</td>
                 <td class="right num secondary hide-sm">${pulled} / ${p.banners.length}</td>
-              </tr>`;
+              </tr>${open ? patchBanners(p) : ''}`;
             })}
           </tbody>
         </table></div>

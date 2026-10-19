@@ -40,6 +40,8 @@ export interface ScheduleVersion {
 
 /** An in-game event from a version's update notes ("■ New Events"). */
 export interface ScheduleEvent {
+  /** Stable number from ef-assets (never moves or gets reused): the /event/<id> link. */
+  id?: number;
   name: string;
   /** "Sign-In Event", "Challenge Event", "Fun & Games Event", ... */
   type: string;
@@ -149,34 +151,46 @@ export function discordText(
 }
 
 // ---------------------------------------------------------------------------
-// Links: itjustlogs.dev/banners/<name>, /events/<name>
+// Links: itjustlogs.dev/banners/<name>, /event/<id>
 // ---------------------------------------------------------------------------
 
 export type ScheduleItem = ScheduleBanner | ScheduleEvent;
 export const isScheduleBanner = (i: ScheduleItem): i is ScheduleBanner => 'kind' in i;
 
 /**
- * Every banner's and event's link path (/banners/rejuvenation,
- * /events/sanity-supply). The first to use a name keeps the plain link; later
- * ones (reruns, recurring events) add their opening date, so a link never
- * changes what it points to as the schedule grows.
+ * Every banner's and event's link path. Banners go by name (/banners/rejuvenation);
+ * the first to use a name keeps the plain link, later ones (reruns) add their
+ * opening date, so a link never changes what it points to as the schedule
+ * grows. Events go by their stable number (/event/12).
  */
 export function scheduleLinks(s: Schedule): Map<ScheduleItem, string> {
+  const out = byName(s.banners, 'banners');
+  for (const [e, path] of legacyEventLinks(s)) out.set(e, e.id != null ? `/event/${e.id}` : path);
+  return out;
+}
+
+/**
+ * LEGACY, to be removed: events' old name links (/events/sanity-supply,
+ * /events/sanity-supply-2026-11-19). Still opened (app.ts redirects them to
+ * /event/<id>) and still built (vite.config.ts) until they're dropped; delete
+ * this and its two uses then.
+ */
+export function legacyEventLinks(s: Schedule): Map<ScheduleEvent, string> {
+  return byName(s.events ?? [], 'events') as Map<ScheduleEvent, string>;
+}
+
+function byName(items: ScheduleItem[], dir: string): Map<ScheduleItem, string> {
   const out = new Map<ScheduleItem, string>();
-  const assign = (dir: string, items: ScheduleItem[]) => {
-    const seen = new Set<string>();
-    const order = items
-      .map((item, i) => ({ item, i, at: timeOn(item.start, 'americas') ?? Infinity }))
-      .sort((p, q) => p.at - q.at || p.i - q.i);
-    for (const { item } of order) {
-      const base = nameSlug(item.name) || 'untitled';
-      let slug = seen.has(base) && item.start ? `${base}-${item.start.americas.slice(0, 10)}` : base;
-      for (let n = 2; seen.has(slug); n++) slug = `${base}-${n}`;
-      seen.add(slug);
-      out.set(item, `/${dir}/${slug}`);
-    }
-  };
-  assign('banners', s.banners);
-  assign('events', s.events ?? []);
+  const seen = new Set<string>();
+  const order = items
+    .map((item, i) => ({ item, i, at: timeOn(item.start, 'americas') ?? Infinity }))
+    .sort((p, q) => p.at - q.at || p.i - q.i);
+  for (const { item } of order) {
+    const base = nameSlug(item.name) || 'untitled';
+    let slug = seen.has(base) && item.start ? `${base}-${item.start.americas.slice(0, 10)}` : base;
+    for (let n = 2; seen.has(slug); n++) slug = `${base}-${n}`;
+    seen.add(slug);
+    out.set(item, `/${dir}/${slug}`);
+  }
   return out;
 }

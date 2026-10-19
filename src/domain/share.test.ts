@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import scheduleSnapshot from '../data/schedule.snapshot.json';
 import snapshot from '../data/wiki-share.snapshot.json';
-import { scheduleLinks, type Schedule } from './schedule';
+import { legacyEventLinks, scheduleLinks, type Schedule } from './schedule';
 import { itemShortLinks, nameSlug, operatorShortLinks, RESERVED_PATHS, shortLinkOf } from './wiki';
 import {
   DISCORD_CHARS,
@@ -217,16 +217,23 @@ describe('banner and event pages', () => {
   const schedule = scheduleSnapshot as unknown as Schedule;
   const links = scheduleLinks(schedule);
 
-  it('give every banner and event its own link, and keep the plain name for the first', () => {
+  it('give every banner its name and every event its number', () => {
     const paths = [...links.values()];
     expect(paths).toHaveLength(schedule.banners.length + (schedule.events ?? []).length);
     expect(new Set(paths).size).toBe(paths.length);
     expect(paths).toContain('/banners/rejuvenation');
+    for (const b of schedule.banners) expect(links.get(b)).toMatch(/^\/banners\/[a-z0-9-]+$/);
+    for (const e of schedule.events ?? []) expect(links.get(e)).toBe(`/event/${e.id}`);
+  });
+
+  it('keep the old name links of events, each pointing at one event', () => {
+    const legacy = legacyEventLinks(schedule);
+    const old = [...legacy.values()];
+    expect(new Set(old).size).toBe(old.length);
     // Sanity Supply recurs: the earliest is /events/sanity-supply, later ones add their date.
-    const sanity = paths.filter((p) => p.startsWith('/events/sanity-supply'));
+    const sanity = old.filter((p) => p.startsWith('/events/sanity-supply'));
     expect(sanity).toContain('/events/sanity-supply');
     expect(sanity.filter((p) => /-\d{4}-\d{2}-\d{2}$/.test(p))).toHaveLength(sanity.length - 1);
-    for (const p of paths) expect(p).toMatch(/^\/(banners|events)\/[a-z0-9-]+$/);
   });
 
   it("fit Discord's limits, with live timestamps for both servers", () => {

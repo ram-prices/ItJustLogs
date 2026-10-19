@@ -25,9 +25,12 @@ builds the info pages' "Copy to Discord" text. If
 ef-assets can't be fetched it uses `src/data/wiki-share.snapshot.json`, which
 local builds refresh. New operators get a preview only after a rebuild.
 Every banner and event in ef-assets `schedule.json` gets one too:
-`banners/<name>.html`, `events/<name>.html` (`scheduleLinks` in
-`domain/schedule.ts`; a name used again later adds its opening date, so links
-never change target). Their embed has the key art and both servers' dates as
+`banners/<name>.html` and `event/<id>.html` (`scheduleLinks` in
+`domain/schedule.ts`; a banner name used again later adds its opening date,
+and an event's `id` is a stable number ef-assets assigns and never reuses, so
+links never change target). The old `/events/<name>` links still work
+(`legacyEventLinks`, redirected in app.ts and built in vite.config.ts, all
+marked LEGACY); the owner plans to remove them. Their embed has the key art and both servers' dates as
 Discord timestamps. In the app those paths open Home at that card, row or
 timeline bar (`focusScheduleItem`), and Home's right-click menu has "Copy
 link". All pages are kept; if their number ever becomes a problem, drop old

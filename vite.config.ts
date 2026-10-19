@@ -18,7 +18,7 @@ import {
   type ShareOperator,
   type ShareWeapon,
 } from './src/domain/share.ts';
-import { scheduleLinks, type Schedule } from './src/domain/schedule.ts';
+import { legacyEventLinks, scheduleLinks, type Schedule } from './src/domain/schedule.ts';
 import { itemShortLinks, WIKI_ALIASES } from './src/domain/wiki.ts';
 
 /** The app's top-level pages; each gets its own copy of index.html in the build. */
@@ -165,12 +165,20 @@ function pageCopies(): Plugin {
         ...ops.map(([id, o]) => ({ dir: 'operators/info', id, name: o.name, p: operatorPreview(id, o), embed: (p: Preview) => operatorEmbed(o, p) })),
         ...Object.entries(wiki.weapons).map(([id, w]) => ({ dir: 'arsenal/info', id, name: w.name, p: weaponPreview(id, w), embed: (p: Preview) => weaponEmbed(w, p) })),
       ];
-      // Every banner and event in the schedule: /banners/<name>, /events/<name>.
-      const schedulePages = [...scheduleLinks(schedule)].map(([item, path]) => {
+      // Every banner and event in the schedule: /banners/<name>, /event/<id>.
+      const links = scheduleLinks(schedule);
+      const schedulePages = [...links].map(([item, path]) => {
         const [, dir, id] = path.split('/');
         return { dir, id, name: item.name, p: schedulePreview(item, path), embed: (p: Preview) => scheduleEmbed(item, p), fromWiki: false };
       });
       pages.push(...schedulePages);
+      // LEGACY, to be removed with legacyEventLinks: the old /events/<name> pages,
+      // same preview (pointing at /event/<id>) so old links still unfurl.
+      for (const [e, path] of legacyEventLinks(schedule)) {
+        const [, dir, id] = path.split('/');
+        const to = links.get(e)!;
+        if (to !== path) pages.push({ dir, id, name: e.name, p: schedulePreview(e, to), embed: (p: Preview) => scheduleEmbed(e, p), fromWiki: false });
+      }
       const missing: string[] = [];
       let largest = 0;
       await Promise.all(
@@ -186,10 +194,10 @@ function pageCopies(): Plugin {
         }),
       );
       // Short links (/si, /lunar-calling): the same page at the root, which Pages serves from si.html.
-      const links = itemShortLinks(wiki.operators, wiki.weapons);
-      for (const [slug, t] of links) copyFileSync(join(outDir, t.kind === 'weap' ? 'arsenal/info' : 'operators/info', `${t.id}.html`), join(outDir, `${slug}.html`));
-      const n = [...links.values()].filter((t) => t.kind === 'weap').length;
-      console.log(`[item-pages] short links: ${links.size - n} operator, ${n} weapon (/${[...links.keys()].slice(0, 3).join(', /')}...)`);
+      const shortLinks = itemShortLinks(wiki.operators, wiki.weapons);
+      for (const [slug, t] of shortLinks) copyFileSync(join(outDir, t.kind === 'weap' ? 'arsenal/info' : 'operators/info', `${t.id}.html`), join(outDir, `${slug}.html`));
+      const n = [...shortLinks.values()].filter((t) => t.kind === 'weap').length;
+      console.log(`[item-pages] short links: ${shortLinks.size - n} operator, ${n} weapon (/${[...shortLinks.keys()].slice(0, 3).join(', /')}...)`);
       console.log(`[item-pages] largest component embed: ${largest} bytes`);
       console.log(`[item-pages] ${ops.length} operator and ${Object.keys(wiki.weapons).length} weapon pages for ${SITE_URL}`);
       console.log(`[item-pages] ${schedulePages.length} banner and event pages`);

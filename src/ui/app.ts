@@ -1,4 +1,5 @@
 import { endministratorOf, EXTRA_PRESETS, extrasOf, isEndministrator, type ExtraCopy } from '../domain/owned';
+import { legacyEventLinks } from '../domain/schedule';
 import { RESERVED_PATHS } from '../domain/wiki';
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
@@ -17,7 +18,7 @@ import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
-import { statsPage } from './pages/stats';
+import { statsPage, togglePatch } from './pages/stats';
 import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow } from './sync';
 import { installTint, tintSixStrip, tintWeaponCards } from './tint';
 
@@ -45,17 +46,26 @@ interface Route {
   /** A short link (/si, /lunar-calling): the item's info page once resolved, else why not. */
   short?: string;
   shortState?: 'loading' | 'missing' | 'failed';
-  /** /banners/<name>, /events/<name>: Home, scrolled to that banner or event (its link path). */
+  /** /banners/<name>, /event/<id>: Home, scrolled to that banner or event (its link path). */
   focus?: string;
 }
 
 /** Top-level paths that aren't pages: operator and weapon short links (/si), resolved once the wiki data loads. */
 const isShortLink = (segment: string) => /^[a-z0-9][a-z0-9-]*$/i.test(segment) && !RESERVED_PATHS.has(segment.toLowerCase());
 
-/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /banners/<name> and /events/<name> (Home at that item), /stats, /settings. */
+/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /banners/<name> and /event/<id> (Home at that item), /stats, /settings. */
 function parseRoute(): Route {
   const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
-  if ((page === 'banners' || page === 'events') && id) return { page: 'home', focus: `/${page}/${id.toLowerCase()}` };
+  if (page === 'banners' && id) return { page: 'home', focus: `/banners/${id.toLowerCase()}` };
+  if (page === 'event' && id) return { page: 'home', focus: `/event/${id}` };
+  // LEGACY, to be removed with legacyEventLinks: old /events/<name> links go to their /event/<id>.
+  if (page === 'events' && id) {
+    const old = `/events/${id.toLowerCase()}`;
+    const e = [...legacyEventLinks(state.schedule)].find(([, path]) => path === old)?.[0];
+    const to = e?.id != null ? `/event/${e.id}` : old;
+    if (to !== old) history.replaceState(null, '', to);
+    return { page: 'home', focus: to };
+  }
   if (page && !id && !TABS.some(([t]) => t === page) && isShortLink(page)) {
     const short = page.toLowerCase();
     const { map, failed } = shortLinkMap(draw);
@@ -182,7 +192,7 @@ function draw(): void {
     if (target) target.scrollIntoView({ block: 'start' });
     else scrollTo({ top: 0 });
     if (route.page === 'home') scrollTimelineToNow();
-    // /banners/<name>, /events/<name>: that item's card, row or timeline bar.
+    // /banners/<name>, /event/<id>: that item's card, row or timeline bar.
     if (route.focus) focusScheduleItem(route.focus);
   } else {
     if (timelineScroll != null) {
@@ -475,6 +485,10 @@ async function onClick(e: MouseEvent): Promise<void> {
       return signOut();
     case 'copy-link':
       toast((await copyText(el.dataset.value!)) ? 'Link copied.' : "Couldn't copy the link.", 'info');
+      break;
+    case 'patch-toggle':
+      togglePatch(el.dataset.value!);
+      draw();
       break;
     case 'extra-add': {
       const id = (document.getElementById('extraItem') as HTMLSelectElement | null)?.value;

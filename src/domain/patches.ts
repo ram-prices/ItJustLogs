@@ -1,13 +1,17 @@
 import type { AnalyzedPull, Analysis, BannerSummary } from './analyze';
 import { canonicalPoolId, comparePatches, patchOf, type PatchRef } from './banners';
+import { isWeaponBanner, timeOn, type Schedule } from './schedule';
 import type { BannerDb } from './types';
 
 export interface PatchBanner {
-  poolId: string;
+  /** Null for a scheduled banner whose pool id isn't known (reruns that have no pool of their own yet). */
+  poolId: string | null;
   name: string;
   kind: 'char' | 'weap';
   /** Undefined when the player never pulled on this banner. */
   summary?: BannerSummary;
+  /** When it opened (Americas / Europe), from the schedule; orders a patch's banners. */
+  start?: number;
 }
 
 export interface PatchStats {
@@ -20,9 +24,12 @@ export interface PatchStats {
 
 /**
  * Groups banners by game patch. Banners listed in ef-assets but never pulled on
- * are included so skipped banners show up too.
+ * are included so skipped banners show up too, and with `schedule`, so are
+ * scheduled banners with no pool id of their own (patch = their version's
+ * place among released versions: Launch is 1.0). Each patch's banners are in
+ * opening order.
  */
-export function patchStats(analysis: Analysis, db: BannerDb): PatchStats[] {
+export function patchStats(analysis: Analysis, db: BannerDb, schedule?: Schedule): PatchStats[] {
   const byPatch = new Map<string, PatchStats>();
   const get = (patch: PatchRef) => {
     let s = byPatch.get(patch.key);
@@ -51,7 +58,27 @@ export function patchStats(analysis: Analysis, db: BannerDb): PatchStats[] {
     get(patch).banners.push({ poolId, name: entry.name ?? poolId, kind });
   }
 
-  for (const s of byPatch.values()) s.sixStars.sort((a, b) => a.ts - b.ts);
+  if (schedule) {
+    const starts = new Map<string, number>();
+    const released = schedule.versions.filter((v) => v.release).map((v) => v.name);
+    for (const sb of schedule.banners) {
+      const start = timeOn(sb.start, 'americas') ?? undefined;
+      if (sb.poolId) {
+        if (start != null) starts.set(canonicalPoolId(sb.poolId), start);
+        continue;
+      }
+      const minor = sb.version ? released.indexOf(sb.version) : -1;
+      if (minor < 0 || start == null || start > Date.now()) continue;
+      const patch: PatchRef = { key: `1.${minor}`, major: 1, minor };
+      get(patch).banners.push({ poolId: null, name: sb.name, kind: isWeaponBanner(sb.kind) ? 'weap' : 'char', start });
+    }
+    for (const s of byPatch.values()) for (const b of s.banners) if (b.poolId && b.start == null) b.start = starts.get(b.poolId);
+  }
+
+  for (const s of byPatch.values()) {
+    s.sixStars.sort((a, b) => a.ts - b.ts);
+    s.banners.sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || Number(a.kind === 'weap') - Number(b.kind === 'weap'));
+  }
   return [...byPatch.values()].sort((a, b) => comparePatches(a.patch, b.patch));
 }
 
