@@ -1,5 +1,6 @@
 import { SERVER_LABEL } from '../../domain/schedule';
 import { currentServer, state } from '../../state';
+import { MAX_SNAPSHOTS } from '../../store';
 import { EXPORTER_SOURCE } from '../guide';
 import { badge, icon, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
@@ -146,17 +147,18 @@ export function settingsPage(): Html {
           </div></div>
       </section>
 
+      ${versionHistory(synced)}
+
       ${count
         ? html`<section class="card danger">
             <div class="card-body">
-              <h2 class="heading-20">Delete saved data</h2>
-              <p class="copy-14">This can't be undone. What each button deletes:</p>
-              ${deleteTable(synced)}
+              <h2 class="heading-20">Delete locally saved data</h2>
+              ${deleteOptions(synced)}
             </div>
             <div class="card-footer">${confirmingDelete
               ? html`<span class="delete-confirm">${confirmingDelete === 'pulls'
-                    ? html`<b>Delete pull history?</b> ${fmtInt(count)} pulls will be removed from this browser. Settings and images stay.`
-                    : html`<b>Delete everything?</b> ${fmtInt(count)} pulls, your settings and images will be removed from this browser.`}
+                    ? html`<b>Delete pull history?</b> ${fmtInt(count)} pulls will be removed from this browser. Your name, picture, settings and version history stay.`
+                    : html`<b>Delete everything?</b> ${fmtInt(count)} pulls, your settings, pictures and version history will be removed from this browser.`}
                   ${synced ? driveImpact() : ''}</span>
                   <div class="row">
                     <button class="btn secondary sm" data-action="clear-cancel">Cancel</button>
@@ -173,37 +175,53 @@ export function settingsPage(): Html {
 }
 
 /**
- * What each delete button does, here and in Google Drive, spelled out before
- * anyone clicks. Deleting only ever clears this browser: while synced, both
- * buttons sign this browser out first, so the Drive copy is never touched.
+ * Version history: the copies of your pulls saved before each import, delete,
+ * replace, restore or Drive merge that changed them (store.ts). Restoring
+ * saves the current pulls first, so it can be undone too.
  */
-function deleteTable(synced: boolean): Html {
-  const drive = (text: string) => html`<span class="delete-drive kept">${icon('cloud')}${text}</span>`;
-  return html`<table class="delete-table">
-    <thead><tr><th></th><th>This browser</th>${synced ? html`<th>Your Google Drive copy</th>` : ''}</tr></thead>
-    <tbody>
-      <tr>
-        <th scope="row">Delete pull history</th>
-        <td>Pulls deleted. Name, picture and settings stay.${synced ? ' This browser is signed out of sync.' : ''}</td>
-        ${synced ? html`<td>${drive('Kept as it is')}</td>` : ''}
-      </tr>
-      <tr>
-        <th scope="row">Delete everything</th>
-        <td>Pulls, settings and pictures deleted${synced ? ', and this browser is signed out of sync' : ''}.</td>
-        ${synced ? html`<td>${drive('Kept as it is')}</td>` : ''}
-      </tr>
-    </tbody>
-  </table>
-  ${synced
-    ? html`<p class="copy-13 secondary delete-note">To delete the Drive copy itself: Google Drive → Settings → Manage apps → ItJustLogs → Delete hidden app data.</p>`
-    : driveConfigured()
-      ? html`<p class="copy-13 secondary delete-note">You're not signed in to Google Drive sync, so only this browser is affected.</p>`
+function versionHistory(synced: boolean): Html {
+  const list = state.snapshots;
+  return html`<section class="card">
+    <div class="card-body">
+      <h2 class="heading-20">Version history</h2>
+      <p class="copy-14">A copy of your pulls is saved in this browser before anything changes them (an import, a delete, a restore or a Google Drive merge). The last ${MAX_SNAPSHOTS} are kept. Restore one if something went wrong; your current pulls are saved here first, so you can undo it.</p>
+      ${list.length
+        ? html`<div class="versions">${list.map(
+            (s) => html`<div class="version">
+              <div class="min0">
+                <div class="version-when">${fmtDate(s.at, true)}</div>
+                <div class="version-what copy-13 secondary">${s.reason} · ${fmtInt(s.chars)} operator, ${fmtInt(s.weaps)} arsenal records</div>
+              </div>
+              <button class="btn secondary sm" data-action="restore-snapshot" data-value="${s.id}">Restore</button>
+            </div>`,
+          )}</div>`
+        : html`<p class="copy-13 secondary versions-empty">No earlier versions yet.</p>`}
+    </div>
+    ${synced
+      ? html`<div class="card-footer"><span>Restoring signs this browser out of Google Drive sync first, so your Drive copy stays as it was.</span></div>`
+      : ''}
+  </section>`;
+}
+
+/**
+ * The two delete buttons, described plainly. Deleting only ever clears this
+ * browser: while synced, either button signs it out first (app.ts), so the
+ * Google Drive copy is never touched from here.
+ */
+function deleteOptions(synced: boolean): Html {
+  return html`<p class="copy-14">Clears what ItJustLogs saved in this browser. It can't be undone${driveConfigured() ? ', and it never touches your Google Drive copy' : ''}.</p>
+    <dl class="delete-options">
+      <div><dt>Delete pull history</dt><dd>Removes your pulls. Your name, picture, settings and version history stay, so you can restore them.</dd></div>
+      <div><dt>Delete everything</dt><dd>Removes your pulls, settings, pictures and version history.</dd></div>
+    </dl>
+    ${synced
+      ? html`<p class="copy-13 secondary delete-note">You're signed in to Google Drive sync, so either button signs this browser out first. To delete the Drive copy itself: Google Drive → Settings → Manage apps → ItJustLogs → Delete hidden app data.</p>`
       : ''}`;
 }
 
-/** The Drive outcome, repeated in the confirmation step where it can't be missed. */
+/** Repeated in the confirmation step while synced. */
 const driveImpact = (): Html =>
-  html`<span class="delete-drive kept">${icon('cloud')}Your Google Drive copy is not touched. This browser is signed out of sync, and only this browser is cleared.</span>`;
+  html`<span class="delete-drive">${icon('cloud')}This browser will be signed out of Google Drive sync first. Your Drive copy isn't touched.</span>`;
 
 export function aboutCard(): Html {
   return html`<p class="copy-13 tertiary" style="margin-top:40px">

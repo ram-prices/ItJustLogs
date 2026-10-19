@@ -111,8 +111,6 @@ export interface SyncMeta {
   /** Hash of what this browser last uploaded, to skip unchanged uploads. */
   hash?: string;
   lastSynced?: number;
-  /** Pulls were deleted or replaced here: the next sync overwrites Drive's pulls instead of merging them back. */
-  replaceHistory?: boolean;
   /** Drive's copy looked like another player's and the player chose Cancel: wait for Sync now. */
   paused?: boolean;
   changed: ChangeTimes;
@@ -123,6 +121,53 @@ export const loadSyncMeta = (): SyncMeta => {
   return { on: false, ...saved, changed: { settings: 0, avatar: 0, header: 0, ...saved?.changed } };
 };
 export const saveSyncMeta = (m: SyncMeta): void => writeJson(KEYS.sync, m);
+
+// ---------------------------------------------------------------------------
+// Version history: copies of the pulls taken before each change that could lose
+// any (import, delete, replace, restore, a merge from Google Drive). Kept in
+// the "data" store as "snapshot:<id>", with a small index under "snapshots".
+// Delete pull history keeps them (so it can be undone); Delete everything
+// clears them with the rest.
+// ---------------------------------------------------------------------------
+
+export interface SnapshotInfo {
+  id: string;
+  /** When the copy was taken (just before the change). */
+  at: number;
+  /** What was about to happen, e.g. "Before import". */
+  reason: string;
+  chars: number;
+  weaps: number;
+  /** Newest pull in the copy (ms), to skip saving the same pulls twice in a row. */
+  newest: number;
+}
+
+/** How many copies to keep; the oldest go first. */
+export const MAX_SNAPSHOTS = 15;
+
+export const listSnapshots = (): Promise<SnapshotInfo[]> =>
+  idb<SnapshotInfo[] | undefined>('data', 'readonly', (s) => s.get('snapshots')).then((l) => l ?? []).catch(() => []);
+
+export const loadSnapshot = (id: string): Promise<PullHistory | undefined> =>
+  idb<PullHistory | undefined>('data', 'readonly', (s) => s.get(`snapshot:${id}`));
+
+/** Saves a copy and trims to MAX_SNAPSHOTS. Returns the new list, newest first. */
+export async function saveSnapshot(info: SnapshotInfo, history: PullHistory): Promise<SnapshotInfo[]> {
+  const list = [info, ...(await listSnapshots())];
+  const keep = list.slice(0, MAX_SNAPSHOTS);
+  const drop = list.slice(MAX_SNAPSHOTS);
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const t = db.transaction('data', 'readwrite');
+    const s = t.objectStore('data');
+    s.put(history, `snapshot:${info.id}`);
+    for (const d of drop) s.delete(`snapshot:${d.id}`);
+    s.put(keep, 'snapshots');
+    t.oncomplete = () => resolve();
+    t.onerror = t.onabort = () => reject(t.error);
+  });
+  return keep;
+}
 
 /** Removes only the saved pull history; settings and images stay. */
 export async function clearHistory(): Promise<void> {

@@ -100,6 +100,24 @@ export interface MergeResult {
  * Union of two histories. The game only serves a limited window of history, so
  * merging each new export onto what's saved keeps older pulls forever.
  */
+/**
+ * How many pulls in `from` are missing from `to` (banner rewards ignored).
+ * Drive sync refuses to upload when this is above 0: the Drive copy's pulls
+ * may only ever grow.
+ */
+export function missingPulls(from: PullHistory | null | undefined, to: PullHistory | null | undefined): number {
+  if (!from) return 0;
+  let missing = 0;
+  for (const [kind, a, b] of [
+    ['char', from.characters, to?.characters ?? []],
+    ['weap', from.weapons, to?.weapons ?? []],
+  ] as [Kind, RawRecord[], RawRecord[]][]) {
+    const have = new Set(b.map((r) => recordKey(r, kind)));
+    for (const r of a) if (!isGift(r) && !have.has(recordKey(r, kind))) missing++;
+  }
+  return missing;
+}
+
 export function mergeHistories(base: PullHistory, incoming: PullHistory): MergeResult {
   const mergeList = (a: RawRecord[], b: RawRecord[], kind: Kind) => {
     const seen = new Set(a.map((r) => recordKey(r, kind)));

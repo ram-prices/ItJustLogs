@@ -39,9 +39,20 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   plus `changed` times. Pulls merge like an import, with the same same-player
   check and dialog (`ui/dialog.ts`); settings and each picture are taken whole
   from whichever side changed them last (ties go to Drive); Drive's file
-  `version` is re-checked right before each upload. Deleting or replacing pulls
-  sets `replaceHistory`, so the next sync overwrites Drive's pulls instead of
-  merging them back. Tokens last an hour and there's no backend to refresh
+  `version` is re-checked right before each upload.
+  - Guardrail: the Drive copy's pulls only ever grow. Every sync downloads it
+    and merges its pulls in before uploading (which also restores pulls this
+    browser lost), and `missingPulls` (parse.ts) refuses any upload that would
+    drop one. Anything that removes pulls here (both delete buttons, "Replace
+    saved pulls" on import, restoring a version) signs this browser out of
+    sync first, so it never reaches Drive. Only the player deleting the app
+    data in Google Drive removes the Drive copy.
+- Version history (`store.ts` snapshots, `state.snapshot`): before any
+  import, delete, replace, restore or Drive merge that changes the pulls, the
+  previous pulls are saved in IndexedDB (`data` store, `snapshot:<id>` plus a
+  `snapshots` index; last 15, identical copies skipped). Settings → Version
+  history lists them with Restore (which saves the current pulls first).
+  Delete pull history keeps them; Delete everything clears them. Tokens last an hour and there's no backend to refresh
   them: each visit needs one click (header Sync button / Sync now). The token
   lives in sessionStorage only. Google's script is loaded only when the sync
   card is shown or sync is on; no other visitor ever contacts Google.

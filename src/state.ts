@@ -1,11 +1,13 @@
 import { analyze, type Analysis } from './domain/analyze';
-import { mergeHistories } from './domain/parse';
+import { mergeHistories, parseTimestamp } from './domain/parse';
 import { guessServer, type Schedule, type Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
 import * as store from './store';
 
 interface State {
   history: PullHistory | null;
+  /** Version history (newest first); see store.ts. */
+  snapshots: store.SnapshotInfo[];
   db: BannerDb;
   schedule: Schedule;
   analysis: Analysis | null;
@@ -15,6 +17,7 @@ interface State {
 
 export const state: State = {
   history: null,
+  snapshots: [],
   db: store.cachedBannerDb(),
   schedule: store.cachedSchedule(),
   analysis: null,
@@ -32,6 +35,63 @@ const changeListeners = new Set<(c: Change) => void>();
 export const onChange = (fn: (c: Change) => void): void => void changeListeners.add(fn);
 const changed = (c: Change) => changeListeners.forEach((fn) => fn(c));
 
+/** Newest pull time in a history (ms), 0 if empty. */
+function newestPull(h: PullHistory): number {
+  let max = 0;
+  for (const r of [...h.characters, ...h.weapons]) max = Math.max(max, parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp));
+  return max;
+}
+
+/**
+ * Saves the current pulls to version history before a change. Skips an empty
+ * history and a copy identical to the last one. Never blocks the change: a
+ * failed copy only logs a warning. True if the current pulls are in version
+ * history afterwards (newly saved or already the latest copy).
+ */
+async function snapshot(reason: string): Promise<boolean> {
+  const h = state.history;
+  if (!h || !(h.characters.length || h.weapons.length)) return false;
+  const info: store.SnapshotInfo = {
+    id: `${Date.now()}`,
+    at: Date.now(),
+    reason,
+    chars: h.characters.length,
+    weaps: h.weapons.length,
+    newest: newestPull(h),
+  };
+  const last = state.snapshots[0];
+  if (last && last.chars === info.chars && last.weaps === info.weaps && last.newest === info.newest) return true;
+  try {
+    state.snapshots = await store.saveSnapshot(info, h);
+    return true;
+  } catch (e) {
+    console.warn('Could not save a version history copy', e);
+    return false;
+  }
+}
+
+/** Loads the version history list. Call once at startup. */
+export async function loadSnapshots(): Promise<void> {
+  state.snapshots = await store.listSnapshots();
+  emit();
+}
+
+/**
+ * Replaces the pulls with an older copy from version history. The current
+ * pulls are saved to version history first, so a restore can be undone too.
+ */
+export async function restoreSnapshot(id: string): Promise<{ chars: number; weaps: number; savedCurrent: boolean }> {
+  const copy = await store.loadSnapshot(id);
+  if (!copy) throw new Error('That copy is no longer in version history.');
+  const savedCurrent = await snapshot('Before restoring an older copy');
+  await store.saveHistory(copy);
+  state.history = copy;
+  recompute();
+  emit();
+  changed('history');
+  return { chars: copy.characters.length, weaps: copy.weapons.length, savedCurrent };
+}
+
 function recompute(): void {
   const h = state.history;
   state.analysis = h && (h.characters.length || h.weapons.length) ? analyze(h, state.db) : null;
@@ -48,9 +108,10 @@ export async function loadSavedHistory(): Promise<void> {
 }
 
 /** Merges an imported file onto saved history. Returns how many new pulls it added. */
-export async function importHistory(incoming: PullHistory): Promise<{ char: number; weap: number }> {
+export async function importHistory(incoming: PullHistory, reason = 'Before import'): Promise<{ char: number; weap: number }> {
   const base = state.history ?? { characters: [], weapons: [] };
   const { history, added } = mergeHistories(base, incoming);
+  if (added.char || added.weap) await snapshot(reason);
   await store.saveHistory(history);
   state.history = history;
   recompute();
@@ -102,7 +163,8 @@ export async function loadImages(): Promise<void> {
 }
 
 /** Deletes the imported pull history only; name, picture and settings are kept. */
-export async function clearHistory(): Promise<void> {
+export async function clearHistory(reason = 'Before deleting pull history'): Promise<void> {
+  await snapshot(reason);
   await store.clearHistory();
   state.history = null;
   recompute();
@@ -114,6 +176,7 @@ export async function clearHistory(): Promise<void> {
 export async function clearEverything(): Promise<void> {
   await store.clearAll();
   state.history = null;
+  state.snapshots = [];
   state.images = {};
   state.settings = store.loadSettings();
   recompute();

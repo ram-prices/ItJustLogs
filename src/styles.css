@@ -960,7 +960,17 @@ select.input {
 .banner-expand {
   flex-shrink: 0;
 }
+/* The pull count and filters stay put; only the list under them scrolls. */
 .banner-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.banner-body > .card-head {
+  flex-shrink: 0;
+}
+.banner-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -968,7 +978,7 @@ select.input {
      scroll doesn't nudge every row sideways. */
   scrollbar-gutter: stable;
 }
-.banner.expanded .banner-body {
+.banner.expanded .banner-scroll {
   overflow: visible;
 }
 .banner-expand {
@@ -1073,7 +1083,10 @@ select.input {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.6) 38%, rgba(0, 0, 0, 0.08) 70%, transparent);
+  /* Dark only behind the names (bottom left), so the rest of the art stays bright. */
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 100%, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0.6) 40%, rgba(0, 0, 0, 0.15) 75%, transparent),
+    linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 35%);
 }
 .banner-art-text {
   position: absolute;
@@ -2180,6 +2193,13 @@ code {
 .sched-card .progress {
   margin-top: 8px;
 }
+/* Labels the time bar, so it doesn't read as a pity bar. */
+.sched-through {
+  margin-top: 4px;
+  font: 400 11px/14px var(--font-sans);
+  color: var(--gray-700);
+  text-align: right;
+}
 .sched-card .progress > i {
   background: var(--op);
 }
@@ -2340,6 +2360,28 @@ code {
   font: 400 10px/12px var(--font-sans);
   color: var(--gray-700);
   text-transform: uppercase;
+}
+/* Mondays: a day number on the axis and a faint guide line down the rows. */
+.tl-week {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  border-left: 1px dotted var(--gray-alpha-100);
+}
+.tl-week span {
+  display: block;
+  padding-left: 3px;
+  font: 400 10px/12px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-700);
+  opacity: 0.8;
+}
+/* A bar's date range, after its name. */
+.tl-dates {
+  margin-left: 8px;
+  font-style: normal;
+  font-weight: 400;
+  opacity: 0.75;
 }
 .tl-rows {
   position: relative;
@@ -2537,40 +2579,34 @@ code {
   margin: 48px 0 32px;
 }
 
-/* Settings → Delete saved data: what each button deletes, here and in Drive. */
-.delete-table {
-  width: 100%;
-  margin-top: 12px;
-  border-collapse: collapse;
+/* Settings → Delete locally saved data: each button with one line on what it removes. */
+.delete-options {
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.delete-options > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
   font: 400 13px/18px var(--font-sans);
 }
-.delete-table th,
-.delete-table td {
-  padding: 8px 10px 8px 0;
-  text-align: left;
-  vertical-align: top;
-  box-shadow: inset 0 -1px 0 var(--gray-alpha-200);
-}
-.delete-table thead th {
-  font: 500 11px/16px var(--font-mono);
-  text-transform: uppercase;
-  color: var(--gray-900);
-}
-.delete-table tbody th {
+.delete-options dt {
   font-weight: 600;
-  white-space: nowrap;
+}
+.delete-options dd {
+  margin: 0;
+  color: var(--gray-900);
 }
 .delete-drive {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-weight: 600;
+  color: var(--gray-900);
 }
 .delete-drive .icon {
   font-size: 16px;
-}
-.delete-drive.kept {
-  color: var(--green);
 }
 .delete-note {
   margin-top: 10px;
@@ -2581,7 +2617,29 @@ code {
   gap: 6px;
 }
 @media (max-width: 640px) {
-  .delete-table tbody th {
-    white-space: normal;
+  .delete-options > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
+}
+
+/* Settings → Version history. */
+.versions {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.version {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  box-shadow: inset 0 -1px 0 var(--gray-alpha-200);
+}
+.version-when {
+  font: 600 14px/20px var(--font-sans);
+}
+.versions-empty {
+  margin-top: 10px;
 }

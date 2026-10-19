@@ -126,27 +126,21 @@ const stamp = (ms: number, style: 'F' | 'f' | 'D' | 'R') => `<t:${Math.round(ms 
 
 /**
  * A banner or event as a Discord message: bold name and type, rate-ups, then
- * its timing relative to now. Server is noted since dates differ by server.
+ * when it opens and ends. Server is noted since dates differ by server.
  */
 export function discordText(
   item: { name: string; start: ServerTimes | null; end: ServerTimes | null },
   label: string,
   server: Server,
-  now: number,
   rateUps: string[] = [],
 ): string {
   const start = timeOn(item.start, server);
   const end = timeOn(item.end, server);
   const lines = [`**${item.name}** · ${label}`];
   if (rateUps.length) lines.push(`Rate-up: ${rateUps.join(', ')}`);
-  const status = statusOf(item, now, server);
-  if (start == null) lines.push('Date not announced yet');
-  else if (status === 'upcoming') {
-    lines.push(`Opens ${stamp(start, 'F')} (${stamp(start, 'R')})`);
-    if (end) lines.push(`Ends ${stamp(end, 'F')}`);
-  }
-  else if (status === 'live') lines.push(end ? `Ends ${stamp(end, 'F')} (${stamp(end, 'R')})` : `Open now since ${stamp(start, 'D')}, end not announced yet`);
-  else lines.push(`Ran ${stamp(start, 'D')} to ${end ? stamp(end, 'D') : 'the next version update'}`);
+  // Always both times, each with Discord's full date and its live countdown.
+  lines.push(start == null ? 'Opens TBA' : `Opens ${stamp(start, 'F')} (${stamp(start, 'R')})`);
+  lines.push(end == null ? 'Ends TBA' : `Ends ${stamp(end, 'F')} (${stamp(end, 'R')})`);
   lines.push(`-# ${SERVER_LABEL[server]} server`);
   return lines.join('\n');
 }

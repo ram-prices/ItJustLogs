@@ -93,7 +93,8 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
 
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
-  if (id.includes('constant')) return null;
+  // Constant Issues have ef-assets art (rebuilt from the weapon render); other constant pools don't.
+  if (id.includes('constant') && !id.startsWith('weaponbox_constant_')) return null;
   return `${EF_ASSETS}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
 }
 

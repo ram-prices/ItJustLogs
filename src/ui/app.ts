@@ -1,12 +1,12 @@
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
-import { clearEverything, clearHistory, currentServer, setImage, state, subscribe, updateSettings } from '../state';
+import { clearEverything, clearHistory, currentServer, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
 import type { ThemePref } from '../store';
 import { installTooltips } from './charts';
 import { installImageFallback, toast } from './common';
 import { LOGO, TAB_ICON, icon, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
-import { html, raw, render, type Html } from './html';
+import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
 import { homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
@@ -157,7 +157,7 @@ function draw(): void {
 function markOverflow(): void {
   for (const card of document.querySelectorAll<HTMLElement>('.banner')) {
     if (card.classList.contains('expanded')) continue;
-    const list = card.querySelector<HTMLElement>('.banner-body');
+    const list = card.querySelector<HTMLElement>('.banner-scroll');
     card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
   }
   // The 6★ history only needs Show all when it runs past two rows.
@@ -188,7 +188,7 @@ function toggleCard(card: HTMLElement): void {
     'transitionend',
     () => {
       card.style.height = '';
-      if (!opening) card.querySelector('.banner-body')?.scrollTo({ top: 0 });
+      if (!opening) card.querySelector('.banner-scroll')?.scrollTo({ top: 0 });
     },
     { once: true },
   );
@@ -211,7 +211,19 @@ async function runImport(text: string, source: string, mode: ImportMode = 'check
 /** A file that doesn't look like the saved player's history: ask before mixing two players' pulls. */
 async function askAboutMismatch(e: ImportMismatch): Promise<void> {
   const choice = await askSamePlayer(e.match, e.source);
-  if (choice !== 'cancel') await runImport(e.text, e.source, choice);
+  if (choice === 'cancel') return;
+  // Replacing removes pulls, which must never reach Google Drive: sign this
+  // browser out first, so the Drive copy stays as it was.
+  if (choice === 'replace' && signOutBeforeLosingPulls())
+    toast('This browser was signed out of Google Drive so your Drive copy stays as it was.');
+  await runImport(e.text, e.source, choice);
+}
+
+/** Signs out of Drive sync before a change that removes pulls. True if it was signed in. */
+function signOutBeforeLosingPulls(): boolean {
+  if (!syncIsOn()) return false;
+  signOut(true);
+  return true;
 }
 
 function installImport(): void {
@@ -385,6 +397,21 @@ async function onClick(e: MouseEvent): Promise<void> {
       return signOut();
     case 'export-backup':
       return exportBackup();
+    case 'restore-snapshot': {
+      // Restoring can remove pulls, which must never reach Google Drive.
+      const signedOut = signOutBeforeLosingPulls();
+      try {
+        const { chars, weaps, savedCurrent } = await restoreSnapshot(el.dataset.value!);
+        toast(
+          `Restored ${fmtInt(chars)} operator and ${fmtInt(weaps)} arsenal records.` +
+            (savedCurrent ? ' Your previous pulls were saved to version history.' : '') +
+            (signedOut ? ' This browser was signed out of Google Drive; the copy there is untouched.' : ''),
+        );
+      } catch (err) {
+        toast(`Couldn't restore: ${(err as Error).message}`, 'error');
+      }
+      return;
+    }
     case 'clear-all':
       setConfirmingDelete(el.dataset.value === 'pulls' ? 'pulls' : 'all');
       return draw();

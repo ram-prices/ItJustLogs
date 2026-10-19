@@ -1,4 +1,4 @@
-import { compareHistories, mergeHistories } from '../domain/parse';
+import { compareHistories, mergeHistories, missingPulls } from '../domain/parse';
 import * as drive from '../drive';
 import { clearHistory, importHistory, onChange, setImage, state, updateSettings } from '../state';
 import { blobToDataUrl, dataUrlToBlob, loadSyncMeta, saveSyncMeta, type ChangeTimes } from '../store';
@@ -64,7 +64,7 @@ async function applyRemote(remote: Backup): Promise<boolean> {
   applying = true;
   try {
     const h = remote.history;
-    if (h && !meta.replaceHistory && (h.characters.length || h.weapons.length)) {
+    if (h && (h.characters.length || h.weapons.length)) {
       const match = compareHistories(state.history, h);
       let replace = false;
       if (match.verdict === 'different' || match.verdict === 'noOverlap') {
@@ -72,9 +72,9 @@ async function applyRemote(remote: Backup): Promise<boolean> {
         if (choice === 'cancel') return false;
         replace = choice === 'replace';
       }
-      if (replace) await clearHistory();
+      if (replace) await clearHistory("Before using Drive's pulls");
       const { added } = mergeHistories(state.history ?? { characters: [], weapons: [] }, h);
-      if (replace || added.char || added.weap) await importHistory(h);
+      if (replace || added.char || added.weap) await importHistory(h, 'Before syncing from Google Drive');
     }
 
     const theirs: ChangeTimes = { settings: 0, avatar: 0, header: 0, ...remote.changed };
@@ -130,10 +130,13 @@ async function syncWith(token: string): Promise<void> {
   file ??= await drive.findFile(token);
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    let remoteHash = meta.hash;
-    if (file && file.version !== meta.version) {
-      // Another device (or a first sync here): bring its changes in first.
-      const remote = parseRemote(await drive.download(token, file.id));
+    // Always read Drive's copy and merge its pulls in before uploading, even
+    // when no other device changed it: that also brings back any pulls this
+    // browser lost. The Drive copy's pulls can only ever grow.
+    let remoteHash: string | undefined;
+    let remote: Backup | null = null;
+    if (file) {
+      remote = parseRemote(await drive.download(token, file.id));
       remoteHash = await hashOf(remote);
       if (!(await applyRemote(remote))) {
         meta.paused = true;
@@ -144,6 +147,12 @@ async function syncWith(token: string): Promise<void> {
     const local: Backup = { ...(await buildBackup()), changed: { ...meta.changed } };
     const hash = await hashOf(local);
     if (file && hash !== remoteHash) {
+      // Guardrail: never upload a copy that's missing any pull Drive has.
+      const lost = missingPulls(remote?.history, local.history);
+      if (lost)
+        throw new Error(
+          `Sync stopped: uploading would have removed ${lost} pulls from your Google Drive copy, so nothing was uploaded. Your Drive copy is unchanged.`,
+        );
       // Did another device upload while we were merging? Then merge that first.
       const now = await drive.fileInfo(token, file.id);
       if (now.version !== file.version) {
@@ -155,7 +164,7 @@ async function syncWith(token: string): Promise<void> {
       const body = JSON.stringify(local);
       file = file ? await drive.updateFile(token, file.id, body) : await drive.createFile(token, body);
     }
-    meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), replaceHistory: false, paused: false };
+    meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), paused: false };
     save();
     return;
   }
@@ -262,7 +271,6 @@ export function installSync(): void {
       return setStatus('off');
     }
     if (c === 'settings' || c === 'avatar' || c === 'header') meta.changed[c] = Date.now();
-    if (c === 'historyCleared' && meta.on) meta.replaceHistory = true;
     save();
     if (meta.on && !meta.paused) schedule();
   });

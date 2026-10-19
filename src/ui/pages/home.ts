@@ -32,6 +32,7 @@ const DAY = 86_400_000;
 const dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const dayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric' });
 const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 const when = (ms: number) => dateFmt.format(ms);
 
 /** "16d 4h", "5h 20m", "12m". */
@@ -78,8 +79,8 @@ const EVENT_ICONS: [RegExp, string][] = [
 const eventIcon = (e: ScheduleEvent) => EVENT_ICONS.find(([re]) => re.test(e.type))?.[1] ?? 'event';
 
 /** The "Copy to Discord" text, stored on the element (see installDiscordMenu). */
-const bannerDiscord = (b: ScheduleBanner, server: Server, now: number) => discordText(b, KIND_LABEL[b.kind], server, now, b.rateUps);
-const eventDiscord = (e: ScheduleEvent, server: Server, now: number) => discordText(e, e.type, server, now);
+const bannerDiscord = (b: ScheduleBanner, server: Server) => discordText(b, KIND_LABEL[b.kind], server, b.rateUps);
+const eventDiscord = (e: ScheduleEvent, server: Server) => discordText(e, e.type, server);
 
 // ---------------------------------------------------------------------------
 // Open now
@@ -91,7 +92,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const src = artOf(b);
   const mine = summaryFor(b, a);
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
-  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server, now)}">
+  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}">
     <div class="banner-art">
       ${src ? html`<img src="${src}" alt="" loading="lazy" decoding="async" />` : ''}
       <div class="banner-art-text">
@@ -104,9 +105,12 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
       <div class="sched-when">
         ${end
           ? html`<span>Ends in <b>${span(end - now)}</b></span><span class="tertiary">${when(end)}</span>`
-          : html`<span>Open</span><span class="tertiary">End not announced yet</span>`}
+          : html`<span>Ends <b>TBA</b></span>`}
       </div>
-      <div class="progress"><i style="width:${(elapsed ?? 0.15) * 100}%;${elapsed == null ? 'opacity:0.4' : ''}"></i></div>
+      ${elapsed == null
+        ? ''
+        : html`<div class="progress" title="How much of the banner's run has passed"><i style="width:${elapsed * 100}%"></i></div>
+            <div class="sched-through">${Math.round(elapsed * 100)}% through</div>`}
       ${mine
         ? html`<a class="sched-mine" href="${pagePath(b)}" style="color:${mine.pity.done ? 'var(--gray-700)' : heat(mine.pity.value, mine.pity.max)}">
             ${hourglass(mine.pity.done ? 1 : mine.pity.value / mine.pity.max)}<b>${mine.pity.done ? 'Done' : mine.pity.value}</b>${mine.pity.done ? '' : html`<i>/${mine.pity.max}</i>`}
@@ -125,14 +129,14 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
 function rowWhen(start: number | null, end: number | null, now: number): Html {
   if (start == null) return html`<span class="tertiary">Date not announced</span>`;
   if (now < start) return html`<b>in ${span(start - now)}</b><span class="tertiary">${when(start)}</span>`;
-  if (end == null) return html`<b>Open</b><span class="tertiary">End not announced</span>`;
+  if (end == null) return html`<b>ends TBA</b>`;
   return html`<b>ends in ${span(end - now)}</b><span class="tertiary">${when(end)}</span>`;
 }
 
 function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
   const start = timeOn(b.start, server);
   const src = artOf(b);
-  return html`<div class="sched-next${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server, now)}">
+  return html`<div class="sched-next${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}">
     ${src
       ? html`<div class="sched-thumb"><img src="${src}" alt="" loading="lazy" decoding="async" /></div>`
       : html`<div class="sched-thumb sched-date">${start ? html`<span>${monthFmt.format(start)}</span><b>${dayFmt.format(start)}</b>` : '?'}</div>`}
@@ -145,7 +149,7 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 }
 
 function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
-  return html`<div class="sched-next evt" data-discord="${eventDiscord(e, server, now)}" ${e.details ? html`title="${e.details}"` : ''}>
+  return html`<div class="sched-next evt" data-discord="${eventDiscord(e, server)}" ${e.details ? html`title="${e.details}"` : ''}>
     <div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>
@@ -200,7 +204,7 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       ...(b.rateUps.length ? [tipRow('Rate-up', b.rateUps.join(', '))] : []),
       ...(mine?.info ? [tipRow('You have it', rateUpOwned(mine) ? `Yes, ×${rateUpOwned(mine)}` : 'Not yet')] : []),
       tipRow('Opens', when(start)),
-      tipRow('Ends', end == null ? 'Not announced' : when(end)),
+      tipRow('Ends', end == null ? 'TBA' : when(end)),
       ...(mine ? [tipRow('Your pulls', fmtInt(mine.paidPulls))] : []),
     ];
     return {
@@ -209,7 +213,7 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       name: b.name,
       cls: `${isWeaponBanner(b.kind) ? 'weap' : 'op'} ${b.kind} ${statusOf(b, now, server)}${mine ? ' mine' : ''}`,
       tip: tip(b.name, rows),
-      discord: bannerDiscord(b, server, now),
+      discord: bannerDiscord(b, server),
       href: mine ? pagePath(b) : undefined,
     };
   };
@@ -221,8 +225,8 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       end,
       name: e.name,
       cls: `evt ${statusOf(e, now, server)}`,
-      tip: tip(e.name, [tipRow('Type', e.type), tipRow('Opens', when(start)), tipRow('Ends', end == null ? 'Not announced' : when(end))]),
-      discord: eventDiscord(e, server, now),
+      tip: tip(e.name, [tipRow('Type', e.type), tipRow('Opens', when(start)), tipRow('Ends', end == null ? 'TBA' : when(end))]),
+      discord: eventDiscord(e, server),
     };
   };
 
@@ -244,13 +248,20 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
     </div>`;
   });
 
-  // Month ticks.
+  // Month ticks, plus a day number every Monday so bar ends can be read off.
   const months: Html[] = [];
   const d = new Date(from);
   d.setDate(1);
   d.setHours(0, 0, 0, 0);
   for (d.setMonth(d.getMonth() + 1); d.getTime() < to; d.setMonth(d.getMonth() + 1)) {
     months.push(html`<div class="tl-month" style="left:${x(d.getTime())}px"><span>${monthFmt.format(d)}${d.getMonth() === 0 ? ` ${d.getFullYear()}` : ''}</span></div>`);
+  }
+  const w = new Date(from);
+  w.setHours(0, 0, 0, 0);
+  w.setDate(w.getDate() + ((8 - w.getDay()) % 7 || 7)); // the next Monday
+  for (; w.getTime() < to; w.setDate(w.getDate() + 7)) {
+    if (w.getDate() <= 2) continue; // a month label sits there
+    months.push(html`<div class="tl-week" style="left:${x(w.getTime())}px"><span>${w.getDate()}</span></div>`);
   }
 
   const rows = groups
@@ -266,7 +277,9 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
           // --x/--w let the label slide along to stay in view (see .tl-bar > span).
           const style = `left:${left}px;width:${w}px;top:${lanes[i] * LANE + 4}px;--x:${left}px;--w:${w}px`;
           const cls = `tl-bar ${b.cls}${b.end == null ? ' open-end' : ''}`;
-          const inner = html`<span class="ellipsis">${b.name}</span>`;
+          // The name, then its dates when the bar has room for them.
+          const range = `${shortDate.format(b.start)} – ${b.end == null ? 'TBA' : shortDate.format(b.end)}`;
+          const inner = html`<span class="ellipsis">${b.name}<i class="tl-dates">${range}</i></span>`;
           return b.href
             ? html`<a class="${cls}" href="${b.href}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}">${inner}</a>`
             : html`<div class="${cls}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}">${inner}</div>`;
@@ -279,7 +292,7 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       <div class="tl-canvas" style="width:${width}px">
         <div class="tl-bands">${bands}${months}</div>
         <div class="tl-rows">${rows}</div>
-        <div class="tl-now" style="left:${x(now)}px"><span>Today</span></div>
+        <div class="tl-now" style="left:${x(now)}px"><span>Today · ${shortDate.format(now)}</span></div>
       </div>
     </div>
   </div>`;
@@ -461,24 +474,24 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
 
       ${liveEvents.length
         ? html`<div class="section">
-            <div class="section-head"><h2 class="heading-20">Events now</h2><span class="label-13 secondary">${liveEvents.length} events, ending soonest first</span></div>
+            <div class="section-head"><h2 class="heading-20">Current</h2></div>
             <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server))}</div>
           </div>`
         : ''}
 
       ${next.length
         ? html`<div class="section">
-            <div class="section-head"><h2 class="heading-20">Coming up</h2></div>
+            <div class="section-head"><h2 class="heading-20">Upcoming</h2></div>
             <div class="card sched-next-list">${next.map((n) => n.row)}</div>
           </div>`
         : ''}
 
       <div class="section">
-        <div class="section-head"><h2 class="heading-20">Timeline</h2><span class="label-13 secondary">Every version, banner and event since launch</span></div>
+        <div class="section-head"><h2 class="heading-20">Timeline</h2></div>
         ${timeline(schedule, now, server, a)}
       </div>
       <footer class="home-footer copy-13 tertiary">
-        <span>Fan-made, not affiliated with Gryphline or Hypergryph.</span>
+        <span>Fan-made with Claude AI, not affiliated with Gryphline or Hypergryph.</span>
         <a href="/privacy/" data-native>Privacy policy</a>
         <a href="https://github.com/ram-prices/ItJustLogs" target="_blank" rel="noopener">Source on GitHub</a>
       </footer>

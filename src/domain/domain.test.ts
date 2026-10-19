@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import db from '../data/banners.snapshot.json';
 import { analyze } from './analyze';
 import { canonicalPoolId, categoryOf, patchOf } from './banners';
-import { compareHistories, mergeHistories, parseHistoryJson } from './parse';
+import { compareHistories, mergeHistories, missingPulls, parseHistoryJson } from './parse';
 import { weeklyTimeline, patchStats } from './patches';
 import {
   CHARTERED,
@@ -249,11 +249,11 @@ describe('banner schedule', () => {
     const b = banner('2026-10-29T12:00:00-05:00', '2026-11-19T04:00:00-05:00');
     const open = Date.parse('2026-10-29T17:00:00Z') / 1000;
     const close = Date.parse('2026-11-19T09:00:00Z') / 1000;
-    expect(discordText(b, 'Challenge Event', 'americas', t('2026-10-20T00:00:00Z'))).toBe(
-      [`**Test** · Challenge Event`, `Opens <t:${open}:F> (<t:${open}:R>)`, `Ends <t:${close}:F>`, `-# Americas / Europe server`].join('\n'),
+    expect(discordText(b, 'Challenge Event', 'americas')).toBe(
+      [`**Test** · Challenge Event`, `Opens <t:${open}:F> (<t:${open}:R>)`, `Ends <t:${close}:F> (<t:${close}:R>)`, `-# Americas / Europe server`].join('\n'),
     );
-    expect(discordText(b, 'Chartered Headhunting', 'americas', t('2026-11-01T00:00:00Z'), ['Si'])).toContain(
-      ['Rate-up: Si', `Ends <t:${close}:F> (<t:${close}:R>)`].join('\n'),
+    expect(discordText(b, 'Chartered Headhunting', 'americas', ['Si'])).toContain(
+      ['Rate-up: Si', `Opens <t:${open}:F> (<t:${open}:R>)`, `Ends <t:${close}:F> (<t:${close}:R>)`].join('\n'),
     );
   });
 
@@ -280,6 +280,32 @@ describe('banner schedule', () => {
     }
     // Banners from the news feed that have a pool line up with banners.json.
     for (const b of schedule.banners.filter((x) => x.poolId)) expect(bannerDb[b.poolId!]?.name?.toLowerCase(), b.name).toBe(b.name.toLowerCase());
+  });
+});
+
+describe('Google Drive guardrail: the Drive copy only gains pulls', () => {
+  const pull = (n: number) => ({ seqId: String(n), gachaTs: String(Date.UTC(2026, 0, n)), charId: `chr_${n % 4}`, rarity: 4, poolId: 'standard' });
+  const hist = (ns: number[]) => ({ characters: ns.map(pull), weapons: [] }) as unknown as PullHistory;
+
+  it('counts pulls an upload would drop', () => {
+    expect(missingPulls(hist([1, 2, 3]), hist([1, 2, 3, 4]))).toBe(0);
+    expect(missingPulls(hist([1, 2, 3]), hist([1]))).toBe(2);
+    expect(missingPulls(hist([1, 2]), null)).toBe(2);
+    expect(missingPulls(null, hist([1]))).toBe(0);
+  });
+
+  it('ignores banner rewards, which are not pulls', () => {
+    const drive = hist([1]);
+    drive.characters.push({ kind: 'gift_operator_token', seqId: '99', gachaTs: '1', nameText: 'Token' } as never);
+    expect(missingPulls(drive, hist([1]))).toBe(0);
+  });
+
+  it('merging Drive in first never leaves a Drive pull out, whatever this browser lost', () => {
+    const drive = hist([1, 2, 3, 4, 5]);
+    for (const local of [hist([]), hist([2]), hist([1, 3, 5]), hist([6, 7]), hist([1, 2, 3, 4, 5, 6])]) {
+      const upload = mergeHistories(local, drive).history;
+      expect(missingPulls(drive, upload)).toBe(0);
+    }
   });
 });
 

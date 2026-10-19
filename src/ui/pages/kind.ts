@@ -463,7 +463,7 @@ function bannerBody(b: BannerSummary): Html {
         ).map(([v, label]) => html`<button type="button" data-action="filter" data-value="${v}" aria-pressed="${String(f.has(v))}">${label}</button>`)}
       </div>
     </div>
-    ${shown.length ? pullTable(b, shown) : html`<div class="table-empty">No pulls match this filter.</div>`}`;
+    <div class="banner-scroll">${shown.length ? pullTable(b, shown) : html`<div class="table-empty">No pulls match this filter.</div>`}</div>`;
 }
 
 /** Luck column is hidden for now; flip this to bring it back (analyze.ts still computes `luck`). */
