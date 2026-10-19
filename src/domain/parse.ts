@@ -120,3 +120,57 @@ export function mergeHistories(base: PullHistory, incoming: PullHistory): MergeR
   const w = mergeList(base.weapons, incoming.weapons, 'weap');
   return { history: { characters: c.merged, weapons: w.merged }, added: { char: c.added, weap: w.added } };
 }
+
+// ---------------------------------------------------------------------------
+// Is this the same player?
+// ---------------------------------------------------------------------------
+
+export interface HistoryMatch {
+  /** same: the overlap agrees; different: it doesn't; noOverlap: no shared period to compare; empty: nothing saved yet. */
+  verdict: 'same' | 'different' | 'noOverlap' | 'empty';
+  /** Incoming pulls in the saved history's time span that are also saved... */
+  shared: number;
+  /** ...and those that aren't. */
+  foreign: number;
+}
+
+/** Below this share of matching pulls in the shared period, a file is treated as another player's. */
+export const SAME_PLAYER_SHARE = 0.9;
+
+/**
+ * Checks that an import comes from the same account as the saved history: two
+ * exports of one account contain the very same pulls wherever their periods
+ * overlap. Matches on time + item only, since some exporters omit seqId.
+ */
+export function compareHistories(saved: PullHistory | null, incoming: PullHistory): HistoryMatch {
+  let shared = 0;
+  let foreign = 0;
+  let savedCount = 0;
+  for (const [kind, a, b] of [
+    ['char', saved?.characters ?? [], incoming.characters],
+    ['weap', saved?.weapons ?? [], incoming.weapons],
+  ] as [Kind, RawRecord[], RawRecord[]][]) {
+    const pulls = a.filter((r) => !isGift(r));
+    savedCount += pulls.length;
+    if (!pulls.length) continue;
+    const key = (r: RawRecord) => {
+      const item = str(kind === 'char' ? r.charId : r.weaponId) || str(r.itemId) || str(r.nameText) || str(r.kind);
+      return `${parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp)}|${item}`;
+    };
+    const times = pulls.map((r) => parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp));
+    const from = Math.min(...times);
+    const to = Math.max(...times);
+    const known = new Set(pulls.map(key));
+    for (const r of b) {
+      if (isGift(r)) continue;
+      const t = parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp);
+      if (t < from || t > to) continue;
+      if (known.has(key(r))) shared++;
+      else foreign++;
+    }
+  }
+  if (!savedCount) return { verdict: 'empty', shared, foreign };
+  const inRange = shared + foreign;
+  if (!inRange) return { verdict: 'noOverlap', shared, foreign };
+  return { verdict: shared / inRange >= SAME_PLAYER_SHARE ? 'same' : 'different', shared, foreign };
+}

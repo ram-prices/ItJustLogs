@@ -30,7 +30,7 @@ const bannersOf = (kind: Kind, a: Analysis) =>
     .sort((x, y) => Number(y.category === 'basic') - Number(x.category === 'basic') || y.lastTs - x.lastTs);
 
 /** The rate-up mark: stacked chevrons in a circle. */
-const rateUpIcon = (): Html => html`<span class="rateup-icon">${icon('stat_2')}</span>`;
+export const rateUpIcon = (): Html => html`<span class="rateup-icon">${icon('stat_2')}</span>`;
 
 /** Banner key art; weapon banners without art fall back to the rate-up weapon icon. */
 /** Reward icons: a ticket for Tokens, a crate for Selectors (pick-one boxes), a gift for free rate-up copies. */
@@ -60,7 +60,10 @@ function art(b: BannerSummary): Html {
   return html``;
 }
 
-function rateUpChip(b: BannerSummary): Html {
+/** Rate-up copies you own on a banner: pulled plus rate-up rewards (Tokens, Joint Selectors, Arsenal copies). */
+export const rateUpOwned = (b: BannerSummary): number => b.rateUpCopies + (b.rewards?.copies ?? 0);
+
+export function rateUpChip(b: BannerSummary): Html {
   if (!b.info) return html``;
   const names = b.category === 'joint' && b.info.rateUpIds.length > 1 ? `${b.info.rateUpIds.length} rate-ups` : b.info.rateUpNames.join(', ');
   // Copies you own: the ones pulled plus every reward that is a rate-up copy
@@ -205,6 +208,31 @@ export function setAllExpanded(kind: Kind, a: Analysis, open: boolean): void {
   for (const b of bannersOf(kind, a)) setExpanded(bannerKey(b), open);
 }
 
+/**
+ * Pity as the Material Symbols hourglass with its sand set by `run` (0-1,
+ * pity / hard pity): the empty frame, plus two copies of the full hourglass,
+ * each clipped to show only the sand left in the top bulb and the sand that
+ * has run into the bottom one. The bulbs taper to the neck, so a sand
+ * height goes with the square root of the amount in that bulb.
+ */
+// Sand rows of hourglass_full as a fraction of its 1em line box (measured
+// from the font: the glyph is centred, ink 12%-88%).
+const SAND_TOP = [0.175, 0.465];
+const SAND_BOTTOM = [0.532, 0.823];
+export function hourglass(run: number): Html {
+  const r = Math.max(0, Math.min(1, run));
+  const left = Math.sqrt(1 - r);
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  // Top: sand from its surface down to the neck. Bottom: from its surface down.
+  const top = SAND_TOP[1] - (SAND_TOP[1] - SAND_TOP[0]) * left;
+  const bottom = SAND_BOTTOM[0] + (SAND_BOTTOM[1] - SAND_BOTTOM[0]) * left;
+  return html`<span class="hourglass" aria-hidden="true">
+    <span class="icon">hourglass_empty</span>
+    <span class="icon sand" style="clip-path:inset(${pct(top)} 0 ${pct(1 - SAND_TOP[1])} 0)">hourglass_full</span>
+    <span class="icon sand" style="clip-path:inset(${pct(bottom)} 0 0 0)">hourglass_full</span>
+  </span>`;
+}
+
 /** "7 pulls" / "1 set of 10" / "3 sets of 10" toward the next reward. */
 function rewardProgress(b: BannerSummary): string {
   const n = b.rewards!.progress;
@@ -231,10 +259,10 @@ function bannerSection(b: BannerSummary): Html {
       </div>
       <div class="banner-glance">
         <div class="glance-row">
+          <span class="glance-stat" style="color:${pityColor}" title="6★ pity: ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}" aria-label="6★ pity ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>
           ${b.rewards
-            ? html`<span class="glance-stat" title="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()} (${b.rewards.goal})" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
+            ? html`<span class="glance-stat glance-reward" title="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()} (${b.rewards.goal})" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
             : ''}
-          <span class="glance-stat" style="color:${pityColor}" title="6★ pity: ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}" aria-label="6★ pity ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}">${icon('hourglass_bottom')}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>
         </div>
         ${pityRuler(b)}
       </div>

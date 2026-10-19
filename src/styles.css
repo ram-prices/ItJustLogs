@@ -368,12 +368,23 @@ p a {
   margin-right: 7px;
   flex-shrink: 0;
 }
+/* The traced Operators/Arsenal marks fill their whole box, while Material
+   glyphs keep a margin inside theirs; at 13px the two read the same size. */
+svg.tab-icon {
+  width: 13px;
+  height: 13px;
+  margin: 0 8px 0 1px;
+}
 /* Font icons in the tab row: a glyph's box has padding, so draw it a bit larger. */
 .tab-icon.icon {
   display: grid;
   place-items: center;
   font-size: 18px;
   overflow: visible;
+}
+/* The gear fills its whole glyph box; this brings it to the others' ~13px. */
+.tab-settings .tab-icon.icon {
+  font-size: 15px;
 }
 .tab::before {
   content: '';
@@ -1161,11 +1172,23 @@ select.input {
   color: var(--gray-700);
   margin-left: -3px;
 }
-.glance-stat:first-child {
+.glance-reward,
+.glance-reward b {
   color: var(--gray-1000);
 }
-.glance-stat:first-child b {
-  color: var(--gray-1000);
+/* Pity hourglass: the Material glyph with sand set by pity (see
+   hourglass() in kind.ts). The layers stack exactly on top of each other. */
+.glance-stat .hourglass {
+  align-self: center;
+  display: inline-grid;
+  margin-right: 1px;
+  flex-shrink: 0;
+  opacity: 0.85; /* on the whole icon, so the overlapping layers don't add up */
+}
+.hourglass > .icon {
+  grid-area: 1 / 1;
+  font-size: 15px;
+  line-height: 1;
 }
 .glance-stat .spacer {
   flex: 1;
@@ -1664,6 +1687,15 @@ code {
   color: var(--gray-900);
   margin-bottom: 20px;
 }
+/* Settings → Sync with Google Drive: status badge, note, last synced. */
+.sync-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--gray-900);
+  font: 400 14px/20px var(--font-sans);
+}
 .danger {
   box-shadow: 0 0 0 1px color-mix(in srgb, #e5484d 40%, transparent), 0 2px 2px rgba(0, 0, 0, 0.04);
 }
@@ -1837,6 +1869,16 @@ code {
   }
   .tab-icon {
     margin-right: 5px;
+  }
+  svg.tab-icon {
+    margin-right: 6px;
+  }
+  /* Five tabs don't fit a phone: Home shows just its icon. */
+  .tab-home > span:not(.tab-icon) {
+    display: none;
+  }
+  .tab-home .tab-icon {
+    margin-right: 0;
   }
   .metrics {
     grid-template-columns: 1fr 1fr;
@@ -2089,4 +2131,402 @@ code {
   .six-portrait {
     height: 52px;
   }
+}
+
+/* ---------- Home: banner schedule ----------------------------------------- */
+.sched-import {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  margin-bottom: 32px;
+}
+/* Open now: one card per banner, art header like the banner cards. */
+.sched-live {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.sched-card {
+  overflow: hidden;
+}
+.sched-card .banner-art {
+  height: 140px;
+}
+.sched-kind {
+  font: 500 10px/14px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.7);
+}
+.sched-body {
+  padding: 12px 16px 14px;
+}
+.sched-when {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--gray-900);
+}
+.sched-when b {
+  font-weight: 600;
+  color: var(--gray-1000);
+  font-variant-numeric: tabular-nums;
+}
+.sched-card .progress {
+  margin-top: 8px;
+}
+.sched-card .progress > i {
+  background: var(--op);
+}
+.sched-card.weap .progress > i {
+  background: var(--ars);
+}
+/* Your pity on this banner, linking to its card. */
+.sched-mine {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  font: 500 11px/16px var(--font-sans);
+  text-decoration: none;
+}
+.sched-mine b {
+  font: 600 15px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.sched-mine i {
+  font: 400 11px/16px var(--font-sans);
+  color: var(--gray-700);
+  margin-left: -3px;
+}
+.sched-mine .hourglass {
+  display: inline-grid;
+  opacity: 0.85;
+}
+.sched-mine-pulls {
+  margin-left: auto;
+  color: var(--gray-900);
+  text-transform: uppercase;
+}
+.sched-mine > .icon {
+  font-size: 16px;
+  color: var(--gray-700);
+}
+.sched-mine:hover .sched-mine-pulls,
+.sched-mine:hover > .icon {
+  color: var(--gray-1000);
+}
+
+/* Coming up: compact rows. */
+.sched-next-list {
+  padding: 4px 0;
+}
+.sched-next {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+}
+.sched-next + .sched-next {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.sched-thumb {
+  width: 96px;
+  height: 54px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--gray-100);
+}
+.sched-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* No art yet: a small calendar leaf with the opening day. */
+.sched-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-border);
+}
+.sched-date span {
+  font: 500 10px/12px var(--font-sans);
+  text-transform: uppercase;
+  color: var(--gray-900);
+}
+.sched-date b {
+  font: 600 20px/22px var(--font-sans);
+}
+.sched-next-name {
+  font: 600 14px/20px var(--font-sans);
+}
+.sched-next-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 400 12px/18px var(--font-sans);
+  color: var(--gray-900);
+}
+.sched-next-meta .rateup-icon {
+  font-size: 13px;
+  color: var(--op);
+}
+.sched-next.weap .sched-next-meta .rateup-icon {
+  color: var(--ars);
+}
+.sched-next-when {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font: 400 12px/18px var(--font-sans);
+  white-space: nowrap;
+}
+.sched-next-when b {
+  font: 600 13px/18px var(--font-sans);
+}
+
+/* Timeline: version bands behind, one row of lanes per banner type. */
+.tl {
+  overflow: hidden;
+}
+.tl-scroll {
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+}
+.tl-canvas {
+  position: relative;
+  min-height: 100%;
+  padding: 44px 0 26px;
+}
+.tl-bands {
+  position: absolute;
+  inset: 0;
+}
+.tl-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-shadow: inset 1px 0 0 var(--gray-alpha-300);
+}
+.tl-band.alt {
+  background: var(--gray-alpha-100);
+}
+.tl-band-name {
+  display: block;
+  max-width: 100%;
+  padding: 8px 8px 0;
+  font: 500 11px/14px var(--font-sans);
+  color: var(--gray-900);
+}
+.tl-band.current .tl-band-name {
+  color: var(--gray-1000);
+}
+.tl-month {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  border-left: 1px dashed var(--gray-alpha-200);
+}
+.tl-month span {
+  display: block;
+  padding-left: 4px;
+  font: 400 10px/12px var(--font-sans);
+  color: var(--gray-700);
+  text-transform: uppercase;
+}
+.tl-rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tl-row-label {
+  position: sticky;
+  left: 0;
+  width: max-content;
+  padding: 0 8px 2px;
+  font: 500 10px/14px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-700);
+}
+.tl-lanes {
+  position: relative;
+}
+.tl-bar {
+  position: absolute;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font: 500 11px/22px var(--font-sans);
+  color: #fff;
+  text-decoration: none;
+  overflow: hidden;
+  cursor: default;
+  background: color-mix(in srgb, var(--op) 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--op) 70%, transparent);
+}
+.tl-bar > span {
+  /* Slides right to stay on screen while the bar's start is scrolled out of
+     view, but never past the bar's own end (16px = the bar's padding). */
+  transform: translateX(clamp(0px, calc(var(--sl, 0px) - var(--x)), max(0px, calc(var(--w) - 100% - 16px))));
+}
+.tl-bar.weap {
+  background: color-mix(in srgb, var(--ars) 50%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ars) 70%, transparent);
+}
+.tl-bar.special,
+.tl-bar.refactor,
+.tl-bar.refactorIssue {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0 6px, transparent 6px 12px);
+}
+.tl-bar.ended {
+  opacity: 0.55;
+}
+.tl-bar.live {
+  font-weight: 600;
+}
+.tl-bar.open-end {
+  -webkit-mask-image: linear-gradient(to right, #000 70%, transparent);
+  mask-image: linear-gradient(to right, #000 70%, transparent);
+}
+/* Banners you pulled on link to their card. */
+.tl-bar.mine {
+  cursor: pointer;
+}
+.tl-bar.mine:hover {
+  filter: brightness(1.15);
+}
+.tl-now {
+  position: absolute;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--gray-1000);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--gray-1000) 35%, transparent);
+  pointer-events: none;
+}
+.tl-now span {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  font: 600 10px/12px var(--font-sans);
+  text-transform: uppercase;
+  color: var(--gray-1000);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .sched-next {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .sched-thumb {
+    width: 72px;
+    height: 40px;
+  }
+  .sched-next-when {
+    grid-column: 2;
+    flex-direction: row;
+    gap: 6px;
+    align-items: baseline;
+  }
+}
+
+/* Home: events in rows, with a type icon where banners have art. */
+.sched-evt-icon {
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-border);
+}
+.sched-evt-icon .icon {
+  font-size: 24px;
+  color: var(--amber);
+}
+.tl-bar.evt {
+  color: var(--gray-1000);
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 45%, transparent);
+}
+/* Long-press opens Copy to Discord on touch screens: no native callout or
+   text selection on those items. */
+@media (hover: none) {
+  [data-discord] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+.ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  box-shadow: var(--shadow-border), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.ctx-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--gray-1000);
+  font: 500 13px/18px var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.ctx-menu button:hover,
+.ctx-menu button:focus-visible {
+  background: var(--gray-alpha-200);
+  outline: none;
+}
+.ctx-menu .icon {
+  font-size: 16px;
+  color: var(--gray-900);
+}
+
+/* In-page confirmation (used when an import looks like another player's). */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+}
+.dialog {
+  width: min(460px, 100%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Home starts straight with the banner cards (no page title). */
+.home {
+  padding-top: 28px;
+}
+.home .sched-import {
+  margin-bottom: 20px;
 }

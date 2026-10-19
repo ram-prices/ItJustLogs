@@ -85,6 +85,7 @@ export const TAB_ICON: Record<string, Html> = {
     '<svg class="tab-icon" viewBox="0 0 89.90 89.90" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M77.81 2.37 L89.90 14.46 L88.34 16.03 L82.22 16.03 L69.37 28.87 L69.37 30.71 L75.34 30.71 L80.79 36.17 L68.54 48.42 L50.15 30.03 ZM11.96 2.71 L87.62 78.37 L78.81 87.18 L62.84 71.21 L58.09 71.21 L45.09 58.21 L30.65 72.65 L28.22 70.21 L10.90 87.53 L2.53 79.15 L2.53 77.84 L25.46 54.90 L21.59 51.03 L24.00 48.62 L21.25 48.62 L9.06 36.43 L14.90 30.59 L20.50 30.59 L20.50 28.99 L6.90 15.40 L3.46 15.40 L2.09 16.77 L0.00 14.68 Z"/></svg>',
   ),
   // Material Symbols, filled to match the solid shapes above.
+  home: raw('<span class="tab-icon icon filled" aria-hidden="true">home</span>'),
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
   settings: raw('<span class="tab-icon icon filled" aria-hidden="true">settings</span>'),
 };

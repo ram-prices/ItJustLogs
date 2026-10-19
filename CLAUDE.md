@@ -29,8 +29,35 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   `banners.ts` (pool ids → category/patch/rate-up, asset URLs), `pity.ts`
   (probability model), `analyze.ts` (per-banner pity/guarantee/luck),
   `patches.ts` (patch + weekly aggregation). Covered by `domain.test.ts`.
-- `src/state.ts`: app state + `subscribe`.
+- `src/state.ts`: app state + `subscribe` (redraws) and `onChange` (what the
+  player changed: history, settings, a picture; sync listens to it).
 - `src/store.ts`: persistence (localStorage, IndexedDB, ef-assets fetch).
+- Optional Google Drive sync: `src/drive.ts` (Google Identity Services token
+  client + Drive REST, scope `drive.appdata` only, so the app sees nothing but
+  its own hidden appDataFolder) and `ui/sync.ts` (merge rules). The Drive copy
+  is one file, `itjustlogs-backup.json`, in the full-backup shape of `ui/io.ts`
+  plus `changed` times. Pulls merge like an import, with the same same-player
+  check and dialog (`ui/dialog.ts`); settings and each picture are taken whole
+  from whichever side changed them last (ties go to Drive); Drive's file
+  `version` is re-checked right before each upload. Deleting or replacing pulls
+  sets `replaceHistory`, so the next sync overwrites Drive's pulls instead of
+  merging them back. Tokens last an hour and there's no backend to refresh
+  them: each visit needs one click (header Sync button / Sync now). The token
+  lives in sessionStorage only. Google's script is loaded only when the sync
+  card is shown or sync is on; no other visitor ever contacts Google.
+  - It's off unless the build has `VITE_GOOGLE_CLIENT_ID` (a public value).
+    Locally: put `VITE_GOOGLE_CLIENT_ID=...` in `.env.local` (gitignored). On
+    Pages: the deploy workflow reads the repo variable `GOOGLE_CLIENT_ID`
+    (Settings → Secrets and variables → Actions → Variables). Without it the
+    card is hidden and nothing else changes.
+  - Google Cloud setup (owner, once): create a project; APIs & Services →
+    enable the Google Drive API; OAuth consent screen (Google Auth Platform):
+    External, app name ItJustLogs, support email, add the scope
+    `.../auth/drive.appdata` (non-sensitive), authorized domain
+    `itjustlogs.dev`, then Publish (in Testing only listed test users can sign
+    in); Clients → Create client → Web application, Authorized JavaScript
+    origins `https://itjustlogs.dev` and `http://localhost:5173` (no redirect
+    URIs needed). Copy the client ID into `.env.local` and the repo variable.
 - UI: Geist typography and tokens as the base, but the owner is deliberately
   drifting from strict Geist toward the original eftracker feel: banner cards
   are "acrylic" (blurred art backdrop under translucent panels, hero art with
@@ -56,11 +83,15 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     there (alphabetical).
   - Sentence-case labels; inline styles only for data-driven values.
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
-    `ui/app.ts` renders header + tabs, routes on clean paths (`/operators`,
-    `/operators/<poolId>`, `/arsenal[/<poolId>]`, `/stats`, `/settings`;
-    `/` is Operators) with `history.pushState` for in-page links, rewrites
+    `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
+    `/operators`, `/operators/<poolId>`, `/arsenal[/<poolId>]`, `/stats`,
+    `/settings`) with `history.pushState` for in-page links, rewrites
     old `#/...` links, and holds the delegated `data-action` click handlers.
-    Pages live in `ui/pages/` (`kind.ts` = operators/arsenal: every banner as a fixed-height card
+    Pages live in `ui/pages/` (`home.ts` = the schedule: banners open now
+    with your pity and rate-up status, events now, coming up, and a
+    version/banner/event timeline; works without an import; anything with
+    `data-discord` gets a right-click / long-press "Copy to Discord" menu
+    whose text comes from `discordText` in `domain/schedule.ts`; `kind.ts` = operators/arsenal: every banner as a fixed-height card
     whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/operators/<poolId>` opens one), `stats.ts`, `settings.ts`); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
@@ -83,6 +114,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   Rewards: a Selector on set 10 (non-rate-up weapons, not a copy), then every 8
   sets alternating a rate-up copy and a Selector (18 copy, 26 Selector, ...). `analyze.ts` stores weapon pity,
   guarantee and rewards in sets (`setOf`); rulers and labels show set numbers.
+- Imports check they're from the same player (`compareHistories` in
+  `parse.ts`): within the saved history's time span, an export of the same
+  account has the same pulls (time + item; seqId is ignored since some
+  exporters omit it). Under 90% matching, or no overlap at all, the app asks
+  (Cancel / Replace saved pulls / Add anyway) instead of merging.
 - Free pulls never touch pity. Banner rewards are listed in the export but are
   not pulls and are filtered out (`isGift`: any `kind: gift_*`):
   `gift_intel_book` (Headhunting Dossier), `gift_operator_token` (Token),
@@ -93,4 +129,13 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
 - Banner names/rate-ups come from `ram-prices/ef-assets/banners.json`
   (snapshot in `src/data/` for offline/tests, refreshed at runtime). Fix bad
   banner data there, not with special cases here.
+- The banner schedule is ef-assets `schedule.json` (snapshot in `src/data/`,
+  types and helpers in `domain/schedule.ts`). ef-assets builds it from the
+  official news feed with `scripts/update-schedule.mjs` (a workflow runs it
+  every 3 days and opens a PR). Times are per server: dated banners open at
+  the same local time on Americas/Europe (UTC-5) and Asia (UTC+8), 13 hours
+  apart; version updates are one instant. `end` is null while it depends on
+  an unannounced banner. `events` come from each version's update notes
+  ("New Events"); some have separate windows per server. The player's server is a setting (guessed from the
+  time zone until chosen).
 - `fixtures/` is gitignored and holds the owner's real export. Never commit it.

@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import db from '../data/banners.snapshot.json';
 import { analyze } from './analyze';
 import { canonicalPoolId, categoryOf, patchOf } from './banners';
-import { mergeHistories, parseHistoryJson } from './parse';
+import { compareHistories, mergeHistories, parseHistoryJson } from './parse';
 import { weeklyTimeline, patchStats } from './patches';
 import {
   CHARTERED,
@@ -14,6 +14,8 @@ import {
   pullsForChance,
   rateUpPmf,
 } from './pity';
+import scheduleSnapshot from '../data/schedule.snapshot.json';
+import { discordText, guessServer, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
 import type { BannerDb, PullHistory } from './types';
 
 const bannerDb = db as BannerDb;
@@ -212,5 +214,98 @@ describe.runIf(existsSync(FIXTURE))('real pull history fixture', () => {
         .map((b) => `${b.name}: pity ${b.pity.value}/${b.pity.max} guarantee ${b.guarantee?.value ?? '-'}`)
         .join('\n'),
     );
+  });
+});
+
+describe('banner schedule', () => {
+  const schedule = scheduleSnapshot as Schedule;
+  const banner = (start: string | null, end: string | null): ScheduleBanner => ({
+    name: 'Test',
+    kind: 'chartered',
+    rateUps: [],
+    poolId: null,
+    version: null,
+    start: start ? { americas: start, asia: start } : null,
+    end: end ? { americas: end, asia: end } : null,
+    availability: null,
+    art: null,
+    posts: [],
+  });
+  const t = (s: string) => Date.parse(s);
+
+  it('knows when a banner is open', () => {
+    const b = banner('2026-10-14T23:00:00-05:00', '2026-11-05T11:59:00-05:00');
+    expect(statusOf(b, t('2026-10-01T00:00:00Z'), 'americas')).toBe('upcoming');
+    expect(statusOf(b, t('2026-10-20T00:00:00Z'), 'americas')).toBe('live');
+    expect(statusOf(b, t('2026-11-06T00:00:00Z'), 'americas')).toBe('ended');
+    // An unannounced end keeps a banner open for a while, not forever.
+    const open = banner('2026-10-14T23:00:00-05:00', null);
+    expect(statusOf(open, t('2026-11-20T00:00:00Z'), 'americas')).toBe('live');
+    expect(statusOf(open, t('2027-03-01T00:00:00Z'), 'americas')).toBe('ended');
+    expect(statusOf(banner(null, null), t('2026-10-20T00:00:00Z'), 'americas')).toBe('upcoming');
+  });
+
+  it("writes Discord timestamps for the reader's own time zone", () => {
+    const b = banner('2026-10-29T12:00:00-05:00', '2026-11-19T04:00:00-05:00');
+    const open = Date.parse('2026-10-29T17:00:00Z') / 1000;
+    const close = Date.parse('2026-11-19T09:00:00Z') / 1000;
+    expect(discordText(b, 'Challenge Event', 'americas', t('2026-10-20T00:00:00Z'))).toBe(
+      [`**Test** · Challenge Event`, `Opens <t:${open}:F> (<t:${open}:R>)`, `Ends <t:${close}:F>`, `-# Americas / Europe server`].join('\n'),
+    );
+    expect(discordText(b, 'Chartered Headhunting', 'americas', t('2026-11-01T00:00:00Z'), ['Si'])).toContain(
+      ['Rate-up: Si', `Ends <t:${close}:F> (<t:${close}:R>)`].join('\n'),
+    );
+  });
+
+  it('packs overlapping banners into separate lanes', () => {
+    expect(packLanes([{ start: 0, end: 10 }, { start: 5, end: 15 }, { start: 10, end: 20 }, { start: 16, end: 30 }])).toEqual([0, 1, 0, 1]);
+  });
+
+  it('guesses the server from the time zone', () => {
+    expect(guessServer(-240)).toBe('americas'); // UTC-4
+    expect(guessServer(60)).toBe('americas'); // UTC+1 (Europe)
+    expect(guessServer(480)).toBe('asia'); // UTC+8
+  });
+
+  it('has the same dated opening 13 hours apart on the two servers', () => {
+    const rejuv = schedule.banners.find((b) => b.name === 'Ancestral Spring Flows Anew')!;
+    expect(timeOn(rejuv.start, 'americas')! - timeOn(rejuv.start, 'asia')!).toBe(13 * 3_600_000);
+  });
+
+  it('ships a complete bundled schedule', () => {
+    expect(schedule.versions[0].name).toBe('Launch');
+    for (const b of schedule.banners) {
+      expect(b.start, b.name).not.toBeNull();
+      if (b.end) expect(timeOn(b.end, 'americas')!, b.name).toBeGreaterThan(timeOn(b.start, 'americas')!);
+    }
+    // Banners from the news feed that have a pool line up with banners.json.
+    for (const b of schedule.banners.filter((x) => x.poolId)) expect(bannerDb[b.poolId!]?.name?.toLowerCase(), b.name).toBe(b.name.toLowerCase());
+  });
+});
+
+describe('same-player check on import', () => {
+  const pull = (n: number, charId: string, day = n) => ({ seqId: String(n), gachaTs: String(Date.UTC(2026, 0, day)), charId, charName: charId, rarity: 4, poolId: 'standard' });
+  const mine = { characters: Array.from({ length: 30 }, (_, i) => pull(i + 1, `chr_${i % 7}`)), weapons: [] } as unknown as PullHistory;
+
+  it('accepts a later export of the same account', () => {
+    // Overlaps days 20-30 and adds days 31-40.
+    const later = { characters: Array.from({ length: 21 }, (_, i) => pull(i + 20, `chr_${(i + 19) % 7}`)), weapons: [] } as unknown as PullHistory;
+    expect(compareHistories(mine, later)).toMatchObject({ verdict: 'same', foreign: 0 });
+  });
+
+  it('ignores missing seqIds (older exporters)', () => {
+    const noSeq = { characters: mine.characters.map((r) => ({ ...r, seqId: undefined })), weapons: [] } as unknown as PullHistory;
+    expect(compareHistories(mine, noSeq).verdict).toBe('same');
+  });
+
+  it("flags someone else's pulls from the same period", () => {
+    const friend = { characters: Array.from({ length: 30 }, (_, i) => pull(i + 1, `chr_${(i + 3) % 5}x`)), weapons: [] } as unknown as PullHistory;
+    expect(compareHistories(mine, friend).verdict).toBe('different');
+  });
+
+  it("can't tell when the periods don't overlap, and doesn't ask when nothing is saved", () => {
+    const later = { characters: [pull(100, 'chr_1', 60)], weapons: [] } as unknown as PullHistory;
+    expect(compareHistories(mine, later).verdict).toBe('noOverlap');
+    expect(compareHistories(null, later).verdict).toBe('empty');
   });
 });

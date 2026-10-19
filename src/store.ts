@@ -1,5 +1,7 @@
 import snapshot from './data/banners.snapshot.json';
+import scheduleSnapshot from './data/schedule.snapshot.json';
 import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
+import type { Schedule, Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
 
 /**
@@ -9,7 +11,13 @@ import type { BannerDb, PullHistory } from './domain/types';
  * already have filled it. Only small settings and the banner cache use
  * localStorage, because the theme has to be readable synchronously at startup.
  */
-const KEYS = { history: 'ijl.history', settings: 'ijl.settings', bannerDb: 'ijl.bannerDb' } as const;
+const KEYS = {
+  history: 'ijl.history',
+  settings: 'ijl.settings',
+  bannerDb: 'ijl.bannerDb',
+  schedule: 'ijl.schedule',
+  sync: 'ijl.sync',
+} as const;
 
 export type ThemePref = 'system' | 'light' | 'dark';
 
@@ -26,6 +34,8 @@ export interface Settings {
   bannerBlur: number;
   /** Header image vertical position in %. */
   bannerPos: number;
+  /** Game server whose times the schedule shows; unset = guessed from the time zone. */
+  server?: Server;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -83,6 +93,37 @@ export async function saveHistory(h: PullHistory): Promise<void> {
 export const loadSettings = (): Settings => ({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) });
 export const saveSettings = (s: Settings): void => writeJson(KEYS.settings, s);
 
+/** What changed when (ms), so Google Drive sync can tell which copy is newer. 0 = never changed here. */
+export interface ChangeTimes {
+  settings: number;
+  avatar: number;
+  header: number;
+}
+
+/** Google Drive sync bookkeeping. The access token itself is never stored here. */
+export interface SyncMeta {
+  /** Signed in: sync after each change. */
+  on: boolean;
+  email?: string;
+  /** The Drive file and the version of it this browser last read or wrote. */
+  fileId?: string;
+  version?: string;
+  /** Hash of what this browser last uploaded, to skip unchanged uploads. */
+  hash?: string;
+  lastSynced?: number;
+  /** Pulls were deleted or replaced here: the next sync overwrites Drive's pulls instead of merging them back. */
+  replaceHistory?: boolean;
+  /** Drive's copy looked like another player's and the player chose Cancel: wait for Sync now. */
+  paused?: boolean;
+  changed: ChangeTimes;
+}
+
+export const loadSyncMeta = (): SyncMeta => {
+  const saved = readJson<Partial<SyncMeta>>(KEYS.sync);
+  return { on: false, ...saved, changed: { settings: 0, avatar: 0, header: 0, ...saved?.changed } };
+};
+export const saveSyncMeta = (m: SyncMeta): void => writeJson(KEYS.sync, m);
+
 /** Removes only the saved pull history; settings and images stay. */
 export async function clearHistory(): Promise<void> {
   localStorage.removeItem(KEYS.history);
@@ -103,21 +144,31 @@ export function cachedBannerDb(): BannerDb {
 }
 
 /** Fetches the live banners.json; resolves null if offline or unchanged. */
-export async function refreshBannerDb(): Promise<BannerDb | null> {
+export const refreshBannerDb = (): Promise<BannerDb | null> => refreshFile<BannerDb>('banners.json', KEYS.bannerDb);
+
+/** The banner schedule (ef-assets schedule.json, built from the official news feed). */
+export function cachedSchedule(): Schedule {
+  return readJson<Schedule>(KEYS.schedule) ?? (scheduleSnapshot as Schedule);
+}
+
+export const refreshSchedule = (): Promise<Schedule | null> => refreshFile<Schedule>('schedule.json', KEYS.schedule);
+
+/** Fetches an ef-assets file and caches it; resolves null if offline or unchanged. */
+async function refreshFile<T>(file: string, key: string): Promise<T | null> {
   for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
     try {
-      const res = await fetch(`${base}/banners.json`, { signal: AbortSignal.timeout(6000), cache: 'no-cache' });
+      const res = await fetch(`${base}/${file}`, { signal: AbortSignal.timeout(6000), cache: 'no-cache' });
       if (!res.ok) continue;
-      const db = (await res.json()) as BannerDb;
-      const before = localStorage.getItem(KEYS.bannerDb);
-      const after = JSON.stringify(db);
+      const data = (await res.json()) as T;
+      const before = localStorage.getItem(key);
+      const after = JSON.stringify(data);
       if (before === after) return null;
       try {
-        localStorage.setItem(KEYS.bannerDb, after);
+        localStorage.setItem(key, after);
       } catch {
         /* cache is optional; the bundled snapshot covers offline use */
       }
-      return db;
+      return data;
     } catch {
       /* try the next mirror */
     }

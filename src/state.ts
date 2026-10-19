@@ -1,11 +1,13 @@
 import { analyze, type Analysis } from './domain/analyze';
 import { mergeHistories } from './domain/parse';
+import { guessServer, type Schedule, type Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
 import * as store from './store';
 
 interface State {
   history: PullHistory | null;
   db: BannerDb;
+  schedule: Schedule;
   analysis: Analysis | null;
   settings: store.Settings;
   images: Partial<Record<store.ImageSlot, string>>;
@@ -14,6 +16,7 @@ interface State {
 export const state: State = {
   history: null,
   db: store.cachedBannerDb(),
+  schedule: store.cachedSchedule(),
   analysis: null,
   settings: store.loadSettings(),
   images: {},
@@ -22,6 +25,12 @@ export const state: State = {
 const listeners = new Set<() => void>();
 export const subscribe = (fn: () => void): void => void listeners.add(fn);
 const emit = () => listeners.forEach((fn) => fn());
+
+/** What a change touched: Google Drive sync uploads after the player's own changes. */
+export type Change = 'history' | 'historyCleared' | 'settings' | store.ImageSlot | 'everything';
+const changeListeners = new Set<(c: Change) => void>();
+export const onChange = (fn: (c: Change) => void): void => void changeListeners.add(fn);
+const changed = (c: Change) => changeListeners.forEach((fn) => fn(c));
 
 function recompute(): void {
   const h = state.history;
@@ -46,6 +55,7 @@ export async function importHistory(incoming: PullHistory): Promise<{ char: numb
   state.history = history;
   recompute();
   emit();
+  if (added.char || added.weap) changed('history');
   return added;
 }
 
@@ -55,10 +65,19 @@ export function setBannerDb(db: BannerDb): void {
   emit();
 }
 
+export function setSchedule(schedule: Schedule): void {
+  state.schedule = schedule;
+  emit();
+}
+
+/** The server whose times to show: the player's choice, else a guess from their time zone. */
+export const currentServer = (): Server => state.settings.server ?? guessServer();
+
 export function updateSettings(patch: Partial<store.Settings>): void {
   state.settings = { ...state.settings, ...patch };
   store.saveSettings(state.settings);
   emit();
+  changed('settings');
 }
 
 export async function setImage(slot: store.ImageSlot, blob: Blob | null): Promise<void> {
@@ -71,6 +90,7 @@ export async function setImage(slot: store.ImageSlot, blob: Blob | null): Promis
     delete state.images[slot];
   }
   emit();
+  changed(slot);
 }
 
 export async function loadImages(): Promise<void> {
@@ -87,6 +107,7 @@ export async function clearHistory(): Promise<void> {
   state.history = null;
   recompute();
   emit();
+  changed('historyCleared');
 }
 
 /** Deletes everything this site saved in the browser and resets the page to its empty state. */
@@ -97,4 +118,5 @@ export async function clearEverything(): Promise<void> {
   state.settings = store.loadSettings();
   recompute();
   emit();
+  changed('everything');
 }

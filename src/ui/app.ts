@@ -1,15 +1,19 @@
 import type { Kind } from '../domain/types';
-import { clearEverything, clearHistory, setImage, state, subscribe, updateSettings } from '../state';
+import type { Server } from '../domain/schedule';
+import { clearEverything, clearHistory, currentServer, setImage, state, subscribe, updateSettings } from '../state';
 import type { ThemePref } from '../store';
 import { installTooltips } from './charts';
 import { installImageFallback, toast } from './common';
 import { LOGO, TAB_ICON, icon, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
 import { html, raw, render, type Html } from './html';
-import { exportBackup, exportHistory, importText } from './io';
+import { askSamePlayer } from './dialog';
+import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
+import { homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage } from './pages/stats';
+import { installSync, onSyncStatus, signIn, signOut, syncNeedsClick, syncNow } from './sync';
 import { installTint, tintWeaponCards } from './tint';
 
 /**
@@ -18,8 +22,9 @@ import { installTint, tintWeaponCards } from './tint';
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'operators' | 'arsenal' | 'stats' | 'settings';
+type Page = 'home' | 'operators' | 'arsenal' | 'stats' | 'settings';
 const TABS: [Page, string][] = [
+  ['home', 'Home'],
   ['operators', 'Operators'],
   ['arsenal', 'Arsenal'],
   ['stats', 'Stats'],
@@ -32,10 +37,10 @@ interface Route {
   id?: string;
 }
 
-/** Pages are clean paths: /operators, /arsenal/<poolId>, /stats, /settings ("/" is Operators). */
+/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /stats, /settings. */
 function parseRoute(): Route {
   const [page, id] = location.pathname.replace(/^\/+/, '').split('/');
-  const p = (TABS.some(([t]) => t === page) ? page : 'operators') as Page;
+  const p = (TABS.some(([t]) => t === page) ? page : 'home') as Page;
   return { page: p, id: id ? decodeURIComponent(id) : undefined };
 }
 
@@ -59,12 +64,13 @@ function header(route: Route): Html {
             </div>`
         : ''}
       <span class="spacer"></span>
+      ${syncNeedsClick() ? html`<button class="btn secondary sm" data-action="sync-now" title="Sync with Google Drive">${icon('sync')}<span class="hide-sm">Sync</span></button>` : ''}
       <button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>
     </div>
     <nav class="tabs" aria-label="Sections">
       ${TABS.map(([page, label]) => {
         const disabled = !has && DATA_PAGES.includes(page);
-        return html`<a class="tab" href="/${page}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
+        return html`<a class="tab tab-${page}" href="/${page === 'home' ? '' : page}" aria-label="${label}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
       })}
     </nav>
   </div></header>`;
@@ -96,6 +102,7 @@ function welcome(): Html {
 function page(route: Route): Html {
   const a = state.analysis;
   if (route.page === 'settings') return html`${settingsPage()}<div class="container">${aboutCard()}</div>`;
+  if (route.page === 'home') return homePage(state.schedule, currentServer(), a);
   if (!a) return welcome();
   switch (route.page) {
     case 'operators':
@@ -121,6 +128,8 @@ function applyTheme(): void {
 function draw(): void {
   applyTheme();
   const route = parseRoute();
+  // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
+  const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
   render(root(), html`${header(route)}${page(route)}`);
   const key = `${route.page}/${route.id ?? ''}`;
   if (key !== lastKey) {
@@ -128,6 +137,10 @@ function draw(): void {
     const target = route.id && document.getElementById(`banner-${route.id}`);
     if (target) target.scrollIntoView({ block: 'start' });
     else scrollTo({ top: 0 });
+    if (route.page === 'home') scrollTimelineToNow();
+  } else if (timelineScroll != null) {
+    const tl = document.querySelector('.tl-scroll');
+    if (tl) tl.scrollLeft = timelineScroll;
   }
   lastKey = key;
   markOverflow();
@@ -186,12 +199,19 @@ function toggleCard(card: HTMLElement): void {
 // Import: file picker, drag & drop anywhere, paste anywhere
 // ---------------------------------------------------------------------------
 
-async function runImport(text: string, source: string): Promise<void> {
+async function runImport(text: string, source: string, mode: ImportMode = 'check'): Promise<void> {
   try {
-    await importText(text, source);
+    await importText(text, source, mode);
   } catch (e) {
-    toast((e as Error).message, 'error');
+    if (e instanceof ImportMismatch) void askAboutMismatch(e);
+    else toast((e as Error).message, 'error');
   }
+}
+
+/** A file that doesn't look like the saved player's history: ask before mixing two players' pulls. */
+async function askAboutMismatch(e: ImportMismatch): Promise<void> {
+  const choice = await askSamePlayer(e.match, e.source);
+  if (choice !== 'cancel') await runImport(e.text, e.source, choice);
 }
 
 function installImport(): void {
@@ -344,6 +364,8 @@ async function onClick(e: MouseEvent): Promise<void> {
     }
     case 'theme':
       return updateSettings({ theme: el.dataset.value as ThemePref });
+    case 'server':
+      return updateSettings({ server: el.dataset.value as Server });
     case 'copy-script':
       try {
         await navigator.clipboard.writeText(EXPORTER_SOURCE);
@@ -354,6 +376,12 @@ async function onClick(e: MouseEvent): Promise<void> {
       return;
     case 'export-history':
       return exportHistory();
+    case 'sync-signin':
+      return signIn();
+    case 'sync-now':
+      return syncNow();
+    case 'sync-signout':
+      return signOut();
     case 'export-backup':
       return exportBackup();
     case 'clear-all':
@@ -386,7 +414,10 @@ export function mount(): void {
   installTint();
   installTooltips();
   installImport();
+  installTimelineLabels();
+  installDiscordMenu();
   installProfile();
+  installSync();
   document.addEventListener('click', (e) => void onClick(e));
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
@@ -405,5 +436,6 @@ export function mount(): void {
   addEventListener('popstate', draw);
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
   subscribe(draw);
+  onSyncStatus(draw);
   draw();
 }
