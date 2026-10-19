@@ -107,10 +107,9 @@ describe('component embeds', () => {
       const nodes = walk(root);
       expect(nodes.length).toBeLessThanOrEqual(40);
       expect(nodes.filter((n) => n.type === 17)).toHaveLength(1);
-      for (const b of nodes.filter((n) => n.type === 2)) {
-        expect(b.style).toBe(5);
-        expect(Object.keys(b).every((k) => ['id', 'type', 'url', 'style', 'label', 'emoji', 'disabled'].includes(k))).toBe(true);
-      }
+      // No buttons: the wiki link lives in the credit line instead.
+      expect(nodes.some((n) => n.type === 1 || n.type === 2)).toBe(false);
+      expect(String(nodes.at(-1)!.content)).toMatch(/^-# .*Data from \[endfield\.wiki\.gg\]\(https:\/\/endfield\.wiki\.gg\/wiki\/[^()\s]+\), CC BY-SA 4\.0$/);
     }
   });
 
@@ -119,6 +118,8 @@ describe('component embeds', () => {
     const e = operatorEmbed(o, operatorPreview('chr_0016_laevat', o));
     const text = walk(e.component as Node).map((n) => n.content ?? '').join('\n');
     expect(text).toContain('does not shorten the duration of the ultimate, Twilight.');
+    expect(text).toContain('6★ Striker · 🔥 Heat · Sword');
+    for (const op of Object.values(operators)) expect(operatorPreview('x', op).description).toMatch(/^(💥|🔥|❄️|⚡|🌿) /u);
     // Basic attacks are named only; their text is the same on every operator.
     expect(text).toContain('**Basic Attack · Flaming Cinders**');
     expect(text).not.toContain('DIVE ATTACK');

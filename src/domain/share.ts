@@ -136,12 +136,17 @@ const summaryText = (s: { type: string; description?: string }): string => (s.ty
 
 const stars = (n: number): string => `${n}★`;
 
+/** Unicode, not server emoji: a link preview has no app or server to take custom ones from. */
+const ELEMENT_EMOJI: Record<string, string> = { Physical: '💥', Heat: '🔥', Cryo: '❄️', Electric: '⚡', Nature: '🌿' };
+/** "🔥 Heat"; an element without an emoji stays plain text. */
+const element = (e: string): string => (ELEMENT_EMOJI[e] ? `${ELEMENT_EMOJI[e]} ${e}` : e);
+
 // ---------------------------------------------------------------------------
 // Operators
 // ---------------------------------------------------------------------------
 
 export function operatorPreview(id: string, o: ShareOperator): Preview {
-  const facts = [o.element, o.weapon, o.faction].filter(Boolean).join(' · ');
+  const facts = [element(o.element), o.weapon, o.faction].filter(Boolean).join(' · ');
   const skills = uniqueSkills(o.skills).map((s) => `${s.type}: ${s.name}`);
   return {
     title: clip(`${o.name} · ${stars(o.rarity)} ${o.class}`, TITLE_BYTES, utf8Bytes),
@@ -158,7 +163,7 @@ const footer = (url: string): string => `-# Data from endfield.wiki.gg, CC BY-SA
 export function operatorDiscord(id: string, o: ShareOperator): string {
   const head = [
     `**${md(o.name)}** · ${stars(o.rarity)} ${md(o.class)}`,
-    [o.element, o.weapon, o.faction].filter(Boolean).map((s) => md(s!)).join(' · '),
+    [element(o.element), o.weapon, o.faction].filter(Boolean).map((s) => md(s!)).join(' · '),
     ...(o.tags.length ? [`-# ${o.tags.map(md).join(' · ')}`] : []),
   ].join('\n');
   const tail = footer(operatorUrl(id));
@@ -229,11 +234,14 @@ export interface ComponentEmbed {
 
 const textDisplay = (content: string): Component => ({ type: 10, content });
 const separator: Component = { type: 14, spacing: 1 };
-const linkButton = (label: string, url: string): Component => ({ type: 2, style: 5, label, url });
-const buttons = (p: Preview, wiki: string | undefined): Component => ({
-  type: 1,
-  components: [linkButton('Open in ItJustLogs', p.url), ...(wiki ? [linkButton('Wiki page', wiki)] : [])],
-});
+/**
+ * The wiki credit (CC BY-SA asks for a link to the source), linked to the
+ * item's wiki page. Brackets in the URL are encoded so they can't end the link.
+ */
+const credit = (page: string | undefined, before = ''): Component =>
+  textDisplay(
+    `-# ${before}Data from ${page ? `[endfield.wiki.gg](${page.replace(/\(/g, '%28').replace(/\)/g, '%29')})` : 'endfield.wiki.gg'}, CC BY-SA 4.0`,
+  );
 
 /** The name and facts, with the portrait beside them when ef-assets has one. */
 const header = (content: string, image: string): Component =>
@@ -263,7 +271,7 @@ function fitEmbed(bodies: string[], build: (bodies: string[]) => ComponentEmbed)
 export function operatorEmbed(o: ShareOperator, p: Preview): ComponentEmbed {
   const head = [
     `## ${md(o.name)}`,
-    `${stars(o.rarity)} ${md(o.class)} · ${[o.element, o.weapon].map(md).join(' · ')}`,
+    `${stars(o.rarity)} ${md(o.class)} · ${[element(o.element), o.weapon].map(md).join(' · ')}`,
     `-# ${[o.faction, ...o.tags].filter(Boolean).map((s) => md(s!)).join(' · ')}`,
   ].join('\n');
   const skills = uniqueSkills(o.skills);
@@ -274,9 +282,7 @@ export function operatorEmbed(o: ShareOperator, p: Preview): ComponentEmbed {
       header(head, p.image),
       separator,
       ...titles.map((t, i) => textDisplay(b[i] ? `${t}\n${b[i]}` : t)),
-      separator,
-      buttons(p, o.page),
-      textDisplay('-# Data from endfield.wiki.gg, CC BY-SA 4.0'),
+      credit(o.page),
     ]),
   );
 }
@@ -296,9 +302,7 @@ export function weaponEmbed(w: ShareWeapon, p: Preview): ComponentEmbed {
       header(head, p.image),
       separator,
       ...titles.map((t, i) => textDisplay(b[i] ? `${t}\n${b[i]}` : t)),
-      separator,
-      buttons(p, w.page),
-      textDisplay('-# Skill values at ranks 1–9 · Data from endfield.wiki.gg, CC BY-SA 4.0'),
+      credit(w.page, 'Skill values at ranks 1–9 · '),
     ]),
   );
 }
