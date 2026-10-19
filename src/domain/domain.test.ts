@@ -89,6 +89,73 @@ describe('import + merge', () => {
   });
 });
 
+describe('Arsenal sets of 10', () => {
+  // Bedazzled Issue: rate-up is wpn_lance_0014. Everything else here is filler.
+  const weap = (n: number, rarity = 4, weaponId = 'wpn_filler') => ({
+    seqId: String(n),
+    gachaTs: String(1_000_000 + n),
+    weaponId,
+    weaponName: weaponId,
+    rarity,
+    poolId: 'weponbox_1_4_2',
+  });
+  const run = (count: number, sixes: Record<number, string>) => {
+    const weapons = Array.from({ length: count }, (_, i) => {
+      const n = i + 1;
+      return sixes[n] ? weap(n, 6, sixes[n]) : weap(n);
+    });
+    const a = analyze({ characters: [], weapons } as unknown as PullHistory, bannerDb);
+    return a.banners.find((b) => b.poolId === 'weponbox_1_4_2')!;
+  };
+
+  it('rewards (rate-up copies, Selectors) are not pulls', () => {
+    const gift = (n: number, kind: string) => ({ seqId: String(n), gachaTs: String(1_000_000 + n), kind, nameText: 'Reward', poolId: 'weponbox_1_4_2' });
+    const weapons = [...Array.from({ length: 180 }, (_, i) => weap(i + 1)), gift(181, 'gift_weapon_box'), gift(182, 'gift_weapon')];
+    const b = analyze({ characters: [], weapons } as unknown as PullHistory, bannerDb).banners.find((x) => x.poolId === 'weponbox_1_4_2')!;
+    expect(b.pulls).toHaveLength(180);
+    expect(b.paidPulls).toBe(180);
+  });
+
+  it('a 6★ on pull 28 lands in set 3, so the guarantee is at 3/8', () => {
+    const b = run(30, { 28: 'wpn_offbanner' });
+    const six = b.pulls.find((p) => p.rarity === 6)!;
+    expect(six.pity).toBe(3);
+    expect(b.pity).toMatchObject({ value: 0, max: 4 });
+    expect(b.guarantee).toMatchObject({ value: 3, max: 8, done: false });
+    expect(b.rewards).toMatchObject({ progress: 3, goal: 10, nextReward: 'Selector' });
+  });
+
+  it('pity counts whole sets after the set with the last 6★', () => {
+    const b = run(60, { 28: 'wpn_offbanner' });
+    expect(b.pity.value).toBe(3); // sets 4, 5, 6
+    expect(b.guarantee!.value).toBe(6);
+    const later = run(40, { 28: 'wpn_offbanner', 35: 'wpn_offbanner2' });
+    expect(later.pulls.filter((p) => p.rarity === 6).map((p) => p.pity)).toEqual([3, 1]);
+  });
+
+  it('two 6★ in the same set share that set’s pity', () => {
+    const b = run(30, { 21: 'wpn_offbanner', 28: 'wpn_offbanner2' });
+    expect(b.pulls.filter((p) => p.rarity === 6).map((p) => p.pity)).toEqual([3, 3]);
+  });
+
+  it('the guarantee is the 8th set', () => {
+    const b = run(80, { 75: 'wpn_lance_0014' });
+    const six = b.pulls.find((p) => p.rarity === 6)!;
+    expect(six.outcome).toBe('guaranteed');
+    expect(b.guarantee).toMatchObject({ value: 8, done: true });
+  });
+
+  it('rewards: Selector at set 10, then every 8 sets alternating rate-up copy and Selector', () => {
+    expect(run(90, {}).rewards).toMatchObject({ earned: 0, progress: 9, goal: 10, nextReward: 'Selector', copies: 0 });
+    expect(run(100, {}).rewards).toMatchObject({ earned: 1, progress: 0, goal: 8, nextReward: 'Rate-up copy', copies: 0 });
+    expect(run(180, {}).rewards).toMatchObject({ earned: 2, progress: 0, goal: 8, nextReward: 'Selector', copies: 1 });
+    expect(run(250, {}).rewards).toMatchObject({ earned: 2, progress: 7, goal: 8, nextReward: 'Selector', copies: 1 });
+    expect(run(340, {}).rewards).toMatchObject({ earned: 4, copies: 2, nextReward: 'Selector' });
+    const points = run(100, {}).rewards!.milestones(42).map((m) => `${m.at}:${m.name}`);
+    expect(points).toEqual(['10:Selector', '18:Rate-up copy', '26:Selector', '34:Rate-up copy', '42:Selector']);
+  });
+});
+
 const FIXTURE = new URL('../../fixtures/pull_history.json', import.meta.url);
 
 // fixtures/ is gitignored personal data, so CI won't have it. The describe body runs even
@@ -101,16 +168,17 @@ describe.runIf(existsSync(FIXTURE))('real pull history fixture', () => {
     result = analyze(history, bannerDb);
   });
 
-  it('counts every non-dossier record', () => {
+  it('counts every record except banner rewards (gift_*)', () => {
     const pulls = result.banners.reduce((n, b) => n + b.pulls.length, 0);
-    const dossiers = history.characters.filter((r) => r.kind === 'gift_intel_book').length;
-    expect(pulls).toBe(history.characters.length + history.weapons.length - dossiers);
+    const gifts = [...history.characters, ...history.weapons].filter((r) => String(r.kind ?? '').startsWith('gift_')).length;
+    expect(pulls).toBe(history.characters.length + history.weapons.length - gifts);
   });
 
   it('never exceeds hard pity and resets on every 6★', () => {
     for (const b of result.banners) {
       for (const p of b.pulls) {
-        if (p.pity !== null) expect(p.pity).toBeLessThanOrEqual(b.kind === 'weap' ? 40 : 80);
+        // Arsenal pity is counted in sets of 10, out of 4.
+        if (p.pity !== null) expect(p.pity).toBeLessThanOrEqual(b.kind === 'weap' ? 4 : 80);
       }
     }
   });

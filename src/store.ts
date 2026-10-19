@@ -83,12 +83,15 @@ export async function saveHistory(h: PullHistory): Promise<void> {
 export const loadSettings = (): Settings => ({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) });
 export const saveSettings = (s: Settings): void => writeJson(KEYS.settings, s);
 
+/** Removes only the saved pull history; settings and images stay. */
+export async function clearHistory(): Promise<void> {
+  localStorage.removeItem(KEYS.history);
+  await idb('data', 'readwrite', (s) => s.delete('history'));
+}
+
 export async function clearAll(): Promise<void> {
   Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
-  await Promise.all([
-    idb('data', 'readwrite', (s) => s.clear()).catch(() => undefined),
-    idb('images', 'readwrite', (s) => s.clear()).catch(() => undefined),
-  ]);
+  await Promise.all([idb('data', 'readwrite', (s) => s.clear()), idb('images', 'readwrite', (s) => s.clear())]);
 }
 
 // ---------------------------------------------------------------------------

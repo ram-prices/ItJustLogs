@@ -36,14 +36,41 @@ export interface AnalyzedPull extends Pull {
   bannerName: string;
 }
 
+export interface RewardMilestone {
+  /** Pull (or Arsenal set) the reward lands on. */
+  at: number;
+  name: string;
+  /** Whether this reward is a copy of the rate-up. */
+  copy: boolean;
+}
+
 export interface RewardTrack {
   label: string;
-  /** Pulls made toward the next reward. */
+  /** Pulls (Arsenal: sets) made toward the next reward. */
   progress: number;
-  /** Pulls needed for the next reward. */
+  /** Pulls (Arsenal: sets) between the previous reward and the next one. */
   goal: number;
+  /** Rewards already earned. */
   earned: number;
+  /** Of those, how many were copies of the rate-up. */
+  copies: number;
   nextReward: string;
+  /** Every reward point from the first up to `upTo`, in order. */
+  milestones(upTo: number): RewardMilestone[];
+}
+
+/** A reward every `every` pulls (Chartered Token, Joint Selector). */
+function fixedRewards(label: string, every: number, done: number, copy: boolean): RewardTrack {
+  const earned = Math.floor(done / every);
+  return {
+    label,
+    progress: done % every,
+    goal: every,
+    earned,
+    copies: copy ? earned : 0,
+    nextReward: label,
+    milestones: (upTo) => Array.from({ length: Math.floor(upTo / every) }, (_, i) => ({ at: (i + 1) * every, name: label, copy })),
+  };
 }
 
 export interface Meter {
@@ -117,21 +144,46 @@ function pityScope(kind: Kind, category: Category, poolId: string): string {
 }
 
 /**
- * Arsenal Issue milestone rewards: a selector box at 100 pulls, then every 80
- * pulls alternating rate-up copy and selector.
+ * Arsenal Issues are pulled in sets of 10, and the game counts each set as one
+ * "pull": 6★ pity is out of 4 sets, the rate-up guarantee lands on the 8th set,
+ * and rewards start on the 10th (see weaponRewards). Weapon pity, guarantee and rewards are
+ * all measured in sets.
  */
-function weaponRewards(paid: number): RewardTrack {
-  const FIRST = 100;
-  const EVERY = 80;
-  const earned = paid < FIRST ? 0 : 1 + Math.floor((paid - FIRST) / EVERY);
-  const prev = earned === 0 ? 0 : FIRST + (earned - 1) * EVERY;
-  const goal = earned === 0 ? FIRST : EVERY;
+export const WEAPON_SET = 10;
+export const WEAPON_PITY_SETS = 4;
+export const WEAPON_GUARANTEE_SETS = WEAPON_GUARANTEE / WEAPON_SET; // 8
+export const setOf = (pull: number) => Math.ceil(pull / WEAPON_SET);
+
+/**
+ * Arsenal Issue milestone rewards, in sets: a Selector on the 10th set (it
+ * offers weapons other than the rate-up), then every 8 sets alternating a
+ * rate-up copy and a Selector: 18 copy, 26 Selector, 34 copy, ...
+ * (The 8th-set rate-up guarantee is separate: it's a pull, not a reward.)
+ */
+const WEAPON_FIRST_REWARD = 10;
+const WEAPON_REWARD_EVERY = 8;
+const weaponMilestone = (i: number): RewardMilestone => ({
+  at: WEAPON_FIRST_REWARD + i * WEAPON_REWARD_EVERY,
+  name: i % 2 === 0 ? 'Selector' : 'Rate-up copy',
+  copy: i % 2 === 1,
+});
+
+function weaponRewards(sets: number): RewardTrack {
+  const earned = sets < WEAPON_FIRST_REWARD ? 0 : 1 + Math.floor((sets - WEAPON_FIRST_REWARD) / WEAPON_REWARD_EVERY);
+  const prevAt = earned === 0 ? 0 : weaponMilestone(earned - 1).at;
+  const next = weaponMilestone(earned);
   return {
     label: 'Issue rewards',
-    progress: paid - prev,
-    goal,
+    progress: sets - prevAt,
+    goal: next.at - prevAt,
     earned,
-    nextReward: earned % 2 === 0 ? 'Selector' : 'Rate-up copy',
+    copies: Math.floor(earned / 2),
+    nextReward: next.name,
+    milestones: (upTo) => {
+      const out: RewardMilestone[] = [];
+      for (let i = 0; weaponMilestone(i).at <= upTo; i++) out.push(weaponMilestone(i));
+      return out;
+    },
   };
 }
 
@@ -146,6 +198,9 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
   ] as const) {
     const pity = new Map<string, number>();
     const wonOnBanner = new Map<string, boolean>();
+    // Arsenal: the set that held the latest 6★, and the one before it (for a second 6★ in the same set).
+    const lastSixSet = new Map<string, number>();
+    const prevSixSet = new Map<string, number>();
 
     for (const p of pulls) {
       const poolId = canonicalPoolId(p.poolId);
@@ -167,7 +222,7 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
           firstTs: p.ts,
           lastTs: p.ts,
           startPity: pity.get(scope) ?? 0,
-          pity: { label: '6★ pity', value: 0, max: category === 'newHorizons' ? 40 : kind === 'weap' ? 40 : 80 },
+          pity: { label: '6★ pity', value: 0, max: category === 'newHorizons' ? 40 : kind === 'weap' ? WEAPON_PITY_SETS : 80 },
           guarantee: null,
           rewards: null,
           rateUpCopies: 0,
@@ -184,9 +239,25 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
       } else {
         b.paidPulls++;
         ap.bannerPull = b.paidPulls;
-        const current = (pity.get(scope) ?? 0) + 1;
-        ap.pity = current;
-        pity.set(scope, current);
+        if (kind === 'weap') {
+          // Pity in sets since the set that held the last 6★.
+          const set = setOf(b.paidPulls);
+          const last = lastSixSet.get(scope) ?? 0;
+          if (p.rarity === 6) {
+            const base = last === set ? (prevSixSet.get(scope) ?? 0) : last;
+            ap.pity = set - base;
+            if (last !== set) {
+              prevSixSet.set(scope, last);
+              lastSixSet.set(scope, set);
+            }
+          } else {
+            ap.pity = set - last;
+          }
+        } else {
+          const current = (pity.get(scope) ?? 0) + 1;
+          ap.pity = current;
+          pity.set(scope, current);
+        }
 
         if (p.rarity === 6) {
           pity.set(scope, 0);
@@ -221,7 +292,13 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
       if (b.kind !== kind) continue;
       // Pity as of this banner's last paid pull.
       const lastPaid = [...b.pulls].reverse().find((x) => x.pity !== null);
-      b.pity.value = lastPaid ? (lastPaid.rarity === 6 ? 0 : lastPaid.pity!) : b.startPity;
+      if (b.kind === 'weap') {
+        // Sets completed since the set that held the last 6★.
+        const lastSix = [...b.pulls].reverse().find((x) => x.rarity === 6 && x.bannerPull !== null);
+        b.pity.value = setOf(b.paidPulls) - (lastSix ? setOf(lastSix.bannerPull!) : 0);
+      } else {
+        b.pity.value = lastPaid ? (lastPaid.rarity === 6 ? 0 : lastPaid.pity!) : b.startPity;
+      }
       if (b.category === 'newHorizons' && b.pulls.some((x) => x.rarity === 6)) b.pity.done = true;
 
       const won = wonOnBanner.get(b.poolId) ?? false;
@@ -232,31 +309,21 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
           max: CHARTERED_GUARANTEE,
           done: won,
         };
-        b.rewards = {
-          label: 'Bonus copy',
-          progress: b.paidPulls % 240,
-          goal: 240,
-          earned: Math.floor(b.paidPulls / 240),
-          nextReward: 'Rate-up copy',
-        };
+        // Each Token is a copy of the rate-up.
+        b.rewards = fixedRewards('Token', 240, b.paidPulls, true);
       } else if (b.category === 'joint') {
-        b.rewards = {
-          label: 'Selector',
-          progress: b.paidPulls % 120,
-          goal: 120,
-          earned: Math.floor(b.paidPulls / 120),
-          nextReward: 'Selector',
-        };
+        // A Joint Selector picks one of the banner's rate-ups.
+        b.rewards = fixedRewards('Selector', 120, b.paidPulls, true);
       } else if (b.kind === 'weap') {
         if (b.category === 'limited' && b.info) {
           b.guarantee = {
             label: 'Rate-up guarantee',
-            value: won ? WEAPON_GUARANTEE : Math.min(b.paidPulls, WEAPON_GUARANTEE),
-            max: WEAPON_GUARANTEE,
+            value: won ? WEAPON_GUARANTEE_SETS : Math.min(setOf(b.paidPulls), WEAPON_GUARANTEE_SETS),
+            max: WEAPON_GUARANTEE_SETS,
             done: won,
           };
         }
-        b.rewards = weaponRewards(b.paidPulls);
+        b.rewards = weaponRewards(setOf(b.paidPulls));
       }
       const prev = latestByCategory.get(b.category);
       if (!prev || b.lastTs >= prev.lastTs) latestByCategory.set(b.category, b);

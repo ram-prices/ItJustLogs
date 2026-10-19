@@ -1,5 +1,4 @@
-import './legacy.css';
-import './style.css';
+import './styles.css';
 import { loadImages, loadSavedHistory, setBannerDb } from './state';
 import { refreshBannerDb } from './store';
 import { mount } from './ui/app';

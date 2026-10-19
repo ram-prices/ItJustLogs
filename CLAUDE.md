@@ -25,19 +25,42 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   `patches.ts` (patch + weekly aggregation). Covered by `domain.test.ts`.
 - `src/state.ts`: app state + `subscribe`.
 - `src/store.ts`: persistence (localStorage, IndexedDB, ef-assets fetch).
-- UI deliberately reproduces the old eftracker look exactly:
-  - `index.html` is eftracker's page shell (same ids); `src/legacy.css` is its
-    stylesheet copied verbatim. Put changes and the light variant in
-    `src/style.css` rather than editing legacy.css.
-  - `src/ui/model.ts` adapts the domain Analysis into the shapes eftracker's
-    renderers used (category names, 10-pull weapon blocks, FREE/TOKEN summary
-    items). `dashboard.ts`, `summary.ts`, `stats.ts`, `planner.ts`,
-    `settings.ts` are ports of the matching eftracker `js/render-*.js` files.
-  - `ui/app.ts` is the controller (tab slide animation, expand/filters, luck
-    drawers, imports). Events are delegated via `data-action`/`data-tab`.
-  - Pull rows and banner-box skeletons must stay whitespace-free between tags
-    (`tight()` in dashboard.ts): the old CSS renders that whitespace.
-  - Escape every user/game string with `escape` from `ui/html.ts`.
+- UI: Geist typography and tokens as the base, but the owner is deliberately
+  drifting from strict Geist toward the original eftracker feel: banner cards
+  are "acrylic" (blurred art backdrop under translucent panels, hero art with
+  a vignette, mono rate-up chip with a left accent bar, and a pity ruler with
+  6★ portrait pins inside the opened card). Keep that direction;
+  the Geist rules below are a baseline, not a ceiling.
+  - `src/styles.css` is the only stylesheet: Geist tokens first
+    (`--background-100/200`, `--gray-100..1000`, `--gray-alpha-*`, `--op`
+    purple = operators, `--ars` teal = arsenals, `--green/--amber/--red`
+    status, `--r6/5/4/3` rarity, `--radius-sm/md/lg` 6/8/12), then the Geist
+    type classes (`heading-48..14`, `copy-16..13`, `label-14..12`), then
+    components. Light theme is the `:root[data-theme='light']` token block.
+    Phone tweaks live in the `max-width: 640px` blocks.
+  - Vercel rules: borders are shadows (`--shadow-border`, `--shadow-card`,
+    never CSS `border` on cards); tracking in px shrinking with size (-2.4px
+    at 48, -1.28px at 32, -0.96px at 24, -0.32px at 16, 0 at 14); weights
+    400/500/600 only; Geist Mono uppercase for technical labels (metric
+    labels, table headers); pill badges; blue `--focus` ring and `--link`.
+    Colour is for data only (rarity, pity heat, operator/arsenal), not chrome.
+  - Fonts: Jost everywhere (weights 300–700 differentiate text: 400 body, 500
+    labels, 600 headings/numbers, 700 list names); Geist Mono only for code. Icons: Material Symbols Rounded weight 300,
+    loaded with an explicit `icon_names=` list in index.html: add new names
+    there (alphabetical).
+  - Sentence-case labels; inline styles only for data-driven values.
+  - `index.html` is a bare shell (`#app`, drop overlay, file input).
+    `ui/app.ts` renders header + tabs, routes on the hash (`#/operators`,
+    `#/operators/<poolId>`, `#/arsenal[/<poolId>]`, `#/stats`,
+    `#/settings`) and holds the delegated `data-action` click handlers.
+    Pages live in `ui/pages/` (`kind.ts` = operators/arsenal: every banner as a fixed-height card
+    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `#/operators/<poolId>` opens one), `stats.ts`, `settings.ts`); shared pieces in
+    `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
+    import/export in `ui/io.ts`; charts in `ui/charts.ts`.
+  - Escape every user/game string: use the `html` tagged template from
+    `ui/html.ts` (`raw()` only for trusted markup).
+  - Signature features of the old site (6★ portrait strip, pity ruler, luck
+    curves, profile header) are being re-added one at a time in Geist style.
 - `scripts/export-pulls.ps1`: the PowerShell exporter, shown in Settings → Get
   your data via `?raw`. Keep it readable and dependency-free. Its only network
   target must stay `ef-webview.gryphline.com`. Character pool types are a fixed
@@ -48,8 +71,16 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
 - Chartered Headhunting 6★ pity is shared across all Chartered banners; the
   120-pull rate-up guarantee is per banner. Basic, New Horizons and each Joint
   pool keep their own pity. Weapon pity and the 80-pull guarantee are per banner.
-- Free pulls never touch pity. "Headhunting Dossier" records (`kind:
-  gift_intel_book`) are not pulls and are filtered out.
+- Arsenal Issues are pulled in sets of 10 and the game treats each set as one
+  pull: weapon pity is out of 4 sets, the rate-up guarantee is the 8th set.
+  Rewards: a Selector on set 10 (non-rate-up weapons, not a copy), then every 8
+  sets alternating a rate-up copy and a Selector (18 copy, 26 Selector, ...). `analyze.ts` stores weapon pity,
+  guarantee and rewards in sets (`setOf`); rulers and labels show set numbers.
+- Free pulls never touch pity. Banner rewards are listed in the export but are
+  not pulls and are filtered out (`isGift`: any `kind: gift_*`):
+  `gift_intel_book` (Headhunting Dossier), `gift_operator_token` (Token),
+  `gift_weapon` (Arsenal rate-up copy, no `weaponId`), `gift_weapon_box`
+  (Selector). Reward counts come from the schedule in `analyze.ts`, not these.
 - `rateUpPmf` clamps `startPity` to `hardPity - 1`. Pity resets on hit, so
   `hardPity` itself is not a real state.
 - Banner names/rate-ups come from `ram-prices/ef-assets/banners.json`

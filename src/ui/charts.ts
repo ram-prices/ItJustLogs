@@ -1,4 +1,5 @@
 import type { TimelineBucket } from '../domain/patches';
+import { cumulative } from '../domain/pity';
 import { escape, fmtInt, html, raw, type Html } from './html';
 
 /**
@@ -14,9 +15,12 @@ function niceStep(max: number, target = 4): number {
   return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
 }
 
-const tipRow = (label: string, value: string, color?: string) =>
+/** Tooltip HTML helpers (values are escaped); used with a `data-tip` attribute. */
+export const tipRow = (label: string, value: string, color?: string) =>
   `<div class="t-row"><span>${color ? `<i style="background:${color}"></i>` : ''}${escape(label)}</span><b>${escape(value)}</b></div>`;
-const tip = (title: string, rows: string[]) =>
+/** A line of plain text in a tooltip, under the title. */
+export const tipNote = (text: string) => `<div class="t-note">${escape(text)}</div>`;
+export const tip = (title: string, rows: string[]) =>
   `<div class="t-title">${escape(title)}</div>${rows.join('')}`;
 
 /** Rounded-top column path anchored square to the baseline. */
@@ -67,7 +71,7 @@ export function weeklyChart(buckets: TimelineBucket[]): Html {
     }
     if (b.sixStars.length) {
       marks.push(
-        `<circle cx="${x0 + bw / 2}" cy="${y(total) - 9}" r="4" fill="var(--r6)" stroke="var(--surface)" stroke-width="2"/>`,
+        `<circle cx="${x0 + bw / 2}" cy="${y(total) - 9}" r="4" fill="var(--r6)" stroke="var(--background-100)" stroke-width="2"/>`,
       );
     }
     if (i % labelEvery === 0) marks.push(`<text x="${x0 + bw / 2}" y="${H - 8}" text-anchor="middle">${fmtWeek(b.start)}</text>`);
@@ -91,6 +95,10 @@ export function weeklyChart(buckets: TimelineBucket[]): Html {
     </svg>`)}
   </div>`;
 }
+
+// ---------------------------------------------------------------------------
+// Chance curve: P(rate-up within n pulls), with the planned pull count marked
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Tooltip host
@@ -130,4 +138,47 @@ export function installTooltips(): void {
     if (current) place(e);
   });
   document.addEventListener('scroll', () => (el.hidden = true), { passive: true });
+}
+
+/**
+ * Luck curve for one rate-up pull, after the original tracker's drawer graph:
+ * the chance of having the rate-up by each pull, with a marker where you
+ * actually got it. Compact: no grid, just the curve, a baseline and its ends.
+ */
+export function luckGraph(pmf: Float64Array, at: number, unit = 1): Html {
+  const cdf = cumulative(pmf);
+  let end = cdf.findIndex((v) => v >= 0.999);
+  if (end < 0) end = cdf.length - 1;
+  end = Math.max(end, at, 10);
+  const W = 320;
+  const H = 72;
+  const m = { t: 6, r: 6, b: 18, l: 6 };
+  const iw = W - m.l - m.r;
+  const ih = H - m.t - m.b;
+  const x = (n: number) => m.l + (n / end) * iw;
+  const y = (p: number) => m.t + (1 - p) * ih;
+  const pts: string[] = [];
+  for (let n = 0; n <= end; n++) pts.push(`${x(n).toFixed(1)},${y(cdf[Math.min(n, cdf.length - 1)] ?? 1).toFixed(1)}`);
+  const line = `M${pts.join('L')}`;
+  const atP = cdf[Math.min(at, cdf.length - 1)] ?? 1;
+  const bands = Math.min(end, 40);
+  const bw = iw / bands;
+  const hits: string[] = [];
+  for (let i = 0; i < bands; i++) {
+    const n = Math.round(((i + 0.5) / bands) * end);
+    const label = unit === 1 ? `Within ${n} pulls` : `Within ${Math.ceil(n / unit)} sets of ${unit}`;
+    const tipHtml = tip(label, [tipRow('Chance', `${((cdf[Math.min(n, cdf.length - 1)] ?? 1) * 100).toFixed(1)}%`)]);
+    hits.push(`<rect class="hit" x="${(m.l + i * bw).toFixed(1)}" y="${m.t}" width="${(bw + 0.5).toFixed(1)}" height="${ih}" data-tip="${escape(tipHtml)}"/>`);
+  }
+  return html`<div class="chart luck-graph">${raw(`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${(atP * 100).toFixed(1)}% chance by pull ${at}">
+    <line x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--gray-alpha-400)"/>
+    <path d="${line}L${x(end)},${y(0)}L${x(0)},${y(0)}Z" fill="var(--gray-1000)" opacity="0.06"/>
+    <path class="luck-line" d="${line}" pathLength="1" fill="none" stroke="var(--gray-1000)" stroke-width="2" stroke-linejoin="round"/>
+    <line class="luck-mark" x1="${x(at)}" x2="${x(at)}" y1="${y(atP)}" y2="${y(0)}" stroke="var(--gray-700)" stroke-dasharray="3 3"/>
+    <circle class="luck-mark" cx="${x(at)}" cy="${y(atP)}" r="4.5" fill="var(--gray-1000)" stroke="var(--background-100)" stroke-width="2"/>
+    <text x="${m.l}" y="${H - 4}">0</text>
+    <text x="${x(at)}" y="${H - 4}" text-anchor="middle">${Math.ceil(at / unit)}</text>
+    <text x="${W - m.r}" y="${H - 4}" text-anchor="end">${Math.ceil(end / unit)}</text>
+    ${hits.join('')}
+  </svg>`)}</div>`;
 }

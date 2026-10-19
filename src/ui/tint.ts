@@ -1,0 +1,166 @@
+/**
+ * Ambient banner tint, ported from the original tracker: shrink the banner art
+ * to 10×10, average it, boost saturation and lift dark results, and use that
+ * colour for a soft glow behind the card. Arsenal cards take the rate-up
+ * weapon's main colour instead (`weaponTint`). Results are cached by image
+ * URL so re-renders paint the glow immediately.
+ */
+
+/** Shown until the art has loaded (or if the colour can't be read). */
+export const DEFAULT_TINT = 'rgba(255, 255, 255, 0.1)';
+
+const cache = new Map<string, string>();
+
+export const tintFor = (url: string): string => cache.get(url) ?? DEFAULT_TINT;
+
+const clamp = (v: number) => Math.min(255, Math.max(0, Math.floor(v)));
+
+/** Lift dark colours so the glow is still visible. */
+function lift(r: number, g: number, b: number): string {
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  if (brightness < 100) {
+    const boost = 100 / (brightness || 1);
+    r = Math.min(255, Math.floor(r * boost));
+    g = Math.min(255, Math.floor(g * boost));
+    b = Math.min(255, Math.floor(b * boost));
+  }
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+/**
+ * A weapon icon's main colour: mostly grey metal on a transparent background,
+ * so average only the dominant hue among its coloured pixels (Umbra's purple,
+ * a gold trim...). Falls back to the plain average for colourless weapons.
+ */
+function weaponColour(img: HTMLImageElement): string {
+  const N = 24;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = N;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, N, N);
+  const data = ctx.getImageData(0, 0, N, N).data;
+  const BINS = 24;
+  const bins = Array.from({ length: BINS }, () => ({ w: 0, r: 0, g: 0, b: 0 }));
+  let all = { w: 0, r: 0, g: 0, b: 0 };
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3] / 255];
+    if (a < 0.5) continue;
+    all = { w: all.w + 1, r: all.r + r, g: all.g + g, b: all.b + b };
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const sat = max ? (max - min) / max : 0;
+    if (sat < 0.25 || max < 40) continue; // grey metal and shadows
+    const d = max - min;
+    const hue = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    const bin = bins[Math.floor((hue / 6) * BINS) % BINS];
+    const w = sat * (max / 255);
+    bin.w += w;
+    bin.r += r * w;
+    bin.g += g * w;
+    bin.b += b * w;
+  }
+  // Let neighbouring hue bins vote together so a hue split across a boundary still wins.
+  const score = (i: number) => bins[(i + BINS - 1) % BINS].w + bins[i].w * 2 + bins[(i + 1) % BINS].w;
+  let best = 0;
+  for (let i = 1; i < BINS; i++) if (score(i) > score(best)) best = i;
+  const top = bins[best];
+  if (top.w < 0.5) {
+    if (!all.w) return DEFAULT_TINT;
+    return lift(all.r / all.w, all.g / all.w, all.b / all.w);
+  }
+  let [r, g, b] = [top.r / top.w, top.g / top.w, top.b / top.w];
+  const avg = (r + g + b) / 3;
+  [r, g, b] = [r, g, b].map((v) => clamp(avg + (v - avg) * 1.4));
+  return lift(r, g, b);
+}
+
+const pending = new Set<string>();
+
+/**
+ * Tints every Arsenal card from its rate-up weapon's icon (`data-tint-weapon`).
+ * The icon is loaded off-page; call after each render.
+ */
+export function tintWeaponCards(): void {
+  for (const card of document.querySelectorAll<HTMLElement>('.banner[data-tint-weapon]')) {
+    const url = card.dataset.tintWeapon!;
+    if (cache.has(url) || pending.has(url)) continue;
+    pending.add(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let tint = DEFAULT_TINT;
+      try {
+        tint = weaponColour(img);
+      } catch {
+        // not CORS-clean: keep the default glow
+      }
+      cache.set(url, tint);
+      pending.delete(url);
+      for (const c of document.querySelectorAll<HTMLElement>('.banner[data-tint-weapon]')) {
+        if (c.dataset.tintWeapon === url) c.style.setProperty('--banner-tint', tint);
+      }
+    };
+    img.onerror = () => {
+      pending.delete(url);
+      cache.set(url, DEFAULT_TINT);
+    };
+    img.src = url;
+  }
+}
+
+function extract(img: HTMLImageElement): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 10;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, 10, 10);
+  const data = ctx.getImageData(0, 0, 10, 10).data; // throws if the image isn't CORS-clean
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+  }
+  const n = data.length / 4;
+  r = Math.floor(r / n);
+  g = Math.floor(g / n);
+  b = Math.floor(b / n);
+
+  // Boost saturation so the glow reads as a colour, not grey.
+  const avg = (r + g + b) / 3;
+  const sat = 2.2;
+  r = clamp(avg + (r - avg) * sat);
+  g = clamp(avg + (g - avg) * sat);
+  b = clamp(avg + (b - avg) * sat);
+
+  return lift(r, g, b);
+}
+
+/** Listens for banner art loading anywhere on the page and tints its card. */
+export function installTint(): void {
+  document.addEventListener(
+    'load',
+    (e) => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-tint')) return;
+      const card = img.closest<HTMLElement>('.banner');
+      if (!card) return;
+      let tint = cache.get(img.src);
+      if (!tint) {
+        try {
+          tint = extract(img);
+        } catch {
+          tint = DEFAULT_TINT;
+        }
+        cache.set(img.src, tint);
+        // Also cache under the original URL so the next render finds it even after a CDN fallback.
+        const original = card.dataset.art;
+        if (original) cache.set(original, tint);
+      }
+      card.style.setProperty('--banner-tint', tint);
+    },
+    true, // 'load' doesn't bubble
+  );
+}

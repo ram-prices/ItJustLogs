@@ -3,11 +3,6 @@ import { mergeHistories } from './domain/parse';
 import type { BannerDb, PullHistory } from './domain/types';
 import * as store from './store';
 
-export type Route = 'operators' | 'arsenal' | 'stats' | 'planner' | 'settings' | 'guide';
-export const ROUTES: Route[] = ['operators', 'arsenal', 'stats', 'planner', 'settings', 'guide'];
-/** Tabs that need pull data to show anything. */
-export const DATA_ROUTES: Route[] = ['operators', 'arsenal', 'stats', 'planner'];
-
 interface State {
   history: PullHistory | null;
   db: BannerDb;
@@ -86,7 +81,20 @@ export async function loadImages(): Promise<void> {
   emit();
 }
 
+/** Deletes the imported pull history only; name, picture and settings are kept. */
+export async function clearHistory(): Promise<void> {
+  await store.clearHistory();
+  state.history = null;
+  recompute();
+  emit();
+}
+
+/** Deletes everything this site saved in the browser and resets the page to its empty state. */
 export async function clearEverything(): Promise<void> {
   await store.clearAll();
-  location.reload();
+  state.history = null;
+  state.images = {};
+  state.settings = store.loadSettings();
+  recompute();
+  emit();
 }

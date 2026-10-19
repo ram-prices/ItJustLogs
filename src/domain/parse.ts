@@ -3,9 +3,14 @@ import type { Kind, Pull, PullHistory, RawRecord } from './types';
 const str = (v: unknown): string => (v === undefined || v === null ? '' : String(v));
 const truthy = (v: unknown): boolean => v === true || v === 1 || v === 'true' || v === '1';
 
-/** "Headhunting Dossier" bonus items appear in the character list but are not pulls. */
-export function isDossier(r: RawRecord): boolean {
-  return r.kind === 'gift_intel_book';
+/**
+ * Rewards handed out by a banner are listed alongside the pulls but aren't
+ * pulls: `gift_intel_book` (Headhunting Dossier), `gift_operator_token`
+ * (Tokens), `gift_weapon` (Arsenal rate-up copies) and `gift_weapon_box`
+ * (Selectors). Anything else `gift_*` is treated the same way.
+ */
+export function isGift(r: RawRecord): boolean {
+  return typeof r.kind === 'string' && r.kind.startsWith('gift_');
 }
 
 export function parseTimestamp(v: unknown): number {
@@ -54,8 +59,8 @@ export function chronological(pulls: Pull[]): Pull[] {
 
 export function toPulls(history: PullHistory): { char: Pull[]; weap: Pull[] } {
   return {
-    char: chronological(history.characters.filter((r) => !isDossier(r)).map((r) => normalize(r, 'char'))),
-    weap: chronological(history.weapons.filter((r) => !isDossier(r)).map((r) => normalize(r, 'weap'))),
+    char: chronological(history.characters.filter((r) => !isGift(r)).map((r) => normalize(r, 'char'))),
+    weap: chronological(history.weapons.filter((r) => !isGift(r)).map((r) => normalize(r, 'weap'))),
   };
 }
 

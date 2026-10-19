@@ -12,7 +12,9 @@
   # Gryphline's server, does not need administrator rights, does not change any
   # settings, and does not install or download anything else.
   #
-  # Before running: open the game and view your headhunting history once (the link expires).
+  # Before running: open the game, view your headhunting history once (the link expires),
+  # then close the game. While it runs, the game keeps the cache file that holds the
+  # link open, and Windows won't let anything else read it.
   # After pasting, press Enter if PowerShell shows a >> prompt.
 
   $ErrorActionPreference = 'Stop'
@@ -38,24 +40,32 @@
     (@($response.msg) + @($response.message) | Where-Object { $_ } | ForEach-Object { [string]$_ }) -join '; '
   }
 
+  # Returns the newest history link in the game's web cache, and whether any cache
+  # file was locked (the game holds its cache open while running, so it must be closed).
   function Find-HistoryUrl {
+    $result = @{ Url = $null; Locked = $false }
     $cacheDir = Join-Path $env:LOCALAPPDATA 'PlatformProcess\Cache'
-    if (-not (Test-Path $cacheDir)) { return $null }
+    if (-not (Test-Path $cacheDir)) { return $result }
     $files = Get-ChildItem $cacheDir -File | Sort-Object LastWriteTime -Descending
     foreach ($f in $files) {
       try {
-        # FileShare.ReadWrite lets us read while the game has the cache open.
         $fs = [IO.File]::Open($f.FullName, 'Open', 'Read', 'ReadWrite')
         try {
           $bytes = New-Object byte[] $fs.Length
           [void]$fs.Read($bytes, 0, $bytes.Length)
         } finally { $fs.Close() }
+      } catch [IO.IOException] {
+        $result.Locked = $true
+        continue
       } catch { continue }
       $text = [Text.Encoding]::GetEncoding(28591).GetString($bytes)
       $found = [regex]::Matches($text, $urlPattern)
-      if ($found.Count -gt 0) { return $found[$found.Count - 1].Value }
+      if ($found.Count -gt 0) {
+        $result.Url = $found[$found.Count - 1].Value
+        return $result
+      }
     }
-    return $null
+    return $result
   }
 
   function Get-QueryValue([string]$url, [string]$pattern) {
@@ -69,10 +79,16 @@
   Write-Host ''
   Write-Host '=== ItJustLogs pull history exporter ===' -ForegroundColor Yellow
 
-  $url = Find-HistoryUrl
+  $cache = Find-HistoryUrl
+  $url = $cache.Url
   if (-not $url) {
-    Write-Host 'Could not find your history link in the game cache.' -ForegroundColor Red
-    Write-Host 'Open the game, view your headhunting history, then run this again.'
+    if ($cache.Locked) {
+      Write-Host 'The game is still running, so its cache file is in use and cannot be read.' -ForegroundColor Red
+      Write-Host 'Close the game completely, then run this again.'
+    } else {
+      Write-Host 'Could not find your history link in the game cache.' -ForegroundColor Red
+      Write-Host 'Open the game, view your headhunting history, close the game, then run this again.'
+    }
     return
   }
 
@@ -81,7 +97,7 @@
   $lang = Get-QueryValue $url 'lang'
   if (-not $lang) { $lang = 'en-us' }
   if (-not $token -or -not $server) {
-    Write-Host 'The history link found in the cache is incomplete. View your history in-game and try again.' -ForegroundColor Red
+    Write-Host 'The history link found in the cache is incomplete. View your history in-game, close the game, then run this again.' -ForegroundColor Red
     return
   }
   $q = 'lang=' + [Uri]::EscapeDataString($lang) + '&token=' + [Uri]::EscapeDataString($token) + '&server_id=' + [Uri]::EscapeDataString($server)
@@ -109,7 +125,7 @@
         break
       }
       if ($page.code -ne 0) {
-        throw "The server rejected the request ($(Get-ServerMessage $page)). If the history link expired, view your history in-game and run this again."
+        throw "The server rejected the request ($(Get-ServerMessage $page)). If the history link expired, view your history in-game, close the game, then run this again."
       }
       $list = @($page.data.list)
       if ($list.Count) { $all.AddRange($list); $seq = $list[-1].seqId }

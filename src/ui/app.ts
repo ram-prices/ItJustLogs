@@ -1,369 +1,185 @@
 import type { Kind } from '../domain/types';
-import { clearEverything, setImage, state, subscribe, updateSettings } from '../state';
-import type { Settings, ThemePref } from '../store';
+import { clearEverything, clearHistory, setImage, state, subscribe, updateSettings } from '../state';
+import type { ThemePref } from '../store';
 import { installTooltips } from './charts';
 import { installImageFallback, toast } from './common';
-import { fallbackBannerHtml, renderBanners, renderOverviews } from './dashboard';
+import { LOGO, TAB_ICON, icon, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
-import { buildViewModel, type ViewModel } from './model';
-import { handlePlannerInput, plannerOutput, renderPlanner } from './planner';
-import { exportSelected, importText, renderAbout, renderSettings, SETTINGS_SLIDERS, sliderLabel } from './settings';
-import { patchView, renderDistribution, renderKpis, renderPatchCards, renderWeekly, SORT_LABEL } from './stats';
-import { applySummaryDefault, checkSummaryOverflow, renderSummary, toggleSummaryExpand, triggerSummaryAnimation } from './summary';
+import { html, raw, render, type Html } from './html';
+import { exportBackup, exportHistory, importText } from './io';
+import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
+import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
+import { statsPage } from './pages/stats';
+import { installTint, tintWeaponCards } from './tint';
 
 /**
- * The page controller: eftracker's ui-tabs.js / main.js behaviour (sliding
- * tab switches, expandable banner boxes, filters, luck drawers, ambient tint)
- * driven by app state instead of globals.
+ * App shell and router. Layout follows the Vercel dashboard: a header with
+ * the product mark and a row of underlined tabs, then a page header band and
+ * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Tab = 'char' | 'weap' | 'planner' | 'stats' | 'settings' | 'about';
-const SECTION_ORDER: Tab[] = ['char', 'weap', 'planner', 'stats', 'settings', 'about'];
-const DATA_TABS: Tab[] = ['char', 'weap', 'planner', 'stats'];
+type Page = 'operators' | 'arsenal' | 'stats' | 'settings';
+const TABS: [Page, string][] = [
+  ['operators', 'Operators'],
+  ['arsenal', 'Arsenal'],
+  ['stats', 'Stats'],
+  ['settings', 'Settings'],
+];
+const DATA_PAGES: Page[] = ['operators', 'arsenal', 'stats'];
 
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+interface Route {
+  page: Page;
+  id?: string;
+}
 
-let currentTab: Tab = 'settings';
-let isAnimating = false;
-const visited = new Set<Tab>();
-const animatedDashboards = new Set<Kind>();
-let vm: ViewModel | null = null;
-let lastHistory: unknown = undefined;
-let lastDb: unknown = undefined;
-let lastSettings: Settings = { ...state.settings };
+function parseRoute(): Route {
+  const [page, id] = location.hash.replace(/^#\/?/, '').split('/');
+  const p = (TABS.some(([t]) => t === page) ? page : 'operators') as Page;
+  return { page: p, id: id ? decodeURIComponent(id) : undefined };
+}
+
+const root = () => document.getElementById('app')!;
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
-function renderData(): void {
+function header(route: Route): Html {
+  const has = !!state.analysis;
+  const name = state.settings.displayName || 'Endministrator';
+  return html`<header class="header"><div class="container">
+    <div class="header-top">
+      <a class="logo" href="#/">${LOGO}<span>ItJustLogs</span></a>
+      ${has
+        ? html`<span class="crumb-sep">/</span>
+            <div class="header-user">
+              ${state.images.avatar ? html`<img class="avatar" src="${state.images.avatar}" alt="" />` : html`<span class="avatar"></span>`}
+              <span class="label-14 ellipsis">${name}</span>
+            </div>`
+        : ''}
+      <span class="spacer"></span>
+      <button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      ${TABS.map(([page, label]) => {
+        const disabled = !has && DATA_PAGES.includes(page);
+        return html`<a class="tab" href="#/${page}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
+      })}
+    </nav>
+  </div></header>`;
+}
+
+function welcome(): Html {
+  return html`
+    ${pageHeader('Welcome to ItJustLogs', 'Pity, rate-up luck and patch stats for Arknights: Endfield. Everything runs in your browser.')}
+    <main class="container fade-in">
+      <div class="card">
+        <div class="empty">
+          <div class="empty-icon">${icon('inbox')}</div>
+          <h2 class="heading-20">Import your pull history</h2>
+          <p class="copy-14">Choose an exported file, drop it anywhere on this page, or press <kbd>Ctrl</kbd> <kbd>V</kbd> after running the exporter below.</p>
+          <button class="btn primary" data-action="import" style="margin-top:8px">${icon('upload_file')}Import file</button>
+        </div>
+      </div>
+      <div class="section card">
+        <div class="card-body">
+          <h2 class="heading-20" style="margin-bottom:8px">Get your pull history</h2>
+          <p class="copy-14 secondary" style="margin-bottom:20px">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. Read it before you run it.</p>
+          ${getDataSteps()}
+        </div>
+      </div>
+      ${aboutCard()}
+    </main>`;
+}
+
+function page(route: Route): Html {
   const a = state.analysis;
-  DATA_TABS.forEach((t) => ($(`tab-${t}`).style.display = a ? 'flex' : 'none'));
-  $('overviewStats').style.display = a ? 'flex' : 'none';
-  if (!a) {
-    vm = null;
-    return;
-  }
-  vm = buildViewModel(a);
-  $('uniqueCharCount').textContent = String(a.char.uniqueItems);
-  $('uniqueWeapCount').textContent = String(a.weap.uniqueItems);
-  const overviews = renderOverviews(a);
-  for (const k of ['char', 'weap'] as const) {
-    $(`${k}OverviewDashboard`).innerHTML = overviews[k];
-    $(`summary-${k}-container`).innerHTML = renderSummary(k, vm);
-    $(`${k}BannerGrid`).innerHTML = renderBanners(k, vm);
-  }
-  document.querySelectorAll<HTMLElement>('.banner-box.warm-tint').forEach((b) => {
-    b.style.setProperty('--banner-ambient', 'rgba(255, 152, 0, 0.16)');
-    b.classList.add('has-tint');
-  });
-  document.querySelectorAll<HTMLElement>('.pull-list-container').forEach(updateBlockHeaders);
-  $('plannerContent').innerHTML = renderPlanner(a);
-  renderStats();
-  initScrollReveal();
-  setTimeout(checkSummaryOverflow, 500);
-}
-
-function renderStats(): void {
-  const a = state.analysis;
-  if (!a) return;
-  $('patchStatsKpiDashboard').innerHTML = renderKpis(a);
-  $('patchStatsDistributionCard').innerHTML = renderDistribution(a);
-  $('weeklyCard').innerHTML = renderWeekly(a);
-  $('patchCardsContainer').innerHTML = renderPatchCards(a);
-  (['all', 'char', 'weap'] as const).forEach((f) => $(`patch-filter-${f}`).classList.toggle('active', f === patchView.filter));
-  $('patch-sort-btn').textContent = SORT_LABEL[patchView.sort];
-  initScrollReveal();
-}
-
-function renderSettingsTab(): void {
-  $('settingsContent').innerHTML = renderSettings();
-}
-
-function resolvedTheme(t: ThemePref): 'light' | 'dark' {
-  return t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
-}
-
-function applyAppearance(): void {
-  const s = state.settings;
-  const root = document.documentElement;
-  root.dataset.theme = resolvedTheme(s.theme);
-  root.style.setProperty('--banner-blur', `${s.bannerBlur}px`);
-  root.style.setProperty('--banner-pos-y', `${s.bannerPos}%`);
-  document.body.classList.toggle('show-timestamps', s.showTimestamps);
-  const hero = document.querySelector<HTMLElement>('.hero-banner')!;
-  hero.style.backgroundImage = `url('${state.images.header ?? './banner.png'}')`;
-  $<HTMLImageElement>('display-avatar').src = state.images.avatar ?? './profile.png';
-  const nameEl = $('display-username');
-  if (document.activeElement !== nameEl) nameEl.textContent = s.displayName || 'ItJustLogs';
-}
-
-/** Re-render only what changed since the last state emit. */
-function refresh(): void {
-  const prev = lastSettings;
-  const s = state.settings;
-  applyAppearance();
-  if (state.history !== lastHistory || state.db !== lastDb) {
-    lastHistory = state.history;
-    lastDb = state.db;
-    renderData();
-    renderSettingsTab();
-    if (!state.analysis && DATA_TABS.includes(currentTab)) showTabInstant('settings');
-    else updateTabSlider(currentTab);
-  } else if (vm && (prev.summaryBannerLimit !== s.summaryBannerLimit || prev.summaryMaxRows !== s.summaryMaxRows)) {
-    for (const k of ['char', 'weap'] as const) $(`summary-${k}-container`).innerHTML = renderSummary(k, vm);
-    setTimeout(checkSummaryOverflow, 50);
-  }
-  if (prev.summaryExpandedByDefault !== s.summaryExpandedByDefault) applySummaryDefault(s.summaryExpandedByDefault);
-  if (prev.showTimestamps !== s.showTimestamps) {
-    setTimeout(() => document.querySelectorAll<HTMLElement>('.pull-list-container').forEach(checkExpandButtonVisibility), 320);
-  }
-  if (prev.theme !== s.theme || prev.showTimestamps !== s.showTimestamps || prev.summaryExpandedByDefault !== s.summaryExpandedByDefault) {
-    renderSettingsTab();
-  }
-  lastSettings = { ...s };
-}
-
-// ---------------------------------------------------------------------------
-// Tabs (slide animation)
-// ---------------------------------------------------------------------------
-
-function updateTabSlider(tab: Tab): void {
-  const btn = $(`tab-${tab}`);
-  const slider = $('tabSlider');
-  SECTION_ORDER.forEach((t) => $(`tab-${t}`).classList.toggle('active-tab', t === tab));
-  if (!btn || btn.offsetParent === null) return;
-  slider.style.transform = `translate(${btn.offsetLeft}px, ${btn.offsetTop}px)`;
-  slider.style.width = `${btn.offsetWidth}px`;
-  slider.style.height = `${btn.offsetHeight}px`;
-}
-
-function onShown(tab: Tab): void {
-  if (tab === 'char' || tab === 'weap') {
-    triggerSummaryAnimation(tab);
-    checkSummaryOverflow();
-    document.querySelectorAll<HTMLElement>(`#${tab}BannerGrid .pull-list-container`).forEach(updateBlockHeaders);
-    if (!animatedDashboards.has(tab)) {
-      const dash = $(`${tab}OverviewDashboard`);
-      dash.classList.add('initial-animate');
-      animatedDashboards.add(tab);
-      setTimeout(() => dash.classList.remove('initial-animate'), 3000);
+  if (route.page === 'settings') return html`${settingsPage()}<div class="container">${aboutCard()}</div>`;
+  if (!a) return welcome();
+  switch (route.page) {
+    case 'operators':
+    case 'arsenal': {
+      const kind: Kind = route.page === 'operators' ? 'char' : 'weap';
+      if (route.id && `${route.page}/${route.id}` !== lastKey) setExpanded(`${kind}:${route.id}`, true);
+      return listPage(kind, a);
     }
+    case 'stats':
+      return statsPage(a);
   }
+  return welcome();
 }
 
-function firstVisit(sec: HTMLElement, tab: Tab): void {
-  if (visited.has(tab)) {
-    sec.classList.remove('first-visit');
-    return;
-  }
-  visited.add(tab);
-  sec.classList.add('first-visit');
-  setTimeout(() => sec.classList.remove('first-visit'), 1500);
+let lastKey = '';
+
+function applyTheme(): void {
+  const t = state.settings.theme;
+  document.documentElement.dataset.theme =
+    t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
 }
 
-function showTabInstant(tab: Tab): void {
-  SECTION_ORDER.forEach((t) => ($(`${t}-section`).style.display = t === tab ? 'block' : 'none'));
-  currentTab = tab;
-  firstVisit($(`${tab}-section`), tab);
-  updateTabSlider(tab);
-  onShown(tab);
-  setTimeout(() => $(`${tab}-section`).querySelectorAll<HTMLElement>('.pull-list-container').forEach(checkExpandButtonVisibility), 50);
-}
-
-function switchTab(tab: Tab): void {
-  if (isAnimating || tab === currentTab) return;
-  if (!state.analysis && DATA_TABS.includes(tab)) return;
-  isAnimating = true;
-  updateTabSlider(tab);
-  const oldTab = currentTab;
-  const right = SECTION_ORDER.indexOf(tab) > SECTION_ORDER.indexOf(oldTab);
-  currentTab = tab;
-  const curr = $(`${oldTab}-section`);
-  const next = $(`${tab}-section`);
-  if (oldTab === 'char' || oldTab === 'weap') {
-    $(`summary-${oldTab}-container`).classList.remove('initial-animate');
-    $(`${oldTab}OverviewDashboard`).classList.remove('initial-animate');
+function draw(): void {
+  applyTheme();
+  const route = parseRoute();
+  render(root(), html`${header(route)}${page(route)}`);
+  const key = `${route.page}/${route.id ?? ''}`;
+  if (key !== lastKey) {
+    // #/operators/<poolId> opens that banner's section and scrolls to it.
+    const target = route.id && document.getElementById(`banner-${route.id}`);
+    if (target) target.scrollIntoView({ block: 'start' });
+    else scrollTo({ top: 0 });
   }
-  curr.classList.remove('first-visit');
-  firstVisit(next, tab);
-
-  next.style.display = 'block';
-  next.style.transition = 'none';
-  next.style.transform = `translateX(${right ? '40px' : '-40px'})`;
-  next.style.opacity = '0';
-  next.style.zIndex = '3';
-  curr.style.zIndex = '1';
-  void next.offsetWidth;
-  onShown(tab);
-
-  const ease = 'cubic-bezier(0.25, 1, 0.5, 1)';
-  curr.style.transition = next.style.transition = `transform 0.4s ${ease}, opacity 0.4s ${ease}`;
-  curr.style.transform = `translateX(${right ? '-40px' : '40px'})`;
-  curr.style.opacity = '0';
-  next.style.transform = 'translateX(0)';
-  next.style.opacity = '1';
-
-  setTimeout(() => {
-    Object.assign(curr.style, { display: 'none', transform: '', opacity: '', transition: '', zIndex: '' });
-    Object.assign(next.style, { transition: '', zIndex: '' });
-    isAnimating = false;
-    if (tab === 'char' || tab === 'weap') checkSummaryOverflow();
-    next.querySelectorAll<HTMLElement>('.pull-list-container').forEach(checkExpandButtonVisibility);
-  }, 400);
+  lastKey = key;
+  markOverflow();
+  tintWeaponCards();
+  const title = TABS.find(([p]) => p === route.page)?.[1];
+  document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
 
 // ---------------------------------------------------------------------------
-// Banner boxes: expand, filters, luck drawers, ambient tint
+// Banner cards: fixed height with a scrolling list until expanded
 // ---------------------------------------------------------------------------
 
-function checkExpandButtonVisibility(container: HTMLElement): void {
-  const box = container.parentElement!;
-  const btn = box.querySelector<HTMLElement>('.banner-expand-area');
-  if (!btn || container.offsetParent === null) return;
-  const wasExpanded = box.classList.contains('expanded');
-  box.classList.remove('expanded');
-  const original = box.style.height;
-  box.style.height = '600px';
-  // Rows use content-visibility:auto, so off-screen ones report a 44px placeholder; measure them for real.
-  container.classList.add('measuring');
-  const overflow = container.scrollHeight > container.clientHeight + 2;
-  container.classList.remove('measuring');
-  if (overflow) {
-    btn.style.display = 'flex';
-    if (wasExpanded) {
-      box.classList.add('expanded');
-      box.style.height = original || 'auto';
-    } else box.style.height = '';
-  } else {
-    btn.style.display = 'none';
-    btn.textContent = '▼ EXPAND ▼';
-    btn.classList.remove('active');
-    box.style.height = '';
+/** Cards whose list fits without scrolling don't need the Expand button. */
+function markOverflow(): void {
+  for (const card of document.querySelectorAll<HTMLElement>('.banner')) {
+    if (card.classList.contains('expanded')) continue;
+    const list = card.querySelector<HTMLElement>('.banner-body');
+    card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
+  }
+  // The 6★ history only needs Show all when it runs past two rows.
+  for (const section of document.querySelectorAll<HTMLElement>('.six-section:not(.open)')) {
+    const strip = section.querySelector<HTMLElement>('.six-strip');
+    section.classList.toggle('fits', !!strip && strip.scrollHeight <= strip.clientHeight + 1);
   }
 }
 
-function toggleExpand(btn: HTMLElement): void {
-  const box = btn.closest<HTMLElement>('.banner-box')!;
-  const expanding = !box.classList.contains('expanded');
-  btn.textContent = expanding ? '▲ COLLAPSE ▲' : '▼ EXPAND ▼';
-  btn.classList.toggle('active', expanding);
-  if (expanding) {
-    const start = box.offsetHeight;
-    box.style.transition = 'none';
-    box.style.height = 'auto';
-    box.classList.add('expanded');
-    const end = box.offsetHeight;
-    box.style.height = `${start}px`;
-    void box.offsetHeight;
-    box.style.transition = '';
-    box.style.height = `${end}px`;
-    setTimeout(() => {
-      if (btn.classList.contains('active')) box.style.height = 'auto';
-    }, 400);
-  } else {
-    box.style.height = `${box.offsetHeight}px`;
-    void box.offsetHeight;
-    box.style.height = '600px';
-    setTimeout(() => {
-      if (!btn.classList.contains('active')) {
-        box.classList.remove('expanded');
-        box.style.height = '';
-      }
-    }, 400);
-  }
-}
+/** Animates a card between its fixed height and its full height, as the original did. */
+function toggleCard(card: HTMLElement): void {
+  const opening = !card.classList.contains('expanded');
+  setExpanded(card.dataset.pool!, opening);
+  const btn = card.querySelector<HTMLElement>('.banner-expand')!;
+  btn.setAttribute('aria-expanded', String(opening));
+  btn.querySelector('span')!.textContent = opening ? 'Collapse' : 'Expand';
 
-function toggleLuckDrawer(item: HTMLElement): void {
-  item.classList.toggle('expanded');
-  const container = item.closest<HTMLElement>('.pull-list-container');
-  if (!container) return;
-  if (item.classList.contains('expanded')) setTimeout(() => container.scrollTo({ top: item.offsetTop - 15, behavior: 'smooth' }), 310);
-  checkExpandButtonVisibility(container);
-  setTimeout(() => checkExpandButtonVisibility(container), 320);
+  const from = card.offsetHeight;
+  card.style.transition = 'none';
+  card.classList.toggle('expanded', opening);
+  card.style.height = 'auto';
+  const to = card.offsetHeight;
+  card.style.height = `${from}px`;
+  void card.offsetHeight; // reflow so the transition starts from `from`
+  card.style.transition = '';
+  card.style.height = `${to}px`;
+  card.addEventListener(
+    'transitionend',
+    () => {
+      card.style.height = '';
+      if (!opening) card.querySelector('.banner-body')?.scrollTo({ top: 0 });
+    },
+    { once: true },
+  );
+  if (!opening && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
-
-function updateBlockHeaders(container: HTMLElement): void {
-  const filterBox = document.getElementById(`filters-${container.id.replace('list-', '')}`);
-  if (!filterBox) return;
-  const on = (f: string) => !!filterBox.querySelector(`.filter-btn.active[data-filter="${f}"]`);
-  const f = { six: on('6'), five: on('5'), four: on('4'), ru: on('RU') };
-  let header: HTMLElement | null = null;
-  let headerHasItems = false;
-  let visible = 0;
-  for (const node of Array.from(container.querySelector('.pull-list')!.children) as HTMLElement[]) {
-    if (node.classList.contains('pull-block-header')) {
-      if (header) header.style.display = headerHasItems ? 'inline-block' : 'none';
-      header = node;
-      headerHasItems = false;
-    } else {
-      const c = node.classList;
-      const show =
-        (f.six && c.contains('rarity-6-item')) ||
-        (f.five && c.contains('rarity-5-item')) ||
-        (f.four && ['rarity-4-item', 'rarity-3-item', 'rarity-2-item', 'rarity-1-item'].some((r) => c.contains(r))) ||
-        (f.ru && c.contains('is-rate-up-item'));
-      node.style.display = show ? 'flex' : 'none';
-      if (show) {
-        headerHasItems = true;
-        visible++;
-      }
-    }
-  }
-  if (header) header.style.display = headerHasItems ? 'inline-block' : 'none';
-  const empty = container.querySelector<HTMLElement>('.empty-filter-msg');
-  if (empty) empty.style.display = visible === 0 ? 'block' : 'none';
-  checkExpandButtonVisibility(container);
-}
-
-/** Average the banner art down to one saturated colour for the card's glow. */
-function applyAmbientTint(bannerId: string, img: HTMLImageElement): void {
-  const banner = document.getElementById(bannerId);
-  if (!banner) return;
-  setTimeout(() => {
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 10;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, 10, 10);
-      const d = ctx.getImageData(0, 0, 10, 10).data;
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        r += d[i];
-        g += d[i + 1];
-        b += d[i + 2];
-      }
-      const n = d.length / 4;
-      [r, g, b] = [r / n, g / n, b / n];
-      const avg = (r + g + b) / 3;
-      const sat = (v: number) => Math.min(255, Math.max(0, Math.floor(avg + (v - avg) * 2.2)));
-      [r, g, b] = [sat(r), sat(g), sat(b)];
-      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-      if (brightness < 100) {
-        const boost = 100 / (brightness || 1);
-        [r, g, b] = [r, g, b].map((v) => Math.min(255, Math.floor(v * boost)));
-      }
-      banner.style.setProperty('--banner-tint', `rgb(${r}, ${g}, ${b})`);
-    } catch {
-      banner.style.setProperty('--banner-tint', 'rgba(255, 255, 255, 0.1)');
-    }
-    banner.classList.add('has-tint');
-  }, 100);
-}
-
-const reveal = new IntersectionObserver(
-  (entries) =>
-    entries.forEach((e) => {
-      if (e.isIntersecting) {
-        e.target.classList.add('visible');
-        reveal.unobserve(e.target);
-      }
-    }),
-  { threshold: 0.1 },
-);
-const initScrollReveal = () => document.querySelectorAll('.reveal-on-scroll:not(.visible)').forEach((el) => reveal.observe(el));
 
 // ---------------------------------------------------------------------------
 // Import: file picker, drag & drop anywhere, paste anywhere
@@ -372,7 +188,6 @@ const initScrollReveal = () => document.querySelectorAll('.reveal-on-scroll:not(
 async function runImport(text: string, source: string): Promise<void> {
   try {
     await importText(text, source);
-    if (state.analysis && !DATA_TABS.includes(currentTab)) switchTab('char');
   } catch (e) {
     toast((e as Error).message, 'error');
   }
@@ -408,9 +223,9 @@ function installImport(): void {
     else if (text.startsWith('{') || text.startsWith('[')) {
       e.preventDefault();
       await runImport(text, 'The pasted text');
-    } else if (text) toast('That doesn’t look like pull history. Run the exporter first, then paste.', 'error');
+    } else if (text) toast("That doesn't look like pull history. Run the exporter first, then paste.", 'error');
   });
-  $('fileInput').addEventListener('change', async (e) => {
+  document.getElementById('fileInput')!.addEventListener('change', async (e) => {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
@@ -418,55 +233,100 @@ function installImport(): void {
   });
 }
 
+/** Centre-crops a picture to a 256px square so the saved copy stays small. */
+async function squareAvatar(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  canvas.getContext('2d')!.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 256, 256);
+  bitmap.close();
+  return new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error('Could not read the picture'))), 'image/webp', 0.9));
+}
+
+/** Personalization in Settings: profile picture and display name. */
+function installProfile(): void {
+  document.getElementById('avatarInput')!.addEventListener('change', async (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      await setImage('avatar', await squareAvatar(file));
+    } catch {
+      toast("That picture couldn't be opened. Try a PNG or JPG.", 'error');
+    }
+  });
+  // Saved on Enter or leaving the field: saving per keystroke would redraw the page under the cursor.
+  document.addEventListener('change', (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
+  });
+  document.addEventListener('keydown', (e) => {
+    const el = e.target as HTMLInputElement;
+    if (e.key === 'Enter' && el.dataset?.setting === 'displayName') el.blur();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Delegated events
 // ---------------------------------------------------------------------------
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const THEMES: ThemePref[] = ['dark', 'light', 'system'];
-
 async function onClick(e: MouseEvent): Promise<void> {
-  const target = e.target as HTMLElement;
-  const tabBtn = target.closest<HTMLElement>('[data-tab]');
-  if (tabBtn) return switchTab(tabBtn.dataset.tab as Tab);
-  const el = target.closest<HTMLElement>('[data-action]');
+  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
   switch (el.dataset.action) {
-    case 'filter': {
-      el.classList.toggle('active');
-      const box = el.closest('.banner-box')!;
-      updateBlockHeaders(box.querySelector<HTMLElement>('.pull-list-container')!);
-      return;
-    }
-    case 'expand':
-      return toggleExpand(el);
-    case 'luck':
-      return toggleLuckDrawer(el);
-    case 'summary':
-      return toggleSummaryExpand(el);
-    case 'patch-filter':
-      patchView.filter = el.dataset.filter as typeof patchView.filter;
-      return renderStats();
-    case 'patch-sort': {
-      const modes = Object.keys(SORT_LABEL) as (keyof typeof SORT_LABEL)[];
-      patchView.sort = modes[(modes.indexOf(patchView.sort) + 1) % modes.length];
-      return renderStats();
-    }
-    case 'patch-jump': {
-      const card = document.getElementById(`patch-card-${el.dataset.key}`);
-      if (!card) return;
-      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      card.style.boxShadow = '0 0 20px rgba(255, 250, 0, 0.4)';
-      setTimeout(() => (card.style.boxShadow = ''), 1600);
-      return;
-    }
     case 'import':
-      return $('fileInput').click();
-    case 'clear-all':
-      if (confirm('Remove all saved pulls, settings and images from this browser? Export a backup first if you want to keep them.')) {
-        await clearEverything();
+      return document.getElementById('fileInput')!.click();
+    case 'avatar-upload':
+      return document.getElementById('avatarInput')!.click();
+    case 'avatar-remove':
+      return setImage('avatar', null);
+    case 'filter': {
+      // Re-render just this card's body: a full redraw replays the page fade-in and flickers.
+      const card = el.closest<HTMLElement>('[data-pool]');
+      const pool = card?.dataset.pool;
+      if (!card || !pool || !state.analysis) return;
+      toggleBannerFilter(pool, el.dataset.value as '6');
+      const body = bannerBodyFor(pool, state.analysis);
+      const host = card.querySelector('.banner-body');
+      if (body && host) {
+        host.classList.add('no-anim');
+        render(host, body);
+        markOverflow();
       }
       return;
+    }
+    case 'six-strip': {
+      const section = el.closest<HTMLElement>('.six-section');
+      if (!section) return;
+      const open = toggleSixStrip(section.dataset.kind as Kind);
+      section.classList.toggle('open', open);
+      el.setAttribute('aria-expanded', String(open));
+      el.textContent = open ? 'Show less' : 'Show all';
+      return;
+    }
+    case 'luck': {
+      // Open or close the luck drawer under a rate-up pull, in place.
+      const open = toggleLuck(el.dataset.key!);
+      el.classList.toggle('open', open);
+      el.setAttribute('aria-expanded', String(open));
+      markOverflow();
+      if (open) setTimeout(markOverflow, 320);
+      return;
+    }
+    case 'expand-card': {
+      const card = el.closest<HTMLElement>('.banner');
+      if (card?.dataset.pool) toggleCard(card);
+      return;
+    }
+    case 'expand-all': {
+      const r = parseRoute();
+      if (state.analysis) setAllExpanded(r.page === 'arsenal' ? 'weap' : 'char', state.analysis, !!el.dataset.value);
+      return draw();
+    }
+    case 'theme':
+      return updateSettings({ theme: el.dataset.value as ThemePref });
     case 'copy-script':
       try {
         await navigator.clipboard.writeText(EXPORTER_SOURCE);
@@ -475,125 +335,52 @@ async function onClick(e: MouseEvent): Promise<void> {
         toast('Could not copy automatically. Select the script text and copy it.', 'error');
       }
       return;
-    case 'cycle-theme':
-      return updateSettings({ theme: THEMES[(THEMES.indexOf(state.settings.theme) + 1) % THEMES.length] });
-    case 'toggle-setting': {
-      const key = el.dataset.key as 'showTimestamps' | 'summaryExpandedByDefault';
-      return updateSettings({ [key]: !state.settings[key] });
-    }
-    case 'reset-images':
-      await setImage('avatar', null);
-      await setImage('header', null);
-      renderSettingsTab();
+    case 'export-history':
+      return exportHistory();
+    case 'export-backup':
+      return exportBackup();
+    case 'clear-all':
+      setConfirmingDelete(el.dataset.value === 'pulls' ? 'pulls' : 'all');
+      return draw();
+    case 'clear-cancel':
+      setConfirmingDelete(null);
+      return draw();
+    case 'clear-confirm': {
+      setConfirmingDelete(null);
+      const pullsOnly = el.dataset.value === 'pulls';
+      try {
+        if (pullsOnly) {
+          await clearHistory();
+          toast('Pull history deleted. Your name, picture and settings were kept.');
+        } else {
+          await clearEverything();
+          toast('All saved data was deleted from this browser.');
+        }
+      } catch (err) {
+        toast(`Couldn't delete ${pullsOnly ? 'the pull history' : 'everything'}: ${(err as Error).message}`, 'error');
+      }
       return;
-    case 'export':
-      return exportSelected($('settingsContent'));
-  }
-}
-
-function onInput(e: Event): void {
-  const el = e.target as HTMLInputElement;
-  const key = el.dataset.setting as keyof Settings | undefined;
-  if (key && SETTINGS_SLIDERS.has(key)) {
-    const v = Number(el.value);
-    const label = document.querySelector(`[data-val="${key}"]`);
-    if (label) label.textContent = sliderLabel(key, v);
-    if (key === 'bannerBlur') document.documentElement.style.setProperty('--banner-blur', `${v}px`);
-    if (key === 'bannerPos') document.documentElement.style.setProperty('--banner-pos-y', `${v}%`);
-    if (key === 'summaryMaxRows' || key === 'summaryBannerLimit' || e.type === 'change') updateSettings({ [key]: v });
-    return;
-  }
-  if (el.dataset.plan && state.analysis) {
-    const what = handlePlannerInput(el, state.analysis);
-    if (what === 'all') $('plannerContent').innerHTML = renderPlanner(state.analysis);
-    else if (what === 'output') $('plannerOutput').innerHTML = plannerOutput();
-  }
-}
-
-async function onChange(e: Event): Promise<void> {
-  const el = e.target as HTMLInputElement;
-  if (el.dataset.setting) return onInput(e);
-  if (el.dataset.plan) {
-    // Number inputs already updated on 'input'; selects and checkboxes only fire 'change'.
-    if (el.tagName === 'SELECT' || el.type === 'checkbox') onInput(e);
-    return;
-  }
-  const slot = el.dataset.image as 'avatar' | 'header' | undefined;
-  if (slot && el.files?.[0]) {
-    const file = el.files[0];
-    el.value = '';
-    if (!file.type.startsWith('image/')) return toast('That file is not an image.', 'error');
-    if (file.size > MAX_IMAGE_BYTES) return toast('Please choose an image under 8 MB.', 'error');
-    await setImage(slot, file);
-    renderSettingsTab();
-  }
-}
-
-function installEvents(): void {
-  document.addEventListener('click', (e) => void onClick(e));
-  document.addEventListener('input', (e) => {
-    // Selects and checkboxes are handled on 'change' only, so they don't fire twice.
-    const t = e.target as HTMLElement;
-    if (t.tagName === 'SELECT' || (t as HTMLInputElement).type === 'checkbox') return;
-    onInput(e);
-  });
-  document.addEventListener('change', (e) => void onChange(e));
-
-  const nameEl = $('display-username');
-  nameEl.addEventListener('blur', () => updateSettings({ displayName: (nameEl.textContent ?? '').trim().slice(0, 40) }));
-  nameEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      nameEl.blur();
     }
-  });
-
-  // Banner art: tint the card from the image, or swap in the fallback showcase if it can't load.
-  document.addEventListener(
-    'load',
-    (e) => {
-      const img = e.target;
-      if (img instanceof HTMLImageElement && img.dataset.tint) applyAmbientTint(img.dataset.tint, img);
-    },
-    true,
-  );
-  document.addEventListener('img-missing', (e) => {
-    const img = e.target as HTMLImageElement;
-    if (!img.hasAttribute('data-banner-art')) return;
-    const id = img.dataset.tint!;
-    const hero = img.closest('.banner-hero');
-    const tpl = document.querySelector<HTMLTemplateElement>(`template[data-fallback-for="${id}"]`);
-    if (hero && tpl) hero.replaceWith(tpl.content.cloneNode(true));
-    else if (hero && vm) {
-      const v = [...vm.char, ...vm.weap].find((x) => x.domId === id);
-      if (v) hero.outerHTML = fallbackBannerHtml(v);
-    }
-  });
-
-  let resizeTimer = 0;
-  addEventListener('resize', () => {
-    updateTabSlider(currentTab);
-    clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(checkSummaryOverflow, 100);
-  });
-  matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyAppearance);
+  }
 }
 
 export function mount(): void {
   installImageFallback();
+  installTint();
   installTooltips();
   installImport();
-  installEvents();
-  $('aboutContent').innerHTML = renderAbout();
-  subscribe(refresh);
-  refresh();
-  showTabInstant(state.analysis ? 'char' : 'settings');
-  // Row heights change once the web fonts arrive; re-measure which banner boxes overflow.
-  const recheck = () => {
-    document.querySelectorAll<HTMLElement>('.pull-list-container').forEach(checkExpandButtonVisibility);
-    checkSummaryOverflow();
-    updateTabSlider(currentTab);
-  };
-  void document.fonts.ready.then(recheck);
-  addEventListener('load', recheck, { once: true });
+  installProfile();
+  document.addEventListener('click', (e) => void onClick(e));
+  document.addEventListener('keydown', (e) => {
+    const el = e.target as HTMLElement;
+    if ((e.key === 'Enter' || e.key === ' ') && el.dataset?.action === 'luck') {
+      e.preventDefault();
+      el.click();
+    }
+  });
+  addEventListener('resize', markOverflow);
+  addEventListener('hashchange', draw);
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
+  subscribe(draw);
+  draw();
 }

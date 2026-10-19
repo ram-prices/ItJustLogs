@@ -10,9 +10,15 @@ export function installImageFallback(): void {
       if (next) {
         img.dataset.retried = '1';
         img.src = next;
+      } else if (img.dataset.alt) {
+        // e.g. banner art that doesn't exist yet: show the rate-up weapon instead.
+        const alt = img.dataset.alt;
+        delete img.dataset.alt;
+        delete img.dataset.retried;
+        img.classList.add('weapon');
+        img.src = alt;
       } else {
         img.classList.add('missing');
-        img.dispatchEvent(new CustomEvent('img-missing', { bubbles: true }));
       }
     },
     true,
