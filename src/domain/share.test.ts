@@ -55,6 +55,18 @@ describe('link previews', () => {
     expect(wikiText(text, [[5, 5]], true)).toBe('Gains ATK +5% for 10s. *Effects of the same name cannot stack.*');
   });
 
+  it('puts element and healing emojis in front of those terms', () => {
+    const text = 'Deals ⟦heat|Heat DMG⟧, applies ⟦key|Cryo Infliction⟧ and ⟦key|Combustion⟧, and grants ⟦heal|HP Treatment⟧ of ⟦heal|+{0}%⟧.';
+    expect(wikiText(text, [[5, 10]], true)).toBe('Deals 🔥 Heat DMG, applies ❄️ Cryo Infliction and Combustion, and grants 💚 HP Treatment of +5–10%.');
+    expect(wikiText('When the crystal uses up its HP treatments.', undefined, true)).toBe('When the crystal uses up its 💚 HP treatments.');
+    // Physical statuses take Physical's emoji; Arts terms take sparkles, highlighted or not.
+    const statuses = 'Applies ⟦key|Lift⟧, ⟦key|Knocked Down⟧, ⟦key|Breach⟧, ⟦key|Crush⟧ and ⟦key|Vulnerability⟧, then ⟦key|Arts Burst⟧ and ⟦key|Nature Infliction⟧.';
+    expect(wikiText(statuses, undefined, true)).toBe('Applies 💥 Lift, 💥 Knocked Down, 💥 Breach, 💥 Crush and 💥 Vulnerability, then ✨ Arts Burst and 🌿 Nature Infliction.');
+    // "Jadecrushing Grid" is a skill, not Crush.
+    expect(wikiText('⟦key|Jadecrushing Grid⟧', undefined, true)).toBe('Jadecrushing Grid');
+    expect(wikiText('Gains Arts DMG and Arts Intensity; the Arts that bind.', undefined, true)).toBe('Gains ✨ Arts DMG and ✨ Arts Intensity; the Arts that bind.');
+  });
+
   it('escapes tag values', () => {
     const tags = previewTags({ title: 'A "B" <c>', description: 'x & y\nz', image: '', url: 'https://itjustlogs.dev/', color: '#fff', siteName: 'S' });
     expect(tags).toContain('content="A &#34;B&#34; &#60;c&#62;"');

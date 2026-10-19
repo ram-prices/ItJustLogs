@@ -59,15 +59,45 @@ const fill = (text: string, values?: number[][]): string =>
 /** Escapes Discord markdown in wiki text. */
 const md = (s: string): string => s.replace(/[\\*_~|`]/g, '\\$&');
 
+/** The wiki's highlight classes for element damage ("Heat DMG"). */
+const MARK_ELEMENT: Record<string, string> = { phys: 'Physical', heat: 'Heat', cryo: 'Cryo', elec: 'Electric', nature: 'Nature' };
+
+/** Healing. The wiki's heal class also wraps heal formulas, so only the words get it. */
+const HEAL_EMOJI = '💚';
+
+/** Physical statuses, which share Physical's emoji. */
+const PHYSICAL_STATUS = /^(Lift(s|ed)?|Knock(ed)? Down|Breach(es|ed)?|Crush(es|ed)?|Vulnerability)\b/;
+
+/** Arts: every element but Physical. */
+const ARTS_EMOJI = '✨';
+/** Arts terms in plain text ("gains Arts DMG"), leaving loose uses ("the Arts that") alone. */
+const ARTS_TERM = /\bArts (DMG|Intensity|Infliction|Reactions?|Burst|Susceptibility|Amp)\b/g;
+
+/** A highlighted term with its emoji in front: "🔥 Heat DMG", "❄️ Cryo Infliction", "💥 Lift", "✨ Arts Burst", "💚 HP Treatment". */
+function withEmoji(cls: string, text: string): string {
+  if (cls === 'heal') return /treatment/i.test(text) ? `${HEAL_EMOJI} ${text}` : text;
+  const el = MARK_ELEMENT[cls] ?? Object.keys(ELEMENT_EMOJI).find((e) => text.startsWith(`${e} `));
+  if (el) return `${ELEMENT_EMOJI[el]} ${text}`;
+  if (cls === 'muted') return text;
+  if (PHYSICAL_STATUS.test(text)) return `${ELEMENT_EMOJI.Physical} ${text}`;
+  return /\bArts\b/.test(text) ? `${ARTS_EMOJI} ${text}` : text;
+}
+
+/** Plain text gets emojis for the terms the wiki often leaves unhighlighted: healing and Arts. */
+const plainEmoji = (text: string): string =>
+  text.replace(/\bHP treatment/gi, (m) => `${HEAL_EMOJI} ${m}`).replace(ARTS_TERM, (m) => `${ARTS_EMOJI} ${m}`);
+
 /**
  * Wiki markup as plain text (`discord` false: one line, no muted footnotes)
  * or Discord markdown (bold kept, footnotes in italics, line breaks kept).
+ * Element, Arts, physical status and healing terms get their emoji either way.
  */
 export function wikiText(s: string, values: number[][] | undefined, discord: boolean): string {
   const out = parseMarkup(s)
     .map((seg) => {
       if (seg.kind === 'break') return discord ? '\n' : ' ';
-      const text = fill(seg.text, values);
+      const filled = fill(seg.text, values);
+      const text = seg.kind === 'mark' ? withEmoji(seg.cls, filled) : plainEmoji(filled);
       if (!discord) return seg.kind === 'mark' && seg.cls === 'muted' ? '' : text;
       if (seg.kind === 'bold') return `**${md(text)}**`;
       if (seg.kind === 'mark' && seg.cls === 'muted') return `*${md(text)}*`;
