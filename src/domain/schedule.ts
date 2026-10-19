@@ -4,6 +4,7 @@
  * dated banners open at the same local time on each server, so Americas/Europe
  * (UTC-5) and Asia (UTC+8) differ by 13 hours; version updates are one instant.
  */
+import { nameSlug } from './wiki.ts';
 
 export type Server = 'americas' | 'asia';
 export type ScheduleKind = 'chartered' | 'special' | 'refactor' | 'issue' | 'refactorIssue';
@@ -145,4 +146,37 @@ export function discordText(
   lines.push(end == null ? 'Ends TBA' : `Ends ${stamp(end, 'F')} (${stamp(end, 'R')})`);
   lines.push(`-# ${SERVER_LABEL[server]} server`);
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Links: itjustlogs.dev/banners/<name>, /events/<name>
+// ---------------------------------------------------------------------------
+
+export type ScheduleItem = ScheduleBanner | ScheduleEvent;
+export const isScheduleBanner = (i: ScheduleItem): i is ScheduleBanner => 'kind' in i;
+
+/**
+ * Every banner's and event's link path (/banners/rejuvenation,
+ * /events/sanity-supply). The first to use a name keeps the plain link; later
+ * ones (reruns, recurring events) add their opening date, so a link never
+ * changes what it points to as the schedule grows.
+ */
+export function scheduleLinks(s: Schedule): Map<ScheduleItem, string> {
+  const out = new Map<ScheduleItem, string>();
+  const assign = (dir: string, items: ScheduleItem[]) => {
+    const seen = new Set<string>();
+    const order = items
+      .map((item, i) => ({ item, i, at: timeOn(item.start, 'americas') ?? Infinity }))
+      .sort((p, q) => p.at - q.at || p.i - q.i);
+    for (const { item } of order) {
+      const base = nameSlug(item.name) || 'untitled';
+      let slug = seen.has(base) && item.start ? `${base}-${item.start.americas.slice(0, 10)}` : base;
+      for (let n = 2; seen.has(slug); n++) slug = `${base}-${n}`;
+      seen.add(slug);
+      out.set(item, `/${dir}/${slug}`);
+    }
+  };
+  assign('banners', s.banners);
+  assign('events', s.events ?? []);
+  return out;
 }

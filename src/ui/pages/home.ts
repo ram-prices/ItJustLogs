@@ -7,11 +7,13 @@ import {
   endOrGuess,
   isWeaponBanner,
   packLanes,
+  scheduleLinks,
   statusOf,
   timeOn,
   type Schedule,
   type ScheduleBanner,
   type ScheduleEvent,
+  type ScheduleItem,
   type Server,
 } from '../../domain/schedule';
 import { tip, tipRow } from '../charts';
@@ -82,6 +84,14 @@ const eventIcon = (e: ScheduleEvent) => EVENT_ICONS.find(([re]) => re.test(e.typ
 const bannerDiscord = (b: ScheduleBanner, server: Server) => discordText(b, KIND_LABEL[b.kind], server, b.rateUps);
 const eventDiscord = (e: ScheduleEvent, server: Server) => discordText(e, e.type, server);
 
+/**
+ * Each banner's and event's own link (/banners/<name>, /events/<name>), which
+ * the build gives a page with its Discord preview. Stored on the element for
+ * "Copy link"; worked out once per schedule.
+ */
+let links: { schedule: Schedule; map: Map<ScheduleItem, string> } | null = null;
+const linkOf = (item: ScheduleItem): string => links?.map.get(item) ?? '';
+
 // ---------------------------------------------------------------------------
 // Open now
 // ---------------------------------------------------------------------------
@@ -92,7 +102,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const src = artOf(b);
   const mine = summaryFor(b, a);
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
-  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}">
+  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}" data-link="${linkOf(b)}">
     <div class="banner-art">
       ${src ? html`<img src="${src}" alt="" loading="lazy" decoding="async" />` : ''}
       <div class="banner-art-text">
@@ -136,7 +146,7 @@ function rowWhen(start: number | null, end: number | null, now: number): Html {
 function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
   const start = timeOn(b.start, server);
   const src = artOf(b);
-  return html`<div class="sched-next${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}">
+  return html`<div class="sched-next${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}" data-link="${linkOf(b)}">
     ${src
       ? html`<div class="sched-thumb"><img src="${src}" alt="" loading="lazy" decoding="async" /></div>`
       : html`<div class="sched-thumb sched-date">${start ? html`<span>${monthFmt.format(start)}</span><b>${dayFmt.format(start)}</b>` : '?'}</div>`}
@@ -149,7 +159,7 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 }
 
 function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
-  return html`<div class="sched-next evt" data-discord="${eventDiscord(e, server)}" ${e.details ? html`title="${e.details}"` : ''}>
+  return html`<div class="sched-next evt" data-discord="${eventDiscord(e, server)}" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
     ${e.art
       ? html`<div class="sched-thumb evt-art"><img src="${e.art}" alt="" loading="lazy" decoding="async" /></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
@@ -177,6 +187,7 @@ interface Bar {
   cls: string;
   tip: string;
   discord: string;
+  link: string;
   href?: string;
 }
 
@@ -216,6 +227,7 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       cls: `${isWeaponBanner(b.kind) ? 'weap' : 'op'} ${b.kind} ${statusOf(b, now, server)}${mine ? ' mine' : ''}`,
       tip: tip(b.name, rows),
       discord: bannerDiscord(b, server),
+      link: linkOf(b),
       href: mine ? pagePath(b) : undefined,
     };
   };
@@ -229,6 +241,7 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       cls: `evt ${statusOf(e, now, server)}`,
       tip: tip(e.name, [tipRow('Type', e.type), tipRow('Opens', when(start)), tipRow('Ends', end == null ? 'TBA' : when(end))]),
       discord: eventDiscord(e, server),
+      link: linkOf(e),
     };
   };
 
@@ -283,8 +296,8 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
           const range = `${shortDate.format(b.start)} – ${b.end == null ? 'TBA' : shortDate.format(b.end)}`;
           const inner = html`<span class="ellipsis">${b.name}<i class="tl-dates">${range}</i></span>`;
           return b.href
-            ? html`<a class="${cls}" href="${b.href}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}">${inner}</a>`
-            : html`<div class="${cls}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}">${inner}</div>`;
+            ? html`<a class="${cls}" href="${b.href}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}" data-link="${b.link}">${inner}</a>`
+            : html`<div class="${cls}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}" data-link="${b.link}">${inner}</div>`;
         })}</div>
       </div>`;
     });
@@ -372,6 +385,19 @@ function openMenu(x: number, y: number, el: HTMLElement): void {
     toast(ok ? (el.dataset.discordNote ?? 'Copied. Paste it in Discord to show the time for everyone.') : "Couldn't copy here.", ok ? 'info' : 'error');
   });
   menu.append(btn);
+  const link = el.dataset.link;
+  if (link) {
+    const copyLink = document.createElement('button');
+    copyLink.type = 'button';
+    copyLink.setAttribute('role', 'menuitem');
+    copyLink.innerHTML = '<span class="icon" aria-hidden="true">link</span>Copy link';
+    copyLink.addEventListener('click', async () => {
+      closeMenu();
+      const ok = await copyText(location.origin + link);
+      toast(ok ? 'Link copied. Discord shows its preview when you paste it.' : "Couldn't copy here.", ok ? 'info' : 'error');
+    });
+    menu.append(copyLink);
+  }
   document.body.append(menu);
   // Keep the menu on screen.
   const r = menu.getBoundingClientRect();
@@ -450,6 +476,7 @@ export function installDiscordMenu(): void {
 
 export function homePage(schedule: Schedule, server: Server, a: Analysis | null): Html {
   const now = Date.now();
+  if (links?.schedule !== schedule) links = { schedule, map: scheduleLinks(schedule) };
   const startOf = (i: { start: ScheduleBanner['start'] }) => timeOn(i.start, server) ?? Infinity;
   const byStart = (p: ScheduleBanner, q: ScheduleBanner) => startOf(p) - startOf(q) || Number(isWeaponBanner(p.kind)) - Number(isWeaponBanner(q.kind));
   // Headhunting banners on the first row, Arsenal Issues on the second; each by when it opened.
@@ -499,4 +526,23 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
         <a href="https://github.com/ram-prices/ItJustLogs" target="_blank" rel="noopener">Source on GitHub</a>
       </footer>
     </main>`;
+}
+
+let focused: { link: string; until: number } | null = null;
+
+/**
+ * /banners/<name> and /events/<name> open Home at that item: its card or row
+ * if it's open or coming up, else its bar on the timeline, briefly outlined.
+ * `scroll` false: a redraw within that moment (data refreshing on load)
+ * replaced the element, so outline the new one without scrolling again.
+ */
+export function focusScheduleItem(link: string, scroll = true): void {
+  if (scroll) focused = { link, until: Date.now() + 2500 };
+  else if (focused?.link !== link || Date.now() >= focused.until) return;
+  const all = [...document.querySelectorAll<HTMLElement>('[data-link]')].filter((el) => el.dataset.link === link);
+  const el = all.find((x) => !x.closest('.tl')) ?? all[0];
+  if (!el) return;
+  if (scroll) el.scrollIntoView({ block: 'center', inline: 'center' });
+  el.classList.add('sched-focus');
+  setTimeout(() => el.classList.remove('sched-focus'), focused!.until - Date.now());
 }

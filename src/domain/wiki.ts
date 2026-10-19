@@ -86,7 +86,7 @@ export const wikiId = (itemId: string): string => WIKI_ALIASES[itemId] ?? itemId
 // ---------------------------------------------------------------------------
 
 /** Top-level paths the app or its files already use; no short link may take one. */
-export const RESERVED_PATHS = new Set(['operators', 'arsenal', 'stats', 'settings', 'privacy', 'assets', 'icons', 'info', 'home', '404', 'index']);
+export const RESERVED_PATHS = new Set(['operators', 'arsenal', 'stats', 'settings', 'privacy', 'assets', 'icons', 'info', 'home', '404', 'index', 'banners', 'events']);
 
 /** "Zhuang Fangyi" → "zhuang-fangyi", "Si" → "si". */
 export const nameSlug = (name: string): string =>

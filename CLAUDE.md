@@ -7,6 +7,7 @@ images, localStorage only for small settings and the banner cache. Keep it that
 way: localStorage's ~5 MB is shared with every site on `ram-prices.github.io`
 (the old eftracker filled it with base64 images, which broke imports).
 Deploys as static files via `.github/workflows/deploy.yml` on push to `main`
+and daily at 06:17 UTC (so pages made from ef-assets data stay current)
 (`npm run build` → `dist/`) to GitHub Pages at the custom domain
 `itjustlogs.dev` (the old `ram-prices.github.io/ItJustLogs` redirects there).
 Served from the domain root, so `base: '/'` (absolute asset paths). Clean
@@ -17,12 +18,20 @@ to its `PAGES` list. It also writes `operators/info/<chr id>.html` and
 `arsenal/info/<wpn id>.html` (Pages serves them at the clean path) for every
 item in the ef-assets wiki data, each with that item's Discord component
 embed (`<script id="discord:component-embed">`, max 3,000 bytes: header with
-portrait, every skill fitted, link buttons) and Open Graph tags as its
+portrait, every skill fitted, wiki credit link) and Open Graph tags as its
 fallback (Discord runs no script). Built by `domain/share.ts`, fitted to
 Discord's limits (OG description 350 bytes, title 70 bytes), which also
 builds the info pages' "Copy to Discord" text. If
 ef-assets can't be fetched it uses `src/data/wiki-share.snapshot.json`, which
 local builds refresh. New operators get a preview only after a rebuild.
+Every banner and event in ef-assets `schedule.json` gets one too:
+`banners/<name>.html`, `events/<name>.html` (`scheduleLinks` in
+`domain/schedule.ts`; a name used again later adds its opening date, so links
+never change target). Their embed has the key art and both servers' dates as
+Discord timestamps. In the app those paths open Home at that card, row or
+timeline bar (`focusScheduleItem`), and Home's right-click menu has "Copy
+link". All pages are kept; if their number ever becomes a problem, drop old
+ones then.
 
 ## Commands
 

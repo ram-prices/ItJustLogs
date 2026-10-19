@@ -2275,6 +2275,11 @@ code {
 .sched-next + .sched-next {
   box-shadow: 0 -1px 0 var(--gray-alpha-200);
 }
+/* /banners/<name>, /events/<name>: the linked item, outlined for a moment. */
+.sched-focus {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
 .sched-thumb {
   width: 96px;
   height: 54px;

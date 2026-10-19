@@ -5,6 +5,7 @@
  * can use it too (imports carry .ts extensions for Vite's config loader).
  */
 import { EF_ASSETS_CDN } from './banners.ts';
+import { isScheduleBanner, isWeaponBanner, KIND_LABEL, SERVER_LABEL, timeOn, type ScheduleItem, type Server, type ServerTimes } from './schedule.ts';
 import { fmtSkillValue, parseMarkup, splitPlaceholders, wikiId, type WikiOperator, type WikiWeapon, type WikiWeaponSkill } from './wiki.ts';
 
 export const SITE_URL = 'https://itjustlogs.dev';
@@ -73,7 +74,9 @@ const PHYSICAL_STATUS = /^(Lift(s|ed)?|Knock(ed)? Down|Breach(es|ed)?|Crush(es|e
 /** Arts: every element but Physical. */
 const ARTS_EMOJI = '✨';
 /** Arts terms in plain text ("gains Arts DMG"), leaving loose uses ("the Arts that") alone. */
-const ARTS_TERM = /\bArts (DMG|Intensity|Infliction|Reactions?|Burst|Susceptibility|Amp)\b/g;
+const ARTS_TERM = /\bArts (DMG( Dealt| Taken)?|Intensity|Infliction|Reactions?|Burst|Susceptibility|Amp)\b/g;
+/** Element damage in plain text, as weapon skills write it ("Heat DMG Dealt"). */
+const ELEMENT_TERM = /\b(Physical|Heat|Cryo|Electric|Nature) DMG( Dealt| Taken)?\b/g;
 
 /**
  * Invisible markers around a term that got an emoji, so wikiText can bold it
@@ -94,9 +97,12 @@ function withEmoji(cls: string, text: string): string {
   return /\bArts\b/.test(text) ? term(ARTS_EMOJI, text) : text;
 }
 
-/** Plain text gets emojis for the terms the wiki often leaves unhighlighted: healing and Arts. */
+/** Plain text gets emojis for the terms the wiki often leaves unhighlighted: healing, Arts and element damage. */
 const plainEmoji = (text: string): string =>
-  text.replace(/\bHP treatments?\b/gi, (m) => term(HEAL_EMOJI, m)).replace(ARTS_TERM, (m) => term(ARTS_EMOJI, m));
+  text
+    .replace(/\bHP treatments?\b/gi, (m) => term(HEAL_EMOJI, m))
+    .replace(ARTS_TERM, (m) => term(ARTS_EMOJI, m))
+    .replace(ELEMENT_TERM, (m, el: string) => term(ELEMENT_EMOJI[el], m));
 
 /**
  * Wiki markup as plain text (`discord` false: one line, no muted footnotes)
@@ -347,6 +353,83 @@ export function weaponEmbed(w: ShareWeapon, p: Preview): ComponentEmbed {
       separator,
       ...titles.map((t, i) => textDisplay(b[i] ? `${t}\n${b[i]}` : t)),
       credit(w.page, 'Skill values at ranks 1–9 · '),
+    ]),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Banners and events (Home's schedule): /banners/<name>, /events/<name>
+// ---------------------------------------------------------------------------
+
+/** Side bar: Headhunting purple, Arsenal teal (--op, --ars), events amber (--amber). */
+const scheduleColor = (i: ScheduleItem): string => (isScheduleBanner(i) ? (isWeaponBanner(i.kind) ? '#12a594' : '#8e4ec6') : '#ffb224');
+const scheduleLabel = (i: ScheduleItem): string => (isScheduleBanner(i) ? KIND_LABEL[i.kind] : i.type);
+const rateUpsOf = (i: ScheduleItem): string[] => (isScheduleBanner(i) ? i.rateUps : []);
+
+/** "[Oroberyls]" in the schedule's text is an in-game name: plain text drops the brackets, Discord bolds it. */
+const bracketed = (s: string, discord: boolean): string =>
+  discord ? md(s).replace(/\[([^\]]+)\]/g, '**$1**') : s.replace(/\[([^\]]+)\]/g, '$1');
+
+const SERVERS: Server[] = ['americas', 'asia'];
+const UTC_LABEL: Record<Server, string> = { americas: 'UTC-5', asia: 'UTC+8' };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "Nov 5, 12:00": the time as that server shows it (the ISO string's own offset). */
+const serverClock = (iso: string): string => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}, ${iso.slice(11, 16)}`;
+
+/** The plain preview (Open Graph): server times written out, since it can't use Discord timestamps. */
+export function schedulePreview(i: ScheduleItem, path: string): Preview {
+  const rateUps = rateUpsOf(i);
+  const lines = [
+    ...(rateUps.length ? [`Rate-up: ${rateUps.join(', ')}`] : []),
+    ...SERVERS.map((s) => `${SERVER_LABEL[s]}: ${i.start ? serverClock(i.start[s]) : 'TBA'} – ${i.end ? serverClock(i.end[s]) : 'TBA'} (${UTC_LABEL[s]})`),
+    ...(!isScheduleBanner(i) && i.details ? [bracketed(i.details, false)] : []),
+  ];
+  return {
+    title: clip(`${i.name} · ${scheduleLabel(i)}`, TITLE_BYTES, utf8Bytes),
+    description: clip(lines.join('\n'), PREVIEW_BYTES, utf8Bytes),
+    image: i.art ?? '',
+    url: `${SITE_URL}${path}`,
+    color: scheduleColor(i),
+  };
+}
+
+/** Discord's timestamp markup, shown in each reader's own time zone (F: full date, R: "in 3 days"). */
+const stamp = (ms: number, style: 'F' | 'R'): string => `<t:${Math.round(ms / 1000)}:${style}>`;
+
+/** One server's opening and closing, as live Discord timestamps. */
+function serverDates(t: { start: ServerTimes | null; end: ServerTimes | null }, s: Server, label = SERVER_LABEL[s]): string {
+  const at = (x: ServerTimes | null) => {
+    const ms = timeOn(x, s);
+    return ms == null ? 'TBA' : `${stamp(ms, 'F')} (${stamp(ms, 'R')})`;
+  };
+  return [`**${label}**`, `Opens ${at(t.start)}`, `Ends ${at(t.end)}`].join('\n');
+}
+
+/**
+ * Name, type and rate-ups, the key art, an event's details, then both
+ * servers' dates (the embed is the same for every reader, so it can't pick one).
+ */
+export function scheduleEmbed(i: ScheduleItem, p: Preview): ComponentEmbed {
+  const rateUps = rateUpsOf(i);
+  const head = [
+    `## ${md(i.name)}`,
+    `${md(scheduleLabel(i))}${i.version ? ` · ${md(i.version)}` : ''}`,
+    ...(rateUps.length ? [`Rate-up: ${rateUps.map((r) => `**${md(r)}**`).join(', ')}`] : []),
+  ].join('\n');
+  // An end that waits on banners not announced yet: say what it waits for.
+  const note = !i.end && i.availability ? `-# ${md(bracketed(i.availability, false))}` : '';
+  const details = !isScheduleBanner(i) && i.details ? bracketed(i.details, true) : '';
+  // Version updates open and close at one instant everywhere: one block instead of two the same.
+  const sameInstant = (['start', 'end'] as const).every((k) => timeOn(i[k], 'americas') === timeOn(i[k], 'asia'));
+  const dates = sameInstant ? [serverDates(i, 'americas', 'All servers')] : SERVERS.map((s) => serverDates(i, s));
+  return fitEmbed([details], ([d]) =>
+    container(p, [
+      textDisplay(head),
+      ...(p.image ? [{ type: 12, items: [{ media: { url: p.image } }] }] : []),
+      ...(d ? [textDisplay(d)] : []),
+      separator,
+      textDisplay([...dates, note].filter(Boolean).join('\n\n')),
+      textDisplay('-# Times are shown in your time zone'),
     ]),
   );
 }

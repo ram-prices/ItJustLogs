@@ -11,7 +11,7 @@ import { EXPORTER_SOURCE } from './guide';
 import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
-import { copyText, homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
+import { copyText, focusScheduleItem, homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
@@ -45,14 +45,17 @@ interface Route {
   /** A short link (/si, /lunar-calling): the item's info page once resolved, else why not. */
   short?: string;
   shortState?: 'loading' | 'missing' | 'failed';
+  /** /banners/<name>, /events/<name>: Home, scrolled to that banner or event (its link path). */
+  focus?: string;
 }
 
 /** Top-level paths that aren't pages: operator and weapon short links (/si), resolved once the wiki data loads. */
 const isShortLink = (segment: string) => /^[a-z0-9][a-z0-9-]*$/i.test(segment) && !RESERVED_PATHS.has(segment.toLowerCase());
 
-/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /stats, /settings. */
+/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /banners/<name> and /events/<name> (Home at that item), /stats, /settings. */
 function parseRoute(): Route {
   const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
+  if ((page === 'banners' || page === 'events') && id) return { page: 'home', focus: `/${page}/${id.toLowerCase()}` };
   if (page && !id && !TABS.some(([t]) => t === page) && isShortLink(page)) {
     const short = page.toLowerCase();
     const { map, failed } = shortLinkMap(draw);
@@ -166,16 +169,21 @@ function draw(): void {
   // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
   const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
   render(root(), html`${header(route)}${page(route)}`);
-  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}`;
+  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}`;
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.
     const target = route.id && !route.info && document.getElementById(`banner-${route.id}`);
     if (target) target.scrollIntoView({ block: 'start' });
     else scrollTo({ top: 0 });
     if (route.page === 'home') scrollTimelineToNow();
-  } else if (timelineScroll != null) {
-    const tl = document.querySelector('.tl-scroll');
-    if (tl) tl.scrollLeft = timelineScroll;
+    // /banners/<name>, /events/<name>: that item's card, row or timeline bar.
+    if (route.focus) focusScheduleItem(route.focus);
+  } else {
+    if (timelineScroll != null) {
+      const tl = document.querySelector('.tl-scroll');
+      if (tl) tl.scrollLeft = timelineScroll;
+    }
+    if (route.focus) focusScheduleItem(route.focus, false);
   }
   lastKey = key;
   markOverflow();

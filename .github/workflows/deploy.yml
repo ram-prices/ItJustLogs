@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Daily rebuild of main, so pages made from ef-assets data (new banners and
+  # events in schedule.json, new operators and weapons in wiki/*.json) appear
+  # without a push. It only redeploys what's already on main.
+  schedule:
+    - cron: '17 6 * * *'
 
 permissions:
   contents: read

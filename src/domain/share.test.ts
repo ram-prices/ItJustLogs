@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import scheduleSnapshot from '../data/schedule.snapshot.json';
 import snapshot from '../data/wiki-share.snapshot.json';
+import { scheduleLinks, type Schedule } from './schedule';
 import { itemShortLinks, nameSlug, operatorShortLinks, RESERVED_PATHS, shortLinkOf } from './wiki';
 import {
   DISCORD_CHARS,
@@ -12,6 +14,8 @@ import {
   escapeHtml,
   operatorDiscord,
   operatorEmbed,
+  scheduleEmbed,
+  schedulePreview,
   operatorPreview,
   previewTags,
   utf8Bytes,
@@ -69,6 +73,13 @@ describe('link previews', () => {
     // "Jadecrushing Grid" is a skill, not Crush.
     expect(wikiText('⟦key|Jadecrushing Grid⟧', undefined, true)).toBe('Jadecrushing Grid');
     expect(wikiText('Gains Arts DMG and Arts Intensity; the Arts that bind.', undefined, true)).toBe('Gains ✨ **Arts DMG** and ✨ **Arts Intensity**; the Arts that bind.');
+  });
+
+  it('marks element damage the way weapon skills write it', () => {
+    const text = 'Heat DMG Dealt ⟦num|+{0}%⟧ and Arts DMG Taken ⟦num|+{1}%⟧ against ⟦key|Electric Infliction⟧.';
+    expect(wikiText(text, [[5, 10], [2, 4]], true)).toBe('🔥 **Heat DMG Dealt** +5–10% and ✨ **Arts DMG Taken** +2–4% against ⚡ **Electric Infliction**.');
+    const w = weaponEmbed(weapons.wpn_sword_0023, weaponPreview('wpn_sword_0023', weapons.wpn_sword_0023));
+    expect(JSON.stringify(w)).toContain('✨ **Arts Intensity**');
   });
 
   it('escapes tag values', () => {
@@ -199,5 +210,38 @@ describe('weapon short links', () => {
     const linked = new Set([...links.values()].map((t) => t.id));
     expect(Object.keys(snapshot.weapons).filter((id) => !linked.has(id))).toEqual([]);
     for (const slug of links.keys()) expect(RESERVED_PATHS.has(slug)).toBe(false);
+  });
+});
+
+describe('banner and event pages', () => {
+  const schedule = scheduleSnapshot as unknown as Schedule;
+  const links = scheduleLinks(schedule);
+
+  it('give every banner and event its own link, and keep the plain name for the first', () => {
+    const paths = [...links.values()];
+    expect(paths).toHaveLength(schedule.banners.length + (schedule.events ?? []).length);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(paths).toContain('/banners/rejuvenation');
+    // Sanity Supply recurs: the earliest is /events/sanity-supply, later ones add their date.
+    const sanity = paths.filter((p) => p.startsWith('/events/sanity-supply'));
+    expect(sanity).toContain('/events/sanity-supply');
+    expect(sanity.filter((p) => /-\d{4}-\d{2}-\d{2}$/.test(p))).toHaveLength(sanity.length - 1);
+    for (const p of paths) expect(p).toMatch(/^\/(banners|events)\/[a-z0-9-]+$/);
+  });
+
+  it("fit Discord's limits, with live timestamps for both servers", () => {
+    for (const [item, path] of links) {
+      const p = schedulePreview(item, path);
+      expect(utf8Bytes(p.title)).toBeLessThanOrEqual(TITLE_BYTES);
+      expect(utf8Bytes(p.description)).toBeLessThanOrEqual(PREVIEW_BYTES);
+      expect(embedBytes(scheduleEmbed(item, p))).toBeLessThanOrEqual(EMBED_BYTES);
+    }
+    const si = schedule.banners.find((b) => b.name === 'Rejuvenation')!;
+    const e = scheduleEmbed(si, schedulePreview(si, links.get(si)!));
+    const text = walk(e.component as Node).map((n) => n.content ?? '').join('\n');
+    expect(text).toContain('Rate-up: **Si**');
+    expect(text).toContain('**Americas / Europe**\nOpens <t:');
+    expect(text).toContain('**Asia**\nOpens <t:');
+    expect(walk(e.component as Node).some((n) => n.type === 12)).toBe(true);
   });
 });

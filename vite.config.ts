@@ -8,6 +8,8 @@ import {
   operatorEmbed,
   operatorPreview,
   previewTags,
+  scheduleEmbed,
+  schedulePreview,
   SITE_URL,
   weaponEmbed,
   weaponPreview,
@@ -16,10 +18,14 @@ import {
   type ShareOperator,
   type ShareWeapon,
 } from './src/domain/share.ts';
+import { scheduleLinks, type Schedule } from './src/domain/schedule.ts';
 import { itemShortLinks, WIKI_ALIASES } from './src/domain/wiki.ts';
 
 /** The app's top-level pages; each gets its own copy of index.html in the build. */
 const PAGES = ['operators', 'arsenal', 'stats', 'settings'];
+
+/** Fallback for the banner and event pages when ef-assets can't be reached (the app's own schedule snapshot). */
+const SCHEDULE_SNAPSHOT = 'src/data/schedule.snapshot.json';
 
 /** Fallback for the per-item pages when ef-assets can't be reached; refreshed by local builds. */
 const WIKI_SNAPSHOT = 'src/data/wiki-share.snapshot.json';
@@ -54,11 +60,12 @@ function slim(ops: Record<string, ShareOperator>, wpns: Record<string, ShareWeap
   return { operators, weapons };
 }
 
-async function fetchWiki<T>(file: string): Promise<T> {
+/** An ef-assets file (raw.githubusercontent, then jsDelivr). */
+async function fetchAsset<T>(path: string): Promise<T> {
   let error: unknown;
   for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
     try {
-      const res = await fetch(`${base}/wiki/${file}`, { signal: AbortSignal.timeout(20000) });
+      const res = await fetch(`${base}/${path}`, { signal: AbortSignal.timeout(20000) });
       if (res.ok) return (await res.json()) as T;
       error = new Error(`${res.status} ${res.statusText}`);
     } catch (e) {
@@ -82,8 +89,8 @@ async function imageExists(url: string): Promise<boolean> {
 async function loadWiki(): Promise<WikiShare> {
   try {
     const [o, w] = await Promise.all([
-      fetchWiki<{ operators: Record<string, ShareOperator> }>('operators.json'),
-      fetchWiki<{ weapons: Record<string, ShareWeapon> }>('weapons.json'),
+      fetchAsset<{ operators: Record<string, ShareOperator> }>('wiki/operators.json'),
+      fetchAsset<{ weapons: Record<string, ShareWeapon> }>('wiki/weapons.json'),
     ]);
     const data = slim(o.operators, w.weapons);
     // Keep the fallback current on the owner's machine (CI builds are thrown away).
@@ -95,14 +102,25 @@ async function loadWiki(): Promise<WikiShare> {
   }
 }
 
+/** The banner schedule from ef-assets (refreshed every few days), or the app's snapshot. */
+async function loadSchedule(): Promise<Schedule> {
+  try {
+    return await fetchAsset<Schedule>('schedule.json');
+  } catch (e) {
+    console.warn(`[item-pages] ef-assets schedule unavailable (${e}); using ${SCHEDULE_SNAPSHOT}`);
+    return JSON.parse(readFileSync(SCHEDULE_SNAPSHOT, 'utf8')) as Schedule;
+  }
+}
+
 const PREVIEW_TAG = /\s*<meta\s+(?:property|name)="(?:og:[^"]+|twitter:[^"]+|description|theme-color)"[^>]*>/g;
 
 /**
  * index.html with the default preview tags swapped for `p`'s, plus Discord's
  * component embed (which Discord shows instead; the tags are its fallback).
  */
-function withPreview(index: string, p: Preview, embed: ComponentEmbed, title: string): string {
-  const tags = [previewTags({ ...p, siteName: 'ItJustLogs · endfield.wiki.gg' }), embedTag(embed)].filter(Boolean).join('\n    ');
+function withPreview(index: string, p: Preview, embed: ComponentEmbed, title: string, wiki = true): string {
+  // Wiki data gets the wiki's credit; schedule art is shown large, portraits as thumbnails.
+  const tags = [previewTags({ ...p, siteName: wiki ? 'ItJustLogs · endfield.wiki.gg' : 'ItJustLogs', large: !wiki }), embedTag(embed)].filter(Boolean).join('\n    ');
   return index
     .replace(PREVIEW_TAG, '')
     .replace(/<title>[^<]*<\/title>/, `<title>${title.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`)} · ItJustLogs</title>`)
@@ -139,26 +157,32 @@ function pageCopies(): Plugin {
       copyFileSync(indexFile, join(outDir, '404.html'));
 
       const index = readFileSync(indexFile, 'utf8');
-      const wiki = await loadWiki();
+      const [wiki, schedule] = await Promise.all([loadWiki(), loadSchedule()]);
       const ops = Object.entries(wiki.operators);
       // Game ids the wiki files under another id get the same page.
       for (const [game, wikiKey] of Object.entries(WIKI_ALIASES)) if (wiki.operators[wikiKey]) ops.push([game, wiki.operators[wikiKey]]);
-      const pages = [
+      const pages: { dir: string; id: string; name: string; p: Preview; embed: (p: Preview) => ComponentEmbed; fromWiki?: boolean }[] = [
         ...ops.map(([id, o]) => ({ dir: 'operators/info', id, name: o.name, p: operatorPreview(id, o), embed: (p: Preview) => operatorEmbed(o, p) })),
         ...Object.entries(wiki.weapons).map(([id, w]) => ({ dir: 'arsenal/info', id, name: w.name, p: weaponPreview(id, w), embed: (p: Preview) => weaponEmbed(w, p) })),
       ];
+      // Every banner and event in the schedule: /banners/<name>, /events/<name>.
+      const schedulePages = [...scheduleLinks(schedule)].map(([item, path]) => {
+        const [, dir, id] = path.split('/');
+        return { dir, id, name: item.name, p: schedulePreview(item, path), embed: (p: Preview) => scheduleEmbed(item, p), fromWiki: false };
+      });
+      pages.push(...schedulePages);
       const missing: string[] = [];
       let largest = 0;
       await Promise.all(
-        pages.map(async ({ dir, id, name, p, embed }) => {
-          if (!(await imageExists(p.image))) {
+        pages.map(async ({ dir, id, name, p, embed, fromWiki = true }) => {
+          if (p.image && !(await imageExists(p.image))) {
             missing.push(id);
             p = { ...p, image: '' };
           }
           const e = embed(p);
           largest = Math.max(largest, embedBytes(e));
           mkdirSync(join(outDir, dir), { recursive: true });
-          writeFileSync(join(outDir, dir, `${id}.html`), withPreview(index, p, e, name));
+          writeFileSync(join(outDir, dir, `${id}.html`), withPreview(index, p, e, name, fromWiki));
         }),
       );
       // Short links (/si, /lunar-calling): the same page at the root, which Pages serves from si.html.
@@ -168,7 +192,8 @@ function pageCopies(): Plugin {
       console.log(`[item-pages] short links: ${links.size - n} operator, ${n} weapon (/${[...links.keys()].slice(0, 3).join(', /')}...)`);
       console.log(`[item-pages] largest component embed: ${largest} bytes`);
       console.log(`[item-pages] ${ops.length} operator and ${Object.keys(wiki.weapons).length} weapon pages for ${SITE_URL}`);
-      if (missing.length) console.log(`[item-pages] no ef-assets image yet, previews without one: ${missing.sort().join(', ')}`);
+      console.log(`[item-pages] ${schedulePages.length} banner and event pages`);
+      if (missing.length) console.log(`[item-pages] no image yet, previews without one: ${missing.sort().join(', ')}`);
     },
   };
 }
