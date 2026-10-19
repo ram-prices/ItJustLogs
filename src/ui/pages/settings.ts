@@ -157,7 +157,7 @@ export function settingsPage(): Html {
               ? html`<span class="delete-confirm">${confirmingDelete === 'pulls'
                     ? html`<b>Delete pull history?</b> ${fmtInt(count)} pulls will be removed from this browser. Settings and images stay.`
                     : html`<b>Delete everything?</b> ${fmtInt(count)} pulls, your settings and images will be removed from this browser.`}
-                  ${synced ? driveImpact(confirmingDelete) : ''}</span>
+                  ${synced ? driveImpact() : ''}</span>
                   <div class="row">
                     <button class="btn secondary sm" data-action="clear-cancel">Cancel</button>
                     <button class="btn error sm" data-action="clear-confirm" data-value="${confirmingDelete}">${icon('delete')}${confirmingDelete === 'pulls' ? 'Delete pulls' : 'Delete everything'}</button>
@@ -174,25 +174,23 @@ export function settingsPage(): Html {
 
 /**
  * What each delete button does, here and in Google Drive, spelled out before
- * anyone clicks. "Delete pull history" while synced also clears the Drive
- * copy's pulls (otherwise the next sync would bring them back); "Delete
- * everything" only clears this browser and signs it out, leaving Drive alone.
+ * anyone clicks. Deleting only ever clears this browser: while synced, both
+ * buttons sign this browser out first, so the Drive copy is never touched.
  */
 function deleteTable(synced: boolean): Html {
-  const drive = (text: string, tone: 'gone' | 'kept') =>
-    html`<span class="delete-drive ${tone}">${icon(tone === 'gone' ? 'delete' : 'cloud')}${text}</span>`;
+  const drive = (text: string) => html`<span class="delete-drive kept">${icon('cloud')}${text}</span>`;
   return html`<table class="delete-table">
     <thead><tr><th></th><th>This browser</th>${synced ? html`<th>Your Google Drive copy</th>` : ''}</tr></thead>
     <tbody>
       <tr>
         <th scope="row">Delete pull history</th>
-        <td>Pulls deleted. Name, picture and settings stay.</td>
-        ${synced ? html`<td>${drive('Pulls deleted there too', 'gone')}</td>` : ''}
+        <td>Pulls deleted. Name, picture and settings stay.${synced ? ' This browser is signed out of sync.' : ''}</td>
+        ${synced ? html`<td>${drive('Kept as it is')}</td>` : ''}
       </tr>
       <tr>
         <th scope="row">Delete everything</th>
         <td>Pulls, settings and pictures deleted${synced ? ', and this browser is signed out of sync' : ''}.</td>
-        ${synced ? html`<td>${drive('Kept as it is', 'kept')}</td>` : ''}
+        ${synced ? html`<td>${drive('Kept as it is')}</td>` : ''}
       </tr>
     </tbody>
   </table>
@@ -203,11 +201,9 @@ function deleteTable(synced: boolean): Html {
       : ''}`;
 }
 
-/** The Drive consequence, repeated in the confirmation step where it can't be missed. */
-const driveImpact = (scope: DeleteScope): Html =>
-  scope === 'pulls'
-    ? html`<span class="delete-drive gone">${icon('delete')}Your Google Drive copy's pulls are deleted too.</span>`
-    : html`<span class="delete-drive kept">${icon('cloud')}Your Google Drive copy is kept. Only this browser is cleared.</span>`;
+/** The Drive outcome, repeated in the confirmation step where it can't be missed. */
+const driveImpact = (): Html =>
+  html`<span class="delete-drive kept">${icon('cloud')}Your Google Drive copy is not touched. This browser is signed out of sync, and only this browser is cleared.</span>`;
 
 export function aboutCard(): Html {
   return html`<p class="copy-13 tertiary" style="margin-top:40px">

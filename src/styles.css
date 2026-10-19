@@ -2569,9 +2569,6 @@ code {
 .delete-drive .icon {
   font-size: 16px;
 }
-.delete-drive.gone {
-  color: var(--red);
-}
 .delete-drive.kept {
   color: var(--green);
 }

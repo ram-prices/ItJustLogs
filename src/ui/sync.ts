@@ -234,13 +234,16 @@ export async function signIn(): Promise<void> {
   }
 }
 
-export function signOut(): void {
+/** Whether this browser is signed in to Drive sync (even if it needs a click to reconnect). */
+export const syncIsOn = (): boolean => meta.on;
+
+export function signOut(quiet = false): void {
   drive.revoke();
   clearTimeout(timer);
   meta = { on: false, changed: meta.changed };
   save();
   setStatus('off');
-  toast('Signed out of Google Drive. The copy there stays, and so does everything in this browser.');
+  if (!quiet) toast('Signed out of Google Drive. The copy there stays, and so does everything in this browser.');
 }
 
 /** Loads Google's sign-in script ahead of a click, so the sign-in window opens straight from it. */

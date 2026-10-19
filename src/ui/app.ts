@@ -13,7 +13,7 @@ import { homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNo
 import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage } from './pages/stats';
-import { installSync, onSyncStatus, signIn, signOut, syncNeedsClick, syncNow } from './sync';
+import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow } from './sync';
 import { installTint, tintWeaponCards } from './tint';
 
 /**
@@ -394,13 +394,18 @@ async function onClick(e: MouseEvent): Promise<void> {
     case 'clear-confirm': {
       setConfirmingDelete(null);
       const pullsOnly = el.dataset.value === 'pulls';
+      // Deleting never reaches Google Drive: sign this browser out first so
+      // nothing syncs, and leave the Drive copy exactly as it was.
+      const wasSynced = syncIsOn();
+      if (wasSynced) signOut(true);
+      const driveNote = wasSynced ? ' This browser was signed out of Google Drive; the copy there is untouched.' : '';
       try {
         if (pullsOnly) {
           await clearHistory();
-          toast('Pull history deleted. Your name, picture and settings were kept.');
+          toast(`Pull history deleted from this browser. Your name, picture and settings were kept.${driveNote}`);
         } else {
           await clearEverything();
-          toast('All saved data was deleted from this browser.');
+          toast(`All saved data was deleted from this browser.${driveNote}`);
         }
       } catch (err) {
         toast(`Couldn't delete ${pullsOnly ? 'the pull history' : 'everything'}: ${(err as Error).message}`, 'error');
