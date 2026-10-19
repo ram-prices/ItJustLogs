@@ -37,6 +37,16 @@ export function setConfirmingDelete(v: DeleteScope | null): void {
   confirmingDelete = v;
 }
 
+/**
+ * The two halves of Drive sync (ui/sync.ts), said plainly: pulls are only
+ * ever merged, so none can be lost; everything else is taken whole from
+ * whichever device changed it last.
+ */
+const syncParts = (): Html => html`<dl class="delete-options sync-parts">
+  <div><dt>Pull history</dt><dd>Only ever merged. Each device adds its pulls to your Drive copy and gets the others' back. Nothing here can remove a pull from your Drive copy.</dd></div>
+  <div><dt>Settings, extra copies, pictures</dt><dd>The newest version wins. Whichever device changed them last replaces them everywhere, so removing an extra copy removes it on your other devices too. Sync a device right after changing them there.</dd></div>
+</dl>`;
+
 /** Google Drive sync; only on builds with a client ID. */
 function syncCard(): Html {
   if (!driveConfigured()) return html``;
@@ -47,6 +57,7 @@ function syncCard(): Html {
       <div class="card-body">
         <h2 class="heading-20">Sync with Google Drive</h2>
         <p class="copy-14">Keep your pulls, settings and pictures in your own Google Drive and use them on any device. ItJustLogs can only see a hidden folder of its own there, not your files.</p>
+        ${syncParts()}
       </div>
       <div class="card-footer"><span>Optional. Nothing leaves this browser until you sign in.</span>
         <button class="btn primary sm" data-action="sync-signin">${icon('cloud')}Sign in with Google</button></div>
@@ -64,7 +75,8 @@ function syncCard(): Html {
   return html`<section class="card">
     <div class="card-body">
       <h2 class="heading-20">Sync with Google Drive</h2>
-      <p class="copy-14">Signed in as <b>${v.email ?? 'your Google account'}</b>. Imports and changes are saved to your Drive and merged with your other devices.</p>
+      <p class="copy-14">Signed in as <b>${v.email ?? 'your Google account'}</b>. Imports and changes are saved to your Drive and shared with your other devices, in two ways:</p>
+      ${syncParts()}
       <div class="sync-status">${line}${v.lastSynced ? html`<span class="tertiary">Last synced ${fmtDate(v.lastSynced, true)}</span>` : ''}</div>
     </div>
     <div class="card-footer"><span>To delete the Drive copy: Google Drive → Settings → Manage apps → ItJustLogs → Delete hidden app data.</span>

@@ -2818,6 +2818,16 @@ a.patch-banner:hover {
   align-items: center;
   gap: 8px;
 }
+/* Preset names are long: let them wrap instead of widening the page on phones. */
+.extra-presets .btn {
+  height: auto;
+  min-height: 32px;
+  padding-block: 6px;
+  white-space: normal;
+  text-align: left;
+  line-height: 18px;
+  max-width: 100%;
+}
 @media (max-width: 640px) {
   .extra {
     grid-template-columns: 36px minmax(0, 1fr) auto auto;
@@ -2826,12 +2836,22 @@ a.patch-banner:hover {
     grid-column: 2 / -1;
     grid-row: 2;
   }
+  /* Item, then event, then copies and Add side by side. */
   .extra-add {
-    grid-template-columns: minmax(0, 1fr) 88px;
+    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-areas: 'item item' 'note note' 'copies add';
   }
-  .extra-add-item,
+  .extra-add-item {
+    grid-area: item;
+  }
   .extra-add-note {
-    grid-column: 1 / -1;
+    grid-area: note;
+  }
+  .extra-add-copies {
+    grid-area: copies;
+  }
+  .extra-add .btn {
+    grid-area: add;
   }
 }
 

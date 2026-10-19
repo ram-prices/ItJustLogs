@@ -3,7 +3,6 @@ import { bannerArtUrl, canonicalPoolId } from '../../domain/banners';
 import {
   KIND_LABEL,
   SERVER_LABEL,
-  discordText,
   endOrGuess,
   isWeaponBanner,
   packLanes,
@@ -27,7 +26,7 @@ import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
  * Home: the banner and event schedule. What's open now (with your pity on
  * each banner), what's announced next, and a timeline of every version, banner
  * and event since launch. Built from ef-assets' schedule.json, so it works
- * before any import. Right-click or long-press anything to copy it for Discord.
+ * before any import. Right-click or long-press a banner or event to copy its link.
  */
 
 const DAY = 86_400_000;
@@ -81,9 +80,6 @@ const EVENT_ICONS: [RegExp, string][] = [
 ];
 const eventIcon = (e: ScheduleEvent) => EVENT_ICONS.find(([re]) => re.test(e.type))?.[1] ?? 'event';
 
-/** The "Copy to Discord" text, stored on the element (see installDiscordMenu). */
-const bannerDiscord = (b: ScheduleBanner, server: Server) => discordText(b, KIND_LABEL[b.kind], server, b.rateUps);
-const eventDiscord = (e: ScheduleEvent, server: Server) => discordText(e, e.type, server);
 
 /**
  * Each banner's and event's own link (/banners/<name>, /events/<name>), which
@@ -103,7 +99,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const src = artOf(b);
   const mine = summaryFor(b, a);
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
-  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}" data-link="${linkOf(b)}" data-card-image="${b.name}">
+  return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-link="${linkOf(b)}" data-card-image="${b.name}">
     <div class="banner-art">
       ${src ? html`<img src="${src}" alt="" loading="lazy" decoding="async" />` : ''}
       <div class="banner-art-text">
@@ -147,7 +143,7 @@ function rowWhen(start: number | null, end: number | null, now: number): Html {
 function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
   const start = timeOn(b.start, server);
   const src = artOf(b);
-  return html`<div class="sched-next${isWeaponBanner(b.kind) ? ' weap' : ''}" data-discord="${bannerDiscord(b, server)}" data-link="${linkOf(b)}">
+  return html`<div class="sched-next${isWeaponBanner(b.kind) ? ' weap' : ''}" data-link="${linkOf(b)}">
     ${src
       ? html`<div class="sched-thumb"><img src="${src}" alt="" loading="lazy" decoding="async" /></div>`
       : html`<div class="sched-thumb sched-date">${start ? html`<span>${monthFmt.format(start)}</span><b>${dayFmt.format(start)}</b>` : '?'}</div>`}
@@ -160,7 +156,7 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 }
 
 function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
-  return html`<div class="sched-next evt" data-discord="${eventDiscord(e, server)}" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
+  return html`<div class="sched-next evt" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
     ${e.art
       ? html`<div class="sched-thumb evt-art"><img src="${e.art}" alt="" loading="lazy" decoding="async" /></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
@@ -187,7 +183,6 @@ interface Bar {
   name: string;
   cls: string;
   tip: string;
-  discord: string;
   link: string;
   href?: string;
 }
@@ -227,7 +222,6 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       name: b.name,
       cls: `${isWeaponBanner(b.kind) ? 'weap' : 'op'} ${b.kind} ${statusOf(b, now, server)}${mine ? ' mine' : ''}`,
       tip: tip(b.name, rows),
-      discord: bannerDiscord(b, server),
       link: linkOf(b),
       href: mine ? pagePath(b) : undefined,
     };
@@ -241,7 +235,6 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       name: e.name,
       cls: `evt ${statusOf(e, now, server)}`,
       tip: tip(e.name, [tipRow('Type', e.type), tipRow('Opens', when(start)), tipRow('Ends', end == null ? 'TBA' : when(end))]),
-      discord: eventDiscord(e, server),
       link: linkOf(e),
     };
   };
@@ -297,8 +290,8 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
           const range = `${shortDate.format(b.start)} – ${b.end == null ? 'TBA' : shortDate.format(b.end)}`;
           const inner = html`<span class="ellipsis">${b.name}<i class="tl-dates">${range}</i></span>`;
           return b.href
-            ? html`<a class="${cls}" href="${b.href}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}" data-link="${b.link}">${inner}</a>`
-            : html`<div class="${cls}" style="${style}" data-tip="${b.tip}" data-discord="${b.discord}" data-link="${b.link}">${inner}</div>`;
+            ? html`<a class="${cls}" href="${b.href}" style="${style}" data-tip="${b.tip}" data-link="${b.link}">${inner}</a>`
+            : html`<div class="${cls}" style="${style}" data-tip="${b.tip}" data-link="${b.link}">${inner}</div>`;
         })}</div>
       </div>`;
     });
@@ -338,7 +331,7 @@ export function scrollTimelineToNow(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Copy to Discord, Copy link, Copy image: right-click, or long-press on touch screens
+// Copy link, Copy image: right-click, or long-press on touch screens
 // ---------------------------------------------------------------------------
 
 let menu: HTMLElement | null = null;
@@ -370,8 +363,7 @@ export async function copyText(text: string): Promise<boolean> {
 }
 
 /**
- * The menu for a copyable element: "Copy to Discord" for `data-discord` (its
- * `data-discord-note` overrides the toast), "Copy link" for `data-link`, and
+ * The menu for a copyable element: "Copy link" for `data-link`, and
  * "Copy image" for banner cards (`data-card-image`, the picture's name).
  */
 function openMenu(x: number, y: number, el: HTMLElement): void {
@@ -390,13 +382,6 @@ function openMenu(x: number, y: number, el: HTMLElement): void {
     });
     menu!.append(btn);
   };
-  const text = el.dataset.discord;
-  if (text) {
-    item('content_copy', 'Copy to Discord', async () => {
-      const ok = await copyText(text);
-      toast(ok ? (el.dataset.discordNote ?? 'Copied. Paste it in Discord to show the time for everyone.') : "Couldn't copy here.", ok ? 'info' : 'error');
-    });
-  }
   const link = el.dataset.link;
   if (link) {
     item('link', 'Copy link', async () => {
@@ -424,10 +409,10 @@ function openMenu(x: number, y: number, el: HTMLElement): void {
   first?.focus();
 }
 
-/** Things that can be copied: Home's banners and events, the info pages, and every banner card. */
-const copyable = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-discord], [data-card-image]') : null);
+/** Things with a menu: Home's banners and events (Copy link) and every banner card (Copy image). */
+const copyable = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-link], [data-card-image]') : null);
 
-export function installDiscordMenu(): void {
+export function installCopyMenu(): void {
   document.addEventListener('contextmenu', (e) => {
     const el = copyable(e.target);
     if (!el) return;

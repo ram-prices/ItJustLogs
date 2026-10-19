@@ -21,7 +21,7 @@ embed (`<script id="discord:component-embed">`, max 3,000 bytes: header with
 portrait, every skill fitted, wiki credit link) and Open Graph tags as its
 fallback (Discord runs no script). Built by `domain/share.ts`, fitted to
 Discord's limits (OG description 350 bytes, title 70 bytes), which also
-builds the info pages' "Copy to Discord" text. If
+builds the (now unused) "Copy to Discord" text. If
 ef-assets can't be fetched it uses `src/data/wiki-share.snapshot.json`, which
 local builds refresh. New operators get a preview only after a rebuild.
 Every banner and event in ef-assets `schedule.json` gets one too:
@@ -122,8 +122,8 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     Pages live in `ui/pages/` (`home.ts` = the schedule: banners open now
     with your pity and rate-up status, events now, coming up, and a
     version/banner/event timeline; works without an import; anything with
-    `data-discord` gets a right-click / long-press "Copy to Discord" menu
-    whose text comes from `discordText` in `domain/schedule.ts`; `kind.ts` = operators/arsenal: every banner as a fixed-height card
+    `data-link` or `data-card-image` gets a right-click / long-press menu
+    (`installCopyMenu`: Copy link, Copy image via `ui/cardImage.ts`); `kind.ts` = operators/arsenal: every banner as a fixed-height card
     whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/operators/<poolId>` opens one), `operator.ts` / `weapon.ts` = `/operators/info[/<chr id>]` / `/arsenal/info[/<wpn id>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.

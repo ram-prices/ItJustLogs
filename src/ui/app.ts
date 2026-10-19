@@ -12,7 +12,7 @@ import { EXPORTER_SOURCE } from './guide';
 import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
-import { copyText, focusScheduleItem, homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
+import { copyText, focusScheduleItem, homePage, installCopyMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
@@ -218,6 +218,9 @@ function markOverflow(): void {
   for (const card of document.querySelectorAll<HTMLElement>('.banner')) {
     if (card.classList.contains('expanded')) continue;
     const list = card.querySelector<HTMLElement>('.banner-scroll');
+    // Measure with Expand hidden (the list is taller then), so the answer
+    // doesn't depend on whether the button was showing.
+    card.classList.add('fits');
     card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
   }
   // The 6★ history only needs Show all when it runs past two rows.
@@ -248,7 +251,12 @@ function toggleCard(card: HTMLElement): void {
     'transitionend',
     () => {
       card.style.height = '';
-      if (!opening) card.querySelector('.banner-scroll')?.scrollTo({ top: 0 });
+      if (!opening) {
+        card.querySelector('.banner-scroll')?.scrollTo({ top: 0 });
+        // Expanded cards aren't measured (markOverflow), so a filter changed
+        // while open left Expand stale: measure again now it's collapsed.
+        markOverflow();
+      }
     },
     { once: true },
   );
@@ -562,7 +570,7 @@ export function mount(): void {
   installTooltips();
   installImport();
   installTimelineLabels();
-  installDiscordMenu();
+  installCopyMenu();
   installWikiControls();
   installProfile();
   installSync();
