@@ -2530,3 +2530,9 @@ code {
 .home .sched-import {
   margin-bottom: 20px;
 }
+.home-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 48px 0 32px;
+}

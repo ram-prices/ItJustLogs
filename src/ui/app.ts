@@ -298,7 +298,8 @@ function installProfile(): void {
  * reloading. Modified clicks (new tab etc.) are left to the browser.
  */
 function navigate(e: MouseEvent): boolean {
-  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="/"]');
+  // data-native: a real page outside the app (e.g. /privacy/), loaded normally.
+  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="/"]:not([data-native])');
   if (!a || a.target || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
   e.preventDefault();
   if (a.getAttribute('aria-disabled') === 'true') return true;

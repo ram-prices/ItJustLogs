@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy policy · ItJustLogs</title>
+    <meta name="description" content="How ItJustLogs handles your data: everything stays in your browser, and optional Google Drive sync uses a hidden app folder in your own Drive." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      /* Standalone on purpose: readable without JavaScript and with no outside requests. */
+      :root {
+        color-scheme: dark light;
+        --bg: #0a0a0a;
+        --fg: #ededed;
+        --muted: #a1a1a1;
+        --line: rgba(255, 255, 255, 0.12);
+        --link: #52a8ff;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #ffffff;
+          --fg: #171717;
+          --muted: #4d4d4d;
+          --line: rgba(0, 0, 0, 0.1);
+          --link: #0068d6;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 20px 64px;
+      }
+      h1 {
+        font-size: 32px;
+        line-height: 1.2;
+        letter-spacing: -0.5px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 36px 0 8px;
+      }
+      p,
+      li {
+        color: var(--fg);
+      }
+      ul {
+        padding-left: 22px;
+      }
+      li + li {
+        margin-top: 6px;
+      }
+      a {
+        color: var(--link);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .back {
+        display: inline-block;
+        margin-bottom: 28px;
+        text-decoration: none;
+      }
+      footer {
+        margin-top: 48px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="/">&larr; ItJustLogs</a>
+      <h1>Privacy policy</h1>
+      <p class="muted">Effective October 19, 2026</p>
+
+      <p>
+        ItJustLogs (<a href="https://itjustlogs.dev">itjustlogs.dev</a>) is a free, fan-made pull-history tracker for
+        Arknights: Endfield. It has no accounts and no server of its own: it runs entirely in your browser. This page
+        explains what it stores, where, and what it shares.
+      </p>
+
+      <h2>What stays in your browser</h2>
+      <ul>
+        <li>Your pull history (the file you import or paste), your settings, and any profile picture you add.</li>
+        <li>
+          These are kept in your browser's own storage (IndexedDB and localStorage) on your device. They are never sent
+          to ItJustLogs or anyone else, except to your own Google Drive if you turn on sync (below).
+        </li>
+        <li>
+          You can delete them at any time in Settings &rarr; Delete saved data, or by clearing this site's data in your
+          browser.
+        </li>
+      </ul>
+
+      <h2>Optional Google Drive sync</h2>
+      <p>If you choose <b>Sign in with Google</b> in Settings, ItJustLogs uses Google's sign-in to sync your data between your devices:</p>
+      <ul>
+        <li>
+          It asks for one permission, <code>drive.appdata</code>: access to a hidden folder in your Google Drive that
+          belongs to ItJustLogs alone. It cannot see, open or change any of your other Drive files.
+        </li>
+        <li>
+          It stores one file there, a backup of your pulls, settings and profile picture, and reads it back on your other
+          devices.
+        </li>
+        <li>
+          It reads your Google account's email address only to show which account is syncing. That email is kept in your
+          browser while sync is on; the short-lived access token from Google is kept only for the current browser tab.
+        </li>
+        <li>
+          All of this happens between your browser and Google. The developer of ItJustLogs never receives your Google
+          data, your token or your backup.
+        </li>
+        <li>
+          To stop: choose Sign out in Settings. To remove the Drive copy too, delete ItJustLogs' hidden app data in Google
+          Drive (Settings &rarr; Manage apps), and you can remove its access at
+          <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+        </li>
+      </ul>
+      <p>
+        ItJustLogs' use and transfer of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+        including the Limited Use requirements. Google data is used only to provide sync to you, and is never sold, used
+        for advertising, or shared with anyone.
+      </p>
+
+      <h2>The pull-history exporter</h2>
+      <p>
+        The optional PowerShell script shown in Settings reads the game's own cache on your PC to find your history link,
+        and downloads your history only from Gryphline's official server (<code>ef-webview.gryphline.com</code>). It saves
+        the result to your Desktop and clipboard. It sends nothing anywhere else.
+      </p>
+
+      <h2>Other services the site loads from</h2>
+      <p>To show the page, your browser loads files from these services, which receive your IP address as any website does:</p>
+      <ul>
+        <li>Google Fonts (fonts.googleapis.com, fonts.gstatic.com) for the typeface and icons.</li>
+        <li>GitHub and jsDelivr (raw.githubusercontent.com, cdn.jsdelivr.net) for banner names, the schedule and game art.</li>
+        <li>Gryphline's image server (web-static.hg-cdn.com) for art of new banners.</li>
+        <li>GitHub Pages, which hosts the site.</li>
+      </ul>
+      <p>ItJustLogs itself uses no analytics, no advertising and no tracking cookies.</p>
+
+      <h2>Children</h2>
+      <p>ItJustLogs doesn't knowingly collect anything from anyone, of any age: your data stays with you.</p>
+
+      <h2>Changes</h2>
+      <p>If this policy changes, the new version will be posted on this page with a new effective date.</p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or requests: open an issue at
+        <a href="https://github.com/ram-prices/ItJustLogs/issues">github.com/ram-prices/ItJustLogs/issues</a>.
+      </p>
+
+      <footer class="muted">
+        ItJustLogs is not affiliated with Gryphline or Hypergryph. Arknights: Endfield and its assets belong to them.
+      </footer>
+    </main>
+  </body>
+</html>
