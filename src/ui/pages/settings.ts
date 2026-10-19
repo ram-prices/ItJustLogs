@@ -118,7 +118,7 @@ function extrasCard(redraw: () => void): Html {
             (x, i) => html`<div class="extra">
               ${itemImg(extraKind(x.id), x.id, 'extra-icon')}
               ${name(x, i)}
-              <input class="input extra-note" data-extra-note="${i}" value="${x.note}" maxlength="48" placeholder="Where from" aria-label="Where ${nameOf(x.id)} came from" />
+              <input class="input extra-note" data-extra-note="${i}" value="${x.note}" maxlength="48" placeholder="Event" aria-label="Event that gave ${nameOf(x.id)}" />
               <label class="extra-copies"><input class="input" type="number" min="1" max="99" data-extra-copies="${i}" value="${x.copies}" aria-label="Copies of ${nameOf(x.id)}" /><span class="secondary">${x.copies >= MAX_COPIES ? 'max' : `P${x.copies - 1}`}</span></label>
               <button class="btn tertiary sm" data-action="extra-remove" data-value="${i}" aria-label="Remove ${nameOf(x.id)}">${icon('close')}</button>
             </div>`,
@@ -132,7 +132,7 @@ function extrasCard(redraw: () => void): Html {
               : html`<option>Loading…</option>`}
           </select></label>
         <label class="field extra-add-copies"><span>Copies</span><input class="input" id="extraCopies" type="number" min="1" max="99" value="1" /></label>
-        <label class="field extra-add-note"><span>Where from</span><input class="input" id="extraNote" maxlength="48" placeholder="Event name" /></label>
+        <label class="field extra-add-note"><span>Event</span><input class="input" id="extraNote" maxlength="48" placeholder="Event name" /></label>
         <button class="btn secondary sm" data-action="extra-add" ${ops && weps ? '' : 'disabled'}>Add</button>
       </div>
       <div class="extra-presets">

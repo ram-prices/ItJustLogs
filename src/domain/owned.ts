@@ -49,6 +49,14 @@ export const EXTRA_PRESETS: { key: string; label: string; extras: ExtraCopy[] }[
       { id: 'wpn_sword_0023', copies: 6, note: 'Purry Big Feline! RAWR!' },
     ],
   },
+  {
+    key: 'awakening',
+    label: 'Awakening Sign-In (Ardelia and Dreams of the Starry Beach)',
+    extras: [
+      { id: 'chr_0025_ardelia', copies: 1, note: 'Awakening Sign-In' },
+      { id: 'wpn_funnel_0013', copies: 1, note: 'Awakening Sign-In' },
+    ],
+  },
 ];
 
 export const extraKind = (id: string): Kind => (id.startsWith('wpn_') ? 'weap' : 'char');

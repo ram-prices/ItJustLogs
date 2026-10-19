@@ -78,7 +78,7 @@ function hero(id: string, o: WikiOperator, owned: Owned | undefined): Html {
           <span class="wiki-fact"><span class="wiki-fact-label">Element</span><span class="wk wk-${o.element.toLowerCase().replace(/\W/g, '')}">${o.element}</span></span>
           <span class="wiki-fact"><span class="wiki-fact-label">Weapon</span>${o.weapon}</span>
           ${o.faction ? html`<span class="wiki-fact"><span class="wiki-fact-label">Faction</span>${o.faction}</span>` : ''}
-          ${owned?.copies ? html`<span class="wiki-fact"><span class="wiki-fact-label">Your Potential</span><span class="wiki-fact-pot">${potentialLevel(owned)}${pips(owned.potential)}</span></span>` : ''}
+          ${owned?.copies ? html`<span class="wiki-fact"><span class="wiki-fact-label">Potential</span><span class="wiki-fact-pot">${potentialLevel(owned)}${pips(owned.potential)}</span></span>` : ''}
         </div>
         ${o.tags.length ? html`<div class="wiki-tags">${o.tags.map((t) => badge(t, 'outline'))}</div>` : ''}
       </div>
