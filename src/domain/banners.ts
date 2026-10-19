@@ -1,4 +1,4 @@
-import type { BannerDb, BannerDbEntry, Category, Kind } from './types';
+import type { BannerDb, BannerDbEntry, Category, Kind } from './types.ts';
 
 export const EF_ASSETS = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
 export const EF_ASSETS_CDN = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main';

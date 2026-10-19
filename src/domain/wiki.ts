@@ -77,9 +77,9 @@ export interface WikiOperatorFile {
 }
 
 /** Game ids the wiki files under another id. */
-const ALIASES: Record<string, string> = { chr_0034_typhoeus: 'chr_0034_typhoea' };
+export const WIKI_ALIASES: Record<string, string> = { chr_0034_typhoeus: 'chr_0034_typhoea' };
 
-export const wikiId = (itemId: string): string => ALIASES[itemId] ?? itemId;
+export const wikiId = (itemId: string): string => WIKI_ALIASES[itemId] ?? itemId;
 
 export type Segment =
   | { kind: 'text'; text: string }

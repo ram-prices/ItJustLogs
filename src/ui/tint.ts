@@ -76,6 +76,52 @@ function weaponColour(img: HTMLImageElement): string {
 
 const pending = new Set<string>();
 
+/** Rate-up portraits in the 6★ strip take their banner card's colour (`data-six-tint`). */
+function paintSix(url: string, tint: string): void {
+  if (tint === DEFAULT_TINT) return; // keep the 6★ gold outline
+  for (const el of document.querySelectorAll<HTMLElement>('[data-six-tint]')) {
+    if (el.dataset.sixTint === url) el.style.setProperty('--six-tint', tint);
+  }
+}
+
+/** The cached colour for a 6★ strip outline, if it's known yet (else the gold stays). */
+export const sixTintFor = (url: string): string | null => {
+  const t = cache.get(url);
+  return t && t !== DEFAULT_TINT ? t : null;
+};
+
+/**
+ * Works out the strip's banner colours itself: the cards further down lazy-load
+ * their art, so the strip can't wait for them. Same maths as the cards: the
+ * weapon's main colour for Arsenal, the art's average for Headhunting.
+ */
+export function tintSixStrip(): void {
+  for (const el of document.querySelectorAll<HTMLElement>('[data-six-tint]')) {
+    const url = el.dataset.sixTint!;
+    if (cache.has(url) || pending.has(url)) continue;
+    const weapon = el.dataset.sixTintKind === 'weap';
+    pending.add(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let tint = DEFAULT_TINT;
+      try {
+        tint = weapon ? weaponColour(img) : extract(img);
+      } catch {
+        // not CORS-clean: keep the gold outline
+      }
+      cache.set(url, tint);
+      pending.delete(url);
+      paintSix(url, tint);
+    };
+    img.onerror = () => {
+      pending.delete(url);
+      cache.set(url, DEFAULT_TINT);
+    };
+    img.src = url;
+  }
+}
+
 /**
  * Tints every Arsenal card from its rate-up weapon's icon (`data-tint-weapon`).
  * The icon is loaded off-page; call after each render.
@@ -96,6 +142,7 @@ export function tintWeaponCards(): void {
       }
       cache.set(url, tint);
       pending.delete(url);
+      paintSix(url, tint);
       for (const c of document.querySelectorAll<HTMLElement>('.banner[data-tint-weapon]')) {
         if (c.dataset.tintWeapon === url) c.style.setProperty('--banner-tint', tint);
       }
@@ -157,7 +204,10 @@ export function installTint(): void {
         cache.set(img.src, tint);
         // Also cache under the original URL so the next render finds it even after a CDN fallback.
         const original = card.dataset.art;
-        if (original) cache.set(original, tint);
+        if (original) {
+          cache.set(original, tint);
+          paintSix(original, tint);
+        }
       }
       card.style.setProperty('--banner-tint', tint);
     },

@@ -1,5 +1,6 @@
 import type { Analysis } from '../../domain/analyze';
 import type { Owned } from '../../domain/owned';
+import { operatorDiscord, operatorSkillDiscord } from '../../domain/share';
 import { skillSets, wikiId, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
@@ -14,6 +15,9 @@ import { credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, 
  */
 
 const MAX_RANK = 12;
+
+/** Toast after "Copy to Discord" (right-click or long-press the header or a skill). */
+const COPIED = 'Copied. Paste it in Discord.';
 
 /** Link to an operator's info page (or the list of all of them). */
 export const operatorInfoHref = (id?: string): string => infoHref('char', id);
@@ -57,7 +61,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
 // ---------------------------------------------------------------------------
 
 function hero(id: string, o: WikiOperator, owned: Owned | undefined): Html {
-  return html`<section class="wiki-hero">
+  return html`<section class="wiki-hero" data-discord="${operatorDiscord(id, o)}" data-discord-note="${COPIED}">
     ${itemImg('char', id, 'wiki-hero-bg')}
     <div class="container wiki-hero-inner">
       ${itemImg('char', id, 'wiki-hero-portrait')}
@@ -118,8 +122,8 @@ function statsSection(o: WikiOperator): Html {
   </section>`;
 }
 
-function skillCard(s: WikiSkill, rank: number): Html {
-  return html`<article class="card wiki-skill">
+function skillCard(id: string, o: WikiOperator, s: WikiSkill, rank: number): Html {
+  return html`<article class="card wiki-skill" data-discord="${operatorSkillDiscord(id, o, s)}" data-discord-note="${COPIED}">
     <div class="wiki-skill-head">
       <span class="wiki-skill-type">${s.type}</span>
       <h3 class="heading-16">${s.name}</h3>
@@ -136,7 +140,7 @@ function skillCard(s: WikiSkill, rank: number): Html {
   </article>`;
 }
 
-function skillsSection(o: WikiOperator): Html {
+function skillsSection(id: string, o: WikiOperator): Html {
   if (!o.skills.length) return html``;
   const rank = sliderRank('char', MAX_RANK);
   return html`<section class="section">
@@ -146,7 +150,7 @@ function skillsSection(o: WikiOperator): Html {
     </div>
     ${skillSets(o.skills).map(
       (set) => html`${set.variant ? html`<h3 class="heading-16 wiki-variant">${set.variant}</h3>` : ''}
-        <div class="wiki-skills">${set.skills.map((s) => skillCard(s, rank))}</div>`,
+        <div class="wiki-skills">${set.skills.map((s) => skillCard(id, o, s, rank))}</div>`,
     )}
   </section>`;
 }
@@ -233,7 +237,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
     <main class="container fade-in wiki-page">
       ${ownedSection('char', o.name, a, owned)}
       ${statsSection(o)}
-      ${skillsSection(o)}
+      ${skillsSection(id, o)}
       ${potentialsSection(o, owned, !!a)}
       ${talentsSection(o)}
       ${baseSkillsSection(o)}

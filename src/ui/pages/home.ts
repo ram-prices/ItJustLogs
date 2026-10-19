@@ -355,7 +355,9 @@ async function copyText(text: string): Promise<boolean> {
   return ok;
 }
 
-function openMenu(x: number, y: number, text: string): void {
+/** The menu for a `data-discord` element; `data-discord-note` overrides the toast. */
+function openMenu(x: number, y: number, el: HTMLElement): void {
+  const text = el.dataset.discord!;
   closeMenu();
   menu = document.createElement('div');
   menu.className = 'ctx-menu';
@@ -367,7 +369,7 @@ function openMenu(x: number, y: number, text: string): void {
   btn.addEventListener('click', async () => {
     closeMenu();
     const ok = await copyText(text);
-    toast(ok ? 'Copied. Paste it in Discord to show the time for everyone.' : "Couldn't copy here.", ok ? 'info' : 'error');
+    toast(ok ? (el.dataset.discordNote ?? 'Copied. Paste it in Discord to show the time for everyone.') : "Couldn't copy here.", ok ? 'info' : 'error');
   });
   menu.append(btn);
   document.body.append(menu);
@@ -378,7 +380,7 @@ function openMenu(x: number, y: number, text: string): void {
   btn.focus();
 }
 
-/** Things on the Home page that can be copied (only Home has data-discord). */
+/** Things that can be copied: Home's banners and events, and the operator and weapon info pages. */
 const copyable = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-discord]') : null);
 
 export function installDiscordMenu(): void {
@@ -386,7 +388,7 @@ export function installDiscordMenu(): void {
     const el = copyable(e.target);
     if (!el) return;
     e.preventDefault();
-    openMenu(e.clientX, e.clientY, el.dataset.discord!);
+    openMenu(e.clientX, e.clientY, el);
   });
 
   // iOS Safari has no contextmenu event: open on a 500ms press instead, and
@@ -404,7 +406,7 @@ export function installDiscordMenu(): void {
       clearTimeout(timer);
       timer = window.setTimeout(() => {
         swallowClick = true;
-        openMenu(t.clientX, t.clientY, el.dataset.discord!);
+        openMenu(t.clientX, t.clientY, el);
       }, 500);
     },
     { passive: true },

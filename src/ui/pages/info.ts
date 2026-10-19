@@ -1,7 +1,8 @@
 import type { Analysis } from '../../domain/analyze';
-import { MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type Owned } from '../../domain/owned';
+import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type ExtraCopy, type Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
 import { fmtSkillValue, parseMarkup, splitPlaceholders, type WikiAttribution } from '../../domain/wiki';
+import { state } from '../../state';
 import { loadWikiFile } from '../../store';
 import { badge, icon, metric, metrics } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
@@ -54,14 +55,17 @@ export function wikiFile<T>(file: string, redraw: () => void): Loaded<T> {
   return f as Loaded<T>;
 }
 
-const ownedCache = new WeakMap<Analysis, Partial<Record<Kind, Map<string, Owned>>>>();
+let ownedCache: { a: Analysis | null; extras: ExtraCopy[]; maps: Partial<Record<Kind, Map<string, Owned>>> } | null = null;
 
-/** The player's copies of every item of `kind` (null without an import). */
+/**
+ * The player's copies of every item of `kind`: pulls, rewards and the extra
+ * copies from Settings. Null only with neither an import nor any extras.
+ */
 export function ownedOf(a: Analysis | null, kind: Kind): Map<string, Owned> | null {
-  if (!a) return null;
-  let c = ownedCache.get(a);
-  if (!c) ownedCache.set(a, (c = {}));
-  return (c[kind] ??= ownedItems(a, kind));
+  const extras = extrasOf(state.settings);
+  if (!a && !extras.length) return null;
+  if (ownedCache?.a !== a || ownedCache.extras !== extras) ownedCache = { a, extras, maps: {} };
+  return (ownedCache.maps[kind] ??= ownedItems(a, kind, extras));
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +189,7 @@ const OUTCOME: Record<string, Html> = {
  */
 export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined): Html {
   const head = html`<div class="section-head"><h2 class="heading-20">Your pulls</h2></div>`;
-  if (!a) {
+  if (!a && !owned?.copies) {
     return html`<section class="section">${head}
       <div class="card wiki-owned-empty">
         <p class="copy-14 secondary">Import your pull history to see how many copies of ${name} you have and their Potential.</p>
@@ -209,9 +213,11 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
   const level = potentialLevel(owned);
   const isMax = owned.copies >= MAX_COPIES;
   const toMax = MAX_COPIES - owned.copies;
-  const fromRewards = owned.copies - owned.pulled;
+  const fromRewards = owned.copies - owned.pulled - owned.extra;
   const lastSpare = owned.spare ? latest : null;
   const via = (x: Acquisition) => (x.reward ? `${x.reward} · ${x.bannerName}` : x.bannerName);
+  // Extra copies have no date: they show as "Extra" with their note.
+  const when = (x: Acquisition) => html`<span class="wiki-date">${x.extra ? 'Extra' : fmtDate(x.ts)}</span>`;
   const path = PATH[kind];
 
   return html`<section class="section">
@@ -220,7 +226,7 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
       metric({
         label: 'Copies',
         value: String(owned.copies),
-        sub: [`${owned.pulled} pulled`, fromRewards ? `${fromRewards} from rewards` : ''].filter(Boolean).join(' · '),
+        sub: [`${owned.pulled} pulled`, fromRewards ? `${fromRewards} from rewards` : '', owned.extra ? `${owned.extra} extra` : ''].filter(Boolean).join(' · '),
       }),
       metric({
         label: 'Potential',
@@ -229,31 +235,41 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
         // Spare copies stay low-key: a count and when the latest one turned up.
         sub: isMax
           ? lastSpare
-            ? `${owned.spare} spare · latest ${fmtDate(lastSpare.ts)}`
+            ? `${owned.spare} spare${lastSpare.extra ? '' : ` · latest ${fmtDate(lastSpare.ts)}`}`
             : 'Fully upgraded'
           : `${toMax} more cop${toMax > 1 ? 'ies' : 'y'} to P${MAX_POTENTIAL}`,
       }),
-      metric({ label: 'First copy', value: html`<span class="wiki-date">${fmtDate(first.ts)}</span>`, sub: via(first) }),
+      metric({ label: 'First copy', value: when(first), sub: via(first) }),
       owned.maxed
-        ? metric({ label: `Reached P${MAX_POTENTIAL}`, value: html`<span class="wiki-date">${fmtDate(owned.maxed.ts)}</span>`, sub: via(owned.maxed) })
-        : metric({ label: 'Latest copy', value: html`<span class="wiki-date">${fmtDate(latest.ts)}</span>`, sub: via(latest) }),
+        ? metric({ label: `Reached P${MAX_POTENTIAL}`, value: when(owned.maxed), sub: via(owned.maxed) })
+        : metric({ label: 'Latest copy', value: when(latest), sub: via(latest) }),
     ])}
     <div class="card wiki-pulls">
       ${[...owned.acquisitions].reverse().map((x) => {
         const p = x.pull;
+        const spare = x.copy > MAX_COPIES;
+        const copyTag = html`<span class="wiki-copy" title="Copy ${x.copy}">${spare ? `+${x.copy - MAX_COPIES}` : `P${x.copy - 1}`}</span>`;
+        if (x.extra) {
+          return html`<a class="wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}" href="/settings" title="Extra copies are listed in Settings">
+            <span class="num secondary">Extra</span>
+            <span class="ellipsis wiki-em">${x.bannerName}</span>
+            <span class="num secondary wiki-pull-at">Not a pull</span>
+            <span class="wiki-pull-tag">${badge('Extra', 'outline')}</span>
+            ${copyTag}
+          </a>`;
+        }
         const at = x.reward
           ? `${x.reward}${p?.bannerPull ? ` · ${kind === 'weap' ? `set ${Math.ceil(p.bannerPull / 10)}` : `pull ${p.bannerPull}`}` : ''}${x.estimated ? ' · estimated' : ''}`
           : !p || p.bannerPull === null
             ? 'Free'
             : `${kind === 'weap' ? `Set ${Math.ceil(p.bannerPull / 10)}` : `Pull ${p.bannerPull}`}${p.pity !== null ? ` · pity ${p.pity}` : ''}`;
         const tag = x.reward ? badge('Reward', 'outline') : p?.outcome ? OUTCOME[p.outcome] : p?.bannerPull === null ? badge('Free', 'outline') : '';
-        const spare = x.copy > MAX_COPIES;
         return html`<a class="wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}" href="/${path}/${encodeURIComponent(x.poolId)}">
           <span class="num secondary">${fmtDate(x.ts)}</span>
           <span class="ellipsis wiki-em">${x.bannerName}</span>
           <span class="num secondary wiki-pull-at">${at}</span>
           <span class="wiki-pull-tag">${tag}</span>
-          <span class="wiki-copy" title="Copy ${x.copy}">${spare ? `+${x.copy - MAX_COPIES}` : `P${x.copy - 1}`}</span>
+          ${copyTag}
         </a>`;
       })}
     </div>

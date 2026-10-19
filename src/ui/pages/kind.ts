@@ -1,6 +1,6 @@
 import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPull, type Analysis, type BannerSummary, type LuckTier } from '../../domain/analyze';
 import { bannerArtUrl, itemIconUrl } from '../../domain/banners';
-import { tintFor } from '../tint';
+import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
 import type { Schedule, Server } from '../../domain/schedule';
@@ -129,8 +129,15 @@ function sixStrip(kind: Kind, a: Analysis): Html {
             <span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
           const cls = `six-item${p.isRateUp ? ' rateup' : ''}`;
           const title = `${p.name} · ${p.bannerName} · ${fmtDate(p.ts, true)}`;
+          // Rate-ups are outlined in their banner card's colour: the art's for
+          // Headhunting, the weapon's own for Arsenal (as the cards glow).
+          const tintUrl = p.isRateUp ? (p.kind === 'weap' ? itemIconUrl('weap', p.itemId) : bannerArtUrl(p.poolId)) : null;
+          const known = tintUrl ? sixTintFor(tintUrl) : null;
+          const tintAttrs = tintUrl
+            ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind}"${known ? ` style="--six-tint:${known}"` : ''}`)
+            : '';
           // Portraits open that operator's or weapon's info page.
-          return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title}">${inner}</a>`;
+          return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title}" ${tintAttrs}>${inner}</a>`;
         },
       )}
     </div>

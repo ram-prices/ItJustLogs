@@ -1,6 +1,7 @@
 import snapshot from './data/banners.snapshot.json';
 import scheduleSnapshot from './data/schedule.snapshot.json';
 import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
+import type { ExtraCopy } from './domain/owned';
 import type { Schedule, Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
 
@@ -38,6 +39,11 @@ export interface Settings {
   server?: Server;
   /** Operators/Arsenal list every banner that has opened, not just the ones pulled on. */
   showAllBanners?: boolean;
+  /**
+   * Copies from outside pulls (story operators, event gifts); counted on the
+   * info pages, never added to the pull history. Unset = DEFAULT_EXTRAS.
+   */
+  extras?: ExtraCopy[];
 }
 
 const DEFAULT_SETTINGS: Settings = {

@@ -1,5 +1,6 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
+import { weaponDiscord } from '../../domain/share';
 import type { WikiAttribution, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
@@ -61,7 +62,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
 // ---------------------------------------------------------------------------
 
 function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
-  return html`<section class="wiki-hero weapon">
+  return html`<section class="wiki-hero weapon" data-discord="${weaponDiscord(id, w)}" data-discord-note="Copied. Paste it in Discord.">
     ${itemImg('weap', id, 'wiki-hero-bg')}
     <div class="container wiki-hero-inner">
       ${itemImg('weap', id, 'wiki-hero-portrait')}

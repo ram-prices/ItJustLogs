@@ -13,7 +13,16 @@ Served from the domain root, so `base: '/'` (absolute asset paths). Clean
 paths need files on Pages: the `pageCopies` plugin in `vite.config.ts` copies
 `index.html` into `operators/`, `arsenal/`, `stats/`, `settings/` and to
 `404.html` (the fallback for `/operators/<poolId>`). Add new top-level pages
-to its `PAGES` list.
+to its `PAGES` list. It also writes `operators/info/<chr id>.html` and
+`arsenal/info/<wpn id>.html` (Pages serves them at the clean path) for every
+item in the ef-assets wiki data, each with that item's Discord component
+embed (`<script id="discord:component-embed">`, max 3,000 bytes: header with
+portrait, every skill fitted, link buttons) and Open Graph tags as its
+fallback (Discord runs no script). Built by `domain/share.ts`, fitted to
+Discord's limits (OG description 350 bytes, title 70 bytes), which also
+builds the info pages' "Copy to Discord" text. If
+ef-assets can't be fetched it uses `src/data/wiki-share.snapshot.json`, which
+local builds refresh. New operators get a preview only after a rebuild.
 
 ## Commands
 

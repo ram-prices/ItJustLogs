@@ -1,3 +1,4 @@
+import { EXTRA_PRESETS, extrasOf, type ExtraCopy } from '../domain/owned';
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
 import { clearEverything, clearHistory, currentServer, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
@@ -17,7 +18,7 @@ import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage } from './pages/stats';
 import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow } from './sync';
-import { installTint, tintWeaponCards } from './tint';
+import { installTint, tintSixStrip, tintWeaponCards } from './tint';
 
 /**
  * App shell and router. Layout follows the Vercel dashboard: a header with
@@ -109,7 +110,7 @@ function welcome(): Html {
 
 function page(route: Route): Html {
   const a = state.analysis;
-  if (route.page === 'settings') return html`${settingsPage()}<div class="container">${aboutCard()}</div>`;
+  if (route.page === 'settings') return html`${settingsPage(draw)}<div class="container">${aboutCard()}</div>`;
   if (route.page === 'home') return homePage(state.schedule, currentServer(), a);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
@@ -155,6 +156,7 @@ function draw(): void {
   lastKey = key;
   markOverflow();
   tintWeaponCards();
+  tintSixStrip();
   const title = route.info ? (route.page === 'arsenal' ? weaponInfoTitle(route.id) : operatorInfoTitle(route.id)) : TABS.find(([p]) => p === route.page)?.[1];
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
@@ -304,10 +306,15 @@ function installProfile(): void {
   document.addEventListener('change', (e) => {
     const el = e.target as HTMLInputElement;
     if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
+    // Extra copies (Settings): edit one entry's copies or note.
+    const editExtra = (i: number, patch: Partial<ExtraCopy>) =>
+      updateSettings({ extras: extrasOf(state.settings).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+    if (el.dataset?.extraCopies) editExtra(Number(el.dataset.extraCopies), { copies: Math.max(1, Math.min(99, Math.floor(Number(el.value)) || 1)) });
+    if (el.dataset?.extraNote) editExtra(Number(el.dataset.extraNote), { note: el.value.trim() });
   });
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLInputElement;
-    if (e.key === 'Enter' && el.dataset?.setting === 'displayName') el.blur();
+    if (e.key === 'Enter' && (el.dataset?.setting === 'displayName' || el.dataset?.extraNote || el.dataset?.extraCopies)) el.blur();
   });
 }
 
@@ -329,6 +336,20 @@ function navigate(e: MouseEvent): boolean {
   if (to !== location.pathname) history.pushState(null, '', to);
   draw();
   return true;
+}
+
+/**
+ * Adds extra copies (Settings). An entry for the same item and note gets the
+ * copies added to it instead of a second row.
+ */
+function addExtras(add: ExtraCopy[]): void {
+  const list = [...extrasOf(state.settings)];
+  for (const x of add) {
+    const i = list.findIndex((e) => e.id === x.id && e.note === x.note);
+    if (i < 0) list.push({ ...x });
+    else list[i] = { ...list[i], copies: Math.min(99, list[i].copies + x.copies) };
+  }
+  updateSettings({ extras: list });
 }
 
 async function onClick(e: MouseEvent): Promise<void> {
@@ -407,6 +428,24 @@ async function onClick(e: MouseEvent): Promise<void> {
       return syncNow();
     case 'sync-signout':
       return signOut();
+    case 'extra-add': {
+      const id = (document.getElementById('extraItem') as HTMLSelectElement | null)?.value;
+      if (!id) break;
+      const copies = Math.max(1, Math.min(99, Math.floor(Number((document.getElementById('extraCopies') as HTMLInputElement).value)) || 1));
+      const note = (document.getElementById('extraNote') as HTMLInputElement).value.trim();
+      addExtras([{ id, copies, note }]);
+      break;
+    }
+    case 'extra-preset': {
+      const preset = EXTRA_PRESETS.find((p) => p.key === el.dataset.value);
+      // Only what's missing: a preset never stacks copies on entries already there.
+      const have = extrasOf(state.settings);
+      if (preset) addExtras(preset.extras.filter((x) => !have.some((e) => e.id === x.id && e.note === x.note)));
+      break;
+    }
+    case 'extra-remove':
+      updateSettings({ extras: extrasOf(state.settings).filter((_, i) => i !== Number(el.dataset.value)) });
+      break;
     case 'export-backup':
       return exportBackup();
     case 'restore-snapshot': {

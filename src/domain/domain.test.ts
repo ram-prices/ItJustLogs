@@ -18,7 +18,7 @@ import scheduleSnapshot from '../data/schedule.snapshot.json';
 import { discordText, guessServer, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
 import type { BannerDb, PullHistory } from './types';
 import { fmtSkillValue, parseMarkup, skillSets, splitPlaceholders, wikiId } from './wiki';
-import { ownedItems } from './owned';
+import { extrasOf, ownedItems } from './owned';
 import { unpulledBanners } from './catalog';
 import type { Analysis } from './analyze';
 
@@ -433,6 +433,29 @@ describe('owned copies and potential', () => {
     expect(chars.get('chr_old')!.acquisitions.map((x) => [x.ts, x.reward, x.estimated])).toEqual([[240, 'Token', true]]);
     // Two listed copies on the Issue (the schedule alone would say one).
     expect(ownedItems(a, 'weap').get('wpn_j')).toMatchObject({ copies: 3, pulled: 1, potential: 2 });
+  });
+
+  it('counts extra copies first, apart from pulls, and only for their own kind', () => {
+    const a = { banners: [banner({ pulls: [pull('chr_a', 5)] })] } as unknown as Analysis;
+    const extras = [
+      { id: 'chr_a', copies: 2, note: 'Story' },
+      { id: 'wpn_e', copies: 6, note: 'Event' },
+    ];
+    const o = ownedItems(a, 'char', extras).get('chr_a')!;
+    expect(o).toMatchObject({ copies: 3, pulled: 1, extra: 2, potential: 2 });
+    expect(o.acquisitions.map((x) => [x.copy, !!x.extra, x.bannerName])).toEqual([
+      [1, true, 'Story'],
+      [2, true, 'Story'],
+      [3, false, 'B'],
+    ]);
+    expect(ownedItems(a, 'char', extras).has('wpn_e')).toBe(false);
+    // Without an import the extras still count: a maxed event weapon.
+    expect(ownedItems(null, 'weap', extras).get('wpn_e')).toMatchObject({ copies: 6, pulled: 0, extra: 6, potential: 5, spare: 0 });
+  });
+
+  it('starts everyone with the story operators until the list is edited', () => {
+    expect(extrasOf({}).map((x) => x.id)).toEqual(['chr_0003_endminf', 'chr_0005_chen', 'chr_0004_pelica']);
+    expect(extrasOf({ extras: [] })).toEqual([]);
   });
 });
 

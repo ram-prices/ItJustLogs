@@ -1,8 +1,11 @@
+import { EXTRA_PRESETS, extraKind, extrasOf, MAX_COPIES, type ExtraCopy } from '../../domain/owned';
 import { SERVER_LABEL } from '../../domain/schedule';
+import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
 import { MAX_SNAPSHOTS } from '../../store';
 import { EXPORTER_SOURCE } from '../guide';
-import { badge, icon, pageHeader, toggleGroup } from '../components';
+import { badge, icon, itemImg, pageHeader, toggleGroup } from '../components';
+import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { driveConfigured } from '../../drive';
 import { preloadSync, syncView } from '../sync';
@@ -72,7 +75,63 @@ function syncCard(): Html {
   </section>`;
 }
 
-export function settingsPage(): Html {
+/**
+ * Extra copies: operators and weapons the player has without pulling them
+ * (story operators, event gifts). Kept in settings, so backups and Drive sync
+ * carry them; the pull history is never touched. Names come from the wiki
+ * snapshot (loaded on demand, `redraw` once it's in).
+ */
+function extrasCard(redraw: () => void): Html {
+  const ops = wikiFile<WikiOperatorFile>('operators.json', redraw).data;
+  const weps = wikiFile<WikiWeaponFile>('weapons.json', redraw).data;
+  const extras = extrasOf(state.settings);
+  // There are two Endministrators; say which.
+  const label = (id: string, name: string) => (id.endsWith('_endminm') ? `${name} (male)` : id.endsWith('_endminf') ? `${name} (female)` : name);
+  const nameOf = (id: string): string => {
+    const name = extraKind(id) === 'weap' ? weps?.weapons[id]?.name : ops?.operators[id]?.name;
+    return name ? label(id, name) : id;
+  };
+  const has = (x: ExtraCopy) => extras.some((e) => e.id === x.id && e.note === x.note);
+  const options = (items: [string, { name: string; rarity: number }][]) =>
+    items
+      .sort(([, p], [, q]) => q.rarity - p.rarity || p.name.localeCompare(q.name))
+      .map(([id, v]) => html`<option value="${id}">${label(id, v.name)} · ${v.rarity}★</option>`);
+  return html`<section class="card" id="extras">
+    <div class="card-body">
+      <h2 class="heading-20">Extra copies</h2>
+      <p class="copy-14">Operators and weapons you got without pulling: story operators and event gifts. They count toward copies and Potential on the info pages. Your pull history stays exactly as the game exported it.</p>
+      ${extras.length
+        ? html`<div class="extras">${extras.map(
+            (x, i) => html`<div class="extra">
+              ${itemImg(extraKind(x.id), x.id, 'extra-icon')}
+              <span class="extra-name ellipsis">${nameOf(x.id)}</span>
+              <input class="input extra-note" data-extra-note="${i}" value="${x.note}" maxlength="48" placeholder="Where from" aria-label="Where ${nameOf(x.id)} came from" />
+              <label class="extra-copies"><input class="input" type="number" min="1" max="99" data-extra-copies="${i}" value="${x.copies}" aria-label="Copies of ${nameOf(x.id)}" /><span class="secondary">${x.copies >= MAX_COPIES ? 'max' : `P${x.copies - 1}`}</span></label>
+              <button class="btn tertiary sm" data-action="extra-remove" data-value="${i}" aria-label="Remove ${nameOf(x.id)}">${icon('close')}</button>
+            </div>`,
+          )}</div>`
+        : html`<p class="copy-13 secondary versions-empty">None yet.</p>`}
+      <div class="extra-add">
+        <label class="field extra-add-item"><span>Operator or weapon</span>
+          <select class="input" id="extraItem" ${ops && weps ? '' : 'disabled'}>
+            ${ops && weps
+              ? html`<optgroup label="Operators">${options(Object.entries(ops.operators))}</optgroup><optgroup label="Weapons">${options(Object.entries(weps.weapons))}</optgroup>`
+              : html`<option>Loading…</option>`}
+          </select></label>
+        <label class="field extra-add-copies"><span>Copies</span><input class="input" id="extraCopies" type="number" min="1" max="99" value="1" /></label>
+        <label class="field extra-add-note"><span>Where from</span><input class="input" id="extraNote" maxlength="48" placeholder="Event name" /></label>
+        <button class="btn secondary sm" data-action="extra-add" ${ops && weps ? '' : 'disabled'}>Add</button>
+      </div>
+      <div class="extra-presets">
+        <span class="label-13 secondary">Quick add</span>
+        ${EXTRA_PRESETS.map((p) => html`<button class="btn tertiary sm" data-action="extra-preset" data-value="${p.key}" ${p.extras.every(has) ? 'disabled' : ''}>${p.label}</button>`)}
+      </div>
+    </div>
+    <div class="card-footer"><span>Saved with your settings: included in full backups and Google Drive sync, never in your pull history. Copies 1 = P0, 6 = max.</span></div>
+  </section>`;
+}
+
+export function settingsPage(redraw: () => void): Html {
   const s = state.settings;
   const h = state.history;
   const count = h ? h.characters.length + h.weapons.length : 0;
@@ -132,6 +191,8 @@ export function settingsPage(): Html {
           ${toggleGroup('server', [['americas', SERVER_LABEL.americas], ['asia', SERVER_LABEL.asia]], currentServer())}
         </div>
       </section>
+
+      ${extrasCard(redraw)}
 
       ${syncCard()}
 
