@@ -18,7 +18,9 @@ export const TITLE_BYTES = 70;
 /** Discord's message limit. */
 export const DISCORD_CHARS = 2000;
 
-/** Rarity colours (the dark theme's --r6..--r3), for the preview's side bar. */
+/** The preview's side bar: operators take their element's colour (the dark theme's .wk-* colours)... */
+const ELEMENT_COLOR: Record<string, string> = { Physical: '#dfbb92', Heat: '#ff853f', Cryo: '#00c0cb', Nature: '#9cd54a', Electric: '#fdc038' };
+/** ...and weapons, which have none, their rarity's (the dark theme's --r6..--r3). */
 const RARITY_COLOR: Record<number, string> = { 6: '#ff7a3d', 5: '#ffbb33', 4: '#a07cff', 3: '#6aa8ff' };
 
 /** The fields the previews use, so the build's fallback snapshot can stay small. */
@@ -73,24 +75,34 @@ const ARTS_EMOJI = '✨';
 /** Arts terms in plain text ("gains Arts DMG"), leaving loose uses ("the Arts that") alone. */
 const ARTS_TERM = /\bArts (DMG|Intensity|Infliction|Reactions?|Burst|Susceptibility|Amp)\b/g;
 
+/**
+ * Invisible markers around a term that got an emoji, so wikiText can bold it
+ * after escaping the text around it (or just drop them).
+ */
+const OPEN = String.fromCharCode(1);
+const CLOSE = String.fromCharCode(2);
+const term = (emoji: string, text: string): string => `${emoji} ${OPEN}${text}${CLOSE}`;
+const unmark = (s: string, bold: boolean): string => s.split(OPEN).join(bold ? '**' : '').split(CLOSE).join(bold ? '**' : '');
+
 /** A highlighted term with its emoji in front: "🔥 Heat DMG", "❄️ Cryo Infliction", "💥 Lift", "✨ Arts Burst", "💚 HP Treatment". */
 function withEmoji(cls: string, text: string): string {
-  if (cls === 'heal') return /treatment/i.test(text) ? `${HEAL_EMOJI} ${text}` : text;
+  if (cls === 'heal') return /treatment/i.test(text) ? term(HEAL_EMOJI, text) : text;
   const el = MARK_ELEMENT[cls] ?? Object.keys(ELEMENT_EMOJI).find((e) => text.startsWith(`${e} `));
-  if (el) return `${ELEMENT_EMOJI[el]} ${text}`;
+  if (el) return term(ELEMENT_EMOJI[el], text);
   if (cls === 'muted') return text;
-  if (PHYSICAL_STATUS.test(text)) return `${ELEMENT_EMOJI.Physical} ${text}`;
-  return /\bArts\b/.test(text) ? `${ARTS_EMOJI} ${text}` : text;
+  if (PHYSICAL_STATUS.test(text)) return term(ELEMENT_EMOJI.Physical, text);
+  return /\bArts\b/.test(text) ? term(ARTS_EMOJI, text) : text;
 }
 
 /** Plain text gets emojis for the terms the wiki often leaves unhighlighted: healing and Arts. */
 const plainEmoji = (text: string): string =>
-  text.replace(/\bHP treatment/gi, (m) => `${HEAL_EMOJI} ${m}`).replace(ARTS_TERM, (m) => `${ARTS_EMOJI} ${m}`);
+  text.replace(/\bHP treatments?\b/gi, (m) => term(HEAL_EMOJI, m)).replace(ARTS_TERM, (m) => term(ARTS_EMOJI, m));
 
 /**
  * Wiki markup as plain text (`discord` false: one line, no muted footnotes)
  * or Discord markdown (bold kept, footnotes in italics, line breaks kept).
- * Element, Arts, physical status and healing terms get their emoji either way.
+ * Element, Arts, physical status and healing terms get their emoji either
+ * way, and in Discord markdown the term is bolded too ("🔥 **Heat DMG**").
  */
 export function wikiText(s: string, values: number[][] | undefined, discord: boolean): string {
   const out = parseMarkup(s)
@@ -98,10 +110,12 @@ export function wikiText(s: string, values: number[][] | undefined, discord: boo
       if (seg.kind === 'break') return discord ? '\n' : ' ';
       const filled = fill(seg.text, values);
       const text = seg.kind === 'mark' ? withEmoji(seg.cls, filled) : plainEmoji(filled);
-      if (!discord) return seg.kind === 'mark' && seg.cls === 'muted' ? '' : text;
-      if (seg.kind === 'bold') return `**${md(text)}**`;
-      if (seg.kind === 'mark' && seg.cls === 'muted') return `*${md(text)}*`;
-      return md(text);
+      const muted = seg.kind === 'mark' && seg.cls === 'muted';
+      if (!discord) return muted ? '' : unmark(text, false);
+      // Already bold or italic: no bold inside it.
+      if (seg.kind === 'bold') return `**${md(unmark(text, false))}**`;
+      if (muted) return `*${md(unmark(text, false))}*`;
+      return unmark(md(text), true);
     })
     .join('');
   return discord ? out.replace(/[ \t]+\n/g, '\n').trim() : out.replace(/\s+/g, ' ').trim();
@@ -183,7 +197,7 @@ export function operatorPreview(id: string, o: ShareOperator): Preview {
     description: fitLines([facts, ...(o.tags.length ? [o.tags.join(' · ')] : [])], skills),
     image: `${EF_ASSETS_CDN}/operators/${wikiId(id)}.webp`,
     url: operatorUrl(id),
-    color: RARITY_COLOR[o.rarity] ?? RARITY_COLOR[6],
+    color: ELEMENT_COLOR[o.element] ?? RARITY_COLOR[o.rarity] ?? RARITY_COLOR[6],
   };
 }
 
@@ -193,7 +207,7 @@ const footer = (url: string): string => `-# Data from endfield.wiki.gg, CC BY-SA
 export function operatorDiscord(id: string, o: ShareOperator): string {
   const head = [
     `**${md(o.name)}** · ${stars(o.rarity)} ${md(o.class)}`,
-    [element(o.element), o.weapon, o.faction].filter(Boolean).map((s) => md(s!)).join(' · '),
+    [md(element(o.element)), md(o.weapon), ...(o.faction ? [md(o.faction)] : [])].join(' · '),
     ...(o.tags.length ? [`-# ${o.tags.map(md).join(' · ')}`] : []),
   ].join('\n');
   const tail = footer(operatorUrl(id));
@@ -301,7 +315,7 @@ function fitEmbed(bodies: string[], build: (bodies: string[]) => ComponentEmbed)
 export function operatorEmbed(o: ShareOperator, p: Preview): ComponentEmbed {
   const head = [
     `## ${md(o.name)}`,
-    `${stars(o.rarity)} ${md(o.class)} · ${[element(o.element), o.weapon].map(md).join(' · ')}`,
+    `${stars(o.rarity)} ${md(o.class)} · ${md(element(o.element))} · ${md(o.weapon)}`,
     `-# ${[o.faction, ...o.tags].filter(Boolean).map((s) => md(s!)).join(' · ')}`,
   ].join('\n');
   const skills = uniqueSkills(o.skills);

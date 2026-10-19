@@ -57,14 +57,18 @@ describe('link previews', () => {
 
   it('puts element and healing emojis in front of those terms', () => {
     const text = 'Deals ⟦heat|Heat DMG⟧, applies ⟦key|Cryo Infliction⟧ and ⟦key|Combustion⟧, and grants ⟦heal|HP Treatment⟧ of ⟦heal|+{0}%⟧.';
-    expect(wikiText(text, [[5, 10]], true)).toBe('Deals 🔥 Heat DMG, applies ❄️ Cryo Infliction and Combustion, and grants 💚 HP Treatment of +5–10%.');
-    expect(wikiText('When the crystal uses up its HP treatments.', undefined, true)).toBe('When the crystal uses up its 💚 HP treatments.');
+    expect(wikiText(text, [[5, 10]], true)).toBe('Deals 🔥 **Heat DMG**, applies ❄️ **Cryo Infliction** and Combustion, and grants 💚 **HP Treatment** of +5–10%.');
+    // Plain text (link preview fallback) keeps the emoji but has no markdown.
+    expect(wikiText(text, [[5, 10]], false)).toBe('Deals 🔥 Heat DMG, applies ❄️ Cryo Infliction and Combustion, and grants 💚 HP Treatment of +5–10%.');
+    expect(wikiText('When the crystal uses up its HP treatments.', undefined, true)).toBe('When the crystal uses up its 💚 **HP treatments**.');
+    // Inside text that's already bold, no bold within bold.
+    expect(wikiText('**Restores HP treatment:** now', undefined, true)).toBe('**Restores 💚 HP treatment:** now');
     // Physical statuses take Physical's emoji; Arts terms take sparkles, highlighted or not.
     const statuses = 'Applies ⟦key|Lift⟧, ⟦key|Knocked Down⟧, ⟦key|Breach⟧, ⟦key|Crush⟧ and ⟦key|Vulnerability⟧, then ⟦key|Arts Burst⟧ and ⟦key|Nature Infliction⟧.';
-    expect(wikiText(statuses, undefined, true)).toBe('Applies 💥 Lift, 💥 Knocked Down, 💥 Breach, 💥 Crush and 💥 Vulnerability, then ✨ Arts Burst and 🌿 Nature Infliction.');
+    expect(wikiText(statuses, undefined, true)).toBe('Applies 💥 **Lift**, 💥 **Knocked Down**, 💥 **Breach**, 💥 **Crush** and 💥 **Vulnerability**, then ✨ **Arts Burst** and 🌿 **Nature Infliction**.');
     // "Jadecrushing Grid" is a skill, not Crush.
     expect(wikiText('⟦key|Jadecrushing Grid⟧', undefined, true)).toBe('Jadecrushing Grid');
-    expect(wikiText('Gains Arts DMG and Arts Intensity; the Arts that bind.', undefined, true)).toBe('Gains ✨ Arts DMG and ✨ Arts Intensity; the Arts that bind.');
+    expect(wikiText('Gains Arts DMG and Arts Intensity; the Arts that bind.', undefined, true)).toBe('Gains ✨ **Arts DMG** and ✨ **Arts Intensity**; the Arts that bind.');
   });
 
   it('escapes tag values', () => {
@@ -140,6 +144,8 @@ describe('component embeds', () => {
     expect(text).not.toContain('SKILL DESCRIPTION');
     expect(text).toContain('**COMBO TRIGGER:** When an enemy suffers Combustion or Corrosion.');
     expect(text).toContain('**Ultimate · Twilight**\nLaevatain summons her Sviga Lævi');
+    // Side bar in the element's colour (Heat), not the rarity's.
+    expect((e.component as Node).accent_color).toBe(0xff853f);
     const head = (e.component as Node).components![0];
     expect(head.type).toBe(9);
     expect((head.accessory as Node).type).toBe(11);
