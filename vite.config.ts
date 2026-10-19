@@ -16,7 +16,7 @@ import {
   type ShareOperator,
   type ShareWeapon,
 } from './src/domain/share.ts';
-import { WIKI_ALIASES } from './src/domain/wiki.ts';
+import { itemShortLinks, WIKI_ALIASES } from './src/domain/wiki.ts';
 
 /** The app's top-level pages; each gets its own copy of index.html in the build. */
 const PAGES = ['operators', 'arsenal', 'stats', 'settings'];
@@ -119,6 +119,8 @@ function withPreview(index: string, p: Preview, embed: ComponentEmbed, title: st
  * that item's link-preview tags and Discord component embed, since Discord
  * and friends read the raw HTML and run no script. A new operator needs a rebuild to get one; until then
  * its link still works through 404.html, with the generic preview.
+ * Each short link (/si, /lunar-calling; see itemShortLinks) gets a copy of its
+ * item's page at the site root.
  */
 function pageCopies(): Plugin {
   let outDir = 'dist';
@@ -159,6 +161,11 @@ function pageCopies(): Plugin {
           writeFileSync(join(outDir, dir, `${id}.html`), withPreview(index, p, e, name));
         }),
       );
+      // Short links (/si, /lunar-calling): the same page at the root, which Pages serves from si.html.
+      const links = itemShortLinks(wiki.operators, wiki.weapons);
+      for (const [slug, t] of links) copyFileSync(join(outDir, t.kind === 'weap' ? 'arsenal/info' : 'operators/info', `${t.id}.html`), join(outDir, `${slug}.html`));
+      const n = [...links.values()].filter((t) => t.kind === 'weap').length;
+      console.log(`[item-pages] short links: ${links.size - n} operator, ${n} weapon (/${[...links.keys()].slice(0, 3).join(', /')}...)`);
       console.log(`[item-pages] largest component embed: ${largest} bytes`);
       console.log(`[item-pages] ${ops.length} operator and ${Object.keys(wiki.weapons).length} weapon pages for ${SITE_URL}`);
       if (missing.length) console.log(`[item-pages] no ef-assets image yet, previews without one: ${missing.sort().join(', ')}`);

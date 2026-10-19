@@ -1,4 +1,5 @@
 import { EXTRA_PRESETS, extrasOf, type ExtraCopy } from '../domain/owned';
+import { RESERVED_PATHS } from '../domain/wiki';
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
 import { clearEverything, clearHistory, currentServer, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
@@ -10,9 +11,9 @@ import { EXPORTER_SOURCE } from './guide';
 import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
-import { homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
+import { copyText, homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
-import { installWikiControls } from './pages/info';
+import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
@@ -41,11 +42,24 @@ interface Route {
   id?: string;
   /** /operators/info[/<chr id>], /arsenal/info[/<wpn id>]: info from the wiki data; `id` is the operator or weapon. */
   info?: boolean;
+  /** A short link (/si, /lunar-calling): the item's info page once resolved, else why not. */
+  short?: string;
+  shortState?: 'loading' | 'missing' | 'failed';
 }
+
+/** Top-level paths that aren't pages: operator and weapon short links (/si), resolved once the wiki data loads. */
+const isShortLink = (segment: string) => /^[a-z0-9][a-z0-9-]*$/i.test(segment) && !RESERVED_PATHS.has(segment.toLowerCase());
 
 /** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /stats, /settings. */
 function parseRoute(): Route {
   const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
+  if (page && !id && !TABS.some(([t]) => t === page) && isShortLink(page)) {
+    const short = page.toLowerCase();
+    const { map, failed } = shortLinkMap(draw);
+    const t = map?.get(short);
+    if (t) return { page: t.kind === 'weap' ? 'arsenal' : 'operators', info: true, id: t.id, short };
+    return { page: 'home', short, shortState: map ? 'missing' : failed ? 'failed' : 'loading' };
+  }
   const p = (TABS.some(([t]) => t === page) ? page : 'home') as Page;
   if ((p === 'operators' || p === 'arsenal') && id === 'info') return { page: p, info: true, id: sub ? decodeURIComponent(sub) : undefined };
   return { page: p, id: id ? decodeURIComponent(id) : undefined };
@@ -111,6 +125,16 @@ function welcome(): Html {
 function page(route: Route): Html {
   const a = state.analysis;
   if (route.page === 'settings') return html`${settingsPage(draw)}<div class="container">${aboutCard()}</div>`;
+  if (route.shortState === 'loading') return statusPage('char', 'Loading…', 'Loading…');
+  if (route.shortState) {
+    return statusPage(
+      'char',
+      'Page not found',
+      route.shortState === 'failed'
+        ? html`Couldn't load the operator and weapon list to open <b>/${route.short}</b>. Check your connection and reload.`
+        : html`Nothing lives at <b>/${route.short}</b>. <a href="/">Go home</a>, or browse <a href="/operators/info">operators</a> and <a href="/arsenal/info">weapons</a>.`,
+    );
+  }
   if (route.page === 'home') return homePage(state.schedule, currentServer(), a);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
@@ -428,6 +452,9 @@ async function onClick(e: MouseEvent): Promise<void> {
       return syncNow();
     case 'sync-signout':
       return signOut();
+    case 'copy-link':
+      toast((await copyText(el.dataset.value!)) ? 'Link copied.' : "Couldn't copy the link.", 'info');
+      break;
     case 'extra-add': {
       const id = (document.getElementById('extraItem') as HTMLSelectElement | null)?.value;
       if (!id) break;

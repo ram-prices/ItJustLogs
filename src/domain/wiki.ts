@@ -81,6 +81,81 @@ export const WIKI_ALIASES: Record<string, string> = { chr_0034_typhoeus: 'chr_00
 
 export const wikiId = (itemId: string): string => WIKI_ALIASES[itemId] ?? itemId;
 
+// ---------------------------------------------------------------------------
+// Short links: itjustlogs.dev/<operator name>
+// ---------------------------------------------------------------------------
+
+/** Top-level paths the app or its files already use; no short link may take one. */
+export const RESERVED_PATHS = new Set(['operators', 'arsenal', 'stats', 'settings', 'privacy', 'assets', 'icons', 'info', 'home', '404', 'index']);
+
+/** "Zhuang Fangyi" → "zhuang-fangyi", "Si" → "si". */
+export const nameSlug = (name: string): string =>
+  name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '') // accents left over by NFKD
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+/**
+ * Operators that share a name. The two Endministrators each get a suffixed
+ * link, and the plain one opens the female, the default in Extra copies.
+ */
+const SHARED_NAME_SLUGS: Record<string, string[]> = {
+  chr_0003_endminf: ['endministrator', 'endministrator-female'],
+  chr_0002_endminm: ['endministrator-male'],
+};
+
+/**
+ * Short link → operator id, for every operator: its name as a slug (/si,
+ * /chen-qianyu). Names shared by several operators only get the links in
+ * SHARED_NAME_SLUGS; names that clash with a page (RESERVED_PATHS) get none.
+ */
+export function operatorShortLinks(operators: Record<string, { name: string }>): Map<string, string> {
+  const byName = new Map<string, string[]>();
+  for (const [id, o] of Object.entries(operators)) {
+    const slug = nameSlug(o.name);
+    if (slug) byName.set(slug, [...(byName.get(slug) ?? []), id]);
+  }
+  const out = new Map<string, string>();
+  for (const [slug, ids] of byName) {
+    if (ids.length === 1 && !RESERVED_PATHS.has(slug)) out.set(slug, ids[0]);
+  }
+  for (const [id, slugs] of Object.entries(SHARED_NAME_SLUGS)) {
+    if (operators[id]) for (const s of slugs) out.set(s, id);
+  }
+  return out;
+}
+
+/** What a short link opens. */
+export interface ShortTarget {
+  kind: 'char' | 'weap';
+  id: string;
+}
+
+/**
+ * Short links for every operator (operatorShortLinks) and weapon
+ * (/lunar-calling). An operator keeps a name it shares with a weapon; weapons
+ * that share a name, or would take a page path, get none.
+ */
+export function itemShortLinks(operators: Record<string, { name: string }>, weapons: Record<string, { name: string }>): Map<string, ShortTarget> {
+  const out = new Map<string, ShortTarget>();
+  for (const [slug, id] of operatorShortLinks(operators)) out.set(slug, { kind: 'char', id });
+  const count = new Map<string, number>();
+  for (const w of Object.values(weapons)) count.set(nameSlug(w.name), (count.get(nameSlug(w.name)) ?? 0) + 1);
+  for (const [id, w] of Object.entries(weapons)) {
+    const slug = nameSlug(w.name);
+    if (slug && count.get(slug) === 1 && !RESERVED_PATHS.has(slug) && !out.has(slug)) out.set(slug, { kind: 'weap', id });
+  }
+  return out;
+}
+
+/** An item's own short link (the first one that opens it), if it has one. */
+export function shortLinkOf(links: Map<string, string | ShortTarget>, id: string): string | null {
+  for (const [slug, target] of links) if ((typeof target === 'string' ? target : target.id) === id) return slug;
+  return null;
+}
+
 export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'bold'; text: string }

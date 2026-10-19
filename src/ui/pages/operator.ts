@@ -4,7 +4,7 @@ import { operatorDiscord, operatorSkillDiscord } from '../../domain/share';
 import { skillSets, wikiId, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
-import { credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Operator info pages (/operators/info and /operators/info/<chr id>): class,
@@ -78,7 +78,10 @@ function hero(id: string, o: WikiOperator, owned: Owned | undefined): Html {
         </div>
         ${o.tags.length ? html`<div class="wiki-tags">${o.tags.map((t) => badge(t, 'outline'))}</div>` : ''}
       </div>
-      <a class="btn secondary sm wiki-hero-link" href="${o.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
+      <div class="row wiki-hero-link">
+        ${copyLinkButton(id)}
+        <a class="btn secondary sm" href="${o.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
+      </div>
     </div>
   </section>`;
 }

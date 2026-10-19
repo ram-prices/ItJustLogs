@@ -121,11 +121,18 @@ const uniqueSkills = <T extends { name: string; type: string }>(skills: T[]): T[
   skills.filter((s, i) => skills.findIndex((x) => x.name === s.name && x.type === s.type) === i);
 
 /**
+ * A skill's description for Discord, without the "SKILL DESCRIPTION:" label
+ * (the skill's name is right above it). Other labels, like "COMBO TRIGGER:",
+ * say something and stay.
+ */
+const skillText = (description: string | undefined): string =>
+  description ? wikiText(description.replace(/\*\*SKILL DESCRIPTION:\*\*\s*/g, ''), undefined, true) : '';
+
+/**
  * A skill's description in the operator summaries. Basic attacks show only
  * their name: the basic, dive and finisher text is the same on everyone.
  */
-const summaryText = (s: { type: string; description?: string }): string =>
-  s.type !== 'Basic Attack' && s.description ? wikiText(s.description, undefined, true) : '';
+const summaryText = (s: { type: string; description?: string }): string => (s.type !== 'Basic Attack' ? skillText(s.description) : '');
 
 const stars = (n: number): string => `${n}★`;
 
@@ -168,7 +175,7 @@ export function operatorDiscord(id: string, o: ShareOperator): string {
 export function operatorSkillDiscord(id: string, o: ShareOperator, skill: ShareOperator['skills'][number]): string {
   const text = [
     `**${md(o.name)}** · ${md(skill.type)} · **${md(skill.name)}**`,
-    skill.description ? wikiText(skill.description, undefined, true) : '',
+    skillText(skill.description),
     footer(operatorUrl(id)),
   ].filter(Boolean);
   return clip(text.join('\n'), DISCORD_CHARS);

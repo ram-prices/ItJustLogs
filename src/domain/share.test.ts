@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import snapshot from '../data/wiki-share.snapshot.json';
+import { itemShortLinks, nameSlug, operatorShortLinks, RESERVED_PATHS, shortLinkOf } from './wiki';
 import {
   DISCORD_CHARS,
   EMBED_BYTES,
@@ -122,6 +123,10 @@ describe('component embeds', () => {
     expect(text).toContain('**Basic Attack · Flaming Cinders**');
     expect(text).not.toContain('DIVE ATTACK');
     expect(operatorDiscord('chr_0016_laevat', o)).not.toContain('DIVE ATTACK');
+    // "SKILL DESCRIPTION:" goes; "COMBO TRIGGER:" says when the skill fires, so it stays.
+    expect(text).not.toContain('SKILL DESCRIPTION');
+    expect(text).toContain('**COMBO TRIGGER:** When an enemy suffers Combustion or Corrosion.');
+    expect(text).toContain('**Ultimate · Twilight**\nLaevatain summons her Sviga Lævi');
     const head = (e.component as Node).components![0];
     expect(head.type).toBe(9);
     expect((head.accessory as Node).type).toBe(11);
@@ -134,5 +139,46 @@ describe('component embeds', () => {
     const tag = embedTag(e);
     expect(tag.split('</script>')).toHaveLength(2);
     expect(tag).toContain(`${String.fromCharCode(92)}u003c/script>`);
+  });
+});
+
+describe('operator short links', () => {
+  const links = operatorShortLinks(snapshot.operators as Record<string, { name: string }>);
+
+  it('turns names into links', () => {
+    expect(nameSlug('Si')).toBe('si');
+    expect(nameSlug('Zhuang Fangyi')).toBe('zhuang-fangyi');
+    expect(nameSlug('Chen Qianyu')).toBe('chen-qianyu');
+    expect(links.get('si')).toBe('chr_0036_jsspsi');
+    expect(links.get('zhuang-fangyi')).toBe('chr_0030_zhuangfy');
+  });
+
+  it('splits the two Endministrators, the plain link opening the female', () => {
+    expect(links.get('endministrator')).toBe('chr_0003_endminf');
+    expect(links.get('endministrator-female')).toBe('chr_0003_endminf');
+    expect(links.get('endministrator-male')).toBe('chr_0002_endminm');
+    expect(shortLinkOf(links, 'chr_0002_endminm')).toBe('endministrator-male');
+  });
+
+  it('never takes a page path, and gives every other operator one', () => {
+    for (const slug of links.keys()) expect(RESERVED_PATHS.has(slug)).toBe(false);
+    const linked = new Set(links.values());
+    expect(Object.keys(snapshot.operators).filter((id) => !linked.has(id))).toEqual([]);
+  });
+});
+
+describe('weapon short links', () => {
+  const links = itemShortLinks(snapshot.operators as Record<string, { name: string }>, snapshot.weapons as Record<string, { name: string }>);
+
+  it('gives weapons their name, operators keeping theirs', () => {
+    expect(links.get('jade-vessel')).toEqual({ kind: 'weap', id: 'wpn_claym_0018' });
+    expect(links.get('si')).toEqual({ kind: 'char', id: 'chr_0036_jsspsi' });
+    expect(shortLinkOf(links, 'wpn_claym_0018')).toBe('jade-vessel');
+  });
+
+  it('links every weapon, none on a page path', () => {
+    const linked = new Set([...links.values()].map((t) => t.id));
+    expect(Object.keys(snapshot.weapons).filter((id) => !linked.has(id))).toEqual([]);
+    for (const slug of links.keys()) expect(RESERVED_PATHS.has(slug)).toBe(false);
   });
 });

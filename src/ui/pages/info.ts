@@ -1,7 +1,18 @@
 import type { Analysis } from '../../domain/analyze';
 import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type ExtraCopy, type Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
-import { fmtSkillValue, parseMarkup, splitPlaceholders, type WikiAttribution } from '../../domain/wiki';
+import { SITE_URL } from '../../domain/share';
+import {
+  fmtSkillValue,
+  itemShortLinks,
+  parseMarkup,
+  shortLinkOf,
+  splitPlaceholders,
+  type ShortTarget,
+  type WikiAttribution,
+  type WikiOperatorFile,
+  type WikiWeaponFile,
+} from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
 import { badge, icon, metric, metrics } from '../components';
@@ -53,6 +64,30 @@ export function wikiFile<T>(file: string, redraw: () => void): Loaded<T> {
     );
   }
   return f as Loaded<T>;
+}
+
+const linkCache = new WeakMap<object, { weps: object; map: Map<string, ShortTarget> }>();
+
+/**
+ * Every short link (/si, /lunar-calling), once both wiki files are in; starts
+ * loading them (redrawing when done) if not. `map` null while loading.
+ */
+export function shortLinkMap(redraw: () => void): { map: Map<string, ShortTarget> | null; failed: boolean } {
+  const ops = wikiFile<WikiOperatorFile>('operators.json', redraw);
+  const weps = wikiFile<WikiWeaponFile>('weapons.json', redraw);
+  if (!ops.data || !weps.data) return { map: null, failed: ops.failed || weps.failed };
+  let c = linkCache.get(ops.data);
+  if (!c || c.weps !== weps.data) linkCache.set(ops.data, (c = { weps: weps.data, map: itemShortLinks(ops.data.operators, weps.data.weapons) }));
+  return { map: c.map, failed: false };
+}
+
+/** Copy-link button for an item's short link, when it has one and the links are known. */
+export function copyLinkButton(id: string): Html {
+  const map = shortLinkMap(() => {}).map;
+  const slug = map && shortLinkOf(map, id);
+  if (!slug) return html``;
+  const url = `${SITE_URL}/${slug}`;
+  return html`<button class="btn secondary sm" data-action="copy-link" data-value="${url}" title="${url.replace('https://', '')}">${icon('link')}<span class="hide-sm">Copy link</span></button>`;
 }
 
 let ownedCache: { a: Analysis | null; extras: ExtraCopy[]; maps: Partial<Record<Kind, Map<string, Owned>>> } | null = null;

@@ -4,7 +4,7 @@ import { weaponDiscord } from '../../domain/share';
 import type { WikiAttribution, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Weapon info pages (/arsenal/info and /arsenal/info/<wpn id>): base ATK,
@@ -78,7 +78,10 @@ function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
         </div>
         ${w.skills.length ? html`<div class="wiki-tags">${w.skills.map((s) => badge(s.tag ?? s.name, 'outline'))}</div>` : ''}
       </div>
-      <a class="btn secondary sm wiki-hero-link" href="${w.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
+      <div class="row wiki-hero-link">
+        ${copyLinkButton(id)}
+        <a class="btn secondary sm" href="${w.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
+      </div>
     </div>
   </section>`;
 }

@@ -335,7 +335,7 @@ function closeMenu(): void {
 }
 
 /** Copies text, falling back to a hidden textarea where the Clipboard API isn't allowed (plain http). */
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
