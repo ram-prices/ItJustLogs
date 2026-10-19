@@ -118,6 +118,10 @@ describe('component embeds', () => {
     const e = operatorEmbed(o, operatorPreview('chr_0016_laevat', o));
     const text = walk(e.component as Node).map((n) => n.content ?? '').join('\n');
     expect(text).toContain('does not shorten the duration of the ultimate, Twilight.');
+    // Basic attacks are named only; their text is the same on every operator.
+    expect(text).toContain('**Basic Attack · Flaming Cinders**');
+    expect(text).not.toContain('DIVE ATTACK');
+    expect(operatorDiscord('chr_0016_laevat', o)).not.toContain('DIVE ATTACK');
     const head = (e.component as Node).components![0];
     expect(head.type).toBe(9);
     expect((head.accessory as Node).type).toBe(11);

@@ -120,6 +120,13 @@ function fitAll(texts: string[], budget: number, size: (s: string) => number = c
 const uniqueSkills = <T extends { name: string; type: string }>(skills: T[]): T[] =>
   skills.filter((s, i) => skills.findIndex((x) => x.name === s.name && x.type === s.type) === i);
 
+/**
+ * A skill's description in the operator summaries. Basic attacks show only
+ * their name: the basic, dive and finisher text is the same on everyone.
+ */
+const summaryText = (s: { type: string; description?: string }): string =>
+  s.type !== 'Basic Attack' && s.description ? wikiText(s.description, undefined, true) : '';
+
 const stars = (n: number): string => `${n}★`;
 
 // ---------------------------------------------------------------------------
@@ -150,7 +157,7 @@ export function operatorDiscord(id: string, o: ShareOperator): string {
   const tail = footer(operatorUrl(id));
   const skills = uniqueSkills(o.skills);
   const titles = skills.map((s) => `**${md(s.type)} · ${md(s.name)}**`);
-  const bodies = skills.map((s) => (s.description ? wikiText(s.description, undefined, true) : ''));
+  const bodies = skills.map(summaryText);
   const fixed = [head, ...titles, tail].join('\n\n').length + titles.length * 2;
   const fitted = fitAll(bodies, DISCORD_CHARS - fixed);
   const parts = titles.map((t, i) => (fitted[i] ? `${t}\n${fitted[i]}` : t));
@@ -254,7 +261,7 @@ export function operatorEmbed(o: ShareOperator, p: Preview): ComponentEmbed {
   ].join('\n');
   const skills = uniqueSkills(o.skills);
   const titles = skills.map((s) => `**${md(s.type)} · ${md(s.name)}**`);
-  const bodies = skills.map((s) => (s.description ? wikiText(s.description, undefined, true) : ''));
+  const bodies = skills.map(summaryText);
   return fitEmbed(bodies, (b) =>
     container(p, [
       header(head, p.image),
