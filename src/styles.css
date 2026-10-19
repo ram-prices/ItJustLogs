@@ -2536,3 +2536,55 @@ code {
   gap: 6px 16px;
   margin: 48px 0 32px;
 }
+
+/* Settings → Delete saved data: what each button deletes, here and in Drive. */
+.delete-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font: 400 13px/18px var(--font-sans);
+}
+.delete-table th,
+.delete-table td {
+  padding: 8px 10px 8px 0;
+  text-align: left;
+  vertical-align: top;
+  box-shadow: inset 0 -1px 0 var(--gray-alpha-200);
+}
+.delete-table thead th {
+  font: 500 11px/16px var(--font-mono);
+  text-transform: uppercase;
+  color: var(--gray-900);
+}
+.delete-table tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.delete-drive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.delete-drive .icon {
+  font-size: 16px;
+}
+.delete-drive.gone {
+  color: var(--red);
+}
+.delete-drive.kept {
+  color: var(--green);
+}
+.delete-note {
+  margin-top: 10px;
+}
+.delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .delete-table tbody th {
+    white-space: normal;
+  }
+}
