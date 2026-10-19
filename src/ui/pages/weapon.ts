@@ -1,9 +1,9 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
-import type { WikiAttribution, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
+import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Weapon info pages (/arsenal/info and /arsenal/info/<wpn id>): base ATK,
@@ -27,12 +27,28 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
   const all = Object.entries(f.weapons);
   const types = [...new Set([...TYPES.filter((t) => all.some(([, w]) => w.type === t)), ...all.map(([, w]) => w.type)])];
   const have = owned ? all.filter(([id]) => owned.get(id)?.copies).length : 0;
+  const soon = Object.entries(previews?.weapons ?? {}).filter(([id]) => !f.weapons[id]);
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
       ${crumbs('weap')}
       <h1 class="heading-32">Weapon info</h1>
       <p class="copy-16">Base ATK, skills and Potential for every weapon${owned ? html`. You have ${have} of ${all.length}` : ''}.</p>
     </div><div class="row">${kindNav('weap', 'info')}</div></div></div>
     <main class="container fade-in">
+      ${soon.length
+        ? html`<section class="section wiki-type">
+            <div class="section-head"><h2 class="heading-20">Coming soon</h2><span class="label-13 secondary">From the version guide</span></div>
+            <div class="wiki-grid">
+              ${soon.map(([id, p]) => html`<a class="wiki-tile card" href="${weaponInfoHref(id)}">
+                ${itemImg('weap', id, 'wiki-tile-portrait')}
+                <span class="wiki-tile-text min0">
+                  <span class="wiki-tile-name ellipsis">${p.name}</span>
+                  <span class="label-12 secondary">${rarity(p.rarity)} · ${p.type ?? 'Weapon'}</span>
+                </span>
+                ${badge('Soon', 'amber')}
+              </a>`)}
+            </div>
+          </section>`
+        : ''}
       ${types.map((type) => {
         const list = all.filter(([, w]) => w.type === type).sort(([, a], [, b]) => b.rarity - a.rarity || a.name.localeCompare(b.name));
         return html`<section class="section wiki-type">
@@ -191,19 +207,35 @@ function detailPage(id: string, w: WikiWeapon, attribution: WikiAttribution, a: 
 }
 
 let file: WikiWeaponFile | null = null;
+let previews: WikiPreviewFile | null = null;
+
+/** An unreleased weapon: what the version guide shows (type, traits, banner). */
+function weaponPreview(id: string, p: PreviewWeapon, attribution: WikiPreviewFile['attribution']): Html {
+  const about = html`${p.traits.length
+      ? html`<section class="section"><div class="section-head"><h2 class="heading-20">Traits</h2></div>
+          <div class="card"><div class="card-body"><div class="wiki-tags">${p.traits.map((t) => badge(t, 'outline'))}</div></div></div></section>`
+      : ''}
+    ${p.banner.name ? html`<section class="section"><div class="section-head"><h2 class="heading-20">Banner</h2></div>
+      <div class="card"><div class="card-body copy-14">Rate-up on <b>${p.banner.name}</b>. Its dates are on <a href="/">Home</a>.</div></div></section>` : ''}`;
+  return previewPage('weap', id, p, [['Type', p.type]], [], about, attribution);
+}
 
 /** /arsenal/info[/<wpn id>]; `redraw` runs once the data has loaded. */
 export function weaponInfoPage(id: string | undefined, a: Analysis | null, redraw: () => void): Html {
   const f = wikiFile<WikiWeaponFile>('weapons.json', redraw);
   file = f.data;
+  previews = previewsOf(redraw);
   if (!file) return loadingOrFailed('weap', 'Weapon info', f.failed);
   if (!id) return indexPage(file, ownedOf(a, 'weap'));
   const w = file.weapons[id];
+  // Not on the wiki yet: the version guide's preview, if it has one.
+  const p = !w ? previews?.weapons[id] : undefined;
+  if (p && previews) return weaponPreview(id, p, previews.attribution);
   if (!w) return statusPage('weap', 'Weapon info', html`There's no wiki data for this weapon yet. <a href="${weaponInfoHref()}">See all weapons</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
   return detailPage(id, w, file.attribution, a);
 }
 
 export function weaponInfoTitle(id: string | undefined): string {
-  const w = id && file?.weapons[id];
+  const w = id && (file?.weapons[id] ?? previews?.weapons[id]);
   return w ? w.name : 'Weapon info';
 }

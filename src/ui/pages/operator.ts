@@ -1,10 +1,10 @@
 import type { Analysis } from '../../domain/analyze';
 import { endministratorOf, ENDMINISTRATORS, extrasOf, isEndministrator, type Owned } from '../../domain/owned';
 import { state } from '../../state';
-import { skillSets, wikiId, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiSkill } from '../../domain/wiki';
+import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
-import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Operator info pages (/operators/info and /operators/info/<chr id>): class,
@@ -33,12 +33,28 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
     .filter(([, o]) => !seen.has(o.page) && !!seen.add(o.page))
     .sort(([, a], [, b]) => b.rarity - a.rarity || a.name.localeCompare(b.name));
   const have = owned ? ops.filter(([id]) => owned.get(id)?.copies).length : 0;
+  const soon = Object.entries(previews?.operators ?? {}).filter(([id]) => !f.operators[id]);
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
       ${crumbs('char')}
       <h1 class="heading-32">Operator info</h1>
       <p class="copy-16">Class, attributes, skills and talents for every operator${owned ? html`. You have ${have} of ${ops.length}` : ''}.</p>
     </div><div class="row">${kindNav('char', 'info')}</div></div></div>
     <main class="container fade-in">
+      ${soon.length
+        ? html`<section class="section wiki-type">
+            <div class="section-head"><h2 class="heading-20">Coming soon</h2><span class="label-13 secondary">From the version guide</span></div>
+            <div class="wiki-grid">
+              ${soon.map(([id, p]) => html`<a class="wiki-tile card" href="${operatorInfoHref(id)}">
+                ${itemImg('char', id, 'wiki-tile-portrait')}
+                <span class="wiki-tile-text min0">
+                  <span class="wiki-tile-name ellipsis">${p.name}</span>
+                  <span class="label-12 secondary">${rarity(p.rarity)} · ${[p.class, p.element].filter(Boolean).join(' · ')}</span>
+                </span>
+                ${badge('Soon', 'amber')}
+              </a>`)}
+            </div>
+          </section>`
+        : ''}
       <div class="wiki-grid">
         ${ops.map(([id, o]) => {
           const mine = owned?.get(id);
@@ -250,20 +266,37 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
 }
 
 let file: WikiOperatorFile | null = null;
+let previews: WikiPreviewFile | null = null;
+
+/** An unreleased operator: what the version guide shows (class, element, tags, kit summary, banner). */
+function operatorPreview(id: string, p: PreviewOperator, attribution: WikiPreviewFile['attribution']): Html {
+  const element = p.element ? html`<span class="wk wk-${p.element.toLowerCase().replace(/\W/g, '')}">${p.element}</span>` : null;
+  const about = html`<section class="section">
+    <div class="section-head"><h2 class="heading-20">Kit</h2></div>
+    <div class="card"><div class="card-body"><p class="copy-14 wiki-text">${p.summary ?? 'The guide has no summary of this kit yet.'}</p></div></div>
+  </section>
+  ${p.banner.name ? html`<section class="section"><div class="section-head"><h2 class="heading-20">Banner</h2></div>
+    <div class="card"><div class="card-body copy-14">Rate-up on <b>${p.banner.name}</b>. Its dates are on <a href="/">Home</a>.</div></div></section>` : ''}`;
+  return previewPage('char', id, p, [['Class', p.class], ['Element', element], ['Weapon', p.weapon]], p.tags, about, attribution);
+}
 
 /** /operators/info[/<chr id>]; `redraw` runs once the data has loaded. */
 export function operatorInfoPage(id: string | undefined, a: Analysis | null, redraw: () => void): Html {
   const f = wikiFile<WikiOperatorFile>('operators.json', redraw);
   file = f.data;
+  previews = previewsOf(redraw);
   if (!file) return loadingOrFailed('char', 'Operator info', f.failed);
   if (!id) return indexPage(file, ownedOf(a, 'char'));
   const o = file.operators[wikiId(id)];
+  // Not on the wiki yet: the version guide's preview, if it has one.
+  const p = !o ? previews?.operators[id] : undefined;
+  if (p && previews) return operatorPreview(id, p, previews.attribution);
   if (!o) return statusPage('char', 'Operator info', html`There's no wiki data for this operator yet. <a href="${operatorInfoHref()}">See all operators</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
   return detailPage(wikiId(id), o, file.attribution, a);
 }
 
 /** Tab title for the operator info pages. */
 export function operatorInfoTitle(id: string | undefined): string {
-  const o = id && file?.operators[wikiId(id)];
+  const o = id && (file?.operators[wikiId(id)] ?? previews?.operators[id]);
   return o ? o.name : 'Operator info';
 }

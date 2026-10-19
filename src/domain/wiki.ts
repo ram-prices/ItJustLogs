@@ -7,6 +7,39 @@
  * `**bold**`, `⟦class|text⟧` highlights and `\n` line breaks.
  */
 
+/**
+ * Operators and weapons the wiki doesn't have yet, from the official New
+ * Version Guide (ef-assets wiki/previews.json, scripts/guide-previews.mjs).
+ * The wiki's entry replaces a preview once it exists.
+ */
+export interface PreviewBanner {
+  name: string | null;
+  poolId: string | null;
+}
+export interface PreviewOperator {
+  name: string;
+  rarity: number;
+  class: string | null;
+  element: string | null;
+  weapon: string | null;
+  tags: string[];
+  /** The guide's one-paragraph kit summary. */
+  summary: string | null;
+  banner: PreviewBanner;
+}
+export interface PreviewWeapon {
+  name: string;
+  rarity: number;
+  type: string | null;
+  traits: string[];
+  banner: PreviewBanner;
+}
+export interface WikiPreviewFile {
+  attribution: { source: string; url: string; fetched: string };
+  operators: Record<string, PreviewOperator>;
+  weapons: Record<string, PreviewWeapon>;
+}
+
 export interface WikiAttribution {
   source: string;
   url: string;

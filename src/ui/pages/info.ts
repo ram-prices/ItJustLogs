@@ -11,11 +11,12 @@ import {
   type ShortTarget,
   type WikiAttribution,
   type WikiOperatorFile,
+  type WikiPreviewFile,
   type WikiWeaponFile,
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
-import { badge, icon, metric, metrics } from '../components';
+import { badge, icon, itemImg, metric, metrics } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
 
 /**
@@ -66,7 +67,7 @@ export function wikiFile<T>(file: string, redraw: () => void): Loaded<T> {
   return f as Loaded<T>;
 }
 
-const linkCache = new WeakMap<object, { weps: object; map: Map<string, ShortTarget> }>();
+const linkCache = new WeakMap<object, { weps: object; pre: object | null; map: Map<string, ShortTarget> }>();
 
 /**
  * Every short link (/si, /lunar-calling), once both wiki files are in; starts
@@ -75,10 +76,56 @@ const linkCache = new WeakMap<object, { weps: object; map: Map<string, ShortTarg
 export function shortLinkMap(redraw: () => void): { map: Map<string, ShortTarget> | null; failed: boolean } {
   const ops = wikiFile<WikiOperatorFile>('operators.json', redraw);
   const weps = wikiFile<WikiWeaponFile>('weapons.json', redraw);
+  const pre = previewsOf(redraw);
   if (!ops.data || !weps.data) return { map: null, failed: ops.failed || weps.failed };
   let c = linkCache.get(ops.data);
-  if (!c || c.weps !== weps.data) linkCache.set(ops.data, (c = { weps: weps.data, map: itemShortLinks(ops.data.operators, weps.data.weapons) }));
+  if (!c || c.weps !== weps.data || c.pre !== pre) {
+    // Unreleased operators and weapons get theirs too (/argent-flow); the wiki's names come first.
+    const map = itemShortLinks({ ...pre?.operators, ...ops.data.operators }, { ...pre?.weapons, ...weps.data.weapons });
+    linkCache.set(ops.data, (c = { weps: weps.data, pre, map }));
+  }
   return { map: c.map, failed: false };
+}
+
+/**
+ * The version guide's previews of unreleased operators and weapons, once
+ * loaded (null until then, or if they can't be: pages don't wait on them).
+ */
+export function previewsOf(redraw: () => void): WikiPreviewFile | null {
+  return wikiFile<WikiPreviewFile>('previews.json', redraw).data;
+}
+
+/** The "Coming soon" page of an operator or weapon the wiki doesn't have yet. */
+export function previewPage(
+  kind: Kind,
+  id: string,
+  p: { name: string; rarity: number },
+  facts: [string, Html | string | null][],
+  tags: string[],
+  about: Html,
+  attribution: WikiPreviewFile['attribution'],
+): Html {
+  return html`<section class="wiki-hero${kind === 'weap' ? ' weapon' : ''}">
+      ${itemImg(kind, id, 'wiki-hero-bg')}
+      <div class="container wiki-hero-inner">
+        ${itemImg(kind, id, 'wiki-hero-portrait')}
+        <div class="min0 wiki-hero-text">
+          ${crumbs(kind, p.name)}
+          <div class="wiki-stars" style="color:var(--r${p.rarity})" aria-label="${p.rarity} star">${'★'.repeat(p.rarity)}</div>
+          <h1 class="heading-32">${p.name} ${badge('Coming soon', 'amber')}</h1>
+          <div class="wiki-facts">
+            ${facts.filter(([, v]) => v).map(([label, v]) => html`<span class="wiki-fact"><span class="wiki-fact-label">${label}</span>${v}</span>`)}
+          </div>
+          ${tags.length ? html`<div class="wiki-tags">${tags.map((t) => badge(t, 'outline'))}</div>` : ''}
+        </div>
+        <div class="row wiki-hero-link">${copyLinkButton(id)}</div>
+      </div>
+    </section>
+    <main class="container fade-in wiki-page">
+      ${about}
+      <p class="copy-13 secondary wiki-note">Not released yet: this is what the official version guide shows. Stats, skills${kind === 'char' ? ', talents' : ''} and Potential arrive from the wiki after release.</p>
+      <p class="wiki-credit copy-13">${icon('menu_book')}<span>From the ${external(attribution.url, attribution.source)}, ${attribution.fetched}.</span></p>
+    </main>`;
 }
 
 /** Copy-link button for an item's short link, when it has one and the links are known. */
