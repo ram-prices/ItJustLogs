@@ -7,7 +7,13 @@ images, localStorage only for small settings and the banner cache. Keep it that
 way: localStorage's ~5 MB is shared with every site on `ram-prices.github.io`
 (the old eftracker filled it with base64 images, which broke imports).
 Deploys as static files via `.github/workflows/deploy.yml` on push to `main`
-(`npm run build` → `dist/`, `base: './'` so any GitHub Pages sub-path works).
+(`npm run build` → `dist/`) to GitHub Pages at the custom domain
+`itjustlogs.dev` (the old `ram-prices.github.io/ItJustLogs` redirects there).
+Served from the domain root, so `base: '/'` (absolute asset paths). Clean
+paths need files on Pages: the `pageCopies` plugin in `vite.config.ts` copies
+`index.html` into `operators/`, `arsenal/`, `stats/`, `settings/` and to
+`404.html` (the fallback for `/operators/<poolId>`). Add new top-level pages
+to its `PAGES` list.
 
 ## Commands
 
@@ -50,11 +56,12 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     there (alphabetical).
   - Sentence-case labels; inline styles only for data-driven values.
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
-    `ui/app.ts` renders header + tabs, routes on the hash (`#/operators`,
-    `#/operators/<poolId>`, `#/arsenal[/<poolId>]`, `#/stats`,
-    `#/settings`) and holds the delegated `data-action` click handlers.
+    `ui/app.ts` renders header + tabs, routes on clean paths (`/operators`,
+    `/operators/<poolId>`, `/arsenal[/<poolId>]`, `/stats`, `/settings`;
+    `/` is Operators) with `history.pushState` for in-page links, rewrites
+    old `#/...` links, and holds the delegated `data-action` click handlers.
     Pages live in `ui/pages/` (`kind.ts` = operators/arsenal: every banner as a fixed-height card
-    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `#/operators/<poolId>` opens one), `stats.ts`, `settings.ts`); shared pieces in
+    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/operators/<poolId>` opens one), `stats.ts`, `settings.ts`); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
   - Escape every user/game string: use the `html` tagged template from

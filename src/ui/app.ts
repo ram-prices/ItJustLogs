@@ -32,8 +32,9 @@ interface Route {
   id?: string;
 }
 
+/** Pages are clean paths: /operators, /arsenal/<poolId>, /stats, /settings ("/" is Operators). */
 function parseRoute(): Route {
-  const [page, id] = location.hash.replace(/^#\/?/, '').split('/');
+  const [page, id] = location.pathname.replace(/^\/+/, '').split('/');
   const p = (TABS.some(([t]) => t === page) ? page : 'operators') as Page;
   return { page: p, id: id ? decodeURIComponent(id) : undefined };
 }
@@ -49,7 +50,7 @@ function header(route: Route): Html {
   const name = state.settings.displayName || 'Endministrator';
   return html`<header class="header"><div class="container">
     <div class="header-top">
-      <a class="logo" href="#/">${LOGO}<span>ItJustLogs</span></a>
+      <a class="logo" href="/">${LOGO}<span>ItJustLogs</span></a>
       ${has
         ? html`<span class="crumb-sep">/</span>
             <div class="header-user">
@@ -63,7 +64,7 @@ function header(route: Route): Html {
     <nav class="tabs" aria-label="Sections">
       ${TABS.map(([page, label]) => {
         const disabled = !has && DATA_PAGES.includes(page);
-        return html`<a class="tab" href="#/${page}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
+        return html`<a class="tab" href="/${page}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
       })}
     </nav>
   </div></header>`;
@@ -123,7 +124,7 @@ function draw(): void {
   render(root(), html`${header(route)}${page(route)}`);
   const key = `${route.page}/${route.id ?? ''}`;
   if (key !== lastKey) {
-    // #/operators/<poolId> opens that banner's section and scrolls to it.
+    // /operators/<poolId> opens that banner's section and scrolls to it.
     const target = route.id && document.getElementById(`banner-${route.id}`);
     if (target) target.scrollIntoView({ block: 'start' });
     else scrollTo({ top: 0 });
@@ -272,7 +273,23 @@ function installProfile(): void {
 // Delegated events
 // ---------------------------------------------------------------------------
 
+/**
+ * Links to our own pages switch page in place (history.pushState) instead of
+ * reloading. Modified clicks (new tab etc.) are left to the browser.
+ */
+function navigate(e: MouseEvent): boolean {
+  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="/"]');
+  if (!a || a.target || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
+  e.preventDefault();
+  if (a.getAttribute('aria-disabled') === 'true') return true;
+  const to = a.getAttribute('href')!;
+  if (to !== location.pathname) history.pushState(null, '', to);
+  draw();
+  return true;
+}
+
 async function onClick(e: MouseEvent): Promise<void> {
+  if (navigate(e)) return;
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
   switch (el.dataset.action) {
@@ -379,7 +396,13 @@ export function mount(): void {
     }
   });
   addEventListener('resize', markOverflow);
-  addEventListener('hashchange', draw);
+  // Old links and bookmarks used #/page; move them to the clean path. GitHub
+  // Pages also redirects /operators to /operators/ (it's a folder there):
+  // drop the trailing slash so the address stays clean.
+  if (location.hash.startsWith('#/')) history.replaceState(null, '', `/${location.hash.slice(2)}`);
+  else if (location.pathname.length > 1 && location.pathname.endsWith('/'))
+    history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search);
+  addEventListener('popstate', draw);
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
   subscribe(draw);
   draw();
