@@ -103,7 +103,7 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     version/banner/event timeline; works without an import; anything with
     `data-discord` gets a right-click / long-press "Copy to Discord" menu
     whose text comes from `discordText` in `domain/schedule.ts`; `kind.ts` = operators/arsenal: every banner as a fixed-height card
-    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/operators/<poolId>` opens one), `stats.ts`, `settings.ts`); shared pieces in
+    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/operators/<poolId>` opens one), `operator.ts` / `weapon.ts` = `/operators/info[/<chr id>]` / `/arsenal/info[/<wpn id>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
   - Escape every user/game string: use the `html` tagged template from
@@ -135,8 +135,17 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   `gift_intel_book` (Headhunting Dossier), `gift_operator_token` (Token),
   `gift_weapon` (Arsenal rate-up copy, no `weaponId`), `gift_weapon_box`
   (Selector). Reward counts come from the schedule in `analyze.ts`, not these.
+  Exception: copies owned (`domain/owned.ts`) use the Token and `gift_weapon`
+  records where the export lists them (only banners from 1.4 on do; it gave
+  Arcane a Token at 130 pulls, which the schedule wouldn't), and fall back to
+  the schedule, marked estimated, for older banners. `analysis.gifts` holds them.
 - `rateUpPmf` clamps `startPity` to `hardPity - 1`. Pity resets on hit, so
   `hardPity` itself is not a real state.
+- Operator/weapon/gear info comes from ef-assets `wiki/*.json`, snapshotted
+  weekly from endfield.wiki.gg by ef-assets `scripts/update-wiki.mjs`
+  (`domain/wiki.ts` has the types and the text markup). It's CC BY-SA 4.0:
+  any page showing it must credit "endfield.wiki.gg, CC BY-SA 4.0". Too big
+  for localStorage, so it's fetched on demand (`loadWikiFile` in store.ts).
 - Banner names/rate-ups come from `ram-prices/ef-assets/banners.json`
   (snapshot in `src/data/` for offline/tests, refreshed at runtime). Fix bad
   banner data there, not with special cases here.
@@ -147,6 +156,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   the same local time on Americas/Europe (UTC-5) and Asia (UTC+8), 13 hours
   apart; version updates are one instant. `end` is null while it depends on
   an unannounced banner. `events` come from each version's update notes
-  ("New Events"); some have separate windows per server. The player's server is a setting (guessed from the
+  ("New Events"); some have separate windows per server. An event's `art`
+  comes from the official New Version Guide (replaced every version), which
+  the same workflow saves to ef-assets `events/`; Home's event rows show it,
+  else an icon. Arsenal Issue art is `issues/<weapon>.webp` (text-free,
+  made with ef-assets `scripts/issue-banner.py`). The player's server is a setting (guessed from the
   time zone until chosen).
 - `fixtures/` is gitignored and holds the owner's real export. Never commit it.

@@ -36,6 +36,8 @@ export interface Settings {
   bannerPos: number;
   /** Game server whose times the schedule shows; unset = guessed from the time zone. */
   server?: Server;
+  /** Operators/Arsenal list every banner that has opened, not just the ones pulled on. */
+  showAllBanners?: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -219,6 +221,33 @@ async function refreshFile<T>(file: string, key: string): Promise<T | null> {
     }
   }
   return null;
+}
+
+/**
+ * Wiki data (ef-assets wiki/*.json, from endfield.wiki.gg). Too big for
+ * localStorage, so it's fetched when a wiki page opens and left to the
+ * browser's HTTP cache; a failed fetch is retried on the next visit.
+ */
+const wikiFiles = new Map<string, Promise<unknown>>();
+
+export function loadWikiFile<T>(file: string): Promise<T> {
+  let p = wikiFiles.get(file) as Promise<T> | undefined;
+  if (!p) {
+    p = (async () => {
+      for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
+        try {
+          const res = await fetch(`${base}/wiki/${file}`, { signal: AbortSignal.timeout(10000) });
+          if (res.ok) return (await res.json()) as T;
+        } catch {
+          /* try the next mirror */
+        }
+      }
+      wikiFiles.delete(file);
+      throw new Error(`Couldn't load ${file}`);
+    })();
+    wikiFiles.set(file, p);
+  }
+  return p;
 }
 
 // ---------------------------------------------------------------------------

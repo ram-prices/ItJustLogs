@@ -17,6 +17,10 @@ import {
 import scheduleSnapshot from '../data/schedule.snapshot.json';
 import { discordText, guessServer, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
 import type { BannerDb, PullHistory } from './types';
+import { fmtSkillValue, parseMarkup, skillSets, splitPlaceholders, wikiId } from './wiki';
+import { ownedItems } from './owned';
+import { unpulledBanners } from './catalog';
+import type { Analysis } from './analyze';
 
 const bannerDb = db as BannerDb;
 const total = (pmf: Float64Array) => pmf.reduce((a, b) => a + b, 0);
@@ -333,5 +337,143 @@ describe('same-player check on import', () => {
     const later = { characters: [pull(100, 'chr_1', 60)], weapons: [] } as unknown as PullHistory;
     expect(compareHistories(mine, later).verdict).toBe('noOverlap');
     expect(compareHistories(null, later).verdict).toBe('empty');
+  });
+});
+
+describe('wiki markup', () => {
+  it('splits bold, highlights and line breaks without producing HTML', () => {
+    expect(parseMarkup('**SKILL:**\nDeals ⟦heat|Heat DMG⟧ <b>x</b>')).toEqual([
+      { kind: 'bold', text: 'SKILL:' },
+      { kind: 'break' },
+      { kind: 'text', text: 'Deals ' },
+      { kind: 'mark', cls: 'heat', text: 'Heat DMG' },
+      { kind: 'text', text: ' <b>x</b>' },
+    ]);
+  });
+
+  it('maps the game id the wiki files under another name', () => {
+    expect(wikiId('chr_0034_typhoeus')).toBe('chr_0034_typhoea');
+    expect(wikiId('chr_0019_karin')).toBe('chr_0019_karin');
+  });
+
+  it('groups skill sets by variant in order', () => {
+    const s = (name: string, variant?: string) => ({ name, type: '', variant, description: '', values: [] });
+    expect(skillSets([s('a', 'INT'), s('b', 'INT'), s('a', 'WILL')]).map((x) => [x.variant, x.skills.length])).toEqual([['INT', 2], ['WILL', 1]]);
+    expect(skillSets([s('a'), s('b')])).toHaveLength(1);
+  });
+});
+
+describe('owned copies and potential', () => {
+  const pull = (itemId: string, ts: number, bannerPull: number | null = ts) => ({ itemId, name: itemId, seq: ts, ts, bannerPull, kind: 'char' }) as never;
+  const banner = (over: object) => ({ kind: 'char', poolId: 'p', name: 'B', pulls: [], paidPulls: 0, lastTs: 0, rewards: null, info: null, ...over });
+  /** A reward track paying copies at `at` (pulls, or sets for weapons). */
+  const track = (label: string, earned: number, at: number[], copy = true) => ({
+    label,
+    earned,
+    copies: copy ? at.length : 0,
+    milestones: (upTo: number) => at.filter((x) => x <= upTo).map((x) => ({ at: x, name: label, copy })),
+  });
+
+  it('counts pulls and reward copies in order, capping Potential at 5', () => {
+    const a = {
+      banners: [
+        banner({ pulls: [pull('chr_a', 1), pull('chr_b', 2), pull('chr_a', 3)] }),
+        // The Token comes with the 240th pull (ts 240), after the copy pulled at ts 100.
+        banner({ poolId: 'q', name: 'Q', paidPulls: 240, pulls: [pull('chr_a', 100), pull('chr_x', 240)], info: { rateUpIds: ['chr_a'], rateUpNames: [] }, rewards: track('Token', 1, [240]) }),
+        banner({ kind: 'weap', pulls: [pull('wpn_x', 5)] }),
+      ],
+    } as unknown as Analysis;
+    const o = ownedItems(a, 'char').get('chr_a')!;
+    expect(o).toMatchObject({ copies: 4, pulled: 3, potential: 3, spare: 0, maxed: null });
+    expect(o.acquisitions.map((x) => [x.ts, x.copy, x.reward])).toEqual([
+      [1, 1, null],
+      [3, 2, null],
+      [100, 3, null],
+      [240, 4, 'Token'],
+    ]);
+    expect(ownedItems(a, 'char').has('wpn_x')).toBe(false);
+  });
+
+  it('dates the copy that maxed Potential, and counts the rest as spare', () => {
+    const a = { banners: [banner({ pulls: Array.from({ length: 8 }, (_, i) => pull('chr_c', i + 1)) })] } as unknown as Analysis;
+    const o = ownedItems(a, 'char').get('chr_c')!;
+    expect(o).toMatchObject({ copies: 8, potential: 5, spare: 2 });
+    expect(o.maxed).toMatchObject({ ts: 6, copy: 6 });
+  });
+
+  it("dates Arsenal reward copies by the set that earned them and doesn't guess Selectors", () => {
+    const a = {
+      banners: [
+        banner({ info: { rateUpIds: ['chr_a', 'chr_b'], rateUpNames: [] }, rewards: track('Selector', 2, [120, 240]) }),
+        banner({ kind: 'weap', paidPulls: 180, pulls: [pull('wpn_y', 180)], info: { rateUpIds: ['wpn_x'], rateUpNames: [] }, rewards: track('Issue rewards', 2, [18]) }),
+      ],
+    } as unknown as Analysis;
+    expect(ownedItems(a, 'char').get('chr_a')).toMatchObject({ copies: 0, potential: -1, selectors: 2 });
+    expect(ownedItems(a, 'weap').get('wpn_x')!.acquisitions[0]).toMatchObject({ ts: 180, reward: 'Rate-up copy', copy: 1 });
+  });  it("uses the export's own reward records over the estimate", () => {
+    const gift = (kind: string, gift: string, poolId: string, ts: number, name: string) => ({ kind, gift, poolId, ts, seq: ts, name });
+    const a = {
+      banners: [
+        // 130 pulls: the schedule says no Token yet, but the export lists one.
+        banner({ poolId: 'special_1_4_1', name: 'Arc', paidPulls: 130, pulls: [pull('chr_arc', 10)], info: { rateUpIds: ['chr_arc'], rateUpNames: [] }, rewards: track('Token', 0, []) }),
+        // No reward records for this older pool: estimated from the schedule.
+        banner({ poolId: 'special_1_1_1', name: 'Old', paidPulls: 240, pulls: [pull('chr_x', 240)], info: { rateUpIds: ['chr_old'], rateUpNames: [] }, rewards: track('Token', 1, [240]) }),
+        banner({ kind: 'weap', poolId: 'weponbox_1_4_1', name: 'Issue', paidPulls: 240, pulls: [pull('wpn_j', 5)], info: { rateUpIds: ['wpn_j'], rateUpNames: [] }, rewards: track('Issue rewards', 2, [18]) }),
+      ],
+      gifts: [
+        gift('char', 'gift_intel_book', 'special_1_4_1', 50, 'Headhunting Dossier'),
+        gift('char', 'gift_operator_token', 'special_1_4_1', 130, "Arcane's Token"),
+        gift('weap', 'gift_weapon', 'weaponbox_1_4_1', 100, 'Jade'),
+        gift('weap', 'gift_weapon_box', 'weaponbox_1_4_1', 150, 'Arms OC'),
+        gift('weap', 'gift_weapon', 'weaponbox_1_4_1', 200, 'Jade'),
+      ],
+    } as unknown as Analysis;
+    const chars = ownedItems(a, 'char');
+    expect(chars.get('chr_arc')!.acquisitions.map((x) => [x.ts, x.reward, !!x.estimated])).toEqual([[10, null, false], [130, 'Token', false]]);
+    expect(chars.get('chr_old')!.acquisitions.map((x) => [x.ts, x.reward, x.estimated])).toEqual([[240, 'Token', true]]);
+    // Two listed copies on the Issue (the schedule alone would say one).
+    expect(ownedItems(a, 'weap').get('wpn_j')).toMatchObject({ copies: 3, pulled: 1, potential: 2 });
+  });
+});
+
+
+describe('weapon skill placeholders', () => {
+  it('splits text around {n}', () => {
+    expect(splitPlaceholders('ATK +{0}% and {1}')).toEqual(['ATK +', 0, '% and ', 1]);
+    expect(fmtSkillValue(12)).toBe('12');
+    expect(fmtSkillValue(5.556)).toBe('5.56');
+  });
+});
+
+describe('all banners catalog', () => {
+  const t = (iso: string) => ({ americas: iso, asia: iso });
+  const sched = (name: string, kind: string, poolId: string | null, start: string, rateUps: string[] = []) =>
+    ({ name, kind, rateUps, poolId, version: null, start: t(start), end: null, availability: null, art: null, posts: [] });
+  const schedule = {
+    banners: [
+      sched('Old', 'chartered', 'special_1_0_1', '2026-01-01T00:00:00Z', ['A']),
+      sched('Skipped', 'chartered', 'special_1_1_1', '2026-02-01T00:00:00Z', ['B']),
+      sched('No pool yet', 'special', null, '2026-03-01T00:00:00Z', ['C']),
+      sched('Future', 'chartered', 'special_9_9_9', '2099-01-01T00:00:00Z'),
+      sched('An Issue', 'issue', 'weponbox_1_1_1', '2026-02-01T00:00:00Z'),
+    ],
+  } as unknown as Schedule;
+  const db = {
+    standard: { name: 'Basic Headhunting' },
+    special_1_0_1: { name: 'Old', rateUpIds: ['chr_a'], rateupName: ['A'] },
+    special_1_1_1: { name: 'Skipped', rateUpIds: ['chr_b'], rateupName: ['B'] },
+    special_9_9_9: { name: 'Future' },
+    weaponbox_1_1_1: { name: 'An Issue' },
+  } as BannerDb;
+
+  it('lists opened banners the player has no pulls on, newest first', () => {
+    const now = Date.parse('2026-06-01T00:00:00Z');
+    const got = unpulledBanners('char', [{ poolId: 'special_1_0_1', name: 'Old' }], db, schedule, 'americas', now);
+    expect(got.map((b) => [b.name, b.poolId])).toEqual([
+      ['No pool yet', null],
+      ['Skipped', 'special_1_1_1'],
+      ['Basic Headhunting', 'standard'],
+    ]);
+    expect(unpulledBanners('weap', [], db, schedule, 'americas', now).map((b) => b.poolId)).toEqual(['weponbox_1_1_1']);
   });
 });

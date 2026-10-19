@@ -48,6 +48,8 @@ export interface ScheduleEvent {
   details: string | null;
   availability?: string;
   post: string;
+  /** Art from the official New Version Guide (ef-assets events/), when it had the event. */
+  art?: string;
   needsReview?: boolean;
 }
 

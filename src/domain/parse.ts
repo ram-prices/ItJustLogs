@@ -57,6 +57,30 @@ export function chronological(pulls: Pull[]): Pull[] {
   return [...pulls].sort((a, b) => a.ts - b.ts || a.seq - b.seq);
 }
 
+/** A banner reward the export lists (Token, Arsenal rate-up copy, Dossier, Selector). */
+export interface Gift {
+  kind: Kind;
+  /** The record's own kind: gift_operator_token, gift_weapon, ... */
+  gift: string;
+  poolId: string;
+  ts: number;
+  seq: number;
+  /** "Si's Token", "Jade Vessel", "Headhunting Dossier"... */
+  name: string;
+}
+
+/** Every reward record in the export, oldest first. Only newer banners list them. */
+export function giftsOf(history: PullHistory): Gift[] {
+  const out: Gift[] = [];
+  for (const [kind, records] of [['char', history.characters], ['weap', history.weapons]] as const) {
+    for (const r of records) {
+      if (!isGift(r)) continue;
+      out.push({ kind, gift: str(r.kind), poolId: str(r.poolId).trim(), ts: parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp), seq: Number(r.seqId) || 0, name: str(r.nameText) || str(r.name) });
+    }
+  }
+  return out.sort((a, b) => a.ts - b.ts || a.seq - b.seq);
+}
+
 export function toPulls(history: PullHistory): { char: Pull[]; weap: Pull[] } {
   return {
     char: chronological(history.characters.filter((r) => !isGift(r)).map((r) => normalize(r, 'char'))),

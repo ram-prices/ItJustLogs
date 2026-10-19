@@ -1180,6 +1180,14 @@ select.input {
   margin-right: 1px;
   opacity: 0.85;
 }
+/* The Token glyph at the 15px icon's disc size. */
+.glance-stat .token-glyph {
+  align-self: center;
+  width: 13px;
+  height: 13px;
+  margin: 0 2px 0 1px;
+  opacity: 0.85;
+}
 .glance-stat i {
   font: 400 11px/16px var(--font-sans);
   color: var(--gray-700);
@@ -1336,6 +1344,12 @@ select.input {
 }
 .ruler-mark .icon {
   font-size: 16px;
+}
+/* Token: the stars icon's disc size, with a bigger star cut out (TOKEN_GLYPH). */
+.token-glyph {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 /* Under-track milestones (Arsenal Selectors): tip points up at the track,
    label underneath, and drawn behind the 6★ pins that share that row. */
@@ -2162,6 +2176,10 @@ code {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
+/* Headhunting and Arsenal each get their own row. */
+.sched-live + .sched-live {
+  margin-top: 16px;
+}
 .sched-card {
   overflow: hidden;
 }
@@ -2267,6 +2285,10 @@ code {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+/* Guide event art fades out on the left (where the guide puts its text). */
+.sched-thumb.evt-art img {
+  object-position: 80% center;
 }
 /* No art yet: a small calendar leaf with the opening day. */
 .sched-date {
@@ -2642,4 +2664,557 @@ code {
 }
 .versions-empty {
   margin-top: 10px;
+}
+
+/* ---------- Operator info (/operators/info, wiki data) ------------------- */
+/* Highlights inside wiki text: the game's own colours for elements, numbers
+   and key terms (data, not chrome). The light theme gets darker ink. */
+.wk-num { color: #8da2df; }
+.wk-key { color: #33c2ff; }
+.wk-phys,
+.wk-physical { color: #dfbb92; }
+.wk-heat { color: #ff853f; }
+.wk-cryo { color: #00c0cb; }
+.wk-nature { color: #9cd54a; }
+.wk-elec,
+.wk-electric { color: #fdc038; }
+.wk-stagger { color: #dfc087; }
+.wk-heal { color: #abd040; }
+.wk-accent { color: #fff200; }
+.wk-muted { color: var(--gray-700); }
+:root[data-theme='light'] .wk-num { color: #3d55a8; }
+:root[data-theme='light'] .wk-key { color: #0072b8; }
+:root[data-theme='light'] :is(.wk-phys, .wk-physical) { color: #8a6232; }
+:root[data-theme='light'] .wk-heat { color: #c24a0a; }
+:root[data-theme='light'] .wk-cryo { color: #00808a; }
+:root[data-theme='light'] .wk-nature { color: #4b7f12; }
+:root[data-theme='light'] :is(.wk-elec, .wk-electric) { color: #a67500; }
+:root[data-theme='light'] .wk-stagger { color: #8c6a1c; }
+:root[data-theme='light'] .wk-heal { color: #557a0d; }
+:root[data-theme='light'] .wk-accent { color: #8a7d00; }
+.wiki-em {
+  color: var(--gray-1000);
+}
+.wiki-crumbs {
+  margin-bottom: 8px;
+}
+.wiki-crumbs .icon {
+  color: var(--gray-700);
+}
+.wiki-fact-label,
+.wiki-skill-type,
+.wiki-req,
+.wiki-facts-list dt,
+.wiki-promo {
+  font: 500 12px/16px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-900);
+}
+
+/* Hero: acrylic, like the banner cards. The portrait blurred into a wash
+   behind a sharp copy, fading into the page. */
+.wiki-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.wiki-hero-bg {
+  position: absolute;
+  inset: -20% -10%;
+  width: 120%;
+  height: 140%;
+  object-fit: cover;
+  filter: blur(64px) saturate(1.5);
+  opacity: 0.4;
+  z-index: -2;
+  pointer-events: none;
+}
+.wiki-hero-bg.missing {
+  display: none;
+}
+.wiki-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, var(--background-100));
+  z-index: -1;
+}
+.wiki-hero-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding-block: 48px 8px;
+}
+.wiki-hero-portrait {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: var(--gray-alpha-200);
+  box-shadow: var(--shadow-card);
+}
+.wiki-hero-text {
+  flex: 1;
+}
+.wiki-stars {
+  font-size: 14px;
+  letter-spacing: 2px;
+  line-height: 18px;
+}
+.wiki-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin-top: 12px;
+  font: 500 14px/20px var(--font-sans);
+}
+.wiki-fact {
+  display: inline-flex;
+  flex-direction: column;
+}
+.wiki-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.wiki-hero-link {
+  align-self: flex-start;
+  text-decoration: none;
+}
+
+/* Attributes table */
+.wiki-stats th .wiki-promo {
+  margin-left: 6px;
+  color: var(--gray-700);
+}
+.wiki-stats td:not(:first-child),
+.wiki-stats th:not(:first-child) {
+  text-align: right;
+}
+.wiki-stats tr.main td {
+  background: var(--gray-alpha-100);
+}
+.wiki-stat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.wiki-page .card-footer b {
+  font-weight: 600;
+}
+
+/* Skills, talents, base skills */
+.wiki-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.wiki-rank input {
+  width: 160px;
+  accent-color: var(--gray-1000);
+}
+.wiki-rank-value {
+  min-width: 2ch;
+  text-align: right;
+}
+.wiki-variant {
+  margin: 24px 0 12px;
+}
+.wiki-variant:first-of-type {
+  margin-top: 0;
+}
+.wiki-skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.wiki-skill {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+}
+.wiki-skill-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wiki-text b {
+  font-weight: 600;
+  color: var(--gray-1000);
+}
+.wiki-values {
+  margin: auto 0 0;
+  padding-top: 4px;
+}
+.wiki-values div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ring);
+  font: 400 14px/20px var(--font-sans);
+}
+.wiki-values dt {
+  color: var(--gray-900);
+}
+.wiki-values dd {
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wiki-levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wiki-levels li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Potentials */
+.wiki-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wiki-list li {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+}
+.wiki-list li + li {
+  border-top: 1px solid var(--ring);
+}
+.wiki-pot {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-200);
+  font: 600 13px/1 var(--font-sans);
+}
+
+/* Profile */
+.wiki-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.wiki-quote {
+  margin: 0;
+  padding-left: 16px;
+  box-shadow: inset 2px 0 0 var(--gray-alpha-600);
+  color: var(--gray-1000);
+  font-style: italic;
+}
+.wiki-facts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+.wiki-facts-list dd {
+  margin: 2px 0 0;
+}
+.wiki-more summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.wiki-more p {
+  margin-top: 12px;
+}
+
+/* Credit: CC BY-SA 4.0 asks for it wherever the data shows. */
+.wiki-credit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 56px;
+  color: var(--gray-900);
+}
+.wiki-credit a {
+  color: var(--link);
+  text-decoration: none;
+}
+.wiki-credit a:hover {
+  text-decoration: underline;
+}
+
+/* Index of every operator */
+.wiki-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.wiki-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  text-decoration: none;
+  transition: box-shadow 0.15s var(--ease);
+}
+.wiki-tile:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+.wiki-tile-portrait {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--gray-100);
+}
+.wiki-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wiki-tile-name {
+  font: 700 15px/20px var(--font-sans);
+}
+
+/* Operator portraits on the Operators page link to their info page. */
+a.six-item {
+  text-decoration: none;
+  color: inherit;
+}
+.ruler-pin > a {
+  display: block;
+  line-height: 0;
+  border-radius: 50%;
+}
+
+@media (max-width: 640px) {
+  .wiki-hero-inner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px;
+    padding-top: 32px;
+  }
+  .wiki-hero-portrait {
+    width: 72px;
+    height: 72px;
+  }
+  .wiki-hero-text {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .wiki-hero-link {
+    margin-left: auto;
+  }
+  .wiki-skills {
+    grid-template-columns: 1fr;
+  }
+  .wiki-skill,
+  .wiki-list li {
+    padding: 16px;
+  }
+  .wiki-rank input {
+    width: 120px;
+  }
+}
+
+/* Info pages: the player's copies and Potential */
+.wiki-pips {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+.wiki-pips i {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+  background: var(--gray-alpha-300);
+}
+.wiki-pips i.on {
+  background: var(--r5);
+}
+.wiki-fact-pot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.wiki-owned-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 24px;
+}
+.wiki-pulls {
+  margin-top: 16px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.wiki-pull {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto 96px 32px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 24px;
+  text-decoration: none;
+  font: 400 14px/20px var(--font-sans);
+}
+.wiki-pull + .wiki-pull {
+  border-top: 1px solid var(--ring);
+}
+.wiki-pull:hover {
+  background: var(--gray-alpha-100);
+}
+.wiki-pull-tag {
+  justify-self: end;
+}
+.wiki-note {
+  margin-top: 10px;
+}
+.wiki-skill .wiki-note {
+  margin-top: auto;
+}
+
+/* Index tiles: Potential tag on owned ones; the rest fade once there's an import. */
+.wiki-tile-tag {
+  margin-left: auto;
+  flex: none;
+  padding: 0 8px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-200);
+  font: 600 12px/20px var(--font-sans);
+}
+.wiki-tile.unowned .wiki-tile-portrait,
+.wiki-tile.unowned .wiki-tile-text {
+  opacity: 0.45;
+}
+.wiki-tile.unowned:hover .wiki-tile-portrait,
+.wiki-tile.unowned:hover .wiki-tile-text {
+  opacity: 1;
+}
+.wiki-type:first-child {
+  margin-top: 0;
+}
+
+/* Potentials the player has unlocked */
+.wiki-list li.off {
+  opacity: 0.55;
+}
+.wiki-list li.on .wiki-pot {
+  background: var(--r5);
+  color: #000;
+}
+.wiki-pot .icon {
+  font-size: 16px;
+}
+.wiki-weapon-pot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.wiki-costs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  align-self: center;
+}
+
+/* Weapon art is a cut-out on transparency: contain it on a tile. */
+.wiki-hero-portrait.weapon,
+.wiki-tile-portrait.weapon {
+  object-fit: contain;
+  padding: 6px;
+}
+
+@media (max-width: 640px) {
+  .wiki-pull {
+    grid-template-columns: minmax(0, 1fr) auto 28px;
+    gap: 2px 12px;
+    padding: 10px 16px;
+  }
+  .wiki-pull > :first-child {
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .wiki-pull-at {
+    display: none;
+  }
+}
+.wiki-date {
+  font-size: 20px;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .wiki-date {
+    font-size: 16px;
+    letter-spacing: -0.32px;
+  }
+}
+/* Each copy's Potential step. The one that maxed it is gold; later ones are
+   a quiet +1, +2... (for the player who pulls a 7th copy and wants to know when). */
+.wiki-copy {
+  justify-self: end;
+  font: 600 12px/20px var(--font-sans);
+  color: var(--gray-700);
+}
+.wiki-pull.max .wiki-copy {
+  color: var(--r5);
+}
+.wiki-pull.spare .wiki-copy {
+  font-weight: 400;
+}
+.wiki-pot {
+  font-size: 12px;
+}
+/* Your banners / All operators switch: the toggle look, as links. */
+.kind-nav a {
+  white-space: nowrap;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 4px;
+  color: var(--gray-900);
+  font: 500 13px/1 var(--font-sans);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kind-nav a:hover {
+  color: var(--gray-1000);
+}
+.kind-nav a[aria-current='page'] {
+  background: var(--background-100);
+  color: var(--gray-1000);
+  box-shadow: 0 0 0 1px var(--ring), 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* "All banners": banners the player didn't pull on. Same art header, no
+   body to expand, quieter so the pulled ones still lead. */
+.banner.unpulled {
+  height: auto;
+}
+.banner.unpulled .banner-art img {
+  filter: saturate(0.55) brightness(0.8);
+}
+.banner.unpulled:hover .banner-art img {
+  filter: none;
+}
+.unpulled-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
 }

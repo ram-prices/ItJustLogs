@@ -150,7 +150,9 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 
 function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
   return html`<div class="sched-next evt" data-discord="${eventDiscord(e, server)}" ${e.details ? html`title="${e.details}"` : ''}>
-    <div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>
+    ${e.art
+      ? html`<div class="sched-thumb evt-art"><img src="${e.art}" alt="" loading="lazy" decoding="async" /></div>`
+      : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>
       <div class="sched-next-meta ellipsis"><span>${e.type}</span></div>
@@ -448,10 +450,9 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
   const now = Date.now();
   const startOf = (i: { start: ScheduleBanner['start'] }) => timeOn(i.start, server) ?? Infinity;
   const byStart = (p: ScheduleBanner, q: ScheduleBanner) => startOf(p) - startOf(q) || Number(isWeaponBanner(p.kind)) - Number(isWeaponBanner(q.kind));
-  // Headhunting banners first, then Arsenal Issues; each by when it opened.
-  const live = schedule.banners
-    .filter((b) => statusOf(b, now, server) === 'live')
-    .sort((p, q) => Number(isWeaponBanner(p.kind)) - Number(isWeaponBanner(q.kind)) || byStart(p, q));
+  // Headhunting banners on the first row, Arsenal Issues on the second; each by when it opened.
+  const live = schedule.banners.filter((b) => statusOf(b, now, server) === 'live').sort(byStart);
+  const liveRows = [live.filter((b) => !isWeaponBanner(b.kind)), live.filter((b) => isWeaponBanner(b.kind))].filter((row) => row.length);
   const events = schedule.events ?? [];
   const liveEvents = events
     .filter((e) => statusOf(e, now, server) === 'live')
@@ -470,7 +471,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
             <span class="copy-14">Import your pull history to see your pity on each banner here.</span>
             <button class="btn primary sm" data-action="import">${icon('upload_file')}Import file</button>
           </div>`}
-      <div class="sched-live">${live.map((b) => liveCard(b, now, server, a))}</div>
+      ${liveRows.map((row) => html`<div class="sched-live">${row.map((b) => liveCard(b, now, server, a))}</div>`)}
 
       ${liveEvents.length
         ? html`<div class="section">

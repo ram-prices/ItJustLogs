@@ -8,7 +8,7 @@ import {
   type BannerInfo,
   type PatchRef,
 } from './banners';
-import { toPulls } from './parse';
+import { giftsOf, toPulls, type Gift } from './parse';
 import {
   CHARTERED,
   CHARTERED_GUARANTEE,
@@ -123,6 +123,8 @@ export interface Analysis {
   weap: KindStats;
   /** All 6★ pulls, oldest first. */
   sixStars: AnalyzedPull[];
+  /** Banner rewards the export lists (newer banners only), oldest first. */
+  gifts: Gift[];
   firstTs: number;
   lastTs: number;
 }
@@ -357,6 +359,7 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
     char: stats('char', char),
     weap: stats('weap', weap),
     sixStars: sixStars.sort((a, b) => a.ts - b.ts || a.seq - b.seq),
+    gifts: giftsOf(history),
     firstTs: all.length ? Math.min(...all.map((p) => p.ts)) : 0,
     lastTs: all.length ? Math.max(...all.map((p) => p.ts)) : 0,
   };

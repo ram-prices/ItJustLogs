@@ -11,6 +11,9 @@ import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
 import { homePage, installDiscordMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
+import { installWikiControls } from './pages/info';
+import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
+import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage } from './pages/stats';
 import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow } from './sync';
@@ -35,12 +38,15 @@ const DATA_PAGES: Page[] = ['operators', 'arsenal', 'stats'];
 interface Route {
   page: Page;
   id?: string;
+  /** /operators/info[/<chr id>], /arsenal/info[/<wpn id>]: info from the wiki data; `id` is the operator or weapon. */
+  info?: boolean;
 }
 
-/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /stats, /settings. */
+/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /stats, /settings. */
 function parseRoute(): Route {
-  const [page, id] = location.pathname.replace(/^\/+/, '').split('/');
+  const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
   const p = (TABS.some(([t]) => t === page) ? page : 'home') as Page;
+  if ((p === 'operators' || p === 'arsenal') && id === 'info') return { page: p, info: true, id: sub ? decodeURIComponent(sub) : undefined };
   return { page: p, id: id ? decodeURIComponent(id) : undefined };
 }
 
@@ -69,8 +75,10 @@ function header(route: Route): Html {
     </div>
     <nav class="tabs" aria-label="Sections">
       ${TABS.map(([page, label]) => {
-        const disabled = !has && DATA_PAGES.includes(page);
-        return html`<a class="tab tab-${page}" href="/${page === 'home' ? '' : page}" aria-label="${label}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
+        // Without an import, Operators and Arsenal open their info pages (game data, no pulls needed).
+        const info = !has && (page === 'operators' || page === 'arsenal');
+        const disabled = !has && DATA_PAGES.includes(page) && !info;
+        return html`<a class="tab tab-${page}" href="/${page === 'home' ? '' : info ? `${page}/info` : page}" aria-label="${label}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
       })}
     </nav>
   </div></header>`;
@@ -103,13 +111,15 @@ function page(route: Route): Html {
   const a = state.analysis;
   if (route.page === 'settings') return html`${settingsPage()}<div class="container">${aboutCard()}</div>`;
   if (route.page === 'home') return homePage(state.schedule, currentServer(), a);
+  // Info pages are game data: they work without an import, and show the player's copies with one.
+  if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
   if (!a) return welcome();
   switch (route.page) {
     case 'operators':
     case 'arsenal': {
       const kind: Kind = route.page === 'operators' ? 'char' : 'weap';
       if (route.id && `${route.page}/${route.id}` !== lastKey) setExpanded(`${kind}:${route.id}`, true);
-      return listPage(kind, a);
+      return listPage(kind, a, { db: state.db, schedule: state.schedule, server: currentServer(), showAll: !!state.settings.showAllBanners });
     }
     case 'stats':
       return statsPage(a);
@@ -131,10 +141,10 @@ function draw(): void {
   // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
   const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
   render(root(), html`${header(route)}${page(route)}`);
-  const key = `${route.page}/${route.id ?? ''}`;
+  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}`;
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.
-    const target = route.id && document.getElementById(`banner-${route.id}`);
+    const target = route.id && !route.info && document.getElementById(`banner-${route.id}`);
     if (target) target.scrollIntoView({ block: 'start' });
     else scrollTo({ top: 0 });
     if (route.page === 'home') scrollTimelineToNow();
@@ -145,7 +155,7 @@ function draw(): void {
   lastKey = key;
   markOverflow();
   tintWeaponCards();
-  const title = TABS.find(([p]) => p === route.page)?.[1];
+  const title = route.info ? (route.page === 'arsenal' ? weaponInfoTitle(route.id) : operatorInfoTitle(route.id)) : TABS.find(([p]) => p === route.page)?.[1];
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
 
@@ -379,6 +389,8 @@ async function onClick(e: MouseEvent): Promise<void> {
       return updateSettings({ theme: el.dataset.value as ThemePref });
     case 'server':
       return updateSettings({ server: el.dataset.value as Server });
+    case 'banner-scope':
+      return updateSettings({ showAllBanners: el.dataset.value === 'all' });
     case 'copy-script':
       try {
         await navigator.clipboard.writeText(EXPORTER_SOURCE);
@@ -449,6 +461,7 @@ export function mount(): void {
   installImport();
   installTimelineLabels();
   installDiscordMenu();
+  installWikiControls();
   installProfile();
   installSync();
   document.addEventListener('click', (e) => void onClick(e));

@@ -2,9 +2,12 @@ import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPu
 import { bannerArtUrl, itemIconUrl } from '../../domain/banners';
 import { tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
-import type { Kind } from '../../domain/types';
-import { badge, heat, icon, itemImg, metric, metrics, pageHeader } from '../components';
+import { poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
+import type { Schedule, Server } from '../../domain/schedule';
+import type { BannerDb, Kind } from '../../domain/types';
+import { badge, heat, icon, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
+import { bannerCrumbs, infoHref, kindNav } from './info';
 
 /** Operators / Arsenal: list of banners, and a page per banner with its pull history. */
 
@@ -33,7 +36,7 @@ const bannersOf = (kind: Kind, a: Analysis) =>
 export const rateUpIcon = (): Html => html`<span class="rateup-icon">${icon('stat_2')}</span>`;
 
 /** Banner key art; weapon banners without art fall back to the rate-up weapon icon. */
-/** Reward icons: a ticket for Tokens, a crate for Selectors (pick-one boxes), a gift for free rate-up copies. */
+/** Reward icons: a star in a circle for Tokens, a crate for Selectors (pick-one boxes), a gift for free rate-up copies. */
 /** What a reward teardrop gives, for its hover tip. */
 const rewardInfo = (name: string, kind: Kind): string =>
   name === 'Token'
@@ -43,8 +46,16 @@ const rewardInfo = (name: string, kind: Kind): string =>
       : kind === 'weap'
         ? "Pick a 6★ weapon that isn't the rate-up."
         : 'Pick one of the rate-up operators.';
+/**
+ * The Token teardrop's glyph: a disc with a star cut out of it, like the
+ * Material "stars" icon but with a bigger star, so it reads at ruler size.
+ * The star is a hole (evenodd), so it shows the teardrop's own colour.
+ */
+const TOKEN_GLYPH = raw(
+  '<svg class="token-glyph" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" fill="currentColor" d="M0 12a12 12 0 1 0 24 0a12 12 0 1 0-24 0ZM12 4.1L14.32 9.31L19.99 9.9L15.75 13.72L16.94 19.3L12 16.45L7.06 19.3L8.25 13.72L4.01 9.9L9.68 9.31Z"/></svg>',
+);
 const rewardIcon = (name: string): string =>
-  name === 'Selector' ? 'deployed_code' : name === 'Rate-up copy' ? 'redeem' : 'confirmation_number';
+  name === 'Selector' ? 'deployed_code' : name === 'Rate-up copy' ? 'redeem' : 'stars';
 
 function artUrls(b: BannerSummary): { art: string; weapon: string } {
   const weaponId = b.info?.rateUpIds.find((id) => id.startsWith('wpn_'));
@@ -113,16 +124,70 @@ function sixStrip(kind: Kind, a: Analysis): Html {
     </div>
     <div class="six-strip">
       ${sixes.map(
-        (p) => html`<div class="six-item${p.isRateUp ? ' rateup' : ''}" title="${p.name} · ${p.bannerName} · ${fmtDate(p.ts, true)}">
-          ${itemImg(p.kind, p.itemId, 'six-portrait')}
-          <span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>
-        </div>`,
+        (p) => {
+          const inner = html`${itemImg(p.kind, p.itemId, 'six-portrait')}
+            <span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
+          const cls = `six-item${p.isRateUp ? ' rateup' : ''}`;
+          const title = `${p.name} · ${p.bannerName} · ${fmtDate(p.ts, true)}`;
+          // Portraits open that operator's or weapon's info page.
+          return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title}">${inner}</a>`;
+        },
       )}
     </div>
   </div>`;
 }
 
-export function listPage(kind: Kind, a: Analysis): Html {
+/** What the list page needs beyond the analysis: the banner catalog, for "All banners". */
+export interface ListOptions {
+  db: BannerDb;
+  schedule: Schedule;
+  server: Server;
+  /** List every banner that has opened, not just the ones pulled on. */
+  showAll: boolean;
+}
+
+/**
+ * A banner the player didn't pull on (shown with "All banners"): its art,
+ * name, rate-up and dates, nothing to expand.
+ */
+function unpulledCard(c: CatalogBanner): Html {
+  const weaponId = c.rateUpIds.find((id) => id.startsWith('wpn_'));
+  const weapon = weaponId ? itemIconUrl('weap', weaponId) : '';
+  const url = c.art ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
+  const img = url
+    ? html`<img src="${url}" alt="" loading="lazy" decoding="async" data-fallback data-alt="${weapon}" />`
+    : weapon
+      ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" data-fallback />`
+      : '';
+  const when = c.start ? `${fmtDate(c.start)} – ${c.end ? fmtDate(c.end) : 'open'}` : 'Permanent';
+  return html`<article class="card banner unpulled" ${c.poolId ? html`id="banner-${c.poolId}"` : ''}>
+    <div class="banner-art">
+      ${img}
+      <div class="banner-art-text">
+        <div class="banner-name ellipsis">${c.name}</div>
+        ${c.rateUpNames.length ? html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${c.rateUpNames.join(', ')}</span></span>` : ''}
+      </div>
+    </div>
+    <div class="unpulled-body">
+      <span class="label-13 secondary">${when}</span>
+      <span class="label-13 tertiary">No pulls</span>
+    </div>
+  </article>`;
+}
+
+/** The banner cards: pulled ones, plus (with `showAll`) every other banner that has opened, by opening date. */
+function bannerCards(kind: Kind, banners: BannerSummary[], opts: ListOptions): { cards: Html[]; total: number } {
+  if (!opts.showAll) return { cards: banners.map((b) => bannerSection(b)), total: banners.length };
+  const starts = poolStarts(opts.schedule, opts.server);
+  const extra = unpulledBanners(kind, banners, opts.db, opts.schedule, opts.server);
+  const items = [
+    ...banners.map((b) => ({ basic: b.category === 'basic', at: starts.get(b.poolId) ?? b.firstTs, card: () => bannerSection(b) })),
+    ...extra.map((c) => ({ basic: c.poolId === 'standard', at: c.start ?? -Infinity, card: () => unpulledCard(c) })),
+  ].sort((x, y) => Number(y.basic) - Number(x.basic) || y.at - x.at);
+  return { cards: items.map((i) => i.card()), total: items.length };
+}
+
+export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
   const k = KIND[kind];
   const s = a[kind];
   const banners = bannersOf(kind, a);
@@ -132,9 +197,10 @@ export function listPage(kind: Kind, a: Analysis): Html {
   const flips = s.won + s.lost;
   const winRate = flips ? s.won / flips : 0;
   const flipTier = luckTier(winRate, s.expectedWinRate);
+  const list = bannerCards(kind, banners, opts);
 
   return html`
-    ${pageHeader(k.title, `${fmtInt(s.pulls)} pulls across ${banners.length} banners · ${s.uniqueItems} unique ${k.items}`)}
+    ${pageHeader(k.title, `${fmtInt(s.pulls)} pulls across ${banners.length} banners · ${s.uniqueItems} unique ${k.items}`, kindNav(kind, 'banners'), bannerCrumbs(kind))}
     <main class="container fade-in">
       ${metrics(
         [
@@ -150,13 +216,14 @@ export function listPage(kind: Kind, a: Analysis): Html {
 
       <div class="section">
         <div class="section-head">
-          <h2 class="heading-20">Banners</h2>
+          <h2 class="heading-20">Banners${opts.showAll ? html` <span class="label-13 secondary">${banners.length} of ${list.total} pulled on</span>` : ''}</h2>
           <div class="row">
+            ${toggleGroup('banner-scope', [['pulled', 'Pulled on'], ['all', 'All banners']], opts.showAll ? 'all' : 'pulled')}
             <button class="btn tertiary sm" data-action="expand-all" data-value="1">Expand all</button>
             <button class="btn tertiary sm" data-action="expand-all" data-value="">Collapse all</button>
           </div>
         </div>
-        <div class="banner-list">${banners.map((b) => bannerSection(b))}</div>
+        <div class="banner-list">${list.cards}</div>
       </div>
     </main>`;
 }
@@ -261,7 +328,7 @@ function bannerSection(b: BannerSummary): Html {
         <div class="glance-row">
           <span class="glance-stat" style="color:${pityColor}" title="6★ pity: ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}" aria-label="6★ pity ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>
           ${b.rewards
-            ? html`<span class="glance-stat glance-reward" title="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()} (${b.rewards.goal})" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
+            ? html`<span class="glance-stat glance-reward" title="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()} (${b.rewards.goal})" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${b.rewards.nextReward === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
             : ''}
         </div>
         ${pityRuler(b)}
@@ -383,7 +450,7 @@ function pityRuler(b: BannerSummary): Html {
         at: pct(at),
         hi: 100,
         draw: (left, dx) => html`<div class="ruler-mark ${passed ? 'passed' : 'ahead'}${below ? ' below' : ''}" style="left:${left}%;--dx:${dx}" aria-label="${name}, ${where}" data-tip="${tip(name, [tipNote(rewardInfo(name, b.kind)), tipRow(sets ? 'Set' : 'Pull', String(at)), tipRow('Status', passed ? 'Earned' : at === nextReward ? 'Next' : 'Coming up')])}">
-          <span class="ruler-mark-label">${at}</span><span class="ruler-mark-drop">${icon(rewardIcon(name), true)}</span>
+          <span class="ruler-mark-label">${at}</span><span class="ruler-mark-drop">${name === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(name), true)}</span>
         </div>`,
       });
     }
@@ -416,7 +483,7 @@ function pityRuler(b: BannerSummary): Html {
         hi: 96.5,
         draw: (left, dx) => html`<div class="ruler-pin ${side}" style="left:${left}%;--dx:${dx}" title="${sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`}">
           <span class="ruler-pin-label">${posOf(p)}</span>
-          ${itemImg(p.kind, p.itemId, 'ruler-portrait')}
+          <a href="${infoHref(p.kind, p.itemId)}" aria-label="${p.name} info">${itemImg(p.kind, p.itemId, 'ruler-portrait')}</a>
           <span class="ruler-pin-point"></span>
         </div>`,
       })),
