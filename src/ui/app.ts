@@ -16,7 +16,7 @@ import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilte
 import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
-import { aboutCard, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
+import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage } from './pages/stats';
 import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow } from './sync';
 import { installTint, tintSixStrip, tintWeaponCards } from './tint';
@@ -102,6 +102,13 @@ function header(route: Route): Html {
   </div></header>`;
 }
 
+/** The same footer under every page; its margin also keeps the last cards clear of the screen's bottom edge. */
+const footer = (): Html => html`<footer class="container site-footer copy-13 tertiary">
+  <span>Fan-made with Claude AI, not affiliated with Gryphline or Hypergryph.</span>
+  <a href="/privacy/" data-native>Privacy policy</a>
+  <a href="https://github.com/ram-prices/ItJustLogs" target="_blank" rel="noopener">Source on GitHub</a>
+</footer>`;
+
 function welcome(): Html {
   return html`
     ${pageHeader('Welcome to ItJustLogs', 'Pity, rate-up luck and patch stats for Arknights: Endfield. Everything runs in your browser.')}
@@ -121,13 +128,12 @@ function welcome(): Html {
           ${getDataSteps()}
         </div>
       </div>
-      ${aboutCard()}
     </main>`;
 }
 
 function page(route: Route): Html {
   const a = state.analysis;
-  if (route.page === 'settings') return html`${settingsPage(draw)}<div class="container">${aboutCard()}</div>`;
+  if (route.page === 'settings') return settingsPage(draw);
   if (route.shortState === 'loading') return statusPage('char', 'Loading…', 'Loading…');
   if (route.shortState) {
     return statusPage(
@@ -168,7 +174,7 @@ function draw(): void {
   const route = parseRoute();
   // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
   const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
-  render(root(), html`${header(route)}${page(route)}`);
+  render(root(), html`${header(route)}${page(route)}${footer()}`);
   const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}`;
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.

@@ -284,10 +284,4 @@ function deleteOptions(synced: boolean): Html {
 const driveImpact = (): Html =>
   html`<span class="delete-drive">${icon('cloud')}This browser will be signed out of Google Drive sync first. Your Drive copy isn't touched.</span>`;
 
-export function aboutCard(): Html {
-  return html`<p class="copy-13 tertiary" style="margin-top:40px">
-    ItJustLogs is a fan-made tracker for Arknights: Endfield. It's not affiliated with Gryphline or Hypergryph, and game assets belong to them.
-    Your data never leaves your browser${driveConfigured() ? ' unless you turn on Google Drive sync, which saves it to your own Drive' : ''}. Source: <a href="https://github.com/ram-prices/ItJustLogs" target="_blank" rel="noopener">github.com/ram-prices/ItJustLogs</a>.
-    <a href="/privacy/" data-native>Privacy policy</a>.
-  </p>`;
-}
+

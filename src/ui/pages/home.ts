@@ -520,11 +520,6 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
         <div class="section-head"><h2 class="heading-20">Timeline</h2></div>
         ${timeline(schedule, now, server, a)}
       </div>
-      <footer class="home-footer copy-13 tertiary">
-        <span>Fan-made with Claude AI, not affiliated with Gryphline or Hypergryph.</span>
-        <a href="/privacy/" data-native>Privacy policy</a>
-        <a href="https://github.com/ram-prices/ItJustLogs" target="_blank" rel="noopener">Source on GitHub</a>
-      </footer>
     </main>`;
 }
 

@@ -2600,11 +2600,13 @@ code {
 .home .sched-import {
   margin-bottom: 20px;
 }
-.home-footer {
+/* Under every page (app.ts). The bottom padding clears phones' home indicator. */
+.site-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 16px;
-  margin: 48px 0 32px;
+  padding-top: 48px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
 }
 
 /* Settings → Delete locally saved data: each button with one line on what it removes. */
