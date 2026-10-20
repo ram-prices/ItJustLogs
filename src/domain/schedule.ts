@@ -154,6 +154,26 @@ export function discordText(
 // Links: itjustlogs.dev/banners/<name>, /event/<id>
 // ---------------------------------------------------------------------------
 
+/**
+ * When an operator or weapon came out, and in which version: its first
+ * rate-up banner, else the event its wiki source names, else the game's
+ * launch (standard operators, Arsenal Exchange and Protocol Pass weapons
+ * have no dated banner). Null if the schedule has no versions.
+ */
+export function releaseOf(s: Schedule, name: string, source: string | null | undefined, server: Server): { at: number; version: string } | null {
+  const versions = s.versions
+    .map((v) => ({ name: v.name, at: timeOn(v.release, server) }))
+    .filter((v): v is { name: string; at: number } => v.at != null)
+    .sort((a, b) => a.at - b.at);
+  if (!versions.length) return null;
+  const starts = [
+    ...s.banners.filter((b) => b.rateUps.includes(name)).map((b) => timeOn(b.start, server)),
+    ...(s.events ?? []).filter((e) => source && e.name === source).map((e) => timeOn(e.start, server)),
+  ].filter((t): t is number => t != null);
+  const at = starts.length ? Math.min(...starts) : versions[0].at;
+  return { at, version: versions.filter((v) => v.at <= at).at(-1)?.name ?? versions[0].name };
+}
+
 export type ScheduleItem = ScheduleBanner | ScheduleEvent;
 export const isScheduleBanner = (i: ScheduleItem): i is ScheduleBanner => 'kind' in i;
 

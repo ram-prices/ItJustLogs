@@ -1,6 +1,7 @@
 import type { Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
-import { state, updateSettings } from '../../state';
+import { releaseOf, type Server } from '../../domain/schedule';
+import { currentServer, state, updateSettings } from '../../state';
 import { html, render, type Html } from '../html';
 
 /**
@@ -11,7 +12,7 @@ import { html, render, type Html } from '../html';
  * sections (sortGroups). Saved in settings.
  */
 
-export type SortKey = 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'element' | 'weapon' | 'class';
+export type SortKey = 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'released' | 'element' | 'weapon' | 'class';
 export interface SortSpec {
   key: SortKey;
   desc: boolean;
@@ -25,6 +26,7 @@ const LABEL: Record<SortKey, string> = {
   acquired: 'Last acquired',
   potential: 'Potential',
   owned: 'Owned',
+  released: 'Release date',
   element: 'Element',
   weapon: 'Weapon',
   class: 'Class',
@@ -35,13 +37,13 @@ const labelOf = (kind: Kind, key: SortKey): string => (kind === 'weap' && key ==
 
 /** The keys each list offers, in their default order: operators by rarity, weapons by type, then rarity; then name. */
 const KEYS: Record<Kind, SortKey[]> = {
-  char: ['rarity', 'name', 'acquired', 'potential', 'owned', 'element', 'weapon', 'class'],
-  weap: ['weapon', 'rarity', 'name', 'acquired', 'potential', 'owned'],
+  char: ['rarity', 'name', 'acquired', 'potential', 'owned', 'released', 'element', 'weapon', 'class'],
+  weap: ['weapon', 'rarity', 'name', 'acquired', 'potential', 'owned', 'released'],
 };
 /** Weapon types in the game's order (the rest after them, A to Z). */
 const WEAPON_TYPES = ['Sword', 'Great Sword', 'Polearm', 'Handcannon', 'Arts Unit'];
 /** Which way each key goes until flipped: highest, newest, best and owned first; names A to Z. */
-const DEFAULT_DESC: Record<SortKey, boolean> = { rarity: true, name: false, acquired: true, potential: true, owned: true, element: false, weapon: false, class: false };
+const DEFAULT_DESC: Record<SortKey, boolean> = { rarity: true, name: false, acquired: true, potential: true, owned: true, released: true, element: false, weapon: false, class: false };
 
 /** The list's sort order: the player's, with any keys it lacks added at the end. */
 export function sortSpecs(kind: Kind): SortSpec[] {
@@ -98,7 +100,11 @@ export function sortBar(kind: Kind): Html {
 
 /** The direction button's words: Owned reads "Owned first" rather than high to low. */
 const dirLabel = (s: SortSpec): string =>
-  s.key === 'owned' ? (s.desc ? 'Owned first ↓' : 'Not owned first ↑') : s.desc ? 'High to low ↓' : 'Low to high ↑';
+  s.key === 'owned'
+    ? s.desc ? 'Owned first ↓' : 'Not owned first ↑'
+    : s.key === 'released' || s.key === 'acquired'
+      ? s.desc ? 'Newest first ↓' : 'Oldest first ↑'
+      : s.desc ? 'High to low ↓' : 'Low to high ↑';
 
 const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
 
@@ -251,6 +257,18 @@ export interface SortFacts {
   element?: string | null;
   weapon?: string | null;
   class?: string | null;
+  /** Where the wiki says it comes from (a weapon's event), for its release date. */
+  source?: string | null;
+}
+
+/** Release dates by name (releaseOf), worked out once per schedule and server. */
+let releases: { schedule: unknown; server: Server; byName: Map<string, ReturnType<typeof releaseOf>> } | null = null;
+function released(f: SortFacts): ReturnType<typeof releaseOf> {
+  const server = currentServer();
+  if (releases?.schedule !== state.schedule || releases.server !== server) releases = { schedule: state.schedule, server, byName: new Map() };
+  const key = `${f.name}\n${f.source ?? ''}`;
+  if (!releases.byName.has(key)) releases.byName.set(key, releaseOf(state.schedule, f.name, f.source, server));
+  return releases.byName.get(key)!;
 }
 
 const lastAcquired = (o: Owned | undefined): number | null => {
@@ -271,6 +289,8 @@ function value(f: SortFacts, key: SortKey): number | string | null {
       return f.owned?.copies ? f.owned.potential : null;
     case 'owned':
       return f.owned?.copies ? 1 : 0;
+    case 'released':
+      return released(f)?.at ?? null;
     case 'weapon': {
       if (!f.weapon) return null;
       const i = WEAPON_TYPES.indexOf(f.weapon);
@@ -317,6 +337,8 @@ function groupLabel(key: SortKey, f: SortFacts): string {
       return v == null ? 'Not owned' : `P${v}`;
     case 'owned':
       return v ? 'Owned' : 'Not owned';
+    case 'released':
+      return released(f)?.version ?? 'Unknown';
     case 'acquired':
       return v == null ? 'Not owned' : v === 0 ? 'Owned, no date' : new Date(v).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     default: {

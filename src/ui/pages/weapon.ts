@@ -27,7 +27,7 @@ export const weaponInfoHref = (id?: string): string => infoHref('weap', id);
 
 function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
   const all = Object.entries(f.weapons);
-  const groups = sortGroups('weap', all, ([id, w]) => ({ rarity: w.rarity, name: w.name, owned: owned?.get(id), weapon: w.type }));
+  const groups = sortGroups('weap', all, ([id, w]) => ({ rarity: w.rarity, name: w.name, owned: owned?.get(id), weapon: w.type, source: w.source }));
   const have = owned ? all.filter(([id]) => owned.get(id)?.copies).length : 0;
   const soon = Object.entries(previews?.weapons ?? {}).filter(([id]) => !f.weapons[id]);
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">

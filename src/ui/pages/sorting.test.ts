@@ -35,7 +35,7 @@ describe('ranked sorting', () => {
   });
 
   it('takes a dragged order, and skips sorts turned off', () => {
-    sortAction('sort-order', 'char', 'potential,rarity,name,acquired,owned,element,weapon,class');
+    sortAction('sort-order', 'char', 'potential,rarity,name,acquired,owned,released,element,weapon,class');
     expect(sortSpecs('char').map((s) => s.key).slice(0, 3)).toEqual(['potential', 'rarity', 'name']);
     expect(names()).toEqual(['Chen', 'Ardelia', 'Arcane', 'Ember']);
     sortAction('sort-toggle', 'char', 'potential');
@@ -61,6 +61,11 @@ describe('ranked sorting', () => {
     expect(groups()[0]).toBe('Not owned: Ember');
     sortAction('sort-front', 'char', 'name');
     expect(groups()).toEqual([': Arcane Ardelia Chen Ember']);
+    // Release date: first rate-up banner, else launch; one section per version.
+    sortAction('sort-front', 'char', 'released');
+    const g = groups();
+    expect(g.at(-1)).toMatch(/^Launch: /);
+    expect(g[0]).toMatch(/Arcane/);
     sortAction('sort-reset', 'char');
   });
 });
