@@ -40,7 +40,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
       ${crumbs('weap')}
       <h1 class="heading-32">Weapon info</h1>
-      <p class="copy-16">Base ATK, skills and Potential for every weapon${owned ? html`. You have ${have} of ${all.length}` : ''}.</p>
+      <p class="copy-16">${owned ? `${have}/${all.length}` : `${all.length} weapons`}</p>
     </div><div class="row">${kindNav('weap', 'info')}</div></div></div>
     <main class="container fade-in">
       <div class="section-head wiki-sort-head">${searchBox('weap')}${sortBar('weap')}</div>
@@ -50,7 +50,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
           <div class="wiki-grid">
             ${g.items.map(({ id, w, name, rarity: r, type }) => {
               const mine = owned?.get(id);
-              return html`<a class="wiki-tile card${owned && !mine?.copies && w ? ' unowned' : ''}" href="${weaponInfoHref(id)}">
+              return html`<a class="wiki-tile card${owned && (!w || !mine?.copies) ? ' unowned' : ''}" href="${weaponInfoHref(id)}">
                 ${itemImg('weap', id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${name}</span>

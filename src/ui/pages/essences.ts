@@ -74,10 +74,13 @@ export function essencesPage(redraw: () => void): Html {
   const total = kinds.reduce((s, k) => s + k.n, 0);
   const owned = ownedOf(state.analysis, 'weap');
   const read = state.settings.essencesRead ? new Date(state.settings.essencesRead).toLocaleDateString() : null;
-  const header = pageHeader(
+  // "180 essences · 24 perfect matches · Last read 10/20/2026" (matches: essences that fit a weapon fully, once weapons load).
+  const headerWith = (perfect: number | null) => pageHeader(
     'Essences',
     kinds.length
-      ? `${total} essences (${kinds.length} different), read ${read ?? 'from the game'}.`
+      ? [`${total} ${total === 1 ? 'essence' : 'essences'}`, perfect === null ? '' : `${perfect} perfect ${perfect === 1 ? 'match' : 'matches'}`, read ? `Last read ${read}` : '']
+          .filter(Boolean)
+          .join(' · ')
       : 'Which weapons your essences fit. Read them from a recording of the game: Valuables → Essences, selecting each one, or Etch Essence.',
     html`${kinds.length
         ? Date.now() - clearArmed < 5000
@@ -87,7 +90,7 @@ export function essencesPage(redraw: () => void): Html {
       <button type="button" class="btn secondary sm" data-action="essence-read" title="Read your essences from a recording or screenshots of Valuables → Essences or Etch Essence. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
   );
   if (!kinds.length)
-    return html`${header}<main class="container fade-in">
+    return html`${headerWith(null)}<main class="container fade-in">
         <section class="card"><div class="card-body">
           <h2 class="heading-20">No essences yet</h2>
           <p class="copy-14">Record the game while you go through your essences, then paste, drop or pick the recording here. It's read in this browser; nothing is uploaded.</p>
@@ -98,7 +101,7 @@ export function essencesPage(redraw: () => void): Html {
           <p class="copy-13 secondary">Any screen size works. A slower pace reads better; a quarter of a second per essence is enough.</p>
         </div></section>
       </main>`;
-  if (!file.data) return html`${header}<main class="container fade-in"><p class="copy-14 secondary">Loading weapons…</p></main>`;
+  if (!file.data) return html`${headerWith(null)}<main class="container fade-in"><p class="copy-14 secondary">Loading weapons…</p></main>`;
 
   // Weapons marked Maxed Essence already have their perfect essence: they're left out of both views.
   const weapons = Object.entries(file.data.weapons)
@@ -108,6 +111,8 @@ export function essencesPage(redraw: () => void): Html {
   const ownsSome = weapons.some((x) => x.mine);
   const shownWeapons = ownsSome ? (weaponsShown ?? 'owned') : 'all';
   const pool = shownWeapons === 'owned' ? weapons.filter((x) => x.mine) : weapons;
+  const perfect = kinds.filter((k) => weapons.some((x) => fitOf(k.stats, x.wants).full)).reduce((s, k) => s + k.n, 0);
+  const header = headerWith(perfect);
 
   const byWeapon = () =>
     html`<div class="section-head wiki-sort-head">${searchBox('essence-weapons', 'Search weapons')}${ownsSome ? toggleGroup('essence-weapons', [['owned', 'Owned'], ['all', 'All weapons']], shownWeapons) : ''}</div>
@@ -147,7 +152,7 @@ export function essencesPage(redraw: () => void): Html {
       })
       .filter((r) => (essencesShown === 'fits' ? r.fits.length : essencesShown === 'none' ? !r.fits.length : true))
       .sort((a, b) => b.fits.length - a.fits.length || b.k.n - a.k.n);
-    return html`<div class="section-head wiki-sort-head">${searchBox('essence-kinds', 'Search essences')}${toggleGroup('essence-show', [['all', 'All'], ['fits', 'Fit a weapon'], ['none', 'Fit nothing']], essencesShown)}</div>
+    return html`<div class="section-head wiki-sort-head">${searchBox('essence-kinds', 'Search essences')}${toggleGroup('essence-show', [['all', 'All'], ['fits', 'Matching'], ['none', 'Unmatched']], essencesShown)}</div>
       <div data-search-section class="essence-list">
         ${rows.map(
           ({ k, fits }) => html`<div class="card essence-kind" data-search-item>

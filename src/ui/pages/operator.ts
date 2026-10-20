@@ -50,7 +50,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
       ${crumbs('char')}
       <h1 class="heading-32">Operator info</h1>
-      <p class="copy-16">Class, attributes, skills and talents for every operator${owned ? html`. You have ${have} of ${ops.length}` : ''}.</p>
+      <p class="copy-16">${owned ? `${have}/${ops.length}` : `${ops.length} operators`}</p>
     </div><div class="row">${kindNav('char', 'info')}</div></div></div>
     <main class="container fade-in">
       <div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
@@ -60,7 +60,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
           <div class="wiki-grid">
             ${g.items.map((r) => {
               const mine = owned?.get(r.id);
-              return html`<a class="wiki-tile card${owned && !mine?.copies && !r.soon ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}">
+              return html`<a class="wiki-tile card${owned && (r.soon || !mine?.copies) ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}">
                 ${itemImg('char', r.id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${r.name}</span>

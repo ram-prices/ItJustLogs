@@ -200,7 +200,7 @@ export function achievementsPage(redraw: () => void): Html {
   };
   return html`${pageHeader(
       'Achievements',
-      `The game's Medal Album. You have ${got} of ${all.length} medals. Paste or drop a recording or screenshots of it here to fill this in.`,
+      `${got}/${all.length} medals`,
       html`<button type="button" class="btn secondary sm" data-action="medal-read" title="Read acquired medals and their dates from a recording or screenshots of the Medal Album. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
     )}
     <main class="container fade-in">
@@ -279,7 +279,7 @@ export function archivesPage(redraw: () => void): Html {
   };
   return html`${pageHeader(
       'Archive',
-      `The game's Intel Archives: every Finding. You have ${got} of ${all.length}. Paste or drop a recording or screenshots of its Findings here to fill this in.`,
+      `${got}/${all.length} Findings`,
       html`<button type="button" class="btn secondary sm" data-action="finding-read" title="Read collected findings from a recording or screenshots of Intel Archives → Findings. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
     )}
     <main class="container fade-in">
