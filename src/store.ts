@@ -80,6 +80,8 @@ export interface Settings {
   theme: ThemePref;
   /** Home plays its game clip (ui/videoBackground.ts) and pictures move with the mouse (ui/parallax.ts); off: the clip's first frame, still pictures. Unset = on. */
   motion?: boolean;
+  /** Home's game clip: an id from ef-assets backgrounds/index.json, or 'none'. Unset: one of the defaults at random. */
+  homeClip?: string;
   displayName: string;
   showTimestamps: boolean;
   /** Rows the 6★ summary strip may grow to when expanded. */
@@ -134,6 +136,12 @@ export interface Settings {
   avatarBox?: AvatarBox;
   /** Home's widgets in order; unset = the schedule (homeWidgets.ts DEFAULT_HOME). */
   home?: HomeWidget[];
+  /**
+   * Home on a phone: the same widgets, in its own order (widget ids; ones not
+   * listed follow in the wide layout's reading order) and with its own hidden
+   * ones. Unset: the wide layout's order, nothing hidden.
+   */
+  homePhone?: { order: string[]; hidden?: string[] };
 }
 
 const DEFAULT_SETTINGS: Settings = {

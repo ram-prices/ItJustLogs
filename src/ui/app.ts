@@ -722,6 +722,8 @@ async function onClick(e: MouseEvent): Promise<void> {
       return updateSettings({ theme: el.dataset.value as ThemePref });
     case 'motion':
       return updateSettings({ motion: el.dataset.value === 'on' ? undefined : false });
+    case 'home-clip':
+      return updateSettings({ homeClip: el.dataset.value || undefined });
     case 'server':
       return updateSettings({ server: el.dataset.value as Server });
     case 'banner-scope':

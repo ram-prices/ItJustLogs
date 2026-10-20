@@ -289,7 +289,8 @@ function perWeekOf(a: Analysis, patches: Iterable<PatchIncome>): { char: string;
   }
   earnedArsenal += (ticketsFromPulls(a.banners.flatMap((b) => (b.kind === 'char' ? b.pulls : []))) / TICKETS_PER_ISSUE) * 10;
   const weeksSince = (now - from) / (7 * 86_400_000);
-  const perWeek = (n: number, unit = '') => (any && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)}${unit} / week` : '–');
+  // Per week: the metrics say so underneath.
+  const perWeek = (n: number, unit = '') => (any && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)}${unit}` : '–');
   return { char: perWeek(earned), issues: perWeek(earnedArsenal / 10, ' (×10)') };
 }
 
@@ -444,8 +445,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       html`${metrics([
         metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
         metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),
-        metric({ label: 'Chartered permits earned', value: per.char }),
-        metric({ label: 'Arsenal Issues earned', value: per.issues }),
+        metric({ label: 'Chartered permits earned', value: per.char, sub: 'per week' }),
+        metric({ label: 'Arsenal Issues earned', value: per.issues, sub: 'per week' }),
       ], 'plain')}
 
       <div class="section card">

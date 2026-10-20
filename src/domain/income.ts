@@ -168,6 +168,12 @@ const DAY = 24 * HOUR;
 /** Days since 1970-01-01 in the server's calendar, where a day starts at the 04:00 reset. */
 const resetDay = (t: number, server: Server) => Math.floor((t + (SERVER_UTC_OFFSET[server] - RESET_HOUR) * HOUR) / DAY);
 
+/**
+ * How many more days a daily reward can be claimed before `end`, today
+ * included (a day runs from one 04:00 reset to the next, server time).
+ */
+export const claimDaysLeft = (now: number, end: number, server: Server): number => (end <= now ? 0 : resetDay(end - 1, server) - resetDay(now, server) + 1);
+
 /** Daily resets after `start`, up to and including `end`. */
 export const dailyResets = (start: number, end: number, server: Server): number => Math.max(0, resetDay(end, server) - resetDay(start, server));
 

@@ -1,6 +1,7 @@
 /**
- * Behind Home: a looping, muted clip from the game, one of ef-assets' defaults
- * at random, picked once per visit (backgrounds/index.json, made with its
+ * Behind Home: a looping, muted clip from the game, the one the player picked
+ * in Settings (`homeClip`), else one of ef-assets' defaults at random, picked
+ * once per visit (backgrounds/index.json, made with its
  * scripts/background-clip.py). Settings → Backgrounds Still, reduced motion,
  * phones and Save-Data get the clip's first frame instead, so the video itself
  * is never downloaded there.
@@ -20,6 +21,8 @@ const BASE = (import.meta.env.DEV && localStorage.getItem('ijl.backgrounds')) ||
 
 let index: BackgroundIndex | null = null;
 let loading = false;
+/** Pages waiting for the clip list (Settings' picker). */
+const waiting = new Set<() => void>();
 let video: HTMLVideoElement | null = null;
 let shown: string | null = null;
 /** Which default clip this visit uses. */
@@ -39,9 +42,13 @@ function load(): void {
     .then((data) => {
       index = data ?? { clips: {}, operators: {}, default: [] };
       syncVideoBackground();
+      waiting.forEach((f) => f());
+      waiting.clear();
     })
     .catch(() => {
       index = { clips: {}, operators: {}, default: [] };
+      waiting.forEach((f) => f());
+      waiting.clear();
     });
 }
 
@@ -90,6 +97,16 @@ function show(clip: string): void {
   if (play && !document.hidden) void video.play().catch(() => {});
 }
 
+/** The clips to pick from (Settings), each with its first frame; null until the list loads (then `redraw`). */
+export function clipChoices(redraw: () => void): { id: string; name: string; poster: string }[] | null {
+  if (!index) {
+    waiting.add(redraw);
+    load();
+    return null;
+  }
+  return Object.entries(index.clips).map(([id, c]) => ({ id, name: c.name, poster: `${BASE}/${id}.jpg` }));
+}
+
 /** After each page draw (app.ts): the clip when the page shown is Home, else none. */
 export function syncVideoBackground(): void {
   if (!document.querySelector('.bg-source')) return hide();
@@ -97,7 +114,9 @@ export function syncVideoBackground(): void {
     load();
     return hide();
   }
-  const clip = index.default[Math.floor(pick * index.default.length)];
+  const chosen = state.settings.homeClip;
+  if (chosen === 'none') return hide();
+  const clip = chosen && index.clips[chosen] ? chosen : index.default[Math.floor(pick * index.default.length)];
   if (!clip || !index.clips[clip]) return hide();
   show(clip);
 }

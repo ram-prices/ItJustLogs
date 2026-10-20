@@ -2679,6 +2679,19 @@ a.sched-next:hover {
   font: 400 12px/18px var(--font-sans);
   color: var(--gray-900);
 }
+/* An event row's third line: its tags (Limited/Permanent, Daily Rewards and how long to start them, Unique). */
+.sched-next-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.evt-tag-note {
+  margin-right: 4px;
+  font: 400 12px/18px var(--font-sans);
+  color: var(--gray-900);
+}
 .sched-next-meta .rateup-icon {
   font-size: 13px;
   color: var(--op);
@@ -5682,6 +5695,52 @@ a.six-item {
   gap: 40px 16px;
   align-items: start;
   position: relative;
+}
+/* Settings → Backgrounds: Home's clip, by its first frame (Random and None as plain buttons). */
+.clip-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.clip-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-border);
+}
+.clip-pick img {
+  width: 120px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+.clip-pick.plain {
+  justify-content: center;
+  min-width: 72px;
+  padding: 8px 12px;
+}
+.clip-pick[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+/* Home on a phone: one column in the phone's own order; widgets hidden there show faded while customizing. */
+.home-grid.phone {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 40px;
+}
+.home-grid.phone .widget-bar .widget-label {
+  margin-right: auto;
+}
+.widget.phone-hidden > .widget-body {
+  opacity: 0.35;
 }
 /* While dragging a widget over empty room: where it would land, and how wide. */
 .drop-ghost {

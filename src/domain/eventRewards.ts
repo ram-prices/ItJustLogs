@@ -28,6 +28,13 @@ export interface EventRewards {
   end?: ServerTimes;
   /** Its phases, when the wiki's page lists them (two or more). */
   phases?: EventPhase[];
+  /** It stays playable after it ends; `limitedRewards`: some of its rewards still end with it. */
+  permanent?: boolean;
+  limitedRewards?: boolean;
+  /** How many daily rewards it hands out (sign-in days, "every day, N times"). */
+  days?: number;
+  /** Its rewards that aren't general materials or currencies: portraits, frames, stickers, models, operators... */
+  unique?: string[];
   partial?: boolean;
   totals: Record<string, number>;
   groups: { title: string; partial?: boolean; exchange?: string; rows: { label: string; rewards: Reward[] }[] }[];

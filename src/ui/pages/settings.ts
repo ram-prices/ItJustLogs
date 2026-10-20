@@ -9,6 +9,7 @@ import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { driveConfigured } from '../../drive';
 import { driveSnapshots, preloadSync, syncPending, syncView } from '../sync';
+import { clipChoices } from '../videoBackground';
 
 /** Settings, laid out like Vercel's: one card per topic with a footer for its action. */
 
@@ -200,6 +201,19 @@ function savedPictures(redraw: () => void): Html {
   </div>`;
 }
 
+/** Home's clip: Random, each clip by its first frame, or None. */
+function clipPicker(current: string | undefined, redraw: () => void): Html {
+  const clips = clipChoices(redraw);
+  if (!clips?.length) return html``;
+  const pick = (value: string, label: string, picture?: string) =>
+    html`<button type="button" class="clip-pick${picture ? '' : ' plain'}" data-action="home-clip" data-value="${value}" aria-pressed="${String((current ?? '') === value)}">
+      ${picture ? html`<img src="${picture}" alt="" loading="lazy" decoding="async" />` : ''}<span class="label-13">${label}</span>
+    </button>`;
+  return html`<div class="clip-picks" role="group" aria-label="Home's clip">
+    ${pick('', 'Random')}${clips.map((c) => pick(c.id, c.name, c.poster))}${pick('none', 'None')}
+  </div>`;
+}
+
 export function settingsPage(redraw: () => void): Html {
   const s = state.settings;
   const h = state.history;
@@ -265,6 +279,7 @@ export function settingsPage(redraw: () => void): Html {
             <h3 class="heading-16">Backgrounds</h3>
             <p class="copy-14">Home plays a game clip behind it, and pictures move a little with your mouse.</p>
             ${toggleGroup('motion', [['on', 'Animated'], ['off', 'Still']], s.motion === false ? 'off' : 'on')}
+            ${clipPicker(s.homeClip, redraw)}
           </div>
         </div>
       </section>

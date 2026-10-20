@@ -138,6 +138,31 @@ const newId = (type: string) => `${type}-${Date.now().toString(36)}${Math.random
 /** Edit mode (kept while the app is open), and the layout as it was when it began (for Cancel). */
 let editing = false;
 let before: HomeWidget[] | undefined;
+let beforePhone: { order: string[]; hidden?: string[] } | undefined;
+
+/** A phone-width screen: Home is one column there, with its own order and hidden widgets. */
+const PHONE = '(max-width: 640px)';
+const isPhone = () => matchMedia(PHONE).matches;
+
+/**
+ * Home's widgets for a phone: its own order first, then any it doesn't list
+ * (new ones, or before it was ever customized) in the wide layout's reading
+ * order (row by row, left to right, a column's widgets top to bottom).
+ */
+function phoneLayout(): { list: HomeWidget[]; hidden: Set<string> } {
+  const cols = columns(layout());
+  const places = gridPlaces(cols.map((c) => c[0]));
+  const reading = cols
+    .map((c, i) => ({ c, at: places[i] }))
+    .sort((p, q) => p.at.row - q.at.row || p.at.start - q.at.start)
+    .flatMap((x) => x.c);
+  const phone = state.settings.homePhone;
+  const byId = new Map(reading.map((w) => [w.id, w]));
+  const listed = (phone?.order ?? []).filter((id) => byId.has(id));
+  const list = [...listed.map((id) => byId.get(id)!), ...reading.filter((w) => !listed.includes(w.id))];
+  return { list, hidden: new Set(phone?.hidden ?? []) };
+}
+const savePhone = (order: string[], hidden: Set<string>) => updateSettings({ homePhone: { order, ...(hidden.size ? { hidden: [...hidden] } : {}) } });
 let redrawNow: () => void = () => {};
 
 // ---------------------------------------------------------------------------
@@ -350,6 +375,21 @@ export function widgetGrid(parts: ScheduleParts, a: Analysis | null, redraw: () 
       <div class="widget-body">${body ?? html`<p class="copy-14 secondary widget-empty">Nothing to show right now.</p>`}</div>
       ${editing && w.type === 'spacer' ? html`<span class="spacer-edge" title="Drag to make it taller or shorter"></span>` : ''}
     </section>`;
+  if (isPhone()) {
+    // One column in the phone's own order; hidden widgets show (faded) only while customizing.
+    const { list, hidden } = phoneLayout();
+    const cells = list
+      .filter((w) => editing || !hidden.has(w.id))
+      .map((w) => ({ w, body: bodyOf(w) }))
+      .filter((x) => x.body || editing)
+      .map(
+        ({ w, body }) => html`<section class="widget${w.hideTitle ? ' no-title' : ''}${hidden.has(w.id) ? ' phone-hidden' : ''}" data-widget="${w.id}" data-type="${w.type}" data-size="12">
+          ${editing ? phoneToolbar(w, WIDGETS[w.type], hidden.has(w.id)) : ''}
+          <div class="widget-body">${body ?? html`<p class="copy-14 secondary widget-empty">Nothing to show right now.</p>`}</div>
+        </section>`,
+      );
+    return html`${tools()}<div class="home-grid phone${editing ? ' editing' : ''}">${cells}</div>`;
+  }
   const items = columns(layout())
     .map((col) => ({ head: col[0], shown: col.map((w) => ({ w, body: bodyOf(w) })).filter((x) => x.body || editing) }))
     .filter((x) => x.shown.length);
@@ -359,15 +399,29 @@ export function widgetGrid(parts: ScheduleParts, a: Analysis | null, redraw: () 
       ? cell(shown[0].w, shown[0].body, head, places[i])
       : html`<div class="widget-col" ${place(head, places[i])}>${shown.map((x) => cell(x.w, x.body, head, null))}</div>`,
   );
+  return html`${tools()}<div class="home-grid${editing ? ' editing' : ''}">${cells}</div>`;
+}
+
+/** Customize, or while customizing: add, reset, cancel, done. */
+function tools(): Html {
   return html`<div class="home-tools">
-      ${editing
-        ? html`<button type="button" class="btn secondary sm" data-home="add">${icon('add')}Add widget</button>
-            <button type="button" class="btn tertiary sm" data-home="reset">Reset</button>
-            <button type="button" class="btn secondary sm" data-home="cancel" title="Undo every change since Customize">Cancel</button>
-            <button type="button" class="btn primary sm" data-home="done">${icon('check')}Done</button>`
-        : html`<button type="button" class="btn tertiary sm" data-home="edit">${icon('tune')}Customize</button>`}
-    </div>
-    <div class="home-grid${editing ? ' editing' : ''}">${cells}</div>`;
+    ${editing
+      ? html`<button type="button" class="btn secondary sm" data-home="add">${icon('add')}Add widget</button>
+          <button type="button" class="btn tertiary sm" data-home="reset">Reset</button>
+          <button type="button" class="btn secondary sm" data-home="cancel" title="Undo every change since Customize">Cancel</button>
+          <button type="button" class="btn primary sm" data-home="done">${icon('check')}Done</button>`
+      : html`<button type="button" class="btn tertiary sm" data-home="edit">${icon('tune')}Customize</button>`}
+  </div>`;
+}
+
+/** On a phone a widget can only be moved (by its handle), edited, and hidden or shown there. */
+function phoneToolbar(w: HomeWidget, def: WidgetDef, hidden: boolean): Html {
+  return html`<div class="widget-bar">
+    <span class="widget-grip" title="Drag to move">${icon('drag_indicator')}</span>
+    <span class="widget-label label-12">${def.label}</span>
+    ${def.editable ? html`<button type="button" class="btn tertiary sm icon-only" data-home="config" data-id="${w.id}" title="Edit" aria-label="Edit">${icon('edit')}</button>` : ''}
+    <button type="button" class="btn tertiary sm icon-only" data-home="phone-hide" data-id="${w.id}" title="${hidden ? 'Show on phones' : 'Hide on phones'}" aria-label="${hidden ? 'Show on phones' : 'Hide on phones'}">${icon(hidden ? 'visibility_off' : 'visibility')}</button>
+  </div>`;
 }
 
 /** Shows or hides the widget's title (a Character card's basic information). */
@@ -445,8 +499,8 @@ function statsWidget(a: Analysis, redraw: () => void): Html {
     ${metrics([
       metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
       metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),
-      metric({ label: 'Chartered permits earned', value: per.char }),
-      metric({ label: 'Arsenal Issues earned', value: per.issues }),
+      metric({ label: 'Chartered permits earned', value: per.char, sub: 'per week' }),
+      metric({ label: 'Arsenal Issues earned', value: per.issues, sub: 'per week' }),
     ])}`;
 }
 
@@ -744,6 +798,8 @@ function configDialog(id: string): void {
 /** Clicks on Home's edit controls, and dragging widgets to reorder them. Installed once (app.ts). */
 export function installHomeWidgets(): void {
   addEventListener('resize', fitBannerCards);
+  // Crossing into or out of phone width switches between the two layouts.
+  matchMedia(PHONE).addEventListener('change', () => redrawNow());
   document.addEventListener('click', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-home]');
     if (!el) return;
@@ -752,16 +808,31 @@ export function installHomeWidgets(): void {
       case 'edit':
         editing = true;
         before = state.settings.home && structuredClone(state.settings.home);
+        beforePhone = state.settings.homePhone && structuredClone(state.settings.homePhone);
         return redrawNow();
       case 'done':
         editing = false;
         return redrawNow();
       case 'cancel':
         editing = false;
-        if (JSON.stringify(state.settings.home) !== JSON.stringify(before)) updateSettings({ home: before });
+        if (JSON.stringify([state.settings.home, state.settings.homePhone]) !== JSON.stringify([before, beforePhone])) updateSettings({ home: before, homePhone: beforePhone });
         else redrawNow();
         return;
+      case 'phone-hide': {
+        const { list, hidden } = phoneLayout();
+        if (hidden.has(id)) hidden.delete(id);
+        else hidden.add(id);
+        return savePhone(list.map((w) => w.id), hidden);
+      }
       case 'reset':
+        // On a phone: the phone's order and hidden widgets only.
+        if (isPhone())
+          return dialog(
+            'Reset Home on phones?',
+            () => html`<p class="copy-14">Phones go back to the order of the wide layout, with every widget shown.</p>
+              <div class="dialog-actions"><button type="button" class="btn secondary sm" data-close>Cancel</button><button class="btn error sm">Reset</button></div>`,
+            () => updateSettings({ homePhone: undefined }),
+          );
         return dialog(
           'Reset Home?',
           () => html`<p class="copy-14">Home goes back to the schedule, and your widgets are removed.</p>
@@ -815,7 +886,7 @@ export function installHomeWidgets(): void {
     const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('.home-grid.editing .widget');
     if (!el || el === dragged) return null;
     const r = el.getBoundingClientRect();
-    if (el.dataset.size === '12' || dragged?.dataset.type === 'spacer') return { el, where: y > r.top + r.height / 2 ? 'after' : 'before' };
+    if (el.dataset.size === '12' || dragged?.dataset.type === 'spacer' || isPhone()) return { el, where: y > r.top + r.height / 2 ? 'after' : 'before' };
     const edge = Math.min(120, r.height * 0.3);
     if (y < r.top + edge) return { el, where: 'above' };
     if (y > r.bottom - edge) return { el, where: 'below' };
@@ -892,6 +963,13 @@ export function installHomeWidgets(): void {
       return save(list);
     }
     if (!t) return;
+    if (isPhone()) {
+      // A phone only reorders its own list.
+      const { list, hidden } = phoneLayout();
+      const order = list.map((w) => w.id).filter((x) => x !== id);
+      order.splice(order.indexOf(t.el.dataset.widget!) + (t.where === 'after' ? 1 : 0), 0, id!);
+      return savePhone(order, hidden);
+    }
     const list = layout();
     const w = detach(list, list.findIndex((x) => x.id === id));
     const at = list.findIndex((x) => x.id === t.el.dataset.widget);

@@ -1,5 +1,7 @@
 import type { Analysis, BannerSummary } from '../../domain/analyze';
 import { bannerArtUrl, canonicalPoolId } from '../../domain/banners';
+import type { EventRewards, EventRewardsFile } from '../../domain/eventRewards';
+import { claimDaysLeft } from '../../domain/income';
 import {
   KIND_LABEL,
   SERVER_LABEL,
@@ -23,6 +25,7 @@ import { toast } from '../common';
 import { backgroundSource, badge, heat, icon, issueArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
+import { wikiFile } from './info';
 
 /**
  * Home: the banner and event schedule. What's open now (with your pity on
@@ -157,7 +160,35 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
   </div>`;
 }
 
-function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule): Html {
+/**
+ * An event row's tags: Limited or Permanent (the wiki's page says whether it
+ * stays playable), Limited-Time Rewards for a permanent one whose rewards
+ * still end, Daily Rewards (with how long there's left to start them and
+ * still get them all), and Unique when it hands out portraits, frames,
+ * stickers, operators and the like.
+ */
+function eventTags(e: ScheduleEvent, r: EventRewards | undefined, now: number, server: Server, schedule: Schedule): Html {
+  const tags: Html[] = [r?.permanent ? badge('Permanent', 'green') : badge('Limited', 'amber')];
+  if (r?.permanent && r.limitedRewards) tags.push(badge('Limited-Time Rewards', 'amber'));
+  if (hasDailyRewards(e, schedule)) {
+    const start = timeOn(e.start, server);
+    const end = timeOn(e.end, server);
+    const days = r?.days;
+    let when = '';
+    if (days && start != null && now < start) when = `${days} days`;
+    else if (days && end != null) {
+      const left = claimDaysLeft(now, end, server);
+      // Days to start in and still claim every one: today counts.
+      const spare = left - days;
+      when = spare > 0 ? `start within ${spare + 1} days` : spare === 0 ? 'start today' : `${left} ${left === 1 ? 'day' : 'days'} left`;
+    }
+    tags.push(html`${badge('Daily Rewards', 'blue')}${when ? html`<span class="evt-tag-note">${when}</span>` : ''}`);
+  }
+  if (r?.unique?.length) tags.push(html`<span title="${r.unique.join(', ')}">${badge('Unique', 'purple')}</span>`);
+  return html`<div class="sched-next-tags">${tags}</div>`;
+}
+
+function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule, r?: EventRewards): Html {
   // Each event opens its own page (rewards and dates): pages/event.ts.
   return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
     ${e.art
@@ -165,7 +196,8 @@ function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Sched
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>
-      <div class="sched-next-meta ellipsis"><span>${e.type}</span>${hasDailyRewards(e, schedule) ? html` ${badge('Daily Rewards', 'blue')}` : ''}</div>
+      <div class="sched-next-meta ellipsis"><span>${e.type}</span></div>
+      ${eventTags(e, r, now, server, schedule)}
     </div>
     <div class="sched-next-when">${rowWhen(timeOn(e.start, server), timeOn(e.end, server), now)}</div>
   </a>`;
@@ -505,6 +537,9 @@ export function installCopyMenu(): void {
 
 export function homePage(schedule: Schedule, server: Server, a: Analysis | null, redraw: () => void): Html {
   const now = Date.now();
+  // The wiki's word on each event (permanent, daily rewards, unique rewards) for its tags.
+  const wiki = wikiFile<EventRewardsFile>('events.json', redraw).data;
+  const rewardsOf = (e: ScheduleEvent) => (e.id != null ? wiki?.events[String(e.id)] : undefined);
   if (links?.schedule !== schedule) links = { schedule, map: scheduleLinks(schedule) };
   const startOf = (i: { start: ScheduleBanner['start'] }) => timeOn(i.start, server) ?? Infinity;
   const byStart = (p: ScheduleBanner, q: ScheduleBanner) => startOf(p) - startOf(q) || Number(isWeaponBanner(p.kind)) - Number(isWeaponBanner(q.kind));
@@ -519,7 +554,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null,
   // Coming up: banners and events together, soonest first.
   const next = [
     ...schedule.banners.filter((b) => statusOf(b, now, server) === 'upcoming').map((b) => ({ at: startOf(b), row: bannerRow(b, now, server) })),
-    ...events.filter((e) => statusOf(e, now, server) === 'upcoming').map((e) => ({ at: startOf(e), row: eventRow(e, now, server, schedule) })),
+    ...events.filter((e) => statusOf(e, now, server) === 'upcoming').map((e) => ({ at: startOf(e), row: eventRow(e, now, server, schedule, rewardsOf(e)) })),
   ].sort((p, q) => p.at - q.at);
 
   return html`${backgroundSource()}
@@ -543,7 +578,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null,
           events: liveEvents.length
             ? html`<div class="section">
                 <div class="section-head"><h2 class="heading-20">Current</h2></div>
-                <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server, schedule))}</div>
+                <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server, schedule, rewardsOf(e)))}</div>
               </div>`
             : null,
           upcoming: next.length

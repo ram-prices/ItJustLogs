@@ -178,9 +178,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     loaded with an explicit `icon_names=` list in index.html: add new names
     there (alphabetical).
   - Sentence-case labels; inline styles only for data-driven values.
-  - Home plays a looping game clip behind it (`ui/videoBackground.ts`), one
-    of ef-assets `backgrounds/index.json`'s defaults at random (its
-    `operators` map is unused for now). Clips are made with ef-assets
+  - Home plays a looping game clip behind it (`ui/videoBackground.ts`): the
+    one picked in Settings → Backgrounds (`homeClip`, or 'none'), else one of
+    ef-assets `backgrounds/index.json`'s defaults at random (its `operators`
+    map is unused for now). Clips are made with ef-assets
     `scripts/background-clip.py` from the owner's recordings (seamless loop,
     1280x720 WebM + MP4 + first-frame JPG, bottom strip with the player's UID
     always cut off). Settings → Backgrounds Still, reduced motion, phones and
@@ -215,7 +216,14 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     each widget on its own (`separate`): `gridPlaces` gives every widget or column an
     explicit row and column on wide screens (`newRow` keeps a widget placed
     out of a column at its height), and placing one pins the others in its
-    row where they are. The profile picture can rise above its
+    row where they are. On a phone (640px wide or less) Home is one column
+    with its own order and hidden widgets (settings `homePhone`, the same
+    widgets; unlisted ones follow in the wide layout's reading order):
+    Customize there only reorders, edits, and hides/shows. Home's event rows
+    have a tags line (`eventTags`: Limited/Permanent, Limited-Time Rewards,
+    Daily Rewards with how long's left to start them, Unique) from ef-assets
+    events.json `permanent`, `limitedRewards`, `days`, `unique`.
+    The profile picture can rise above its
     circle (settings `avatarPop`; `avatar` in components.ts): `cropper.ts`
     gives a frame 2.5 circles wide and 1.4 tall where the player paints what
     shows outside the circle (with a live preview); it's saved trimmed to
