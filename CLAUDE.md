@@ -170,6 +170,18 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   longest chain of tiles that rises through the list wins; leftovers seen in
   2+ frames are listed as not on the wiki yet. `ui/screenReader.ts` is the
   shared part (files → frames at 1080 tall, Tesseract.js, progress dialog).
+  The medal reader also reads each reforgeable/trimmable medal's look
+  (`domain/medalTier.ts`: dark/silver/gold = base/Reforged II/III,
+  holographic = Trimmed) from a square of its picture beside the title,
+  rules pinned by `medalTier.test.ts` with real samples.
+- Essences tab (`ui/pages/essences.ts`, `domain/essences.ts`): the player's
+  essences (settings `essences`: kind key → count) against every weapon's
+  skill stats; only perfect fits (all of a weapon's stats) are suggested, by
+  weapon or by essence. `ui/essenceReader.ts` + `domain/essenceReader.ts` read
+  a recording of Valuables → Essences, Etch Essence or a weapon's essence
+  screen: find the stat column once, then read only that area every 0.1s
+  (`scan` focus option); a new essence each time the stats change and hold
+  two frames.
 - `scripts/export-pulls.ps1`: the PowerShell exporter, shown in Settings → Get
   your data via `?raw`. Keep it readable and dependency-free. Its only network
   target must stay `ef-webview.gryphline.com`. Character pool types are a fixed

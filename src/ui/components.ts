@@ -13,9 +13,12 @@ export const icon = (name: string, filled = false): Html =>
  * The game's essence icon (a ball with two rings cut out of it), drawn in the text colour;
  * it stands for Maxed Essence. Labelled for screen readers and on hover.
  */
+/** The essence picture's outline (a ball with two rings cut out), in a 24×24 box. */
+const ESSENCE_PATH = 'M1 12A11 11 0 1 0 23 12A11 11 0 1 0 1 12ZM11.14 3.01A6.81 4.13 44.4 1 0 20.88 12.55A6.81 4.13 44.4 1 0 11.14 3.01ZM11.86 5.44A4.59 2.24 44.4 1 0 18.42 11.87A4.59 2.24 44.4 1 0 11.86 5.44ZM8.32 18.93A3.68 1.91 0 1 0 15.68 18.93A3.68 1.91 0 1 0 8.32 18.93ZM9.81 18.44A2.19 0.82 0 1 0 14.19 18.44A2.19 0.82 0 1 0 9.81 18.44Z';
+
 export const essenceIcon = (label = 'Maxed Essence'): Html =>
   html`<svg class="essence-icon" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="${label}"><title>${label}</title>${raw(
-    `<path fill-rule="evenodd" d="M1 12A11 11 0 1 0 23 12A11 11 0 1 0 1 12ZM11.14 3.01A6.81 4.13 44.4 1 0 20.88 12.55A6.81 4.13 44.4 1 0 11.14 3.01ZM11.86 5.44A4.59 2.24 44.4 1 0 18.42 11.87A4.59 2.24 44.4 1 0 11.86 5.44ZM8.32 18.93A3.68 1.91 0 1 0 15.68 18.93A3.68 1.91 0 1 0 8.32 18.93ZM9.81 18.44A2.19 0.82 0 1 0 14.19 18.44A2.19 0.82 0 1 0 9.81 18.44Z"/>`,
+    `<path fill-rule="evenodd" d="${ESSENCE_PATH}"/>`,
   )}</svg>`;
 
 export type BadgeTone = 'gray' | 'green' | 'amber' | 'red' | 'purple' | 'teal' | 'blue' | 'outline';
@@ -107,6 +110,7 @@ export const TAB_ICON: Record<string, Html> = {
   // Material Symbols, filled to match the solid shapes above.
   home: raw('<span class="tab-icon icon filled" aria-hidden="true">home</span>'),
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
+  essences: raw(`<svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${ESSENCE_PATH}"/></svg>`),
   achievements: raw('<span class="tab-icon icon filled" aria-hidden="true">military_tech</span>'),
   archives: raw('<span class="tab-icon icon filled" aria-hidden="true">auto_stories</span>'),
   settings: raw('<span class="tab-icon icon filled" aria-hidden="true">settings</span>'),

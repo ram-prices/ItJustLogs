@@ -22,9 +22,9 @@ describe('medal reader', () => {
       today,
     );
     expect(got).toEqual([
-      { id: idOf('"Awaken"'), date: '2026-01-21', score: 1 },
-      { id: idOf('"Core ex Machina"'), date: '2026-01-21', score: 1 },
-      { id: idOf('"The Fist Misses"'), date: '2026-01-22', score: 1 },
+      { id: idOf('"Awaken"'), date: '2026-01-21', score: 1, line: 0 },
+      { id: idOf('"Core ex Machina"'), date: '2026-01-21', score: 1, line: 1 },
+      { id: idOf('"The Fist Misses"'), date: '2026-01-22', score: 1, line: 2 },
     ]);
   });
 

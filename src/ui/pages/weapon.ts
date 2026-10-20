@@ -28,9 +28,15 @@ export const weaponInfoHref = (id?: string): string => infoHref('weap', id);
 
 function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
   const all = Object.entries(f.weapons);
-  const groups = sortGroups('weap', all, ([id, w]) => ({ rarity: w.rarity, name: w.name, owned: owned?.get(id), weapon: w.type, source: w.source }));
   const have = owned ? all.filter(([id]) => owned.get(id)?.copies).length : 0;
+  // Weapons the wiki doesn't have yet (the version guide's): in the list like the rest, tagged Unreleased.
   const soon = Object.entries(previews?.weapons ?? {}).filter(([id]) => !f.weapons[id]);
+  type Row = { id: string; w?: WikiWeapon; name: string; rarity: number; type: string | null; source?: string | null };
+  const rows: Row[] = [
+    ...all.map(([id, w]) => ({ id, w, name: w.name, rarity: w.rarity, type: w.type, source: w.source })),
+    ...soon.map(([id, p]) => ({ id, name: p.name, rarity: p.rarity, type: p.type })),
+  ];
+  const groups = sortGroups('weap', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), weapon: r.type, source: r.source, unreleased: !r.w }));
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
       ${crumbs('weap')}
       <h1 class="heading-32">Weapon info</h1>
@@ -38,34 +44,19 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
     </div><div class="row">${kindNav('weap', 'info')}</div></div></div>
     <main class="container fade-in">
       <div class="section-head wiki-sort-head">${searchBox('weap')}${sortBar('weap')}</div>
-      ${soon.length
-        ? html`<section class="section wiki-type">
-            <div class="section-head"><h2 class="heading-20">Unreleased</h2></div>
-            <div class="wiki-grid">
-              ${soon.map(([id, p]) => html`<a class="wiki-tile card" href="${weaponInfoHref(id)}">
-                ${itemImg('weap', id, 'wiki-tile-portrait')}
-                <span class="wiki-tile-text min0">
-                  <span class="wiki-tile-name ellipsis">${p.name}</span>
-                  <span class="label-12 secondary">${rarity(p.rarity)} · ${p.type ?? 'Weapon'}</span>
-                </span>
-                ${badge('Unreleased', 'amber')}
-              </a>`)}
-            </div>
-          </section>`
-        : ''}
       ${groups.map((g) => {
         return html`<section class="section wiki-type">
           <div class="section-head"><h2 class="heading-20">${g.label || 'All weapons'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
           <div class="wiki-grid">
-            ${g.items.map(([id, w]) => {
+            ${g.items.map(({ id, w, name, rarity: r, type }) => {
               const mine = owned?.get(id);
-              return html`<a class="wiki-tile card${owned && !mine?.copies ? ' unowned' : ''}" href="${weaponInfoHref(id)}">
+              return html`<a class="wiki-tile card${owned && !mine?.copies && w ? ' unowned' : ''}" href="${weaponInfoHref(id)}">
                 ${itemImg('weap', id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
-                  <span class="wiki-tile-name ellipsis">${w.name}</span>
-                  <span class="label-12 secondary">${rarity(w.rarity)} · ${w.skills[w.skills.length - 1]?.tag ?? w.type}${mine?.copies && essenceTag(id, w, mine.potential) ? html` · ${essenceTag(id, w, mine.potential)}` : ''}</span>
+                  <span class="wiki-tile-name ellipsis">${name}</span>
+                  <span class="label-12 secondary">${rarity(r)} · ${w ? (w.skills[w.skills.length - 1]?.tag ?? w.type) : (type ?? 'Weapon')}${w && mine?.copies && essenceTag(id, w, mine.potential) ? html` · ${essenceTag(id, w, mine.potential)}` : ''}</span>
                 </span>
-                ${ownedTag(mine)}
+                ${w ? ownedTag(mine) : badge('Unreleased', 'amber')}
               </a>`;
             })}
           </div>

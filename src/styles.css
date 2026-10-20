@@ -435,6 +435,11 @@ svg.tab-icon {
   gap: 16px;
   padding-block: 56px 32px;
 }
+/* The title and description share the row with the actions: a long description
+   wraps within its column instead of pushing the buttons below (phones still stack). */
+.page-header-inner > .min0 {
+  flex: 1 1 320px;
+}
 .page-header p {
   color: var(--gray-900);
   margin-top: 8px;
@@ -3922,7 +3927,8 @@ a.patch-banner:hover {
 }
 .collection-tabs {
   position: sticky;
-  top: 16px;
+  /* Below the site header, which stays pinned too (110px: its top row and the tabs). */
+  top: 126px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -3948,7 +3954,6 @@ a.patch-banner:hover {
 .collection-tab[aria-current='true'] {
   color: var(--gray-1000);
   background: var(--gray-alpha-200);
-  box-shadow: inset 2px 0 0 var(--gray-1000);
 }
 /* Only the open tab's list, unless a search is on: then every tab's matches. */
 main:not(.searching) .collection-pane:not(.active) {
@@ -3970,13 +3975,133 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
 /* The drop overlay says what a drop will do: import pulls, or read medals (Achievements) or findings (Archive). */
 .drop-overlay .drop-medals,
 .drop-overlay .drop-findings,
+.drop-overlay .drop-essences,
 .drop-overlay.medals .drop-import,
-.drop-overlay.findings .drop-import {
+.drop-overlay.findings .drop-import,
+.drop-overlay.essences .drop-import {
   display: none;
 }
 .drop-overlay.medals .drop-medals,
-.drop-overlay.findings .drop-findings {
+.drop-overlay.findings .drop-findings,
+.drop-overlay.essences .drop-essences {
   display: block;
+}
+/* Essences (pages/essences.ts): stat chips, weapons and the essences that fit them. */
+.essence-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+.essence-weapon,
+.essence-kind {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.essence-weapon-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.essence-weapon-head > .min0 {
+  display: flex;
+  flex-direction: column;
+}
+.essence-weapon-name {
+  font: 600 15px/22px var(--font-sans);
+}
+.essence-weapon-icon {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+.essence-wants {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.essence-wants .essence-stat b {
+  display: none;
+}
+.essence-best {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.essence-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.essence-stats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.essence-stat {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-100);
+  color: var(--gray-900);
+  font: 500 12px/18px var(--font-sans);
+  white-space: nowrap;
+}
+.essence-stat b {
+  font-weight: 600;
+  color: var(--gray-1000);
+}
+.essence-stat.hit {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+}
+.essence-fit {
+  min-width: 30px;
+  font: 600 12px/18px var(--font-sans);
+  color: var(--amber);
+}
+.essence-fit.full {
+  color: var(--green);
+}
+.essence-fits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.essence-fit-weapon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray-900);
+  text-decoration: none;
+}
+.essence-fit-weapon.mine {
+  color: var(--gray-1000);
+  font-weight: 600;
+}
+.essence-fit-weapon:hover {
+  text-decoration: underline;
+}
+.essence-fit-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.essence-how {
+  margin: 12px 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* (Two classes: .reader-row's own columns come later in this file.) */
+.reader-row.reader-row-essence {
+  grid-template-columns: minmax(0, 1fr) auto;
+  cursor: default;
 }
 /* The Archive reader's review: findings grouped by category. */
 .reader-cat + .reader-cat {

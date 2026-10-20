@@ -1,3 +1,5 @@
+import type { TierLook } from './medalTier';
+
 /**
  * Reading the game's Medal Album from screenshots or a screen recording:
  * the part after text recognition. The page (ui/medalReader.ts) runs
@@ -28,6 +30,10 @@ export interface Sighting {
   date: string | null;
   /** How sure the name match is (1: the exact name is in the line). */
   score: number;
+  /** Which of the frame's lines it was read from (the page samples its picture: medalTier.ts). */
+  line?: number;
+  /** Its look in that frame, for medals that can be reforged or trimmed. */
+  look?: TierLook | null;
 }
 
 export interface ReadMedal {
@@ -43,6 +49,9 @@ export interface ReadMedal {
   score: number;
   /** Worth a look before saving: one sighting, a loose name match, or frames that disagreed. */
   unsure: boolean;
+  /** Its Reforging tier or Trimming, as most frames saw it (medals that have them). */
+  tier?: 1 | 2 | 3;
+  trim?: boolean;
 }
 
 /** Lowercase words only, accents and symbols dropped; roman numerals (Ⅱ) become letters (ii). */
@@ -117,13 +126,13 @@ export function matchName(title: string, names: { id: string; n: string }[]): { 
 /** The medals one frame shows: each title line, with the date on its row if there is one. */
 export function readFrame(lines: ReadLine[], names: { id: string; n: string }[], today = new Date()): Sighting[] {
   const out: Sighting[] = [];
-  for (const l of lines) {
+  for (const [i, l] of lines.entries()) {
     // The title is what comes before the pill ("[~ ...]", "@ ...", "Acquired") or the date.
     const title = l.text.split(/\[|@|\{|acquired|20\d\d\s*[-–—.]/i)[0];
     const hit = matchName(title, names);
     if (!hit) continue;
     const date = readDate(l.text, today) ?? lines.filter((o) => o !== l && Math.abs(o.y - l.y) < 12).map((o) => readDate(o.text, today)).find(Boolean) ?? null;
-    out.push({ id: hit.id, date, score: hit.score });
+    out.push({ id: hit.id, date, score: hit.score, line: i });
   }
   return out;
 }
@@ -140,7 +149,14 @@ export function settle(sightings: Sighting[], medals: MedalName[]): ReadMedal[] 
     const score = Math.max(...ss.map((s) => s.score));
     const [date, votes] = ranked[0] ?? [null, 0];
     const tie = ranked.length > 1 && ranked[1][1] === votes;
+    // The look most frames saw.
+    const looks = new Map<string, number>();
+    for (const s of ss) if (s.look) looks.set(JSON.stringify(s.look), (looks.get(JSON.stringify(s.look)) ?? 0) + 1);
+    const look = [...looks.entries()].sort((a, b) => b[1] - a[1])[0];
+    const seenLook = look ? (JSON.parse(look[0]) as TierLook) : null;
     return {
+      ...(seenLook && 'tier' in seenLook ? { tier: seenLook.tier } : {}),
+      ...(seenLook && 'trim' in seenLook ? { trim: seenLook.trim } : {}),
       id,
       name: names.get(id) ?? id,
       date,

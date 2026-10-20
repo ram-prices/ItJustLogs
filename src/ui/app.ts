@@ -20,6 +20,8 @@ import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './p
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
 import { achievementsPage, archivesPage, collectionAction, collectionChange, readFindingsFrom, readMedalsFrom } from './pages/collections';
+import { essenceAction, essencesPage } from './pages/essences';
+import { readEssenceFiles, readEssences } from './essenceReader';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
@@ -35,11 +37,12 @@ import { installTint, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'home' | 'operators' | 'arsenal' | 'stats' | 'achievements' | 'archives' | 'settings';
+type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achievements' | 'archives' | 'settings';
 const TABS: [Page, string][] = [
   ['home', 'Home'],
   ['operators', 'Operators'],
   ['arsenal', 'Arsenal'],
+  ['essences', 'Essences'],
   ['stats', 'Stats'],
   ['achievements', 'Achievements'],
   ['archives', 'Archive'],
@@ -205,6 +208,7 @@ function page(route: Route): Html {
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);
+  if (route.page === 'essences') return essencesPage(draw);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
   if (!a) return welcome();
@@ -379,6 +383,7 @@ function installImport(): void {
     // On Achievements and Archive a dropped recording or screenshot is read, not imported.
     overlay.classList.toggle('medals', parseRoute().page === 'achievements');
     overlay.classList.toggle('findings', parseRoute().page === 'archives');
+    overlay.classList.toggle('essences', parseRoute().page === 'essences');
     overlay.classList.add('on');
   });
   addEventListener('dragleave', () => {
@@ -427,7 +432,8 @@ function mediaToReader(files: File[]): boolean {
   const page = parseRoute().page;
   if (page === 'achievements') void readMedalsFrom(media);
   else if (page === 'archives') void readFindingsFrom(media);
-  else toast('To read medals or findings from a recording or screenshots, open Achievements or Archive and paste or drop them there.', 'error');
+  else if (page === 'essences') void readEssenceFiles(media);
+  else toast('To read medals, findings or essences from a recording or screenshots, open Achievements, Archive or Essences and paste or drop them there.', 'error');
   return true;
 }
 
@@ -514,7 +520,8 @@ async function onClick(e: MouseEvent): Promise<void> {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
   // Achievements and Archive handle their own buttons.
-  if (collectionAction(el.dataset.action ?? '', el)) return draw();
+  if (collectionAction(el.dataset.action ?? '', el) || essenceAction(el.dataset.action ?? '', el)) return draw();
+  if (el.dataset.action === 'essence-read') return readEssences();
   switch (el.dataset.action) {
     case 'import':
       return document.getElementById('fileInput')!.click();

@@ -64,6 +64,10 @@ export interface Settings {
   medals?: Record<string, import('./domain/collections').MedalProgress>;
   /** Findings the player has collected (Archive page), by id. */
   findings?: string[];
+  /** The player's essences (Essences page), each kind (domain/essences.ts essenceKey) and how many. */
+  essences?: Record<string, number>;
+  /** When they were last read from the game. */
+  essencesRead?: number;
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;
   /** What each operator has equipped (weapon and gear), by operator id. */

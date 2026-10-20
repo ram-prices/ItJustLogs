@@ -81,14 +81,10 @@ export function sortAction(action: string, kind: Kind, key?: string): void {
   if (action === 'sort-toggle') save(kind, specs.map((s, j) => (j === i ? { ...s, off: !s.off || undefined } : s)));
 }
 
-/** "Rarity ↓, A–Z ↑" for the sort button: the first two sorts in use. */
+/** "Rarity ↓" for the sort button: the first sort in use (the one that splits the list). */
 function summary(kind: Kind): string {
-  const on = sortSpecs(kind).filter((s) => !s.off);
-  if (!on.length) return 'Off';
-  return on
-    .slice(0, 2)
-    .map((s) => `${labelOf(kind, s.key)} ${s.desc ? '↓' : '↑'}`)
-    .join(', ') + (on.length > 2 ? ' …' : '');
+  const first = sortSpecs(kind).find((s) => !s.off);
+  return first ? `${labelOf(kind, first.key)} ${first.desc ? '↓' : '↑'}` : 'Off';
 }
 
 /** The list's sort button; it opens the sort pop-up (openSortPopup). */
@@ -259,6 +255,8 @@ export interface SortFacts {
   class?: string | null;
   /** Where the wiki says it comes from (a weapon's event), for its release date. */
   source?: string | null;
+  /** Not out yet (from the version guide): newest of all by release date, in its own section. */
+  unreleased?: boolean;
 }
 
 /** Release dates by name (releaseOf), worked out once per schedule and server. */
@@ -290,7 +288,7 @@ function value(f: SortFacts, key: SortKey): number | string | null {
     case 'owned':
       return f.owned?.copies ? 1 : 0;
     case 'released':
-      return released(f)?.at ?? null;
+      return f.unreleased ? Number.MAX_SAFE_INTEGER : (released(f)?.at ?? null);
     case 'weapon': {
       if (!f.weapon) return null;
       const i = WEAPON_TYPES.indexOf(f.weapon);
@@ -338,7 +336,7 @@ function groupLabel(key: SortKey, f: SortFacts): string {
     case 'owned':
       return v ? 'Owned' : 'Not owned';
     case 'released':
-      return released(f)?.version ?? 'Unknown';
+      return f.unreleased ? 'Unreleased' : (released(f)?.version ?? 'Unknown');
     case 'acquired':
       return v == null ? 'Not owned' : v === 0 ? 'Owned, no date' : new Date(v).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     default: {

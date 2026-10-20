@@ -239,7 +239,7 @@ export function achievementsPage(redraw: () => void): Html {
  * while the player searches, every category's matches show (pages/search.ts
  * marks the page `searching`).
  */
-function subTabs(action: string, cats: string[], current: string, count: (cat: string) => string): Html {
+export function subTabs(action: string, cats: string[], current: string, count: (cat: string) => string): Html {
   return html`<nav class="collection-tabs" aria-label="Categories">
     ${cats.map(
       (c) => html`<button type="button" class="collection-tab" data-action="${action}" data-value="${c}" aria-current="${String(c === current)}">

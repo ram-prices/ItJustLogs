@@ -38,9 +38,15 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
   const ops = Object.entries(f.operators)
     .filter(([id]) => !isEndministrator(id) || id === endmin)
     .filter(([, o]) => !seen.has(o.page) && !!seen.add(o.page));
-  const groups = sortGroups('char', ops, ([id, o]) => ({ rarity: o.rarity, name: o.name, owned: owned?.get(id), element: o.element, weapon: o.weapon, class: o.class }));
   const have = owned ? ops.filter(([id]) => owned.get(id)?.copies).length : 0;
+  // Operators the wiki doesn't have yet (the version guide's): in the list like the rest, tagged Unreleased.
   const soon = Object.entries(previews?.operators ?? {}).filter(([id]) => !f.operators[id]);
+  type Row = { id: string; name: string; rarity: number; class: string | null; element: string | null; weapon: string | null; soon: boolean };
+  const rows: Row[] = [
+    ...ops.map(([id, o]) => ({ id, name: o.name, rarity: o.rarity, class: o.class, element: o.element, weapon: o.weapon, soon: false })),
+    ...soon.map(([id, p]) => ({ id, name: p.name, rarity: p.rarity, class: p.class, element: p.element, weapon: p.weapon, soon: true })),
+  ];
+  const groups = sortGroups('char', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), element: r.element, weapon: r.weapon, class: r.class, unreleased: r.soon }));
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
       ${crumbs('char')}
       <h1 class="heading-32">Operator info</h1>
@@ -48,34 +54,19 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
     </div><div class="row">${kindNav('char', 'info')}</div></div></div>
     <main class="container fade-in">
       <div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
-      ${soon.length
-        ? html`<section class="section wiki-type">
-            <div class="section-head"><h2 class="heading-20">Unreleased</h2></div>
-            <div class="wiki-grid">
-              ${soon.map(([id, p]) => html`<a class="wiki-tile card" href="${operatorInfoHref(id)}">
-                ${itemImg('char', id, 'wiki-tile-portrait')}
-                <span class="wiki-tile-text min0">
-                  <span class="wiki-tile-name ellipsis">${p.name}</span>
-                  <span class="label-12 secondary">${rarity(p.rarity)} · ${[p.class, p.element].filter(Boolean).join(' · ')}</span>
-                </span>
-                ${badge('Unreleased', 'amber')}
-              </a>`)}
-            </div>
-          </section>`
-        : ''}
       ${groups.map(
         (g) => html`<section class="section wiki-type">
           <div class="section-head"><h2 class="heading-20">${g.label || 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
           <div class="wiki-grid">
-            ${g.items.map(([id, o]) => {
-              const mine = owned?.get(id);
-              return html`<a class="wiki-tile card${owned && !mine?.copies ? ' unowned' : ''}" href="${operatorInfoHref(id)}">
-                ${itemImg('char', id, 'wiki-tile-portrait')}
+            ${g.items.map((r) => {
+              const mine = owned?.get(r.id);
+              return html`<a class="wiki-tile card${owned && !mine?.copies && !r.soon ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}">
+                ${itemImg('char', r.id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
-                  <span class="wiki-tile-name ellipsis">${o.name}</span>
-                  <span class="label-12 secondary">${rarity(o.rarity)} · ${o.class} · ${o.element}</span>
+                  <span class="wiki-tile-name ellipsis">${r.name}</span>
+                  <span class="label-12 secondary">${rarity(r.rarity)} · ${[r.class, r.element].filter(Boolean).join(' · ')}</span>
                 </span>
-                ${ownedTag(mine)}
+                ${r.soon ? badge('Unreleased', 'amber') : ownedTag(mine)}
               </a>`;
             })}
           </div>

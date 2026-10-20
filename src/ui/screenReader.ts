@@ -21,7 +21,7 @@ interface Box {
 }
 /** What Tesseract.js reports for a frame: its lines and its words, each with a box. */
 export interface FrameText {
-  lines: { text: string; bbox: Box }[];
+  lines: { text: string; bbox: Box; words?: { text: string; bbox: Box }[] }[];
   words: { text: string; bbox: Box }[];
 }
 interface TesseractWorker {
@@ -52,7 +52,7 @@ function loadTesseract(): Promise<NonNullable<Window['Tesseract']>> {
  * stray words, which matching against the known names ignores.
  */
 export const READ_HEIGHT = 1080;
-/** Seconds between the frames read from a recording. */
+/** Seconds between the frames read from a recording (unless a reader asks for another step). */
 const STEP = 0.5;
 
 function drawFrame(canvas: HTMLCanvasElement, src: CanvasImageSource, w: number, h: number): void {
@@ -78,7 +78,7 @@ const sameish = (a: Uint8ClampedArray | null, b: Uint8ClampedArray) => {
 };
 
 /** Each frame to read: each screenshot, then every STEP seconds of each recording. */
-async function* frames(files: File[], canvas: HTMLCanvasElement, progress: (done: number, total: number) => void): AsyncGenerator<void> {
+async function* frames(files: File[], canvas: HTMLCanvasElement, progress: (done: number, total: number) => void, step = STEP): AsyncGenerator<void> {
   const videos = files.filter((f) => f.type.startsWith('video/'));
   const images = files.filter((f) => f.type.startsWith('image/'));
   const metas = await Promise.all(
@@ -94,7 +94,7 @@ async function* frames(files: File[], canvas: HTMLCanvasElement, progress: (done
         }),
     ),
   );
-  const total = images.length + metas.reduce((n, v) => n + Math.ceil(v.duration / STEP), 0);
+  const total = images.length + metas.reduce((n, v) => n + Math.ceil(v.duration / step), 0);
   let done = 0;
   try {
     for (const f of images) {
@@ -105,7 +105,7 @@ async function* frames(files: File[], canvas: HTMLCanvasElement, progress: (done
       yield;
     }
     for (const v of metas) {
-      for (let t = 0; t < v.duration; t += STEP) {
+      for (let t = 0; t < v.duration; t += step) {
         v.currentTime = t;
         await new Promise((r) => v.addEventListener('seeked', r, { once: true }));
         drawFrame(canvas, v, v.videoWidth, v.videoHeight);
@@ -131,13 +131,46 @@ export function pickMedia(then: (files: File[]) => void): void {
   input.click();
 }
 
+/** An area of a frame (at READ_HEIGHT), to read alone. */
+export interface Area {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export interface ScanOptions {
+  /** Seconds between frames read from a recording. */
+  step?: number;
+  /**
+   * Reading just one area: given a whole frame's text, where the thing to
+   * read is (or null). Once found, later frames read only that area,
+   * enlarged, until `onFrame` stops finding anything there a few frames in
+   * a row; then whole frames again.
+   */
+  focus?: (text: FrameText) => Area | null;
+  /** A frame that didn't change since the last one (it isn't read again). */
+  onSame?: () => void;
+}
+
+/** How much a focused area is enlarged before reading (small text reads better bigger). */
+const ZOOM = 2;
+/** Frames in a row with nothing found in the focused area before going back to whole frames. */
+const LOST_AFTER = 6;
+
 /**
  * Reads every frame of `files` with a progress dialog titled `title`,
- * passing each frame's text to `onFrame`. Resolves with the dialog (to show
- * the review screen in) and the time it took, or null if the player
- * cancelled or it failed (a toast says why).
+ * passing each frame's text to `onFrame` (which says whether it found what
+ * it reads). Resolves with the dialog (to show the review screen in) and
+ * the time it took, or null if the player cancelled or it failed (a toast
+ * says why).
  */
-export async function scan(files: File[], title: string, onFrame: (text: FrameText) => void): Promise<{ dlg: HTMLDialogElement; seconds: number } | null> {
+export async function scan(
+  files: File[],
+  title: string,
+  onFrame: (text: FrameText, frame: HTMLCanvasElement) => boolean | void,
+  opts: ScanOptions = {},
+): Promise<{ dlg: HTMLDialogElement; seconds: number } | null> {
   const dlg = document.createElement('dialog');
   dlg.className = 'card reader-dialog';
   document.body.append(dlg);
@@ -167,14 +200,47 @@ export async function scan(files: File[], title: string, onFrame: (text: FrameTe
   try {
     worker = await (await loadTesseract()).createWorker('eng');
     const canvas = document.createElement('canvas');
+    const zoomed = document.createElement('canvas');
+    let area: Area | null = null;
+    let misses = 0;
     let last: Uint8ClampedArray | null = null;
     const started = Date.now();
-    for await (const _ of frames(files, canvas, (done, total) => paint(`Reading frame ${done} of ${total}…`, done, total))) {
+    for await (const _ of frames(files, canvas, (done, total) => paint(`Reading frame ${done} of ${total}…`, done, total), opts.step)) {
       if (cancelled) return null;
-      const t = thumb(canvas);
-      if (sameish(last, t)) continue;
+      // Read the focused area alone when there is one, else the whole frame.
+      let src = canvas;
+      if (area) {
+        const w = Math.max(1, area.x1 - area.x0);
+        const h = Math.max(1, area.y1 - area.y0);
+        zoomed.width = Math.round(w * ZOOM);
+        zoomed.height = Math.round(h * ZOOM);
+        zoomed.getContext('2d', { willReadFrequently: true })!.drawImage(canvas, area.x0, area.y0, w, h, 0, 0, zoomed.width, zoomed.height);
+        src = zoomed;
+      }
+      const t = thumb(src);
+      if (sameish(last, t)) {
+        opts.onSame?.();
+        continue;
+      }
       last = t;
-      onFrame((await worker.recognize(canvas)).data);
+      const text = (await worker.recognize(src)).data;
+      if (!area && opts.focus) {
+        const found = opts.focus(text);
+        if (found) {
+          area = {
+            x0: Math.max(0, Math.floor(found.x0)),
+            y0: Math.max(0, Math.floor(found.y0)),
+            x1: Math.min(canvas.width, Math.ceil(found.x1)),
+            y1: Math.min(canvas.height, Math.ceil(found.y1)),
+          };
+          misses = 0;
+        }
+      }
+      const hit = onFrame(text, src);
+      if (area && src === zoomed && hit === false && ++misses >= LOST_AFTER) {
+        area = null;
+        last = null;
+      } else if (hit) misses = 0;
     }
     if (cancelled) return null;
     // A new dialog state: the review screen. Cancel closes it as before.
