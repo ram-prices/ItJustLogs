@@ -162,6 +162,14 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   impossible dates dropped, majority vote across frames), pinned by
   `medalReader.test.ts` with real lines; a review screen saves only what's
   ticked.
+  Archive has the same button (and paste/drop on its page):
+  `ui/findingReader.ts` + `domain/findingReader.ts` split each frame's words
+  into tile names (gaps, "~~" marks and "…" end a name), match the cut-off
+  names by how wiki names start (spaces ignored), and settle look-alikes
+  ("Agent Data: Ha…" ×3) by the grid's order, which is the wiki list's: the
+  longest chain of tiles that rises through the list wins; leftovers seen in
+  2+ frames are listed as not on the wiki yet. `ui/screenReader.ts` is the
+  shared part (files → frames at 1080 tall, Tesseract.js, progress dialog).
 - `scripts/export-pulls.ps1`: the PowerShell exporter, shown in Settings → Get
   your data via `?raw`. Keep it readable and dependency-free. Its only network
   target must stay `ef-webview.gryphline.com`. Character pool types are a fixed

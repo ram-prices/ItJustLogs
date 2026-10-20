@@ -3669,10 +3669,10 @@ a.patch-banner:hover {
 .attr-toggle {
   height: 24px;
   padding: 0 10px;
-  border: 0;
+  /* A real border, not an inset shadow: shadows look jagged around a pill's tight curves. */
+  border: 1px solid var(--gray-alpha-400);
   border-radius: 9999px;
   background: none;
-  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
   color: var(--gray-900);
   font: 500 12px/1 var(--font-sans);
   cursor: pointer;
@@ -3684,7 +3684,7 @@ a.patch-banner:hover {
 }
 .attr-toggle[aria-pressed='true'] {
   color: var(--green);
-  box-shadow: inset 0 0 0 1px currentColor;
+  border-color: currentColor;
 }
 /* A change that makes a skill worse (rare): shown, but not as a gain. */
 .attr-loss {
@@ -3967,13 +3967,30 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   display: none;
 }
 /* Reading medals from a recording or screenshots (ui/medalReader.ts). */
-/* The drop overlay says what a drop will do: import pulls, or read medals on Achievements. */
+/* The drop overlay says what a drop will do: import pulls, or read medals (Achievements) or findings (Archive). */
 .drop-overlay .drop-medals,
-.drop-overlay.medals .drop-import {
+.drop-overlay .drop-findings,
+.drop-overlay.medals .drop-import,
+.drop-overlay.findings .drop-import {
   display: none;
 }
-.drop-overlay.medals .drop-medals {
+.drop-overlay.medals .drop-medals,
+.drop-overlay.findings .drop-findings {
   display: block;
+}
+/* The Archive reader's review: findings grouped by category. */
+.reader-cat + .reader-cat {
+  margin-top: 16px;
+}
+.reader-cat-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  box-shadow: inset 0 -1px 0 var(--gray-alpha-400);
+}
+.reader-row-finding {
+  grid-template-columns: 20px minmax(0, 1fr) 120px;
 }
 .reader-dialog {
   width: min(620px, calc(100vw - 32px));
@@ -4150,10 +4167,10 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   gap: 6px;
   height: 32px;
   padding: 0 12px;
-  border: 0;
+  /* A real border, not an inset shadow: shadows look jagged around a pill's tight curves. */
+  border: 1px solid var(--gray-alpha-400);
   border-radius: 9999px;
   background: none;
-  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
   color: var(--gray-900);
   font: 500 13px/1 var(--font-sans);
   white-space: nowrap;
@@ -4168,7 +4185,7 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
 }
 .have-toggle[aria-pressed='true'] {
   color: var(--green);
-  box-shadow: inset 0 0 0 1px currentColor;
+  border-color: currentColor;
 }
 .finding-grid {
   display: grid;

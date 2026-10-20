@@ -3,6 +3,7 @@ import { state, updateSettings } from '../../state';
 import { icon, pageHeader, toggleGroup } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { credit } from './info';
+import { readFindingFiles, readFindings } from '../findingReader';
 import { readMedalFiles, readMedals } from '../medalReader';
 import { searchBox } from './search';
 
@@ -58,6 +59,12 @@ export async function readMedalsFrom(files: File[]): Promise<void> {
   await readMedalFiles(files, data.medals);
 }
 
+/** Reads findings from pasted or dropped files (app.ts), loading the list first if needed. */
+export async function readFindingsFrom(files: File[]): Promise<void> {
+  const data = findingFile ?? ((await import('../../data/findings.snapshot.json')).default as unknown as FindingFile);
+  await readFindingFiles(files, data.findings);
+}
+
 // ---------------------------------------------------------------------------
 // The player's progress
 // ---------------------------------------------------------------------------
@@ -92,6 +99,9 @@ export function collectionAction(action: string, el: HTMLElement): boolean {
       return true;
     case 'medal-read':
       if (medalFile) readMedals(medalFile.medals);
+      return true;
+    case 'finding-read':
+      if (findingFile) readFindings(findingFile.findings);
       return true;
     case 'medal-toggle':
       setMedal(id, medalsOwned()[id] ? null : {});
@@ -267,7 +277,11 @@ export function archivesPage(redraw: () => void): Html {
     const inCat = all.filter((f) => f.category === cat);
     return `${inCat.filter((f) => owned.has(f.id)).length}/${inCat.length}`;
   };
-  return html`${pageHeader('Archive', `The game's Intel Archives: every Finding. You have ${got} of ${all.length}.`)}
+  return html`${pageHeader(
+      'Archive',
+      `The game's Intel Archives: every Finding. You have ${got} of ${all.length}. Paste or drop a recording or screenshots of its Findings here to fill this in.`,
+      html`<button type="button" class="btn secondary sm" data-action="finding-read" title="Read collected findings from a recording or screenshots of Intel Archives → Findings. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
+    )}
     <main class="container fade-in">
       <div class="collection-layout">
         ${subTabs('finding-tab', FINDING_CATEGORIES, tab.findings, count)}
