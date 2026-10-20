@@ -266,6 +266,40 @@ function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: Tick
   </div>${inc?.lines.length ? patchIncomeList(inc, tickets, bond, dossiers) : ''}</td></tr>`;
 }
 
+/**
+ * Earned per week since the player's first pull and up to now (the current
+ * patch's projection prorated by time): limited Headhunting pulls, and
+ * Arsenal Issues (sets of 10) with the Arsenal Tickets the player's
+ * Headhunting results gave back.
+ */
+function perWeekOf(a: Analysis, patches: Iterable<PatchIncome>): { char: string; issues: string } {
+  const now = Date.now();
+  const from = a.firstTs;
+  let earned = 0;
+  let earnedArsenal = 0;
+  let any = false;
+  for (const inc of patches) {
+    any = true;
+    const span = inc.end - inc.start;
+    const overlap = Math.min(inc.end, now) - Math.max(inc.start, from);
+    if (span > 0 && overlap > 0) {
+      earned += inc.headhunting * (overlap / span);
+      earnedArsenal += inc.arsenal * (overlap / span);
+    }
+  }
+  earnedArsenal += (ticketsFromPulls(a.banners.flatMap((b) => (b.kind === 'char' ? b.pulls : []))) / TICKETS_PER_ISSUE) * 10;
+  const weeksSince = (now - from) / (7 * 86_400_000);
+  const perWeek = (n: number, unit = '') => (any && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)}${unit} / week` : '–');
+  return { char: perWeek(earned), issues: perWeek(earnedArsenal / 10, ' (×10)') };
+}
+
+/** The same, for Home's Stats widget. */
+export function earnedPerWeek(a: Analysis, redraw: () => void): { char: string; issues: string } {
+  const events = wikiFile<EventRewardsFile>('events.json', redraw);
+  const data = wikiFile<IncomeFile>('income.json', redraw).data;
+  return perWeekOf(a, patchIncome(state.schedule, currentServer(), Date.now(), events.data, data, state.settings.paidIncome ?? [], a.firstTs));
+}
+
 export function statsPage(a: Analysis, redraw: () => void): Html {
   const events = wikiFile<EventRewardsFile>('events.json', redraw);
   const incomeFile = wikiFile<IncomeFile>('income.json', redraw);
@@ -343,24 +377,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
     .sort((x, y) => (x.patch.major === -1 ? -1 : y.patch.major === -1 ? 1 : y.patch.major - x.patch.major || y.patch.minor - x.patch.minor));
   const maxPulls = Math.max(1, ...patches.map((p) => Math.max(p.charPulls, weapMadeOf(p), freeOf(p)?.char ?? 0, freeOf(p)?.weap ?? 0)));
   const weeks = weeklyTimeline(a);
-  // Earned per week since the player's first pull and up to now (the current patch's projection
-  // prorated by time): limited Headhunting pulls, and Arsenal Issues (sets of 10) with the
-  // Arsenal Tickets the player's Headhunting results gave back.
   const now = Date.now();
-  const from = a.firstTs;
-  let earned = 0;
-  let earnedArsenal = 0;
-  for (const inc of free.values()) {
-    const span = inc.end - inc.start;
-    const overlap = Math.min(inc.end, now) - Math.max(inc.start, from);
-    if (span > 0 && overlap > 0) {
-      earned += inc.headhunting * (overlap / span);
-      earnedArsenal += inc.arsenal * (overlap / span);
-    }
-  }
-  earnedArsenal += (ticketsFromPulls(a.banners.flatMap((b) => (b.kind === 'char' ? b.pulls : []))) / TICKETS_PER_ISSUE) * 10;
-  const weeksSince = (now - from) / (7 * 86_400_000);
-  const perWeek = (n: number, unit = '') => (free.size && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)}${unit} / week` : '–');
+  const per = perWeekOf(a, free.values());
   /**
    * Pulls made over pulls earned, on one scale: the solid bar is what was
    * pulled, the faded one under it what the patch handed out (≈ while it's
@@ -426,8 +444,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       html`${metrics([
         metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
         metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),
-        metric({ label: 'Chartered permits earned', value: perWeek(earned) }),
-        metric({ label: 'Arsenal Issues earned', value: perWeek(earnedArsenal / 10, ' (×10)') }),
+        metric({ label: 'Chartered permits earned', value: per.char }),
+        metric({ label: 'Arsenal Issues earned', value: per.issues }),
       ], 'plain')}
 
       <div class="section card">

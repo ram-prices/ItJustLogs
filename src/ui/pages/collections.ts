@@ -59,6 +59,18 @@ export async function readMedalsFrom(files: File[]): Promise<void> {
   await readMedalFiles(files, data.medals);
 }
 
+/** Medals and Archive entries the player has, of how many (Home's Collection widget); null while loading. */
+export function archiveProgress(redraw: () => void): { medals: [number, number] | null; archive: [number, number] | null } {
+  const m = medalData(redraw);
+  const f = findingData(redraw);
+  const medals = state.settings.medals ?? {};
+  const have = new Set(state.settings.findings ?? []);
+  return {
+    medals: m ? [m.medals.filter((x) => medals[x.id]).length, m.medals.length] : null,
+    archive: f ? [f.findings.filter((x) => have.has(x.id)).length, f.findings.length] : null,
+  };
+}
+
 /** Reads findings from pasted or dropped files (app.ts), loading the list first if needed. */
 export async function readFindingsFrom(files: File[]): Promise<void> {
   const data = findingFile ?? ((await import('../../data/findings.snapshot.json')).default as unknown as FindingFile);

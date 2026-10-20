@@ -101,6 +101,18 @@ export function bannerArtUrl(poolId: string): string | null {
   return `${EF_ASSETS}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
 }
 
+/**
+ * An Arsenal Issue banner's art as layers (ef-assets banners/layers/, made by
+ * its issue-layers.py): the backdrop and dotted rule shared by every Issue,
+ * this banner's weapon, and the ornaments over it. Null for other banners.
+ */
+export function issueLayerUrls(poolId: string): { back: string; weapon: string; front: string } | null {
+  const id = canonicalPoolId(poolId);
+  if (!id.startsWith('weponbox_') && !id.startsWith('weaponbox_constant_')) return null;
+  const at = `${EF_ASSETS}/banners/layers/`;
+  return { back: `${at}issue-back.webp`, weapon: `${at}${id}.webp`, front: `${at}issue-front.webp` };
+}
+
 /** raw.githubusercontent → jsDelivr, used once when an asset fails to load. */
 export function cdnFallback(url: string): string | null {
   return url.startsWith(EF_ASSETS) ? EF_ASSETS_CDN + url.slice(EF_ASSETS.length) : null;

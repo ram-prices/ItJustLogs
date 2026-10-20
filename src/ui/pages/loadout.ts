@@ -440,3 +440,47 @@ export function hpValue(operatorHp: number, b: Bonus | undefined, t: ReturnType<
   if (split) return html`${r(operatorHp)}<span class="attr-bonus" title="${why}">+${r(t.fromStrength)} Strength</span>${bonusChip(b)}`;
   return html`<span class="attr-total" title="${why}">${r(t.total)}</span>`;
 }
+
+/**
+ * Home's Character card: the weapon (unless `weapon` is false: the card
+ * shows it in detail already) and gear, small (names on hover), and the
+ * sets that are on. Null with nothing to show.
+ */
+export function loadoutStrip(opId: string, redraw: () => void, weapon = true): Html | null {
+  const l = loadoutOf(opId);
+  if (!l || (!(weapon && l.weapon) && !GEAR_SLOTS.some(({ slot }) => l[slot]))) return null;
+  const weps = wikiFile<WikiWeaponFile>('weapons.json', redraw).data;
+  const gear = wikiFile<WikiGearFile>('gear.json', redraw).data;
+  const piece = (img: Html, name: string | undefined) => html`<span class="card-gear" title="${name ?? ''}">${img}</span>`;
+  const sets = gear ? [...setCounts(l, gear.gear.items)].filter(([, n]) => n >= SET_PIECES).map(([name]) => name) : [];
+  return html`<span class="card-gears">
+      ${weapon && l.weapon ? piece(itemImg('weap', l.weapon, 'card-gear-img'), weps?.weapons[l.weapon]?.name) : ''}
+      ${GEAR_SLOTS.map(({ slot }) => (l[slot] ? piece(gearImg(l[slot]!, 'card-gear-img'), gear?.gear.items[l[slot]!]?.name) : ''))}
+    </span>
+    ${sets.length ? html`<span class="char-facts">${sets.map((n) => badge(`${n} ${SET_PIECES}/${SET_PIECES}`, 'green'))}</span>` : ''}`;
+}
+
+/** Short names for the card's weapon skills ("ULT Efficiency" → "Ult EFF"). */
+const shortSkill = (name: string): string => (/^(ult(imate)?( gain)? efficiency)$/i.test(name.trim()) ? 'Ult EFF' : name);
+
+/** Home's Character card: the equipped weapon in detail: rarity, Potential, base ATK, essence and each skill's rank. */
+export function weaponDetail(opId: string, a: Analysis | null, redraw: () => void): Html | null {
+  const id = loadoutOf(opId)?.weapon;
+  if (!id) return null;
+  const w = wikiFile<WikiWeaponFile>('weapons.json', redraw).data?.weapons[id];
+  const mine = ownedOf(a, 'weap')?.get(id);
+  const p = mine?.copies ? mine.potential : null;
+  const atk = w?.stats?.baseAtk.filter((x): x is number => x != null).at(-1);
+  const ranks = w ? (weaponRanksFor(id, w, p) ?? weaponRankCaps(w, p)) : undefined;
+  const tag = essenceTag(id, w, p);
+  return html`<span class="card-weapon">
+      ${itemImg('weap', id, 'card-weapon-img')}
+      <span class="min0">
+        <span class="card-weapon-name">${w?.name ?? id}</span>
+        <span class="label-12 secondary">${w ? rarity(w.rarity) : ''}${p != null ? ` · P${p}` : ''}${atk ? ` · ATK ${atk}` : ''}${tag ? html` · ${tag}` : ''}</span>
+      </span>
+    </span>
+    ${w?.skills.length
+      ? html`<span class="char-facts">${w.skills.map((s, i) => html`<span class="char-fact">${shortSkill(s.tag ?? s.name)}${ranks?.[i] ? html` <b>Rank ${ranks[i]}</b>` : ''}</span>`)}</span>`
+      : ''}`;
+}

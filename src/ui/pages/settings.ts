@@ -2,9 +2,9 @@ import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator,
 import { SERVER_LABEL } from '../../domain/schedule';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
-import { MAX_DRIVE_SNAPSHOTS, MAX_SNAPSHOTS } from '../../store';
+import { loadAvatarHistory, MAX_DRIVE_SNAPSHOTS, MAX_SNAPSHOTS, type AvatarBox } from '../../store';
 import { EXPORTER_SOURCE } from '../guide';
-import { badge, icon, itemImg, pageHeader, toggleGroup } from '../components';
+import { avatar, badge, icon, itemImg, pageHeader, toggleGroup } from '../components';
 import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { driveConfigured } from '../../drive';
@@ -165,6 +165,41 @@ function extrasCard(redraw: () => void): Html {
   </section>`;
 }
 
+/** Saved profile pictures as object URLs, loaded once (and again after a change). */
+let saved: { list: { id: string; url: string; pop: boolean; box?: AvatarBox }[]; current?: string } | null = null;
+let savedLoading = false;
+export function forgetSavedAvatars(): void {
+  saved?.list.forEach((x) => URL.revokeObjectURL(x.url));
+  saved = null;
+}
+
+/** Earlier profile pictures: click one to use it again, × to delete it. */
+function savedPictures(redraw: () => void): Html {
+  if (!saved) {
+    if (!savedLoading) {
+      savedLoading = true;
+      void loadAvatarHistory().then((h) => {
+        saved = { list: h.list.map((x) => ({ id: x.id, url: URL.createObjectURL(x.blob), pop: x.pop, box: x.box })), current: h.current };
+        savedLoading = false;
+        redraw();
+      });
+    }
+    return html``;
+  }
+  if (saved.list.length < 2 && saved.list[0]?.id === saved.current) return html``;
+  return html`<div class="profile-saved">
+    <span class="copy-14">Saved pictures</span>
+    <div class="profile-saved-list">
+      ${saved.list.map(
+        (x) => html`<span class="profile-saved-item${x.id === saved!.current ? ' current' : ''}">
+          <button type="button" class="profile-saved-use" data-action="avatar-use" data-value="${x.id}" title="${x.id === saved!.current ? 'In use' : 'Use this picture'}">${avatar(x.url, x.pop, true, x.box)}</button>
+          ${x.id === saved!.current ? '' : html`<button type="button" class="profile-saved-x" data-action="avatar-forget" data-value="${x.id}" title="Delete" aria-label="Delete this picture">${icon('close')}</button>`}
+        </span>`,
+      )}
+    </div>
+  </div>`;
+}
+
 export function settingsPage(redraw: () => void): Html {
   const s = state.settings;
   const h = state.history;
@@ -193,16 +228,27 @@ export function settingsPage(redraw: () => void): Html {
           <h2 class="heading-20">Personalization</h2>
           <p class="copy-14">Your name and picture at the top of every page, how the site looks, and your game server.</p>
           <div class="profile-edit">
-            ${state.images.avatar ? html`<img class="avatar lg" src="${state.images.avatar}" alt="" />` : html`<span class="avatar lg"></span>`}
+            ${avatar(state.images.avatar, !!s.avatarPop, true, s.avatarBox)}
             <label class="field">
               <span>Display name</span>
               <input class="input" id="displayName" data-setting="displayName" maxlength="32" placeholder="Endministrator" value="${s.displayName}" autocomplete="off" spellcheck="false" />
             </label>
             <div class="row profile-buttons">
-              ${state.images.avatar ? html`<button class="btn tertiary sm" data-action="avatar-remove">Remove</button>` : ''}
+              ${state.images.avatar
+                ? html`<button class="btn tertiary sm" data-action="avatar-remove">Remove</button>
+                    <button class="btn secondary sm" data-action="avatar-edit">${icon('edit')}Edit picture</button>`
+                : ''}
               <button class="btn secondary sm" data-action="avatar-upload">${icon('upload_file')}Upload picture</button>
             </div>
           </div>
+          ${state.images.avatar
+            ? html`<div class="profile-shape">
+                <span class="copy-14">Picture</span>
+                ${toggleGroup('avatar-shape', [['circle', 'In the circle'], ['pop', 'Above the circle']], s.avatarPop ? 'pop' : 'circle')}
+                <span class="copy-13 secondary">Then Edit picture and paint what may show outside the circle, like ears.</span>
+              </div>`
+            : ''}
+          ${savedPictures(redraw)}
         </div>
         <div class="card-body settings-sub settings-split">
           <div>
@@ -214,6 +260,11 @@ export function settingsPage(redraw: () => void): Html {
             <h3 class="heading-16">Server</h3>
             <p class="copy-14">Banners open at the same local time on each server, 13 hours apart.${s.server ? '' : ' Guessed from your time zone for now.'}</p>
             ${toggleGroup('server', [['americas', SERVER_LABEL.americas], ['asia', SERVER_LABEL.asia]], currentServer())}
+          </div>
+          <div>
+            <h3 class="heading-16">Backgrounds</h3>
+            <p class="copy-14">Home plays a game clip behind it, and pictures move a little with your mouse.</p>
+            ${toggleGroup('motion', [['on', 'Animated'], ['off', 'Still']], s.motion === false ? 'off' : 'on')}
           </div>
         </div>
       </section>

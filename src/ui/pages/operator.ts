@@ -461,3 +461,47 @@ export function operatorInfoTitle(id: string | undefined): string {
   const o = id && (file?.operators[wikiId(id)] ?? previews?.operators[id]);
   return o ? o.name : 'Operators';
 }
+
+/**
+ * Home's Character card: the operator's main numbers at Lv 90 (else the
+ * highest level listed) with their loadout and Potential counted, as the
+ * Attributes section shows them: HP, ATK and their two attributes, then the
+ * stats their loadout raises most (Critical rate counted among them), up to
+ * `max` in all. Null without wiki stats.
+ */
+export function cardStats(id: string, a: Analysis | null, redraw: () => void, max = 8): [label: string, value: string][] | null {
+  const o = wikiFile<WikiOperatorFile>('operators.json', redraw).data?.operators[wikiId(id)];
+  const s = o?.stats;
+  if (!o || !s) return null;
+  let at = s.levels.findIndex((l) => l.level === 90);
+  if (at < 0) at = s.levels.length - 1;
+  const bonuses = bonusesFor(id, o, a, redraw);
+  const totalOf = (label: string | null) => {
+    const k = STAT_ROWS.find(([, l]) => l === label)?.[0];
+    return k && Array.isArray(s[k]) ? Math.floor(statTotal((s[k] as number[])[at], bonuses.get(label!))) : 0;
+  };
+  const fmt = (n: number) => Math.round(n).toLocaleString();
+  const out: [string, string][] = [];
+  if (s.hp) out.push(['HP', fmt(hpTotal(s.hp[at], bonuses.get('HP'), totalOf('Strength')).total)]);
+  if (s.atk) out.push(['ATK', fmt(atkTotal(s.atk[at], bonuses.get('ATK'), totalOf(o.mainAttribute), totalOf(o.secondaryAttribute)).total)]);
+  for (const label of [o.mainAttribute, o.secondaryAttribute]) if (label && totalOf(label)) out.push([label, fmt(totalOf(label))]);
+  // Then the stats the loadout raises most: percentages by how many points they add, flat ones by a tenth of theirs.
+  const pct = (n: number) => `${Math.round(n * 10) / 10}%`;
+  const shown = new Set(['HP', 'ATK', ...STAT_ROWS.map(([, l]) => l)]);
+  /** Short names for the card's small cells. */
+  const SHORT: Record<string, string> = { 'Ultimate Gain Efficiency': 'Ult EFF' };
+  const extra: { label: string; value: string; weight: number }[] = [...bonuses]
+    .filter(([k, b]) => !shown.has(k) && k !== 'Critical rate' && (b.pct || b.flat))
+    .map(([k, b]) => ({
+      label: SHORT[k] ?? k,
+      value: BASE_PERCENT[k] != null ? pct(BASE_PERCENT[k] + b.pct) : b.pct ? `+${pct(b.pct)}` : `+${fmt(b.flat)}`,
+      weight: b.pct || b.flat / 10,
+    }));
+  if (s.critRate != null) {
+    const crit = bonuses.get('Critical rate');
+    extra.push({ label: 'Crit rate', value: pct(statTotal(s.critRate * 100, crit)), weight: crit?.pct ?? 0 });
+  }
+  extra.sort((x, y) => y.weight - x.weight);
+  for (const x of extra) if (out.length < max) out.push([x.label, x.value]);
+  return out;
+}

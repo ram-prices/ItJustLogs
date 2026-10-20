@@ -136,6 +136,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     travel as `settings.deletedArt` tombstones. Downloaded full backups do
     include it (`Backup.art`, data URLs; `buildBackup({ art: true })`), and
     importing one restores pictures this browser lacks.
+  - The profile picture's original (at most 1024px) with its framing and
+    painting (`AvatarEdit` in store.ts, for Edit picture) syncs as one
+    appData file, `avatar-edit` (`syncAvatarEdit`; the newer `at` wins, gone
+    with the picture), and goes in downloaded backups (`Backup.avatarEdit`).
   - It's off unless the build has `VITE_GOOGLE_CLIENT_ID` (a public value).
     Locally: put `VITE_GOOGLE_CLIENT_ID=...` in `.env.local` (gitignored). On
     Pages: the deploy workflow reads the repo variable `GOOGLE_CLIENT_ID`
@@ -173,6 +177,18 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     loaded with an explicit `icon_names=` list in index.html: add new names
     there (alphabetical).
   - Sentence-case labels; inline styles only for data-driven values.
+  - Home plays a looping game clip behind it (`ui/videoBackground.ts`), one
+    of ef-assets `backgrounds/index.json`'s defaults at random (its
+    `operators` map is unused for now). Clips are made with ef-assets
+    `scripts/background-clip.py` from the owner's recordings (seamless loop,
+    1280x720 WebM + MP4 + first-frame JPG, bottom strip with the player's UID
+    always cut off). Settings → Backgrounds Still, reduced motion, phones and
+    Save-Data get the still frame only. Pictures (banner art, headers, the
+    Character card) shift a little against the mouse (`ui/parallax.ts`;
+    Arsenal Issues in layers from ef-assets `banners/layers/`, the weapon
+    floating). Firefox puts moved-only pictures on whole pixels (twitching);
+    `transform: perspective(600px) rotateY(0.02deg)` stops it, measured on a
+    real screen (a flat `rotate` fixes headless Firefox only).
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
     `ui/components.ts` (`public/icons/oroberyl.webp`, `--oroberyl`).
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
@@ -185,6 +201,25 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     (`/operators`, `/arsenal`, `/stats`) are sections whose pages keep their
     own paths, picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/pulls` open the page last used there.
+    Home is widgets (`ui/pages/homeWidgets.ts`, settings `home`: type, width
+    4/6/8/12 of a 12-column grid, own settings; unset = the schedule as
+    before): the schedule's four sections, Pity, 6★ history, Latest pulls,
+    Stats, Collection, Note and Character card (an operator, one of their
+    pictures, title, note, chosen facts) and Empty space (full width, height
+    dragged). Customize: drag to move (near a widget's top or bottom stacks
+    it in that widget's column), width, title, edit, remove, add, reset,
+    cancel; a narrower widget can be placed left, middle or right of its row
+    (`align`), each on its own: `gridPlaces` gives every widget or column an
+    explicit row and column on wide screens (`newRow` keeps a widget placed
+    out of a column at its height), and placing one pins the others in its
+    row where they are. The profile picture can rise above its
+    circle (settings `avatarPop`; `avatar` in components.ts): `cropper.ts`
+    gives a frame 2.5 circles wide and 1.4 tall where the player paints what
+    shows outside the circle (with a live preview); it's saved trimmed to
+    what shows, see-through elsewhere, and settings `avatarBox` says how far
+    it reaches left and right, so room is made only on those sides.
+    Every saved picture is kept (last 12, `SavedAvatar` in store.ts, this
+    browser only) under Saved pictures, to use again or delete.
     Pages live in `ui/pages/` (`home.ts` = the schedule: banners open now
     with your pity and rate-up status, events now, coming up, and a
     version/banner/event timeline; works without an import; anything with

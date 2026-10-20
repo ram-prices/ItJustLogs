@@ -298,6 +298,13 @@ export async function uploadSnapshot(token: string, name: string, props: Record<
   });
 }
 
+/** Files named exactly `name` (the profile picture's original: "avatar-edit"), with their appProperties. */
+export async function listNamed(token: string, name: string): Promise<DriveSnapshot[]> {
+  const q = encodeURIComponent(`name = '${name}' and trashed = false`);
+  const r = await call(token, `${API}/files?spaces=appDataFolder&q=${q}&pageSize=100&fields=files(id,name,appProperties)`);
+  return ((await r.json()) as { files: DriveSnapshot[] }).files;
+}
+
 export const downloadText = async (token: string, id: string): Promise<string> => (await call(token, `${API}/files/${id}?alt=media`)).text();
 
 export const deleteFile = async (token: string, id: string): Promise<void> => {

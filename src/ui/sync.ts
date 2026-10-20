@@ -2,7 +2,7 @@ import { compareHistories, mergeHistories, missingPulls } from '../domain/parse'
 import * as drive from '../drive';
 import { artChanged, clearHistory, importHistory, onChange, setImage, state, updateSettings } from '../state';
 import type { PullHistory } from '../domain/types';
-import { allArtKeys, artBlob, blobToDataUrl, dataUrlToBlob, deleteArt, listSnapshots, loadSnapshot, loadSyncMeta, MAX_DRIVE_SNAPSHOTS, putArt, saveSyncMeta, type ChangeTimes, type SnapshotInfo } from '../store';
+import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, deleteArt, deleteAvatarEdit, listSnapshots, loadAvatarEdit, saveAvatarEdit, loadSnapshot, loadSyncMeta, MAX_DRIVE_SNAPSHOTS, putArt, saveSyncMeta, type ChangeTimes, type SnapshotInfo } from '../store';
 import { forgetLoadedArt } from './pages/art';
 import { toast } from './common';
 import { askSamePlayer } from './dialog';
@@ -176,6 +176,7 @@ async function syncWith(token: string): Promise<void> {
     meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), paused: false };
     save();
     await syncArt(token);
+    await syncAvatarEdit(token);
     await syncSnapshots(token);
     return;
   }
@@ -214,6 +215,31 @@ async function syncArt(token: string): Promise<void> {
     forgetLoadedArt();
     artChanged(true);
   }
+}
+
+/**
+ * The profile picture's original and its framing (Edit picture), after the
+ * backup file (so the picture itself is already merged): one Drive file,
+ * "avatar-edit", the newer side (`at`) wins; gone with the picture.
+ */
+async function syncAvatarEdit(token: string): Promise<void> {
+  const files = (await drive.listNamed(token, 'avatar-edit')).sort((a, b) => Number(b.appProperties?.at ?? 0) - Number(a.appProperties?.at ?? 0));
+  const [newest, ...older] = files;
+  const remoteAt = Number(newest?.appProperties?.at ?? 0);
+  const local = await loadAvatarEdit();
+  const localAt = local?.at ?? 0;
+  if (!state.images.avatar) {
+    if (local) await deleteAvatarEdit();
+    for (const f of files) await drive.deleteFile(token, f.id);
+    return;
+  }
+  if (local && localAt > remoteAt) {
+    await drive.uploadSnapshot(token, 'avatar-edit', { at: String(localAt) }, JSON.stringify(await avatarEditToJson(local)));
+    for (const f of files) await drive.deleteFile(token, f.id);
+    return;
+  }
+  if (newest && remoteAt > localAt) await saveAvatarEdit(await avatarEditFromJson(JSON.parse(await drive.downloadText(token, newest.id))));
+  for (const f of older) await drive.deleteFile(token, f.id);
 }
 
 /**

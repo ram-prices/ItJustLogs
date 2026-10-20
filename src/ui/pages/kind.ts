@@ -5,7 +5,7 @@ import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
 import type { Schedule, Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
-import { badge, heat, icon, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
+import { badge, heat, icon, issueArt, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
 import { infoHref, pullsTabs } from './info';
 
@@ -13,7 +13,7 @@ import { infoHref, pullsTabs } from './info';
 
 const KIND = {
   char: { title: 'Headhunting', path: 'operators', flip: '50/50', items: 'operators' },
-  weap: { title: 'Arsenal', path: 'arsenal', flip: '25/75', items: 'weapons' },
+  weap: { title: 'Arsenal Issues', path: 'arsenal', flip: '25/75', items: 'weapons' },
 } as const;
 
 const LUCK_COLOR: Record<LuckTier, string> = {
@@ -73,7 +73,7 @@ function art(b: BannerSummary): Html {
   const { art: url, weapon, item } = artUrls(b);
   // Cards with one rate-up take their glow from it (see tintWeaponCards), so their art doesn't tint.
   const tint = item ? '' : raw('data-tint');
-  if (url) return html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`;
+  if (url) return issueArt(b.poolId, url) ?? html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`;
   if (weapon) return html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`;
   return html``;
 }
@@ -116,7 +116,7 @@ export function toggleSixStrip(kind: Kind): boolean {
  * Every 6★ for this kind, newest first: portrait with its pity underneath.
  * Arsenal shows only the rate-up weapons. Two rows until opened.
  */
-function sixStrip(kind: Kind, a: Analysis): Html {
+export function sixStrip(kind: Kind, a: Analysis): Html {
   const sixes = a.sixStars.filter((x) => x.kind === kind && (kind === 'char' || x.isRateUp)).sort((x, y) => y.ts - x.ts);
   if (!sixes.length) return html``;
   const max = kind === 'char' ? 80 : WEAPON_PITY_SETS;
@@ -177,7 +177,8 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
   const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${c.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
   const tint = item ? '' : raw('data-tint');
   const img = url
-    ? html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`
+    ? (!c.art && c.poolId ? issueArt(c.poolId, url) : null) ??
+      html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`
     : weapon
       ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`
       : '';

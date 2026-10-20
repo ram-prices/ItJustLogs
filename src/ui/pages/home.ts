@@ -18,8 +18,9 @@ import {
 } from '../../domain/schedule';
 import { tip, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
+import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
-import { badge, heat, icon } from '../components';
+import { backgroundSource, badge, heat, icon, issueArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
 
@@ -102,7 +103,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
   return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-link="${linkOf(b)}" data-card-image="${b.name}">
     <div class="banner-art">
-      ${src ? html`<img src="${src}" alt="" loading="lazy" decoding="async" />` : ''}
+      ${src ? ((b.poolId && src === bannerArtUrl(b.poolId) ? issueArt(b.poolId, src) : null) ?? html`<img src="${src}" alt="" loading="lazy" decoding="async" />`) : ''}
       <div class="banner-art-text">
         <span class="sched-kind">${KIND_LABEL[b.kind]}</span>
         <div class="banner-name ellipsis">${b.name}</div>
@@ -502,14 +503,15 @@ export function installCopyMenu(): void {
 
 // ---------------------------------------------------------------------------
 
-export function homePage(schedule: Schedule, server: Server, a: Analysis | null): Html {
+export function homePage(schedule: Schedule, server: Server, a: Analysis | null, redraw: () => void): Html {
   const now = Date.now();
   if (links?.schedule !== schedule) links = { schedule, map: scheduleLinks(schedule) };
   const startOf = (i: { start: ScheduleBanner['start'] }) => timeOn(i.start, server) ?? Infinity;
   const byStart = (p: ScheduleBanner, q: ScheduleBanner) => startOf(p) - startOf(q) || Number(isWeaponBanner(p.kind)) - Number(isWeaponBanner(q.kind));
   // Headhunting banners on the first row, Arsenal Issues on the second; each by when it opened.
   const live = schedule.banners.filter((b) => statusOf(b, now, server) === 'live').sort(byStart);
-  const liveRows = [live.filter((b) => !isWeaponBanner(b.kind)), live.filter((b) => isWeaponBanner(b.kind))].filter((row) => row.length);
+  // Each kind's newest `n` (undefined: all), still in opening order.
+  const newest = (list: ScheduleBanner[], n: number | undefined) => (n == null ? list : n > 0 ? list.slice(-n) : []);
   const events = schedule.events ?? [];
   const liveEvents = events
     .filter((e) => statusOf(e, now, server) === 'live')
@@ -520,7 +522,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
     ...events.filter((e) => statusOf(e, now, server) === 'upcoming').map((e) => ({ at: startOf(e), row: eventRow(e, now, server, schedule) })),
   ].sort((p, q) => p.at - q.at);
 
-  return html`
+  return html`${backgroundSource()}
     <main class="container fade-in home" aria-label="Schedule for the ${SERVER_LABEL[server]} server">
       ${a
         ? ''
@@ -528,26 +530,36 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
             <span class="copy-14">Import your pull history to see your pity on each banner here.</span>
             <button class="btn primary sm" data-action="import">${icon('upload_file')}Import file</button>
           </div>`}
-      ${liveRows.map((row) => html`<div class="sched-live">${row.map((b) => liveCard(b, now, server, a))}</div>`)}
-
-      ${liveEvents.length
-        ? html`<div class="section">
-            <div class="section-head"><h2 class="heading-20">Current</h2></div>
-            <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server, schedule))}</div>
-          </div>`
-        : ''}
-
-      ${next.length
-        ? html`<div class="section">
-            <div class="section-head"><h2 class="heading-20">Upcoming</h2></div>
-            <div class="card sched-next-list">${next.map((n) => n.row)}</div>
-          </div>`
-        : ''}
-
-      <div class="section">
-        <div class="section-head"><h2 class="heading-20">Timeline</h2></div>
-        ${timeline(schedule, now, server, a)}
-      </div>
+      ${widgetGrid(
+        {
+          banners: (char, weap, reruns = true) => {
+            // Re-runs: RE-Factor Headhunting and Issues.
+            const shown = reruns ? live : live.filter((b) => b.kind !== 'refactor' && b.kind !== 'refactorIssue');
+            let rows = [newest(shown.filter((b) => !isWeaponBanner(b.kind)), char), newest(shown.filter((b) => isWeaponBanner(b.kind)), weap)].filter((row) => row.length);
+            // Three or fewer (neither kind more than two) share one row; more get a row per kind.
+            if (rows.length === 2 && rows[0].length + rows[1].length <= 3) rows = [rows.flat()];
+            return rows.length ? html`${rows.map((row) => html`<div class="sched-live">${row.map((b) => liveCard(b, now, server, a))}</div>`)}` : null;
+          },
+          events: liveEvents.length
+            ? html`<div class="section">
+                <div class="section-head"><h2 class="heading-20">Current</h2></div>
+                <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server, schedule))}</div>
+              </div>`
+            : null,
+          upcoming: next.length
+            ? html`<div class="section">
+                <div class="section-head"><h2 class="heading-20">Upcoming</h2></div>
+                <div class="card sched-next-list">${next.map((n) => n.row)}</div>
+              </div>`
+            : null,
+          timeline: html`<div class="section">
+            <div class="section-head"><h2 class="heading-20">Timeline</h2></div>
+            ${timeline(schedule, now, server, a)}
+          </div>`,
+        },
+        a,
+        redraw,
+      )}
     </main>`;
 }
 

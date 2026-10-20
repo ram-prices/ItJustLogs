@@ -27,7 +27,6 @@ import { fmtDate, html, raw, type Html } from '../html';
  */
 
 const PATH: Record<Kind, string> = { char: 'operators', weap: 'arsenal' };
-const NOUN: Record<Kind, string> = { char: 'Operators', weap: 'Arsenal' };
 /** What the banners view of each kind is called (its side tab and title). */
 const BANNERS_LABEL: Record<Kind, string> = { char: 'Headhunting', weap: 'Issues' };
 
@@ -218,7 +217,7 @@ export function credit(a: WikiAttribution, page?: string): Html {
 /** Operators › Headhunting, Arsenal › Issues: the banners pages' breadcrumbs. */
 /** Database › Operators › Si (an item's page), or Database › Operators (the list). */
 export function crumbs(kind: Kind, name?: string): Html {
-  const list = kind === 'char' ? 'Operators' : 'Weapons';
+  const list = kind === 'char' ? 'Operators' : 'Arsenals';
   return html`<nav class="breadcrumb wiki-crumbs" aria-label="Breadcrumb">
     <a href="/database">Database</a>${icon('chevron_right')}
     ${name ? html`<a href="${infoHref(kind)}">${list}</a>${icon('chevron_right')}<span class="wiki-em">${name}</span>` : html`<span class="wiki-em">${list}</span>`}
@@ -446,7 +445,7 @@ function sideTabs(label: string, views: [href: string, name: string, count: stri
 
 /** Database: every operator and weapon (wiki data, with the player's copies). */
 export const databaseTabs = (kind: Kind, body: Html): Html =>
-  sideTabs('Database', [[infoHref('char'), 'Operators', ''], [infoHref('weap'), 'Weapons', '']], infoHref(kind), body);
+  sideTabs('Database', [[infoHref('char'), 'Operators', ''], [infoHref('weap'), 'Arsenals', '']], infoHref(kind), body);
 
 /** Pulls: the player's banners of each kind (with how many they pulled on), and Stats. */
 export function pullsTabs(current: 'char' | 'weap' | 'stats', body: Html): Html {
@@ -455,7 +454,7 @@ export function pullsTabs(current: 'char' | 'weap' | 'stats', body: Html): Html 
     'Pulls',
     [
       [`/${PATH.char}`, BANNERS_LABEL.char, pulled('char')],
-      [`/${PATH.weap}`, NOUN.weap, pulled('weap')],
+      [`/${PATH.weap}`, 'Arsenal Issues', pulled('weap')],
       ['/stats', 'Stats', ''],
     ],
     current === 'stats' ? '/stats' : `/${PATH[current]}`,

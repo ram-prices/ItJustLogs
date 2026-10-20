@@ -268,3 +268,196 @@ export function installTint(): void {
     true, // 'load' doesn't bubble
   );
 }
+
+/**
+ * Ambient light from a picture, as YouTube's ambient mode does: the average
+ * colour along each of its four edges (`data-ambient-src`, set as --amb-t,
+ * --amb-r, --amb-b, --amb-l), so each side of the glow matches the side of
+ * the picture it spills from. Cached by URL; call after each render.
+ */
+const edgeCache = new Map<string, string[]>();
+const edgePending = new Set<string>();
+const AMBIENT_VARS = ['--amb-t', '--amb-r', '--amb-b', '--amb-l'];
+
+function edgeColours(img: HTMLImageElement): string[] {
+  const N = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = N;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, N, N);
+  const d = ctx.getImageData(0, 0, N, N).data;
+  /** The average of the pixels a strip two pixels deep along one edge. */
+  const avg = (pick: (x: number, y: number) => boolean) => {
+    let n = 0;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        const i = (y * N + x) * 4;
+        if (!pick(x, y) || d[i + 3] < 128) continue;
+        n++;
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+      }
+    // The edge's own colour, dark ones included (no lift): a dark picture glows dark.
+    return n ? `rgb(${clamp(r / n)}, ${clamp(g / n)}, ${clamp(b / n)})` : 'transparent';
+  };
+  return [avg((_, y) => y < 2), avg((x) => x >= N - 2), avg((_, y) => y >= N - 2), avg((x) => x < 2)];
+}
+
+export function tintAmbients(): void {
+  paintCardAmbients();
+  const paint = (url: string, colours: string[]) => {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-ambient-src]'))
+      if (el.dataset.ambientSrc === url) AMBIENT_VARS.forEach((v, i) => el.style.setProperty(v, colours[i]));
+  };
+  for (const el of document.querySelectorAll<HTMLElement>('[data-ambient-src]')) {
+    const url = el.dataset.ambientSrc!;
+    const known = edgeCache.get(url);
+    if (known) {
+      paint(url, known);
+      continue;
+    }
+    if (edgePending.has(url)) continue;
+    edgePending.add(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let colours = AMBIENT_VARS.map(() => 'transparent');
+      try {
+        colours = edgeColours(img);
+      } catch {
+        // not CORS-clean: keep the faint default
+      }
+      edgeCache.set(url, colours);
+      edgePending.delete(url);
+      paint(url, colours);
+    };
+    img.onerror = () => edgePending.delete(url);
+    img.src = url;
+  }
+}
+
+/**
+ * Ambient light around a whole card (`data-card-ambient` on a box the size of
+ * the card): its border in SEGMENTS pieces a side, each glowing in the colour
+ * of what the card shows at that point of its edge: the picture where it
+ * reaches the edge (the part of it on screen, after object-fit: cover), the
+ * card's own background everywhere else. So a banner glows from the top and
+ * fades to the card's dark down the sides and below.
+ */
+const SEGMENTS = 8;
+const images = new Map<string, HTMLImageElement | 'loading' | 'failed'>();
+
+function loaded(url: string): HTMLImageElement | null {
+  const known = images.get(url);
+  if (known && known !== 'loading') return known === 'failed' ? null : known;
+  if (!known) {
+    images.set(url, 'loading');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      images.set(url, img);
+      paintCardAmbients();
+    };
+    img.onerror = () => images.set(url, 'failed');
+    img.src = url;
+  }
+  return null;
+}
+
+/** The colour of a picture shown with object-fit: cover in a `bw`×`bh` box, at (x, y) in that box, read from a small copy. */
+function coverSampler(img: HTMLImageElement, bw: number, bh: number): ((x: number, y: number) => string) | null {
+  const N = 24;
+  const scale = Math.max(bw / img.naturalWidth, bh / img.naturalHeight);
+  const sw = bw / scale;
+  const sh = bh / scale;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d')!;
+  try {
+    g.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, N, N);
+    const d = g.getImageData(0, 0, N, N).data;
+    return (x, y) => {
+      const px = Math.min(N - 1, Math.max(0, Math.floor((x / bw) * N)));
+      const py = Math.min(N - 1, Math.max(0, Math.floor((y / bh) * N)));
+      const i = (py * N + px) * 4;
+      return d[i + 3] < 128 ? '' : `rgb(${d[i]}, ${d[i + 1]}, ${d[i + 2]})`;
+    };
+  } catch {
+    return null; // not CORS-clean
+  }
+}
+
+/**
+ * How much of the picture shows through the Background style's vignette at
+ * (x, y) in a w×h card (styles.css `.style-background .char-card-art::after`,
+ * keep these in step): each layer covers it with the card's colour by its
+ * alpha there.
+ */
+function vignetteKeep(x: number, y: number, w: number, h: number): number {
+  const lerp = (t: number, stops: [number, number][]) => {
+    for (let i = 1; i < stops.length; i++) {
+      const [t0, a0] = stops[i - 1];
+      const [t1, a1] = stops[i];
+      if (t <= t1) return a0 + ((a1 - a0) * Math.max(0, t - t0)) / (t1 - t0);
+    }
+    return stops[stops.length - 1][1];
+  };
+  const bottom = lerp((h - y) / h, [[0, 0.9], [0.5, 0.6], [0.8, 0], [1, 0]]);
+  const left = lerp(x / w, [[0, 0.55], [0.6, 0], [1, 0]]);
+  const r = Math.hypot((x / w - 0.55) / 1.1, (y / h - 0.25) / 0.85);
+  const edge = lerp(r, [[0, 0], [0.45, 0], [1, 0.7], [9, 0.7]]);
+  return (1 - bottom) * (1 - left) * (1 - edge);
+}
+
+/** `rgb(...)` mixed toward `base` (also `rgb(...)`), keeping `keep` of it. */
+function mixRgb(c: string, base: string, keep: number): string {
+  const a = c.match(/\d+(\.\d+)?/g)?.map(Number) ?? [0, 0, 0];
+  const b = base.match(/\d+(\.\d+)?/g)?.map(Number) ?? [0, 0, 0];
+  return `rgb(${[0, 1, 2].map((i) => Math.round(a[i] * keep + b[i] * (1 - keep))).join(', ')})`;
+}
+
+export function paintCardAmbients(): void {
+  for (const box of document.querySelectorAll<HTMLElement>('[data-card-ambient]')) {
+    // Outside the card (beside it in its wrap) or inside it.
+    const card = box.closest<HTMLElement>('.char-card') ?? box.parentElement?.querySelector<HTMLElement>('.char-card');
+    const pic = card?.querySelector<HTMLImageElement>('.char-card-art img');
+    if (!card) continue;
+    const cr = card.getBoundingClientRect();
+    if (!cr.width || !cr.height) continue;
+    const base = getComputedStyle(card).backgroundColor;
+    const img = pic && box.dataset.cardAmbient ? loaded(box.dataset.cardAmbient) : null;
+    const pr = pic?.getBoundingClientRect();
+    const sample = img && pr ? coverSampler(img, pr.width, pr.height) : null;
+    const vignetted = card.classList.contains('style-background') && !card.classList.contains('picture-only');
+    /** What the card shows at (x, y) on its edge (card coordinates). */
+    const at = (x: number, y: number): string => {
+      if (sample && pr) {
+        const px = x + cr.left - pr.left;
+        const py = y + cr.top - pr.top;
+        if (px >= 0 && py >= 0 && px <= pr.width && py <= pr.height) {
+          const c = sample(Math.min(px, pr.width - 1), Math.min(py, pr.height - 1));
+          // As a background, the picture is seen through its vignette.
+          if (c) return vignetted ? mixRgb(c, base, vignetteKeep(x, y, cr.width, cr.height)) : c;
+        }
+      }
+      return base;
+    };
+    const glows: string[] = [];
+    const seg = (side: 't' | 'r' | 'b' | 'l', i: number) => {
+      const f = (i + 0.5) / SEGMENTS;
+      const [x, y] = side === 't' ? [f * cr.width, 1] : side === 'b' ? [f * cr.width, cr.height - 1] : side === 'l' ? [1, f * cr.height] : [cr.width - 1, f * cr.height];
+      const pos =
+        side === 't' || side === 'b'
+          ? `left:${(i / SEGMENTS) * 100}%;width:${100 / SEGMENTS}%;${side === 't' ? 'top' : 'bottom'}:0;height:2px`
+          : `top:${(i / SEGMENTS) * 100}%;height:${100 / SEGMENTS}%;${side === 'l' ? 'left' : 'right'}:0;width:2px`;
+      glows.push(`<i style="${pos};--c:${at(x, y)}"></i>`);
+    };
+    for (const side of ['t', 'r', 'b', 'l'] as const) for (let i = 0; i < SEGMENTS; i++) seg(side, i);
+    const html = glows.join('');
+    if (box.innerHTML !== html) box.innerHTML = html;
+  }
+}

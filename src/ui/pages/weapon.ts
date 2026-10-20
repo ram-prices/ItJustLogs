@@ -38,7 +38,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
   ];
   const groups = sortGroups('weap', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), weapon: r.type, source: r.source, unreleased: !r.w }));
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
-      <h1 class="heading-32">Weapons</h1>
+      <h1 class="heading-32">Arsenals</h1>
       <p class="copy-16">${owned ? `${have}/${all.length}` : `${all.length} weapons`}</p>
     </div></div></div>
     <main class="container fade-in">${databaseTabs(
@@ -252,17 +252,17 @@ export function weaponInfoPage(id: string | undefined, a: Analysis | null, redra
   const f = wikiFile<WikiWeaponFile>('weapons.json', redraw);
   file = f.data;
   previews = previewsOf(redraw);
-  if (!file) return loadingOrFailed('weap', 'Weapons', f.failed);
+  if (!file) return loadingOrFailed('weap', 'Arsenals', f.failed);
   if (!id) return indexPage(file, ownedOf(a, 'weap'));
   const w = file.weapons[id];
   // Not on the wiki yet: the version guide's preview, if it has one.
   const p = !w ? previews?.weapons[id] : undefined;
   if (p && previews) return weaponPreview(id, p, previews.attribution);
-  if (!w) return statusPage('weap', 'Weapons', html`There's no wiki data for this weapon yet. <a href="${weaponInfoHref()}">See all weapons</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
+  if (!w) return statusPage('weap', 'Arsenals', html`There's no wiki data for this weapon yet. <a href="${weaponInfoHref()}">See all weapons</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
   return detailPage(id, w, file.attribution, a, redraw);
 }
 
 export function weaponInfoTitle(id: string | undefined): string {
   const w = id && (file?.weapons[id] ?? previews?.weapons[id]);
-  return w ? w.name : 'Weapons';
+  return w ? w.name : 'Arsenals';
 }

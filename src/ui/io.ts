@@ -1,7 +1,7 @@
 import { compareHistories, parseHistoryJson, type HistoryMatch } from '../domain/parse';
 import type { PullHistory } from '../domain/types';
 import { artChanged, clearHistory, importHistory, setImage, state, updateSettings } from '../state';
-import { allArtKeys, artBlob, blobToDataUrl, dataUrlToBlob, putArt, type ChangeTimes, type Settings } from '../store';
+import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, loadAvatarEdit, putArt, saveAvatarEdit, type AvatarEditJson, type ChangeTimes, type Settings } from '../store';
 import { toast } from './common';
 import { forgetLoadedArt } from './pages/art';
 
@@ -21,6 +21,8 @@ export interface Backup {
    * picture as a file of its own.
    */
   art?: Record<string, string>;
+  /** The profile picture's original and framing (Edit picture); downloaded backups only, like `art`. */
+  avatarEdit?: AvatarEditJson;
   changed?: ChangeTimes;
 }
 
@@ -55,6 +57,8 @@ export async function buildBackup(opts: { art?: boolean } = {}): Promise<Backup>
     if (url) backup.images![slot] = await blobToDataUrl(await fetch(url).then((r) => r.blob()));
   }
   if (opts.art) {
+    const edit = state.images.avatar ? await loadAvatarEdit() : undefined;
+    if (edit) backup.avatarEdit = await avatarEditToJson(edit);
     backup.art = {};
     for (const key of await allArtKeys()) {
       const blob = await artBlob(key);
@@ -135,6 +139,7 @@ export async function importText(text: string, source: string, mode: ImportMode 
       const img = b.images?.[slot];
       if (img?.startsWith('data:image/')) await setImage(slot, await dataUrlToBlob(img));
     }
+    if (b.avatarEdit?.source?.startsWith('data:image/') && b.images?.avatar) await saveAvatarEdit(await avatarEditFromJson(b.avatarEdit));
     const art = await restoreArt(b.art);
     toast(art ? `Export imported, with ${art} operator ${art === 1 ? 'picture' : 'pictures'}.` : 'Export imported.');
     return;

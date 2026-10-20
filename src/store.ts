@@ -25,8 +25,57 @@ const KEYS = {
 
 export type ThemePref = 'system' | 'light' | 'dark';
 
+/** How far an "above the circle" profile picture reaches left and right of its circle, in circle widths. */
+export interface AvatarBox {
+  l: number;
+  r: number;
+}
+
+/** One of Home's widgets (ui/pages/homeWidgets.ts): what it is, its width out of 12, and its own settings. */
+export interface HomeWidget {
+  id: string;
+  type: string;
+  size: 4 | 6 | 8 | 12;
+  /** Stacked under the widget before it, in its column (as wide as the column's top widget). */
+  under?: boolean;
+  /** Where in its row a narrower widget sits (a column: where its top widget does); left starts a new row. Unset: right after the one before it. */
+  align?: 'left' | 'center' | 'right';
+  /** Starts a new row: a widget placed out of a column keeps its height on the page. */
+  newRow?: boolean;
+  /** Empty space (always full width): its height in px. */
+  height?: number;
+  /** The widget's title hidden (a Character card hides its basic information instead, `hideBasic`). */
+  hideTitle?: boolean;
+  /** Character card: the operator, the picture (an art key, 'full' for their banner art; unset = portrait), which facts show. */
+  op?: string;
+  pic?: string;
+  facts?: string[];
+  /**
+   * Character card: ambient glow in the picture's edge colours, from the picture's edges
+   * (true / 'picture'), or around the whole card with the card solid inside ('card'); no
+   * outline (the glow spreads past it).
+   */
+  ambient?: boolean | 'picture' | 'card';
+  bare?: boolean;
+  /** Character card: no basic information (title, name, rarity, class, note); with nothing else shown, the picture alone. */
+  hideBasic?: boolean;
+  /** Character card: the picture as a round profile picture, a banner across the top, or the background (unset: profile picture for the portrait, else banner). */
+  artStyle?: 'avatar' | 'banner' | 'background';
+  /** Banners open now: how many of each kind's newest show (unset: all; 0: none). */
+  char?: number;
+  weap?: number;
+  /** Banners open now: false hides re-runs (RE-Factor banners). */
+  reruns?: boolean;
+  /** Character card and note: a title; the card's note, the note's text. */
+  title?: string;
+  note?: string;
+  text?: string;
+}
+
 export interface Settings {
   theme: ThemePref;
+  /** Home plays its game clip (ui/videoBackground.ts) and pictures move with the mouse (ui/parallax.ts); off: the clip's first frame, still pictures. Unset = on. */
+  motion?: boolean;
   displayName: string;
   showTimestamps: boolean;
   /** Rows the 6★ summary strip may grow to when expanded. */
@@ -75,6 +124,12 @@ export interface Settings {
   artPos?: Record<string, [number, number]>;
   /** What each operator has equipped (weapon and gear), by operator id. */
   loadouts?: Record<string, Loadout>;
+  /** The profile picture rises above its circle (its top half isn't cropped), for cut-out pictures: cat ears. */
+  avatarPop?: boolean;
+  /** How far that picture reaches beside its circle on each side, in circle widths (cropper.ts). */
+  avatarBox?: AvatarBox;
+  /** Home's widgets in order; unset = the schedule (homeWidgets.ts DEFAULT_HOME). */
+  home?: HomeWidget[];
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -349,6 +404,74 @@ export const saveImage = (slot: ImageSlot, blob: Blob): Promise<void> =>
   idb('images', 'readwrite', (s) => s.put(blob, slot));
 export const deleteImage = (slot: ImageSlot): Promise<void> =>
   idb<void>('images', 'readwrite', (s) => s.delete(slot)).catch(() => undefined);
+
+/**
+ * The profile picture as uploaded (at most 1024px), with how it was framed
+ * and what was painted outside its circle (cropper.ts), so Edit picture
+ * starts from there. Synced as a Drive file of its own (ui/sync.ts) and in
+ * downloaded backups. `at`: when it was saved; the newer copy wins.
+ */
+export interface AvatarEdit {
+  at?: number;
+  source: Blob;
+  zoom: number;
+  cx: number;
+  cy: number;
+  mask?: Blob;
+}
+const AVATAR_EDIT = 'avatar:edit';
+export const loadAvatarEdit = (): Promise<AvatarEdit | undefined> =>
+  idb<AvatarEdit | undefined>('images', 'readonly', (s) => s.get(AVATAR_EDIT)).catch(() => undefined);
+export const saveAvatarEdit = (edit: AvatarEdit): Promise<void> => idb('images', 'readwrite', (s) => s.put(edit, AVATAR_EDIT));
+export const deleteAvatarEdit = (): Promise<void> => idb<void>('images', 'readwrite', (s) => s.delete(AVATAR_EDIT)).catch(() => undefined);
+
+/**
+ * Profile pictures the player saved, newest first, so they can go back to
+ * one (Settings → Personalization): each as shown, how it shows, and what
+ * Edit picture needs. `current`: the one in use. This browser only.
+ */
+export interface SavedAvatar {
+  id: string;
+  at: number;
+  blob: Blob;
+  pop: boolean;
+  box?: AvatarBox;
+  edit?: AvatarEdit;
+}
+export const MAX_SAVED_AVATARS = 12;
+const AVATAR_HISTORY = 'avatar:history';
+export const loadAvatarHistory = (): Promise<{ list: SavedAvatar[]; current?: string }> =>
+  idb<{ list: SavedAvatar[]; current?: string } | undefined>('images', 'readonly', (s) => s.get(AVATAR_HISTORY))
+    .then((h) => h ?? { list: [] })
+    .catch(() => ({ list: [] }));
+export const saveAvatarHistory = (h: { list: SavedAvatar[]; current?: string }): Promise<void> =>
+  idb('images', 'readwrite', (s) => s.put({ list: h.list.slice(0, MAX_SAVED_AVATARS), current: h.current }, AVATAR_HISTORY));
+
+/** An AvatarEdit as JSON (data URLs), for Drive and backups. */
+export interface AvatarEditJson {
+  at: number;
+  zoom: number;
+  cx: number;
+  cy: number;
+  source: string;
+  mask?: string;
+}
+export const avatarEditToJson = async (e: AvatarEdit): Promise<AvatarEditJson> => ({
+  at: e.at ?? 0,
+  zoom: e.zoom,
+  cx: e.cx,
+  cy: e.cy,
+  source: await blobToDataUrl(e.source),
+  ...(e.mask ? { mask: await blobToDataUrl(e.mask) } : {}),
+});
+export const avatarEditFromJson = async (j: AvatarEditJson): Promise<AvatarEdit> => ({
+  at: j.at,
+  zoom: j.zoom,
+  cx: j.cx,
+  cy: j.cy,
+  source: await dataUrlToBlob(j.source),
+  ...(j.mask ? { mask: await dataUrlToBlob(j.mask) } : {}),
+});
 
 /**
  * Art the player added to an operator's page (uploaded, or downloaded from a

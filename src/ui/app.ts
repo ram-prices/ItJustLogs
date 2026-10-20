@@ -5,15 +5,18 @@ import { RESERVED_PATHS } from '../domain/wiki';
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
 import { clearEverything, clearHistory, currentServer, restoreCopy, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
-import { loadTabViews, saveTabView, type ThemePref } from '../store';
+import { deleteAvatarEdit, loadAvatarEdit, loadAvatarHistory, loadImage, loadTabViews, saveAvatarEdit, saveAvatarHistory, saveTabView, type AvatarBox, type AvatarEdit, type ThemePref } from '../store';
 import { installTooltips } from './charts';
 import { installImageFallback, toast } from './common';
-import { LOGO, TAB_ICON, icon, pageHeader } from './components';
+import { LOGO, TAB_ICON, avatar, icon, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
 import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
 import { copyText, focusScheduleItem, homePage, installCopyMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
+import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
+import { installParallax } from './parallax';
+import { syncVideoBackground } from './videoBackground';
 import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
@@ -26,12 +29,12 @@ import { eventOf, eventPage } from './pages/event';
 import { readEssenceFiles, readEssences } from './essenceReader';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
-import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
+import { forgetSavedAvatars, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage, togglePatch } from './pages/stats';
 import { cropAvatar } from './cropper';
 import { downloadDriveSnapshot, installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncPending, syncQueued, syncShown, syncView } from './sync';
 import { whenNear } from './near';
-import { installTint, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
+import { installTint, tintAmbients, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
 
 /**
  * App shell and router. Layout follows the Vercel dashboard: a header with
@@ -60,7 +63,7 @@ const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'stat
 /** Where Database and Pulls open first: the operator list, the Headhunting banners. */
 const SECTION_HOME = { database: '/operators/info', pulls: '/operators' } as const;
 /** A Pulls page's title (document title). */
-const PULLS_TITLE: Partial<Record<Page, string>> = { operators: 'Headhunting', arsenal: 'Arsenal', stats: 'Stats' };
+const PULLS_TITLE: Partial<Record<Page, string>> = { operators: 'Headhunting', arsenal: 'Arsenal Issues', stats: 'Stats' };
 
 /** The header tab a page belongs to. */
 function tabOf(route: Route): Tab | null {
@@ -166,7 +169,7 @@ function header(route: Route): Html {
       ${has
         ? html`<span class="crumb-sep">/</span>
             <div class="header-user">
-              ${state.images.avatar ? html`<img class="avatar" src="${state.images.avatar}" alt="" />` : html`<span class="avatar"></span>`}
+              ${avatar(state.images.avatar, !!state.settings.avatarPop, false, state.settings.avatarBox)}
               <span class="label-14 ellipsis">${name}</span>
             </div>`
         : ''}
@@ -226,7 +229,7 @@ function page(route: Route): Html {
         : html`Nothing lives at <b>/${route.short}</b>. <a href="/">Go home</a>, or browse <a href="/operators/info">operators</a> and <a href="/arsenal/info">weapons</a>.`,
     );
   }
-  if (route.page === 'home') return homePage(state.schedule, currentServer(), a);
+  if (route.page === 'home') return homePage(state.schedule, currentServer(), a, draw);
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);
@@ -257,6 +260,7 @@ function applyTheme(): void {
   const t = state.settings.theme;
   document.documentElement.dataset.theme =
     t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
+  document.documentElement.dataset.motion = state.settings.motion === false ? 'off' : 'on';
 }
 
 /**
@@ -338,6 +342,9 @@ function draw(): void {
   tintWeaponCards();
   tintSixStrip();
   tintHeroes();
+  syncVideoBackground();
+  fitBannerCards();
+  tintAmbients();
   const title = route.info
     ? route.page === 'arsenal'
       ? weaponInfoTitle(route.id)
@@ -452,8 +459,12 @@ function signOutBeforeLosingPulls(): boolean {
 function installImport(): void {
   let depth = 0;
   const overlay = document.querySelector('.drop-overlay')!;
+  // Something dragged from the page itself (the profile picture, a portrait, a widget) isn't a file to import or read.
+  let fromPage = false;
+  addEventListener('dragstart', () => (fromPage = true));
+  addEventListener('dragend', () => (fromPage = false));
   addEventListener('dragenter', (e) => {
-    if (!e.dataTransfer?.types.includes('Files')) return;
+    if (fromPage || !e.dataTransfer?.types.includes('Files')) return;
     depth++;
     // On Achievements and Archive a dropped recording or screenshot is read, not imported.
     overlay.classList.toggle('medals', parseRoute().page === 'achievements');
@@ -467,8 +478,11 @@ function installImport(): void {
       overlay.classList.remove('on');
     }
   });
-  addEventListener('dragover', (e) => e.preventDefault());
+  addEventListener('dragover', (e) => {
+    if (!fromPage) e.preventDefault();
+  });
   addEventListener('drop', async (e) => {
+    if (fromPage) return;
     e.preventDefault();
     depth = 0;
     overlay.classList.remove('on');
@@ -512,6 +526,52 @@ function mediaToReader(files: File[]): boolean {
   return true;
 }
 
+/** A framed profile picture, what Edit picture reopens, and a place in the saved pictures. */
+async function saveAvatar(done: { blob: Blob; edit: AvatarEdit; box?: AvatarBox }): Promise<void> {
+  const at = Date.now();
+  const edit = { ...done.edit, at };
+  await saveAvatarEdit(edit);
+  const id = at.toString(36);
+  const history = await loadAvatarHistory();
+  await saveAvatarHistory({ list: [{ id, at, blob: done.blob, pop: !!state.settings.avatarPop, box: done.box, edit }, ...history.list], current: id });
+  forgetSavedAvatars();
+  updateSettings({ avatarBox: done.box });
+  await setImage('avatar', done.blob);
+}
+
+/** Back to a saved picture: it, how it showed, and its edit. */
+async function useSavedAvatar(id: string): Promise<void> {
+  const history = await loadAvatarHistory();
+  const saved = history.list.find((x) => x.id === id);
+  if (!saved) return;
+  if (saved.edit) await saveAvatarEdit({ ...saved.edit, at: Date.now() });
+  else await deleteAvatarEdit();
+  await saveAvatarHistory({ list: [saved, ...history.list.filter((x) => x !== saved)], current: id });
+  forgetSavedAvatars();
+  updateSettings({ avatarPop: saved.pop, avatarBox: saved.box });
+  await setImage('avatar', saved.blob);
+}
+
+async function forgetSavedAvatar(id: string): Promise<void> {
+  const history = await loadAvatarHistory();
+  await saveAvatarHistory({ list: history.list.filter((x) => x.id !== id), current: history.current === id ? undefined : history.current });
+  forgetSavedAvatars();
+  draw();
+}
+
+/** Edit picture: the cropper again, from the upload and its framing (else the picture as it is, on a device that didn't upload it). */
+async function editAvatar(): Promise<void> {
+  try {
+    const edit = await loadAvatarEdit();
+    const source = edit?.source ?? (await loadImage('avatar'));
+    if (!source) return;
+    const done = await cropAvatar(source, !!state.settings.avatarPop, edit, state.settings.displayName);
+    if (done) await saveAvatar(done);
+  } catch {
+    toast("That picture couldn't be opened.", 'error');
+  }
+}
+
 /** Personalization in Settings: profile picture and display name. */
 function installProfile(): void {
   document.getElementById('avatarInput')!.addEventListener('change', async (e) => {
@@ -521,8 +581,8 @@ function installProfile(): void {
     if (!file) return;
     try {
       // The player frames it first (cropper.ts); Cancel keeps the old picture.
-      const blob = await cropAvatar(file);
-      if (blob) await setImage('avatar', blob);
+      const done = await cropAvatar(file, !!state.settings.avatarPop, undefined, state.settings.displayName);
+      if (done) await saveAvatar(done);
     } catch {
       toast("That picture couldn't be opened. Try a PNG or JPG.", 'error');
     }
@@ -603,7 +663,17 @@ async function onClick(e: MouseEvent): Promise<void> {
     case 'avatar-upload':
       return document.getElementById('avatarInput')!.click();
     case 'avatar-remove':
+      void deleteAvatarEdit();
+      void loadAvatarHistory().then((h) => saveAvatarHistory({ list: h.list, current: undefined }).then(forgetSavedAvatars));
       return setImage('avatar', null);
+    case 'avatar-edit':
+      return void editAvatar();
+    case 'avatar-use':
+      return void useSavedAvatar(el.dataset.value!);
+    case 'avatar-forget':
+      return void forgetSavedAvatar(el.dataset.value!);
+    case 'avatar-shape':
+      return updateSettings({ avatarPop: el.dataset.value === 'pop' });
     case 'filter': {
       // Re-render just this card's body: a full redraw replays the page fade-in and flickers.
       const card = el.closest<HTMLElement>('[data-pool]');
@@ -649,6 +719,8 @@ async function onClick(e: MouseEvent): Promise<void> {
     }
     case 'theme':
       return updateSettings({ theme: el.dataset.value as ThemePref });
+    case 'motion':
+      return updateSettings({ motion: el.dataset.value === 'on' ? undefined : false });
     case 'server':
       return updateSettings({ server: el.dataset.value as Server });
     case 'banner-scope':
@@ -794,11 +866,13 @@ export function mount(): void {
   installImageFallback();
   installTint();
   installCardGlow();
+  installParallax();
   installSlideshows();
   installTooltips();
   installImport();
   installTimelineLabels();
   installCopyMenu();
+  installHomeWidgets();
   installWikiControls();
   installListSearch();
   installProfile();

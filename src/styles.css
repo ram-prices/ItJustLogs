@@ -319,20 +319,108 @@ p a {
   min-width: 0;
 }
 .header-user .avatar {
-  width: 32px;
-  height: 32px;
+  --s: 32px;
 }
 .avatar {
-  width: 24px;
-  height: 24px;
+  --s: 24px;
+  width: var(--s);
+  height: var(--s);
   border-radius: 50%;
   object-fit: cover;
+  /* A picture framed to rise above the circle is taller: its circle part is at the bottom. */
+  object-position: center bottom;
   background: linear-gradient(135deg, var(--op), var(--ars));
   flex-shrink: 0;
 }
 .avatar.lg {
-  width: 56px;
-  height: 56px;
+  --s: 56px;
+}
+/* A picture framed beyond its circle (cropper.ts): it sits on the circle's
+   bottom, its circle the same size, reaching --l and --r circle widths to the
+   left and right. In the circle it's cut round; above the circle (`pop`) what
+   was painted outside shows, with room made only on the sides it reaches. */
+.avatar.framed {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+.avatar.framed img {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--l) * -100%);
+  width: calc((1 + var(--l) + var(--r)) * 100%);
+  max-width: none;
+  height: auto;
+}
+.avatar.framed.pop {
+  overflow: visible;
+  margin-left: calc(var(--l) * var(--s));
+  margin-right: calc(var(--r) * var(--s));
+}
+/* Saved profile pictures: click one to use it again; the one in use is ringed. */
+.profile-saved {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-saved-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px 12px;
+  padding-top: 24px;
+}
+.profile-saved-item {
+  position: relative;
+  display: inline-flex;
+}
+.profile-saved-use {
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+.profile-saved-use:hover {
+  background: var(--gray-alpha-200);
+}
+.profile-saved-item.current .profile-saved-use {
+  box-shadow: 0 0 0 2px var(--focus);
+  cursor: default;
+}
+.profile-saved-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--background-100);
+  box-shadow: var(--shadow-border);
+  color: var(--gray-900);
+  cursor: pointer;
+  opacity: 0;
+}
+.profile-saved-x .icon {
+  font-size: 14px;
+}
+.profile-saved-item:hover .profile-saved-x,
+.profile-saved-x:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .profile-saved-x {
+    opacity: 1;
+  }
+}
+.profile-shape {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 16px;
 }
 /* Settings → Personalization: picture beside the name field. */
 .profile-edit {
@@ -2413,12 +2501,14 @@ code {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
-/* Headhunting and Arsenal each get their own row. */
+/* Headhunting and Arsenal each get their own row when there are more than three. */
 .sched-live + .sched-live {
   margin-top: 16px;
 }
 .sched-card {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .sched-card .banner-art {
   height: 140px;
@@ -2430,6 +2520,9 @@ code {
   color: rgba(255, 255, 255, 0.7);
 }
 .sched-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 12px 16px 14px;
 }
 .sched-when {
@@ -2466,7 +2559,9 @@ code {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-top: 12px;
+  /* At the card's bottom, level across a row of cards. */
+  margin-top: auto;
+  padding-top: 12px;
   font: 500 11px/16px var(--font-sans);
   text-decoration: none;
 }
@@ -2901,6 +2996,40 @@ a.sched-next:hover {
   cursor: grab;
   touch-action: none;
   user-select: none;
+}
+.crop-stage.tall {
+  aspect-ratio: 2.5 / 1.4;
+}
+/* The cropper's preview: the picture as the header (with the name) and Settings show it. */
+.crop-preview {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 16px 12px 10px;
+  border-radius: var(--radius-md);
+  background: var(--background-200);
+}
+.crop-preview > .label-12 {
+  width: 100%;
+}
+.crop-preview-item {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.crop-stage.tall .crop-ring {
+  display: none;
+}
+.crop-stage.painting {
+  cursor: crosshair;
+}
+.crop-tools {
+  align-self: flex-start;
+}
+.crop-fill {
+  flex-wrap: wrap;
+  gap: 4px;
 }
 .crop-stage.dragging {
   cursor: grabbing;
@@ -5509,4 +5638,699 @@ a.six-item {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
+}
+
+/* Home as widgets (pages/homeWidgets.ts): a 12-column grid, each widget
+   spanning 4, 6, 8 or 12; one column on phones. Customize shows each
+   widget's bar (drag, width, move, edit, remove). */
+.home-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 40px;
+  margin-bottom: 8px;
+}
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 40px 16px;
+  align-items: start;
+}
+/* On a wide screen each widget or column sits at the row and column worked
+   out for it (homeWidgets.ts gridPlaces: its place left, middle or right,
+   Customize); narrower, they just follow one another. */
+@media (min-width: 901px) {
+  .home-grid > :is(.widget, .widget-col) {
+    grid-row: var(--row);
+    grid-column: var(--start) / span var(--span, 12);
+  }
+}
+/* Empty space: blank room across the page, of the player's chosen height (drag its bottom edge). */
+.widget-spacer {
+  min-height: 16px;
+}
+.home-grid.editing .widget[data-type='spacer'] {
+  background: repeating-linear-gradient(135deg, var(--gray-alpha-100) 0 8px, transparent 8px 16px);
+  border-radius: var(--radius-lg);
+}
+.spacer-edge {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 64px;
+  height: 18px;
+  margin-left: -32px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.spacer-edge::after {
+  content: '';
+  position: absolute;
+  inset: 7px 0;
+  border-radius: 2px;
+  background: var(--gray-700);
+}
+.widget {
+  grid-column: span var(--span, 12);
+  min-width: 0;
+  container-type: inline-size;
+}
+.widget-aligns .icon {
+  font-size: 16px;
+}
+/* Widgets stacked in one column (Customize: drop near a widget's top or bottom). */
+.widget-col {
+  grid-column: span var(--span, 12);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+/* Title hidden (Customize → Title): the heading goes, anything beside it stays. */
+.widget.no-title .widget-body .section-head > h2,
+.widget.no-title .widget-note > h2 {
+  display: none;
+}
+.widget.no-title .widget-body .section-head:not(:has(> :not(h2))) {
+  display: none;
+}
+.widget-body > .section:first-child,
+.widget-body > .sched-live:first-child {
+  margin-top: 0;
+}
+/* Editing keeps every widget exactly where and how big it shows: only an
+   outline (not laid out) and a toolbar floating over its top. */
+.home-grid.editing .widget {
+  position: relative;
+  border-radius: var(--radius-lg);
+  outline: 1px dashed var(--gray-alpha-400);
+  outline-offset: 6px;
+}
+.home-grid.editing .widget {
+  cursor: grab;
+  user-select: none;
+}
+.home-grid.editing .widget.dragging {
+  cursor: grabbing;
+}
+.home-grid.editing .widget:hover {
+  outline-color: var(--gray-alpha-600);
+}
+.home-grid.editing .widget-body {
+  pointer-events: none;
+}
+.widget.dragging {
+  opacity: 0.4;
+}
+.widget.drop-before {
+  box-shadow: -10px 0 0 -6px var(--focus);
+}
+.widget.drop-after {
+  box-shadow: 10px 0 0 -6px var(--focus);
+}
+.widget[data-size='12'].drop-before {
+  box-shadow: 0 -10px 0 -6px var(--focus);
+}
+.widget[data-size='12'].drop-after,
+.widget.drop-below {
+  box-shadow: 0 10px 0 -6px var(--focus);
+}
+.widget.drop-above {
+  box-shadow: 0 -10px 0 -6px var(--focus);
+}
+.widget-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  box-shadow: var(--shadow-card);
+}
+.widget-grip {
+  cursor: grab;
+  color: var(--gray-900);
+  display: inline-flex;
+  padding: 4px;
+  /* Dragging by it on a touch screen moves the widget, not the page. */
+  touch-action: none;
+}
+.widget-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  color: var(--gray-900);
+}
+.widget-sizes button {
+  height: 22px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+.widget-empty {
+  padding: 16px;
+}
+.widget-card {
+  padding: 4px 0;
+}
+.widget .metric-value {
+  font-size: 26px;
+  line-height: 32px;
+  white-space: normal;
+}
+.metric-of {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: var(--gray-900);
+}
+.widget-list {
+  display: flex;
+  flex-direction: column;
+}
+.widget-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.widget-row + .widget-row {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.widget-row:hover {
+  background: var(--gray-alpha-100);
+}
+.widget-row .item-icon {
+  width: 32px;
+  height: 32px;
+}
+.widget-row-name {
+  display: block;
+  font-weight: 600;
+}
+.widget-row-name.r6 {
+  color: var(--r6);
+}
+.widget-row-name.r5 {
+  color: var(--r5);
+}
+.widget-row > .min0 > span {
+  display: block;
+}
+.widget-note {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.widget-note p {
+  margin: 0;
+}
+/* Character card. The picture shows as a profile picture (round, beside the
+   text when the card is wide), a banner across the top, or the background
+   behind everything. Ambient: a glow of the operator's colour, inside the
+   card (its outline stays) or, with no outline, spreading past it. */
+.char-card-wrap {
+  position: relative;
+  isolation: isolate;
+}
+.char-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+}
+.char-card .wiki-hero-glow,
+.char-card-wrap > .wiki-hero-glow {
+  inset: -20%;
+  z-index: -1;
+  opacity: 0.9;
+  background: radial-gradient(ellipse 55% 55% at 50% 45%, var(--banner-tint, transparent) 0%, transparent 70%);
+}
+/* Ambient light from the picture's edges (tint.ts tintAmbients): each side's
+   colour glows from that edge of the card, inward while it has its outline,
+   outward past it without. */
+.char-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: var(--radius-lg);
+  opacity: 0.4;
+  box-shadow:
+    inset 0 64px 72px -40px var(--amb-t, transparent),
+    inset -64px 0 72px -40px var(--amb-r, transparent),
+    inset 0 -64px 72px -40px var(--amb-b, transparent),
+    inset 64px 0 72px -40px var(--amb-l, transparent);
+}
+.char-card-wrap.bare .char-ambient {
+  box-shadow:
+    0 -28px 80px 4px var(--amb-t, transparent),
+    28px 0 80px 4px var(--amb-r, transparent),
+    0 28px 80px 4px var(--amb-b, transparent),
+    -28px 0 80px 4px var(--amb-l, transparent);
+}
+/* Around the card: solid inside, the glow all round its edges, outside it. */
+.char-card-wrap.around .char-card {
+  background: var(--background-100);
+}
+/* Each piece of the card's border glows outward in its colour; together they blend round the card. */
+.char-ambient-card {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+}
+.char-ambient-card > i {
+  position: absolute;
+  box-shadow: 0 0 56px 14px var(--c);
+}
+/* A banner covers only the card's top: the glow comes from its edges (sized like it), not from below. */
+.char-ambient.banner {
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow:
+    inset 0 64px 72px -40px var(--amb-t, transparent),
+    inset -64px 0 72px -40px var(--amb-r, transparent),
+    inset 64px 0 72px -40px var(--amb-l, transparent);
+}
+.char-card-wrap.bare .char-ambient.banner {
+  box-shadow:
+    0 -28px 80px 4px var(--amb-t, transparent),
+    28px 0 80px 4px var(--amb-r, transparent),
+    -28px 0 80px 4px var(--amb-l, transparent);
+}
+.char-card-wrap.bare .char-card {
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+.char-card-art {
+  display: block;
+}
+.char-card-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Profile picture: round, at the top left beside the name. */
+.char-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.char-card-names {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.style-avatar .char-card-art {
+  flex: none;
+}
+/* Without the basic information the round picture stands above the rest. */
+.style-avatar > .char-card-art {
+  padding: 16px 16px 0;
+}
+.style-avatar .char-card-art img {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--gray-alpha-100);
+}
+/* Its height is set after layout to match the card as a Background (homeWidgets.ts fitBannerCards). */
+.style-banner .char-card-art {
+  aspect-ratio: 16 / 9;
+  background: var(--gray-alpha-100);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+/* Rounded on the picture itself and clipped round too: overflow alone left a corner square in some browsers. */
+.style-banner .char-card-art,
+.style-banner .char-card-art img {
+  border-radius: var(--radius-lg);
+  clip-path: inset(0 round var(--radius-lg));
+}
+.style-background {
+  min-height: 320px;
+  justify-content: flex-end;
+}
+/* Picture only: no details, so nothing to darken or leave room for. */
+.picture-only.style-background .char-card-art::after {
+  display: none;
+}
+.picture-only.style-avatar {
+  align-items: center;
+  padding: 16px;
+}
+.picture-only.style-avatar .char-card-art img {
+  width: 160px;
+  height: 160px;
+}
+.style-background .char-card-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+/* (tint.ts vignetteKeep copies these layers for the card's ambient glow: keep them in step.)
+   Text stays readable over the picture with a vignette on the picture itself
+   (darker toward the edges and the bottom), not a panel behind the text. */
+.style-background .char-card-text {
+  padding-top: 180px;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+  /* Only the left 60% holds text, so the picture shows on the right; what doesn't fit is cut off. */
+  width: 60%;
+  overflow: hidden;
+}
+.style-background .char-card-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, color-mix(in srgb, var(--background-100) 90%, transparent) 0%, color-mix(in srgb, var(--background-100) 60%, transparent) 50%, transparent 80%),
+    linear-gradient(to right, color-mix(in srgb, var(--background-100) 55%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 110% 85% at 55% 25%, transparent 45%, color-mix(in srgb, var(--background-100) 70%, transparent) 100%);
+}
+.char-card-wrap.bare .style-background .char-card-art {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.char-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+.char-card-name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.char-card-note {
+  color: var(--gray-1000);
+  white-space: pre-line;
+}
+.char-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  margin-top: 4px;
+}
+.char-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-900);
+}
+.char-fact b {
+  color: var(--gray-1000);
+  font-weight: 600;
+}
+.char-fact-icon {
+  width: 22px;
+  height: 22px;
+}
+.char-pic-img.wide {
+  width: 114px;
+}
+.char-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px 12px;
+  margin-top: 6px;
+}
+.char-stats > span {
+  display: flex;
+  flex-direction: column;
+}
+.char-stats b {
+  font: 600 16px/22px var(--font-sans);
+}
+.char-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 10px;
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+/* Over a background picture, a short divider instead of a line across it. */
+.style-background .char-section {
+  position: relative;
+  box-shadow: none;
+}
+.style-background .char-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 1px;
+  background: var(--gray-alpha-500);
+}
+.card-gears {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.card-gear-img {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+  object-fit: contain;
+}
+.card-weapon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.card-weapon-img {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+  object-fit: contain;
+}
+.card-weapon .min0 {
+  display: flex;
+  flex-direction: column;
+}
+.card-weapon-name {
+  font-weight: 600;
+}
+/* Add-a-widget and edit dialogs. */
+.home-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.home-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.widget-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.widget-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+  color: var(--gray-1000);
+  font: 400 14px/20px var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.widget-pick:hover {
+  background: var(--gray-alpha-200);
+}
+.home-dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.home-dialog textarea.input {
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+  font: 400 14px/20px var(--font-sans);
+}
+.char-pics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.char-pic {
+  cursor: pointer;
+}
+.char-pic input {
+  position: absolute;
+  opacity: 0;
+}
+.char-pic-img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--gray-alpha-400);
+}
+.char-pic input:checked + .char-pic-img {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+.char-fact-picks {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  gap: 8px 16px !important;
+}
+.char-fact-picks > .label-13 {
+  width: 100%;
+}
+.char-fact-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 14px/20px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .widget[data-size='4'],
+  .widget-col[data-size='4'] {
+    grid-column: span 6;
+  }
+  .widget[data-size='8'],
+  .widget-col[data-size='8'] {
+    grid-column: span 12;
+  }
+}
+@media (max-width: 640px) {
+  .widget,
+  .widget-col {
+    grid-column: span 12 !important;
+  }
+  /* One column on phones: an empty space would only push things down. */
+  .home-grid:not(.editing) .widget[data-type='spacer'] {
+    display: none;
+  }
+}
+
+/* Home's game clip (ui/videoBackground.ts): behind everything,
+   dimmed and softened so the page stays readable, fading out toward the bottom. */
+.video-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(2px) saturate(0.85);
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
+  mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
+  transition: opacity 1.2s var(--ease);
+}
+.video-bg.shown {
+  opacity: 0.35;
+}
+:root[data-theme='light'] .video-bg.shown {
+  opacity: 0.22;
+}
+
+/* An Arsenal Issue's art in layers (components.ts issueArt), stacked exactly. */
+.issue-art,
+.issue-float {
+  position: absolute;
+  inset: 0;
+}
+
+/* Parallax (Settings → Backgrounds; never with reduced motion or without a
+   mouse): a picture shifts a little the other way from the mouse over it
+   (--px/--py, eased in ui/parallax.ts), slightly enlarged so its edges never
+   show. Banner cards barely move; headers and the Character card more. On an
+   Issue the backdrop and dotted rule stay put, the ornaments move a little
+   and the weapon most, floating gently (on its wrapper, so the float and the
+   shift never animate the same element). */
+@keyframes weapon-float {
+  from {
+    transform: translateY(-0.9%);
+  }
+  to {
+    transform: translateY(0.9%);
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  :root[data-motion='on'] :is(.wiki-hero-art, .op-backdrop, .style-banner .char-card-art img, .style-background .char-card-art img) {
+    --shift: 2%;
+    scale: 1.06;
+  }
+  :root[data-motion='on'] .banner-art img {
+    --shift: 0.6%;
+    scale: 1.03;
+  }
+  :root[data-motion='on'] .banner-art .issue-back {
+    --shift: 0%;
+  }
+  :root[data-motion='on'] .banner-art .issue-front {
+    --shift: 1.2%;
+  }
+  :root[data-motion='on'] .banner-art .issue-weapon {
+    --shift: 2.5%;
+  }
+  :root[data-motion='on'] .issue-float {
+    animation: weapon-float 5s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  :root[data-motion='on'] :is(.wiki-hero-art, .op-backdrop, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
+    translate: calc(var(--px, 0) * -1 * var(--shift)) calc(var(--py, 0) * -1 * var(--shift));
+    /* Firefox puts a picture that's only moved (not tilted) on whole pixels,
+       so these shifts of a pixel or two would twitch. A 3D tilt too small to
+       see lets it move smoothly; a flat turn isn't enough on its GPU path. */
+    transform: perspective(600px) rotateY(0.02deg);
+    will-change: translate;
+    transition:
+      transform 0.4s var(--ease),
+      filter 0.4s var(--ease);
+  }
+  :root[data-motion='on'] .capturing .banner-art img {
+    scale: none;
+    translate: none;
+    transform: none;
+  }
+  :root[data-motion='on'] .capturing .issue-float {
+    animation: none;
+  }
 }

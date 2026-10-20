@@ -1,7 +1,20 @@
-import { itemIconUrl } from '../domain/banners';
+import { issueLayerUrls, itemIconUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { html, raw, type Html } from './html';
 import { tintFor } from './tint';
+
+/**
+ * An Arsenal Issue's banner art in its layers, so the weapon and ornaments
+ * can move apart from the backdrop (ui/parallax.ts). Until a banner's layers
+ * exist, its flat art (`flat`) takes their place (common.ts). Null for other banners.
+ */
+export function issueArt(poolId: string, flat: string): Html | null {
+  const l = issueLayerUrls(poolId);
+  if (!l) return null;
+  const layer = (cls: string, src: string) =>
+    html`<img class="${cls}" src="${src}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" data-fallback />`;
+  return html`<span class="issue-art" data-flat="${flat}">${layer('issue-back', l.back)}<span class="issue-float">${layer('issue-weapon', l.weapon)}</span>${layer('issue-front', l.front)}</span>`;
+}
 
 /** Small Geist-style building blocks shared by every page. */
 
@@ -51,6 +64,20 @@ export function metric(o: MetricOpts): Html {
 export const itemName = (name: string): Html =>
   /^oroberyls?$/i.test(name) ? html`<span class="oroberyl"><img class="oroberyl-icon" src="/icons/oroberyl.webp" alt="" />${name}</span>` : html`${name}`;
 
+/**
+ * The player's profile picture in its circle (`lg`: Settings' bigger one).
+ * A picture framed to show beyond its circle (`box`: how far it reaches
+ * left and right, in circle widths) sits on the circle's bottom; with `pop`
+ * what it has outside the circle shows (room is made only on the sides it
+ * reaches), else it's cut to the circle.
+ */
+export const avatar = (src: string | undefined, pop: boolean, lg = false, box?: { l: number; r: number }): Html => {
+  const size = lg ? ' lg' : '';
+  if (!src) return html`<span class="avatar${size}"></span>`;
+  if (!box) return html`<img class="avatar${size}" src="${src}" alt="" />`;
+  return html`<span class="avatar framed${pop ? ' pop' : ''}${size}" style="--l:${box.l};--r:${box.r}"><img src="${src}" alt="" /></span>`;
+};
+
 /** `plain` is the borderless page-level stat row; the default is a bordered panel. */
 export const metrics = (items: Html[], variant: '' | 'plain' = ''): Html =>
   html`<div class="metrics${variant ? ` ${variant}` : ''}">${items}</div>`;
@@ -60,6 +87,9 @@ export function itemImg(kind: Kind, itemId: string, cls = 'item-icon'): Html {
   if (!src) return html`<span class="${cls}"></span>`;
   return html`<img class="${cls}${kind === 'weap' ? ' weapon' : ''}" src="${src}" alt="" loading="lazy" decoding="async" data-fallback />`;
 }
+
+/** Marks a page that plays a video background (ui/videoBackground.ts): Home. */
+export const backgroundSource = (): Html => html`<i class="bg-source" hidden></i>`;
 
 /**
  * The soft colour glow behind an operator or weapon page's header: the item's
@@ -126,7 +156,8 @@ export const TAB_ICON: Record<string, Html> = {
  * The ItJustLogs mark: a cut log, after Endfield's Wood material icon. Solid in
  * the text colour, with the ring band and bark marks knocked out in the
  * background colour, so it follows the theme.
- * public/favicon.svg is the same log on a dark tile; keep the two in sync.
+ * public/favicon.svg is the same log, its lines cut out, dark or light with the
+ * browser's theme; keep the two in sync.
  */
 const FG = 'currentColor';
 const BG = 'var(--background-100)';
