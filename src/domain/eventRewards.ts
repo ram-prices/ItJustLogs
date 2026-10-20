@@ -26,7 +26,7 @@ export interface EventRewardsFile {
   fetched: string;
   events: Record<string, EventRewards>;
   /** Events the wiki lists but schedule.json doesn't (announced mid-version), by wiki page, with their UTC start per server. */
-  extra?: Record<string, EventRewards & { type: string; start: { asia: string | null; americas: string | null } }>;
+  extra?: Record<string, EventRewards & { type: string; start: { asia: string | null; americas: string | null }; end?: { asia: string | null; americas: string | null } }>;
 }
 
 /** Oroberyl per Headhunting pull, and per Origeometry (from the wiki's Headhunting and Origeometry pages). */

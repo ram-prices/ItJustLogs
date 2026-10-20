@@ -226,7 +226,7 @@ function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossi
         )
       : ''}
     <div class="patch-income-row patch-income-total">
-      <span>${inc.basic ? `Plus ${plural(inc.basic, 'Basic HH Permit')}` : 'In all'}</span><span class="num">${fmtPulls(Math.round((inc.headhunting + (bondLine ? bondPermits : 0) + dossierPulls) * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
+      <span>${inc.basic ? `Plus ${plural(Math.round(inc.basic), 'Basic HH Permit')}` : 'In all'}</span><span class="num">${fmtPulls(Math.round((inc.headhunting + (bondLine ? bondPermits : 0) + dossierPulls) * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
     </div>
   </div>`;
 }
@@ -250,7 +250,7 @@ interface Tickets {
 }
 
 function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: Tickets, bond: number, dossiers: Dossiers | undefined): Html {
-  return html`<tr class="patch-banners"><td colspan="6"><div class="patch-banner-list">
+  return html`<tr class="patch-banners"><td colspan="5"><div class="patch-banner-list">
     ${p.banners.map((b) => {
       const s = b.summary;
       const six = s ? s.pulls.filter((x) => x.rarity === 6).length : 0;
@@ -272,12 +272,18 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
   const incomeFile = wikiFile<IncomeFile>('income.json', redraw);
   income = incomeFile.data;
   const paid = state.settings.paidIncome ?? [];
-  const free = new Map(patchIncome(state.schedule, currentServer(), Date.now(), events.data, income, paid).map((p) => [p.key, p]));
+  const free = new Map(patchIncome(state.schedule, currentServer(), Date.now(), events.data, income, paid, a.firstTs).map((p) => [p.key, p]));
   // Operator pulls on banners outside any patch (Basic Headhunting, New Horizons) count for the patch they were made in.
   const otherPulls = a.banners.filter((b) => b.kind === 'char' && b.patch.major === -1).flatMap((b) => b.pulls);
   const otherIn = (p: PatchStats) => {
     const inc = p.patch.major === -1 ? undefined : free.get(p.patch.key);
     return inc ? otherPulls.filter((x) => x.ts >= inc.start && x.ts < inc.end) : [];
+  };
+  // Constant Issue pulls count as Arsenal pulls made in the patch they were made in, like the tickets that pay for them.
+  const constantPulls = a.banners.filter((b) => b.kind === 'weap' && b.patch.major === -1).flatMap((b) => b.pulls.filter((x) => !x.isFree));
+  const weapMadeOf = (p: PatchStats) => {
+    const inc = p.patch.major === -1 ? undefined : free.get(p.patch.key);
+    return p.weapPulls + (inc ? constantPulls.filter((x) => x.ts >= inc.start && x.ts < inc.end).length : 0);
   };
   /** Arsenal Tickets a patch's Headhunting results gave back. */
   const ticketsOf = (p: PatchStats): Tickets => ({
@@ -333,24 +339,29 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       : null;
   };
   const patches = patchStats(a, state.db, state.schedule)
-    .filter((p) => p.charPulls + p.weapPulls > 0 || freeOf(p))
+    .filter((p) => p.charPulls + weapMadeOf(p) > 0 || freeOf(p))
     // Permanent banners first: the table ends with the total.
     .sort((x, y) => (x.patch.major === -1 ? -1 : y.patch.major === -1 ? 1 : y.patch.major - x.patch.major || y.patch.minor - x.patch.minor));
-  const maxPulls = Math.max(1, ...patches.map((p) => Math.max(p.charPulls, p.weapPulls, freeOf(p)?.char ?? 0, freeOf(p)?.weap ?? 0)));
+  const maxPulls = Math.max(1, ...patches.map((p) => Math.max(p.charPulls, weapMadeOf(p), freeOf(p)?.char ?? 0, freeOf(p)?.weap ?? 0)));
   const weeks = weeklyTimeline(a);
-  const activeWeeks = weeks.filter((w) => w.char + w.weap > 0).length;
-  // Pulls earned per week: each patch's limited Headhunting pulls, for the part of it since the
-  // player's first pull and up to now (the current patch's projection prorated by time), over those weeks.
+  // Earned per week since the player's first pull and up to now (the current patch's projection
+  // prorated by time): limited Headhunting pulls, and Arsenal Issues (sets of 10) with the
+  // Arsenal Tickets the player's Headhunting results gave back.
   const now = Date.now();
   const from = a.firstTs;
   let earned = 0;
+  let earnedArsenal = 0;
   for (const inc of free.values()) {
     const span = inc.end - inc.start;
     const overlap = Math.min(inc.end, now) - Math.max(inc.start, from);
-    if (span > 0 && overlap > 0) earned += inc.headhunting * (overlap / span);
+    if (span > 0 && overlap > 0) {
+      earned += inc.headhunting * (overlap / span);
+      earnedArsenal += inc.arsenal * (overlap / span);
+    }
   }
+  earnedArsenal += (ticketsFromPulls(a.banners.flatMap((b) => (b.kind === 'char' ? b.pulls : []))) / TICKETS_PER_ISSUE) * 10;
   const weeksSince = (now - from) / (7 * 86_400_000);
-  const earnedPerWeek = free.size && weeksSince > 0 ? Math.round((earned / weeksSince) * 10) / 10 : null;
+  const perWeek = (n: number) => (free.size && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)} / week` : '–');
   /**
    * Pulls made over pulls earned, on one scale: the solid bar is what was
    * pulled, the faded one under it what the patch handed out (≈ while it's
@@ -362,7 +373,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       return html`<div class="bar-cell"><span class="num">${fmtInt(n)}</span><div class="bar"><i style="width:${pct(n)};background:${color}"></i></div></div>`;
     const e = Math.round(earned);
     const diff = n - e;
-    const tip = `${fmtInt(n)} made · ${projected ? '≈' : ''}${fmtInt(e)} ${paid.length ? 'earned' : 'free'}${projected ? ' (projected to the patch end)' : ''}: ${
+    const tip = `${fmtInt(n)} spent · ${projected ? '≈' : ''}${fmtInt(e)} ${paid.length ? 'earned' : 'free'}${projected ? ' (projected to the patch end)' : ''}: ${
       diff > 0 ? `${fmtInt(diff)} more than earned (savings or bought)` : diff < 0 ? `${fmtInt(-diff)} spare` : 'all of it'
     }`;
     return html`<div class="bar-pair" title="${tip}">
@@ -373,9 +384,9 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
   const anyFree = patches.some(freeOf);
 
   // The total: pulls made against pulls earned up to today (the current patch's
-  // earnings prorated by how much of it has passed, not projected). Patch
-  // banners only, both kinds: the Permanent row (Basic Headhunting, Constant
-  // Issues) isn't tied to a patch.
+  // earnings prorated by how much of it has passed, not projected). Operators:
+  // patch banners only (not Basic Headhunting); Arsenal: patch Issues and the
+  // Constant Issue pulls made in each patch.
   const sofar = (key: string) => {
     const inc = free.get(key);
     if (!inc) return 0;
@@ -389,7 +400,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       const f = sofar(p.patch.key);
       return {
         charMade: t.charMade + p.charPulls,
-        weapMade: t.weapMade + p.weapPulls,
+        weapMade: t.weapMade + weapMadeOf(p),
         charEarned: t.charEarned + (inc ? inc.headhunting * f : 0) + bondPermitsOf(p) + (dossiersOf(p)?.opened ?? 0) * DOSSIER_PULLS,
         weapEarned: t.weapEarned + (inc ? inc.arsenal * f : 0) + ticketPulls(p),
       };
@@ -402,7 +413,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
     const e = Math.round(earnedPulls);
     const diff = made - e;
     const pct = (x: number) => `${Math.min(100, (x / totalMax) * 100)}%`;
-    return html`<div class="bar-pair" title="${fmtInt(made)} made · ${fmtInt(e)} earned so far">
+    return html`<div class="bar-pair" title="${fmtInt(made)} spent · ${fmtInt(e)} earned so far">
         <span class="num">${fmtInt(made)}</span><div class="bar"><i style="width:${pct(made)};background:${color}"></i></div>
         <span class="num secondary">${fmtInt(e)}</span><div class="bar earned"><i style="width:${pct(earnedPulls)};background:${color}"></i></div>
       </div>
@@ -415,12 +426,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       ${metrics([
         metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
         metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),
-        metric({ label: 'Active weeks', value: activeWeeks, sub: `of ${weeks.length} since your first pull` }),
-        metric({
-          label: 'Pulls earned per week',
-          value: earnedPerWeek ?? '–',
-          sub: earnedPerWeek == null ? 'loading…' : `${paid.length ? 'with your paid options, ' : ''}for Chartered banners (no Basic HH Permits), since your first pull`,
-        }),
+        metric({ label: 'Chartered permits earned', value: perWeek(earned) }),
+        metric({ label: 'Arsenal Issues earned', value: perWeek(earnedArsenal / 10) }),
       ], 'plain')}
 
       <div class="section card">
@@ -440,7 +447,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
           <h2 class="heading-16">By patch</h2>
           ${anyFree
             ? html`<div class="legend">
-                <span><i style="background:var(--gray-1000)"></i>Pulls made</span>
+                <span><i style="background:var(--gray-1000)"></i>Pulls spent</span>
                 <span><i class="faded" style="background:var(--gray-1000)"></i>${paid.length ? 'Pulls earned' : 'Free pulls earned'}</span>
               </div>`
             : ''}
@@ -454,7 +461,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
             </div>`
           : ''}
         <div class="table-wrap"><table class="table">
-          <thead><tr><th>Patch</th><th>Operator pulls</th><th>Arsenal pulls</th><th class="right">6★</th><th class="right hide-sm" title="Operator 6★ only: Arsenal pity counts sets of 10, so the two can't be averaged together">Avg. operator pity</th><th class="right hide-sm">Banners pulled</th></tr></thead>
+          <thead><tr><th>Patch</th><th>Operator pulls</th><th>Arsenal pulls</th><th class="right hide-sm" title="Operator 6★ only: Arsenal pity counts sets of 10, so the two can't be averaged together">Avg. operator pity</th><th class="right hide-sm">Banners pulled</th></tr></thead>
           <tbody>
             ${patches.map((p) => {
               // Operators only: Arsenal pity is counted in sets of 10, a different unit.
@@ -466,8 +473,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
               return html`<tr class="patch-row${open ? ' open' : ''}">
                 <td class="label-14"><button type="button" class="patch-toggle" data-action="patch-toggle" data-value="${p.patch.key}" aria-expanded="${String(open)}">${icon('chevron_right')}${p.patch.major === -1 ? 'Permanent' : `Patch ${p.patch.key}`}</button></td>
                 <td>${bar(p.charPulls, earned?.char, 'var(--op)', earned?.projected)}</td>
-                <td>${bar(p.weapPulls, earned?.weap, 'var(--ars)', earned?.projected)}</td>
-                <td class="right num">${p.sixStars.length}</td>
+                <td>${bar(weapMadeOf(p), earned?.weap, 'var(--ars)', earned?.projected)}</td>
                 <td class="right num secondary hide-sm">${avg}</td>
                 <td class="right num secondary hide-sm">${pulled} / ${p.banners.length}</td>
               </tr>${open ? patchBanners(p, free.get(p.patch.key), ticketsOf(p), bondOf(p), dossiersOf(p)) : ''}`;
@@ -478,8 +484,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
                 <tr class="patch-total">
                   <td class="label-14">In all<div class="label-12 secondary">To today</div></td>
                   <td title="Patch banners only (not the Permanent row)">${totalCell(total.charMade, total.charEarned, 'var(--op)')}</td>
-                  <td title="Patch Issues only (not the Constant Issues)">${totalCell(total.weapMade, total.weapEarned, 'var(--ars)')}</td>
-                  <td class="right num">${patches.reduce((n, p) => n + p.sixStars.length, 0)}</td>
+                  <td title="Patch Issues, and Constant Issues by the patch you pulled them in">${totalCell(total.weapMade, total.weapEarned, 'var(--ars)')}</td>
                   <td class="hide-sm"></td>
                   <td class="hide-sm"></td>
                 </tr>

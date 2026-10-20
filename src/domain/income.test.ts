@@ -277,6 +277,36 @@ describe('free income per patch', () => {
     expect(launch.lines.find((l) => l.source === 'creditStore')).toMatchObject({ count: 22, totals: { Oroberyl: 275, 'Arsenal Ticket': 220 }, estimate: true });
   });
 
+  it("leaves out limited-time rewards that ended before the player's first pull", () => {
+    const since = Date.parse('2026-02-15T12:00:00Z');
+    const ended = { ...schedule, events: schedule.events!.map((e) => (e.id === 2 ? { ...e, end: at('2026-02-01T04:00:00-05:00', '2026-02-01T04:00:00+08:00') } : e)) } as Schedule;
+    const more: IncomeFile = {
+      ...income,
+      oneTime: {
+        source: '',
+        versions: {
+          Launch: [
+            { name: 'Mail', section: 'mailbox', url: '', rewards: { Oroberyl: 4920 }, count: 1, until: '2026-02-01T00:00:00Z' },
+            { name: 'Simulations', section: 'modes', url: '', rewards: { Oroberyl: 1570 }, count: 36 },
+          ],
+        },
+      },
+    };
+    const [launch, second] = patchIncome(ended, 'americas', NOW, events, more, [], since);
+    const sources = launch.lines.map((l) => l.source);
+    // Launch ended before the first pull: no dailies, weeklies, ended events or expired mail; permanent rewards stay.
+    expect(sources).not.toContain('daily');
+    expect(sources).not.toContain('weekly');
+    expect(sources).not.toContain('events');
+    expect(launch.lines.find((l) => l.source === 'oneTime')!.oneTime!.map((x) => x.name)).toEqual(['Simulations']);
+    expect(sources).toContain('quests');
+    // Second: days from the first pull (its day counts), and it begins then for the player.
+    const daily = second.lines.find((l) => l.source === 'daily')!;
+    expect(daily.count).toBe(dailyResets(since, second.end, 'americas') + 1);
+    expect(second.start).toBe(since);
+    expect(second.lines.some((l) => l.source === 'compensation')).toBe(true);
+  });
+
   it('works without the wiki files', () => {
     expect(patchIncome(schedule, 'asia', NOW, null, null).every((p) => p.lines.length === 0 && p.headhunting === 0)).toBe(true);
   });

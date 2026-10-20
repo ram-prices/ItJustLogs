@@ -61,7 +61,10 @@ codes) and the Credit Store's daily stock on average (Estimate); the SKPORT
 web check-in, Twitch drops and birthday mail are left out (owner's call). Each
 Headhunting Dossier (60 paid pulls on a Chartered banner) is 10 pulls for the
 next Chartered banner's patch; Basic Headhunting pulls' Arsenal Tickets and
-Bond Quota count for the patch they were made in. The
+Bond Quota count for the patch they were made in. Limited-time rewards that
+ended before the player's first pull are left out (`since`: events, passes,
+mail `until`, a version's compensation, survey, livestream, Combat Drills and
+AIC permits once it's over); dailies and weeklies count from that pull. The
 quota shops count too: the AIC Quota Exchange's banner HH Permits (official
 notes, else 5 per Chartered/Special banner) and the Bond Quota the player's
 duplicate 5★/6★ operators gave (25 per Chartered HH Permit). The breakdown

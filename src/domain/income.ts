@@ -222,6 +222,8 @@ export interface OneTimeReward {
   count: number;
   /** Partly our own rule (Wuling's Regional Development caps, voucher averages). */
   estimate?: boolean;
+  /** Claimable only until then (UTC): mail events, expired codes. */
+  until?: string;
 }
 
 export type IncomeSource =
@@ -340,8 +342,11 @@ export function patchIncome(
   events: EventRewardsFile | null,
   income: IncomeFile | null,
   paid: readonly PaidIncome[] = [],
+  since?: number,
 ): PatchIncome[] {
   const windows = patchWindows(schedule, server, now);
+  // A player who started later never had the limited-time rewards that ended before then.
+  const gone = (end: number | null | undefined) => since != null && end != null && !Number.isNaN(end) && end < since;
   const index = new Map(windows.map((w, i) => [w.version, i]));
   const at = (t: number) => windows.findIndex((w, i) => t >= w.start && (i === windows.length - 1 || t < w.end));
 
@@ -372,6 +377,7 @@ export function patchIncome(
         const start = timeOn(e.start, server);
         if (e.id == null || start == null || start > windows[windows.length - 1].end) continue;
         if ((e.version != null && index.has(e.version) ? index.get(e.version) : at(start)) !== i) continue;
+        if (gone(timeOn(e.end, server))) continue;
         const r = events.events[e.id];
         const fill = r?.partial && !pullsOf(r.totals).pulls ? typical(e.type) : undefined;
         const t = fill ?? r?.totals ?? {};
@@ -382,6 +388,7 @@ export function patchIncome(
       for (const x of Object.values(events.extra ?? {})) {
         const start = Date.parse(x.start[server] ?? x.start.asia ?? '');
         if (Number.isNaN(start) || start > windows[windows.length - 1].end || at(start) !== i) continue;
+        if (x.end && gone(Date.parse(x.end[server] ?? x.end.asia ?? ''))) continue;
         const fill = x.partial && !pullsOf(x.totals).pulls ? typical(x.type) : undefined;
         const t = fill ?? x.totals;
         plus(totals, t);
@@ -397,15 +404,21 @@ export function patchIncome(
           estimate: counted.some((e) => e.estimated),
         });
     }
+    // Days and weeks from the later of the version's start and the player's.
+    const from = since != null && since > w.start ? since : w.start;
+    const missed = from >= w.end && i < windows.length - 1;
+    // Limited to the version: gone if the player started after it ended.
+    const versionGone = gone(w.end) && i < windows.length - 1;
     if (income) {
-      const first = i === 0 ? 1 : 0;
-      const days = dailyResets(w.start, w.end, server) + first;
-      const weeks = weeklyResets(w.start, w.end, server) + first;
+      const first = i === 0 || from > w.start ? 1 : 0;
+      const days = missed ? 0 : dailyResets(from, w.end, server) + first;
+      const weeks = missed ? 0 : weeklyResets(from, w.end, server) + first;
       if (days) lines.push({ source: 'daily', count: days, totals: plus({}, income.daily.rewards, days), url: income.daily.url });
       if (weeks) lines.push({ source: 'weekly', count: weeks, totals: plus({}, income.weekly.rewards, weeks), url: income.weekly.url });
       for (const p of income.passes) {
         const start = p.start ? Date.parse(p.start) : NaN;
         if (Number.isNaN(start) || start > w.end || at(start) !== i) continue;
+        if (gone(p.end ? Date.parse(p.end) : null)) continue;
         lines.push({
           source: 'pass',
           count: 1,
@@ -452,7 +465,7 @@ export function patchIncome(
       const prog = income.progression;
       if (prog && prog.version === w.version && prog.items.length)
         lines.push({ source: 'progression', count: prog.items.length, totals: prog.items.reduce((t, x) => plus(t, x.rewards), {} as Record<string, number>), items: prog.items });
-      const once = income.oneTime?.versions[w.version] ?? [];
+      const once = (income.oneTime?.versions[w.version] ?? []).filter((x) => !gone(x.until ? Date.parse(x.until) : null));
       for (const section of ['modes', 'exploration', 'mailbox'] as const) {
         const items = once.filter((x) => x.section === section);
         if (items.length)
@@ -476,16 +489,16 @@ export function patchIncome(
       if (aur && (Object.keys(aur.rewards).length || aur.partial))
         lines.push({ source: 'aurylene', count: 1, totals: { ...aur.rewards }, url: income.exploration!.aurylene!.url, partial: !!aur.partial, note: aur.partial });
       const x = income.extras;
-      if (x?.livestream && i >= x.livestream.fromVersion)
+      if (x?.livestream && i >= x.livestream.fromVersion && !versionGone)
         lines.push({ source: 'livestream', count: 1, totals: { ...x.livestream.perVersion }, extra: x.livestream, estimate: !x.livestream.confirmed.includes(w.version) });
-      if (x?.survey && i >= x.survey.fromVersion) lines.push({ source: 'survey', count: 1, totals: { ...x.survey.perVersion }, extra: x.survey });
+      if (x?.survey && i >= x.survey.fromVersion && !versionGone) lines.push({ source: 'survey', count: 1, totals: { ...x.survey.perVersion }, extra: x.survey });
       const drills = x?.combatDrills;
       const newBanners = drills ? schedule.banners.filter((b) => b.version === w.version && drills.kinds.includes(b.kind)).length : 0;
-      if (drills && newBanners)
+      if (drills && newBanners && !versionGone)
         lines.push({ source: 'combatDrills', count: newBanners, totals: plus({}, drills.perBanner, newBanners), extra: drills });
       // The AIC Quota Exchange's banner HH Permits: as the notes list them, else so many per banner.
       const aic = income.shops?.aic;
-      if (aic) {
+      if (aic && !versionGone) {
         const named = aic.versions[w.version];
         const banners = schedule.banners.filter((b) => b.version === w.version && aic.kinds.includes(b.kind)).length;
         const permits = named ?? (banners ? [{ permit: 'Banner HH Permit', count: aic.perBanner * banners }] : []);
@@ -493,7 +506,7 @@ export function patchIncome(
         if (permits.length) lines.push({ source: 'aicShop', count: permits.reduce((n, p) => n + p.count, 0), totals, url: aic.url });
       }
       const comp = income.compensation?.versions[w.version];
-      if (comp)
+      if (comp && !versionGone)
         lines.push({
           source: 'compensation',
           count: comp.rows.length,
@@ -507,6 +520,7 @@ export function patchIncome(
     }
     const all = lines.reduce((t, l) => plus(t, l.totals), {} as Record<string, number>);
     const { headhunting, basic, arsenal } = pullsFrom(all);
-    return { ...w, lines, headhunting, basic, arsenal, partial: lines.some((l) => l.partial) };
+    // Started during this version: it begins for the player then (the total prorates from there).
+    return { ...w, start: missed ? w.start : from, lines, headhunting, basic, arsenal, partial: lines.some((l) => l.partial) };
   });
 }
