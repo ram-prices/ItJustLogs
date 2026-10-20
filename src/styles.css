@@ -1955,6 +1955,22 @@ code {
   min-width: 36px;
   text-align: right;
 }
+/* Stats → By patch: the total row closing the table, set off by a heavier line. */
+.patch-total td {
+  border-top: 2px solid var(--gray-alpha-400);
+  border-bottom: 0;
+  vertical-align: top;
+  padding-top: 10px;
+  padding-bottom: 12px;
+}
+.patch-total-diff {
+  margin: 4px 0 0 50px;
+  color: var(--gray-900);
+}
+.patch-total-diff b {
+  color: var(--gray-1000);
+  font-weight: 600;
+}
 /* Stats → By patch: pulls made (solid) over pulls earned (faded), one scale. */
 .bar-pair {
   display: grid;
@@ -3061,11 +3077,6 @@ a.patch-banner:hover {
 }
 .patch-income-total {
   font-weight: 600;
-}
-.patch-income-note {
-  margin: 0;
-  padding: 8px 12px 10px;
-  box-shadow: 0 -1px 0 var(--gray-alpha-200);
 }
 
 /* Under every page (app.ts). The bottom padding clears phones' home indicator. */

@@ -83,6 +83,16 @@ export interface IncomeFile {
     survey?: Extra & { perVersion: Record<string, number>; fromVersion: number };
     combatDrills?: Extra & { perBanner: Record<string, number>; kinds: string[] };
   };
+  /**
+   * The quota shops: the AIC Quota Exchange's banner HH Permits (per version
+   * from the official notes, else `perBanner` per banner of `kinds`), and the
+   * Bond Quota Exchange's Chartered HH Permit price and the Bond Quota a
+   * duplicate 5★ / 6★ operator gives.
+   */
+  shops?: {
+    aic: { url: string; price: number; perBanner: number; kinds: string[]; versions: Record<string, { permit: string; count: number }[]> };
+    bond: { url: string; price: number; duplicate: Record<string, number> };
+  };
   /** One-time rewards there from launch (Operational Manual Node milestones, Authority Level rewards). */
   progression?: { version: string; items: { name: string; url: string; rewards: Record<string, number> }[] };
   /** What each version's permanent modes hand out anew, by version name. */
@@ -209,6 +219,8 @@ export type IncomeSource =
   | 'livestream'
   | 'survey'
   | 'combatDrills'
+  | 'aicShop'
+  | 'bondShop'
   | 'crafting'
   | 'progression'
   | 'daily' | 'weekly' | 'pass' | 'compensation' | PaidIncome;
@@ -270,6 +282,21 @@ const plus = (a: Record<string, number>, b: Record<string, number>, times = 1) =
 export function pullsFrom(totals: Record<string, number>): { headhunting: number; basic: number; arsenal: number } {
   const p = pullsOf(totals);
   return { headhunting: p.pulls, basic: p.basicPermits, arsenal: (p.arsenalTickets / TICKETS_PER_ISSUE) * 10 };
+}
+
+/**
+ * The Bond Quota each operator pull gave: a 5★ or 6★ the player already had
+ * gives `duplicate[rarity]` (the first copy gives none). Pulls in time order.
+ */
+export function bondQuota(pulls: Pick<AnalyzedPull, 'kind' | 'rarity' | 'itemId' | 'ts'>[], duplicate: Record<string, number>): Map<object, number> {
+  const owned = new Set<string>();
+  const out = new Map<object, number>();
+  for (const p of [...pulls].filter((x) => x.kind === 'char').sort((a, b) => a.ts - b.ts)) {
+    if (p.rarity < 5) continue;
+    if (owned.has(p.itemId)) out.set(p, duplicate[p.rarity] ?? 0);
+    else owned.add(p.itemId);
+  }
+  return out;
 }
 
 /** Arsenal Tickets Headhunting results give back (20 / 200 / 2,000 for a 4★ / 5★ / 6★). */
@@ -421,6 +448,15 @@ export function patchIncome(
       const newBanners = drills ? schedule.banners.filter((b) => b.version === w.version && drills.kinds.includes(b.kind)).length : 0;
       if (drills && newBanners)
         lines.push({ source: 'combatDrills', count: newBanners, totals: plus({}, drills.perBanner, newBanners), extra: drills });
+      // The AIC Quota Exchange's banner HH Permits: as the notes list them, else so many per banner.
+      const aic = income.shops?.aic;
+      if (aic) {
+        const named = aic.versions[w.version];
+        const banners = schedule.banners.filter((b) => b.version === w.version && aic.kinds.includes(b.kind)).length;
+        const permits = named ?? (banners ? [{ permit: 'Banner HH Permit', count: aic.perBanner * banners }] : []);
+        const totals = permits.reduce((t, p) => plus(t, { [p.permit]: p.count }), {} as Record<string, number>);
+        if (permits.length) lines.push({ source: 'aicShop', count: permits.reduce((n, p) => n + p.count, 0), totals, url: aic.url });
+      }
       const comp = income.compensation?.versions[w.version];
       if (comp)
         lines.push({

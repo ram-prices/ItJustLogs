@@ -55,7 +55,12 @@ livestream, version survey, Combat Drills), the Crafting
 Manual's milestones, one-time progression at launch (Node milestones,
 Authority Level), and our own rough estimate (an event or mode the wiki names
 without amounts gets the median of its kind, marked ≈); the SKPORT web
-check-in and the Credit Store are left out on purpose (owner's call). No
+check-in and the Credit Store are left out on purpose (owner's call). The
+quota shops count too: the AIC Quota Exchange's banner HH Permits (official
+notes, else 5 per Chartered/Special banner) and the Bond Quota the player's
+duplicate 5★/6★ operators gave (25 per Chartered HH Permit). The breakdown
+lists pull currencies only, credits only the wiki, and the table ends with a
+total (patch banners only, to today). No
 third-party spreadsheet is used: the owner wants our own estimate. From
 ef-assets `wiki/income.json` (`scripts/income.mjs` there), plus the Arsenal
 Tickets Headhunting gives back; marked on the bars, listed by source when a

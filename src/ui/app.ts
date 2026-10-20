@@ -239,6 +239,37 @@ function applyTheme(): void {
     t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
 }
 
+/**
+ * Rows of tabs that scroll sideways on narrow screens: the site's sections
+ * and Achievements / Archive categories, with their selected tab.
+ */
+const TAB_ROWS: [row: string, current: string][] = [
+  ['.tabs', '.tab[aria-current="page"]'],
+  ['.collection-tabs', '[aria-current="true"]'],
+];
+
+/** Each tab row's sideways scroll, before a redraw rebuilds it. */
+const tabRowScroll = (): (number | null)[] => TAB_ROWS.map(([row]) => document.querySelector(row)?.scrollLeft ?? null);
+
+/**
+ * After a redraw: each tab row back where it was, then scrolled just enough
+ * that its selected tab shows (a tab picked off to the right stays in view).
+ */
+function restoreTabRows(before: (number | null)[]): void {
+  TAB_ROWS.forEach(([row, current], i) => {
+    const bar = document.querySelector<HTMLElement>(row);
+    if (!bar || bar.scrollWidth <= bar.clientWidth) return;
+    if (before[i] != null) bar.scrollLeft = before[i]!;
+    const tab = bar.querySelector<HTMLElement>(current);
+    if (!tab) return;
+    const b = bar.getBoundingClientRect();
+    const t = tab.getBoundingClientRect();
+    const pad = 16;
+    if (t.left < b.left) bar.scrollLeft -= b.left - t.left + pad;
+    else if (t.right > b.right) bar.scrollLeft += t.right - b.right + pad;
+  });
+}
+
 function draw(): void {
   applyTheme();
   const route = parseRoute();
@@ -260,7 +291,9 @@ function draw(): void {
   root().classList.toggle('settled', key === lastKey && Date.now() - openedAt > SETTLE_MS);
   // A redraw while the player types a search keeps the box focused.
   const searching = document.activeElement?.matches('[data-list-search]');
+  const tabRows = tabRowScroll();
   render(root(), html`${header(route)}${page(route)}${footer()}`);
+  restoreTabRows(tabRows);
   if (searching) refocusListSearch();
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.
