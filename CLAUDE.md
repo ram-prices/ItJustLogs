@@ -146,6 +146,22 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     `ui/html.ts` (`raw()` only for trusted markup).
   - Signature features of the old site (6★ portrait strip, pity ruler, luck
     curves, profile header) are being re-added one at a time in Geist style.
+- Achievements and Archives tabs (`ui/pages/collections.ts`, types in
+  `domain/collections.ts`): the game's Medal Album (154 medals) and Intel
+  Archives → Findings (Manuscripts, E-Files, Peculiars), one category tab at a
+  time; work without an import. Data is a wiki snapshot made by
+  `scripts/wiki-collections.mjs` into `src/data/medals.snapshot.json` and
+  `findings.snapshot.json` (lazy-loaded chunks; pictures hotlink
+  endfield.wiki.gg for now, to move to ef-assets with the script). The
+  player's progress is settings (`medals`: date, Reforging tier, Trimmed;
+  `findings`: ids), so it syncs and exports. "Read from video or
+  screenshots" (`ui/medalReader.ts`) reads the Medal Album in the browser:
+  Tesseract.js from jsDelivr, loaded only on that click, on whole frames
+  scaled to 1080 tall (any aspect ratio); `domain/medalReader.ts` matches
+  lines to medal names by rules (no AI: noise stripped, numerals fixed,
+  impossible dates dropped, majority vote across frames), pinned by
+  `medalReader.test.ts` with real lines; a review screen saves only what's
+  ticked.
 - `scripts/export-pulls.ps1`: the PowerShell exporter, shown in Settings → Get
   your data via `?raw`. Keep it readable and dependency-free. Its only network
   target must stay `ef-webview.gryphline.com`. Character pool types are a fixed

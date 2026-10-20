@@ -19,6 +19,7 @@ import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
+import { achievementsPage, archivesPage, collectionAction, collectionChange } from './pages/collections';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
@@ -34,12 +35,14 @@ import { installTint, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'home' | 'operators' | 'arsenal' | 'stats' | 'settings';
+type Page = 'home' | 'operators' | 'arsenal' | 'stats' | 'achievements' | 'archives' | 'settings';
 const TABS: [Page, string][] = [
   ['home', 'Home'],
   ['operators', 'Operators'],
   ['arsenal', 'Arsenal'],
   ['stats', 'Stats'],
+  ['achievements', 'Achievements'],
+  ['archives', 'Archives'],
   ['settings', 'Settings'],
 ];
 const DATA_PAGES: Page[] = ['operators', 'arsenal', 'stats'];
@@ -199,6 +202,9 @@ function page(route: Route): Html {
     );
   }
   if (route.page === 'home') return homePage(state.schedule, currentServer(), a);
+  // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
+  if (route.page === 'achievements') return achievementsPage(draw);
+  if (route.page === 'archives') return archivesPage(draw);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
   if (!a) return welcome();
@@ -422,6 +428,8 @@ function installProfile(): void {
   // Saved on Enter or leaving the field: saving per keystroke would redraw the page under the cursor.
   document.addEventListener('change', (e) => {
     const el = e.target as HTMLInputElement;
+    // Achievements: a medal's date, Reforging tier or Trimming.
+    if (collectionChange(el)) return;
     if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
     // Extra copies (Settings): edit one entry's copies or note.
     const editExtra = (i: number, patch: Partial<ExtraCopy>) =>
@@ -484,6 +492,8 @@ async function onClick(e: MouseEvent): Promise<void> {
   if (navigate(e)) return;
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
+  // Achievements and Archives handle their own buttons.
+  if (collectionAction(el.dataset.action ?? '', el)) return draw();
   switch (el.dataset.action) {
     case 'import':
       return document.getElementById('fileInput')!.click();

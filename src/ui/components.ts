@@ -107,6 +107,8 @@ export const TAB_ICON: Record<string, Html> = {
   // Material Symbols, filled to match the solid shapes above.
   home: raw('<span class="tab-icon icon filled" aria-hidden="true">home</span>'),
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
+  achievements: raw('<span class="tab-icon icon filled" aria-hidden="true">military_tech</span>'),
+  archives: raw('<span class="tab-icon icon filled" aria-hidden="true">auto_stories</span>'),
   settings: raw('<span class="tab-icon icon filled" aria-hidden="true">settings</span>'),
 };
 

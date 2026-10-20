@@ -22,7 +22,7 @@ import { legacyEventLinks, scheduleLinks, type Schedule } from './src/domain/sch
 import { itemShortLinks, WIKI_ALIASES } from './src/domain/wiki.ts';
 
 /** The app's top-level pages; each gets its own copy of index.html in the build. */
-const PAGES = ['operators', 'arsenal', 'stats', 'settings'];
+const PAGES = ['operators', 'arsenal', 'stats', 'achievements', 'archives', 'settings'];
 
 /** Fallback for the banner and event pages when ef-assets can't be reached (the app's own schedule snapshot). */
 const SCHEDULE_SNAPSHOT = 'src/data/schedule.snapshot.json';

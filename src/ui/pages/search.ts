@@ -2,7 +2,9 @@ import type { Kind } from '../../domain/types';
 import { html, type Html } from '../html';
 
 /**
- * Type-to-search for the operator and weapon lists: typing anywhere on the
+ * Type-to-search for the operator and weapon lists (and Achievements and
+ * Archives: anything marked data-search-item inside a data-search-section,
+ * besides .wiki-tile / .wiki-type): typing anywhere on the
  * page shows the search in big letters in the middle of the screen (fading
  * a second after the last key) and hides the tiles whose text (name,
  * rarity, class, element, type...) doesn't contain every word typed.
@@ -12,16 +14,16 @@ import { html, type Html } from '../html';
  * redraw keeps it.
  */
 
-const queries: Partial<Record<Kind, string>> = {};
+const queries: Record<string, string> = {};
 
 /** Lowercase, without accents, so "lifeng" finds "Lifeng" and "eclair" finds "Éclair". */
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-const label = (kind: Kind) => (kind === 'char' ? 'Search operators' : 'Search weapons');
+const LABEL: Record<string, string> = { char: 'Search operators', weap: 'Search weapons' };
 
-/** The hidden input that holds the search (typing on the page goes into it). */
-export function searchBox(kind: Kind): Html {
-  return html`<input class="list-search-input" type="search" data-list-search="${kind}" value="${queries[kind] ?? ''}" aria-label="${label(kind)}: start typing" autocomplete="off" spellcheck="false" tabindex="-1" />`;
+/** The hidden input that holds a list's search (typing on the page goes into it); `key` keeps each list's own. */
+export function searchBox(key: Kind | string, label = LABEL[key] ?? 'Search'): Html {
+  return html`<input class="list-search-input" type="search" data-list-search="${key}" value="${queries[key] ?? ''}" aria-label="${label}: start typing" autocomplete="off" spellcheck="false" tabindex="-1" />`;
 }
 
 /** Shows only the tiles matching the search, hides sections left empty, and updates their counts. */
@@ -31,10 +33,12 @@ export function applyListSearch(): void {
   const main = input.closest('main');
   if (!main) return;
   const words = fold(input.value).split(/\s+/).filter(Boolean);
+  // Pages with category tabs (Achievements, Archives) show every tab's matches while searching.
+  main.classList.toggle('searching', words.length > 0);
   let shown = 0;
-  for (const section of main.querySelectorAll<HTMLElement>('.wiki-type')) {
+  for (const section of main.querySelectorAll<HTMLElement>('.wiki-type, [data-search-section]')) {
     let n = 0;
-    for (const tile of section.querySelectorAll<HTMLElement>('.wiki-tile')) {
+    for (const tile of section.querySelectorAll<HTMLElement>('.wiki-tile, [data-search-item]')) {
       const text = fold(tile.textContent ?? '');
       const hit = words.every((w) => text.includes(w));
       tile.hidden = !hit;
@@ -87,9 +91,9 @@ function setQuery(input: HTMLInputElement, q: string): void {
 export function installListSearch(): void {
   document.addEventListener('input', (e) => {
     const el = e.target as HTMLInputElement;
-    const kind = el.dataset?.listSearch as Kind | undefined;
-    if (!kind) return;
-    queries[kind] = el.value;
+    const key = el.dataset?.listSearch;
+    if (!key) return;
+    queries[key] = el.value;
     applyListSearch();
     showTyped(el.value);
   });

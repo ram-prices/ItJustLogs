@@ -60,6 +60,10 @@ export interface Settings {
   artPlaces?: Record<string, string[]>;
   /** The operator and weapon lists' sort order (ui/pages/sorting.ts), when changed. */
   infoSort?: Partial<Record<'char' | 'weap', { key: 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'released' | 'element' | 'weapon' | 'class'; desc: boolean; off?: boolean }[]>>;
+  /** Medals the player has (Achievements page), by medal id: when, Reforging tier, Trimmed. */
+  medals?: Record<string, import('./domain/collections').MedalProgress>;
+  /** Findings the player has collected (Archives page), by id. */
+  findings?: string[];
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;
   /** What each operator has equipped (weapon and gear), by operator id. */
