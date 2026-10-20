@@ -26,12 +26,16 @@ function save(opId: string, slot: LoadoutSlot, id: string | null): void {
   updateSettings({ loadouts: all });
 }
 
-/** The gear stats as one short line: "Strength +87 · HP +2,370". */
+/**
+ * The gear stats as one short line: "Strength +87 · Ultimate Gain Efficiency +12.3%".
+ * The wiki data gives percentages as fractions (0.123 = 12.3%) and flat stats as
+ * numbers from 1 up, the same rule operatorBonuses counts them by.
+ */
 function statLine(g: WikiGear): string {
   return g.stats
     .map((s) => {
       const v = s.values[0];
-      const shown = v == null ? '' : Number.isInteger(v) ? `+${v.toLocaleString()}` : `+${v}%`;
+      const shown = v == null ? '' : v < 1 ? `+${Math.round(v * 1000) / 10}%` : `+${v.toLocaleString()}`;
       return `${s.stat} ${shown}`.trim();
     })
     .join(' · ');

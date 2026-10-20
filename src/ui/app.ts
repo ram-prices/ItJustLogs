@@ -21,6 +21,7 @@ import { applyListSearch, installListSearch, refocusListSearch } from './pages/s
 import { openSortPopup } from './pages/sorting';
 import { achievementsPage, archivesPage, collectionAction, collectionChange, readFindingsFrom, readMedalsFrom } from './pages/collections';
 import { essenceAction, essencesPage } from './pages/essences';
+import { eventOf, eventPage } from './pages/event';
 import { readEssenceFiles, readEssences } from './essenceReader';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
@@ -37,7 +38,7 @@ import { installTint, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achievements' | 'archives' | 'settings';
+type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achievements' | 'archives' | 'settings' | 'event';
 const TABS: [Page, string][] = [
   ['home', 'Home'],
   ['operators', 'Operators'],
@@ -65,18 +66,18 @@ interface Route {
 /** Top-level paths that aren't pages: operator and weapon short links (/si), resolved once the wiki data loads. */
 const isShortLink = (segment: string) => /^[a-z0-9][a-z0-9-]*$/i.test(segment) && !RESERVED_PATHS.has(segment.toLowerCase());
 
-/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /banners/<name> and /event/<id> (Home at that item), /stats, /settings. */
+/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /banners/<name> (Home at that banner), /event/<id> (that event and its rewards), /stats, /settings. */
 function parseRoute(): Route {
   const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
   if (page === 'banners' && id) return { page: 'home', focus: `/banners/${id.toLowerCase()}` };
-  if (page === 'event' && id) return { page: 'home', focus: `/event/${id}` };
+  if (page === 'event' && id) return { page: 'event', id };
   // LEGACY, to be removed with legacyEventLinks: old /events/<name> links go to their /event/<id>.
   if (page === 'events' && id) {
     const old = `/events/${id.toLowerCase()}`;
     const e = [...legacyEventLinks(state.schedule)].find(([, path]) => path === old)?.[0];
-    const to = e?.id != null ? `/event/${e.id}` : old;
-    if (to !== old) history.replaceState(null, '', to);
-    return { page: 'home', focus: to };
+    if (e?.id == null) return { page: 'home', focus: old };
+    history.replaceState(null, '', `/event/${e.id}`);
+    return { page: 'event', id: String(e.id) };
   }
   if (page && !id && !TABS.some(([t]) => t === page) && isShortLink(page)) {
     const short = page.toLowerCase();
@@ -209,6 +210,7 @@ function page(route: Route): Html {
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);
   if (route.page === 'essences') return essencesPage(draw);
+  if (route.page === 'event') return eventPage(route.id, draw);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
   if (!a) return welcome();
@@ -220,7 +222,7 @@ function page(route: Route): Html {
       return listPage(kind, a, { db: state.db, schedule: state.schedule, server: currentServer(), showAll: !!state.settings.showAllBanners });
     }
     case 'stats':
-      return statsPage(a);
+      return statsPage(a, draw);
   }
   return welcome();
 }
@@ -280,7 +282,13 @@ function draw(): void {
   tintWeaponCards();
   tintSixStrip();
   tintHeroes();
-  const title = route.info ? (route.page === 'arsenal' ? weaponInfoTitle(route.id) : operatorInfoTitle(route.id)) : TABS.find(([p]) => p === route.page)?.[1];
+  const title = route.info
+    ? route.page === 'arsenal'
+      ? weaponInfoTitle(route.id)
+      : operatorInfoTitle(route.id)
+    : route.page === 'event'
+      ? eventOf(route.id)?.name
+      : TABS.find(([p]) => p === route.page)?.[1];
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
 

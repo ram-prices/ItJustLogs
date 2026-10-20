@@ -31,9 +31,19 @@ and an event's `id` is a stable number ef-assets assigns and never reuses, so
 links never change target). The old `/events/<name>` links still work
 (`legacyEventLinks`, redirected in app.ts and built in vite.config.ts, all
 marked LEGACY); the owner plans to remove them. Their embed has the key art and both servers' dates as
-Discord timestamps. In the app those paths open Home at that card, row or
-timeline bar (`focusScheduleItem`), and Home's right-click menu has "Copy
-link". All pages are kept; if their number ever becomes a problem, drop old
+Discord timestamps. In the app a banner's path opens Home at that card, row
+or timeline bar (`focusScheduleItem`); an event's path opens its own page
+(`ui/pages/event.ts`): dates, details and its rewards from ef-assets
+`wiki/events.json` (`scripts/event-rewards.mjs` there; totals as
+Headhunting pulls at 500 Oroberyl each, `domain/eventRewards.ts`; `partial`
+when the wiki names rewards without amounts). Home's event rows and
+timeline bars link to it, and Home's right-click menu has "Copy link".
+Stats → By patch adds each version's free pulls (`domain/income.ts`): its
+events, daily missions and Weekly Routine for every day and week of the
+version (resets at 04:00 server time) and the Protocol Pass free track, from
+ef-assets `wiki/income.json` (`scripts/income.mjs` there), plus the Arsenal
+Tickets Headhunting gives back; marked on the bars, listed by source when a
+patch is opened. All pages are kept; if their number ever becomes a problem, drop old
 ones then.
 
 ## Commands
