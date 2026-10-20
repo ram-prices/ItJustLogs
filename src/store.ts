@@ -56,7 +56,7 @@ export interface Settings {
   /** Where each operator picture shows (by its key); unset = the banner. See ui/pages/art.ts. */
   artPlaces?: Record<string, string[]>;
   /** The operator and weapon lists' sort order (ui/pages/sorting.ts), when changed. */
-  infoSort?: Partial<Record<'char' | 'weap', { key: 'rarity' | 'name' | 'acquired' | 'potential' | 'element' | 'weapon' | 'class'; desc: boolean; off?: boolean }[]>>;
+  infoSort?: Partial<Record<'char' | 'weap', { key: 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'element' | 'weapon' | 'class'; desc: boolean; off?: boolean }[]>>;
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;
   /** What each operator has equipped (weapon and gear), by operator id. */
@@ -138,6 +138,8 @@ export interface SyncMeta {
   lastSynced?: number;
   /** Drive's copy looked like another player's and the player chose Cancel: wait for Sync now. */
   paused?: boolean;
+  /** When the latest change not yet in Drive was made (none: everything here is synced). */
+  pending?: number;
   changed: ChangeTimes;
 }
 

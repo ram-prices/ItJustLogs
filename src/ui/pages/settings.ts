@@ -1,4 +1,4 @@
-import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator, MAX_COPIES, type ExtraCopy } from '../../domain/owned';
+import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator, MAX_COPIES, PROTOCOL_PASS, type ExtraCopy } from '../../domain/owned';
 import { SERVER_LABEL } from '../../domain/schedule';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
@@ -8,7 +8,7 @@ import { badge, icon, itemImg, pageHeader, toggleGroup } from '../components';
 import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { driveConfigured } from '../../drive';
-import { preloadSync, syncView } from '../sync';
+import { preloadSync, syncPending, syncView } from '../sync';
 
 /** Settings, laid out like Vercel's: one card per topic with a footer for its action. */
 
@@ -72,7 +72,9 @@ function syncCard(): Html {
           ? html`${badge('Paused', 'amber')} <span>The Drive copy doesn't look like the pulls saved here. Sync now to choose what to do, or sign out.</span>`
           : v.status === 'error'
             ? html`${badge('Failed', 'red')} <span>${v.error}</span>`
-            : html`${badge('Synced', 'green')}`;
+            : syncPending()
+              ? html`${badge('Waiting', 'amber')} <span>Your latest changes go to Drive in a moment.</span>`
+              : html`${badge('Synced', 'green')}`;
   return html`<section class="card">
     <div class="card-body">
       <h2 class="heading-20">Sync with Google Drive</h2>
@@ -107,6 +109,9 @@ function extrasCard(redraw: () => void): Html {
   // One Endministrator: whichever the player has counts as the preset's too.
   const endmin = endministratorOf(extras);
   const has = (x: ExtraCopy) => extras.some((e) => (e.id === x.id && e.note === x.note) || (isEndministrator(x.id) && e.id === endmin));
+  // Every weapon the wiki lists as a Protocol Pass reward, so new ones join by themselves.
+  const pass = weps ? Object.keys(weps.weapons).filter((id) => /protocol pass/i.test(weps.weapons[id].source ?? '')) : [];
+  const passMissing = pass.filter((id) => !has({ id, copies: 1, note: PROTOCOL_PASS }));
   const options = (items: [string, { name: string; rarity: number }][]) =>
     items
       .sort(([, p], [, q]) => q.rarity - p.rarity || p.name.localeCompare(q.name))
@@ -151,6 +156,9 @@ function extrasCard(redraw: () => void): Html {
       <div class="extra-presets">
         <span class="label-13 secondary">Quick add</span>
         ${EXTRA_PRESETS.map((p) => html`<button class="btn tertiary sm" data-action="extra-preset" data-value="${p.key}" ${p.extras.every(has) ? 'disabled' : ''}>${p.label}</button>`)}
+        ${pass.length
+          ? html`<button class="btn tertiary sm" data-action="extra-ids" data-value="${passMissing.join(',')}" data-note="${PROTOCOL_PASS}" ${passMissing.length ? '' : 'disabled'} title="One copy each of every Protocol Pass weapon you don't have listed yet">Protocol Pass weapons (${pass.length}, 1 copy each)</button>`
+          : ''}
       </div>
     </div>
     <div class="card-footer"><span>Saved with your settings: included in full backups and Google Drive sync, never in your pull history. Copies 1 = P0, 6 = max.</span></div>

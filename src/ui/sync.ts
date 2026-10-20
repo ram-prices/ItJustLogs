@@ -52,6 +52,8 @@ export const syncView = (): SyncView => ({ status, email: meta.email, lastSynced
 export const syncNeedsClick = (): boolean => drive.driveConfigured() && meta.on && (status === 'reconnect' || status === 'paused');
 /** Sync is set up here (the header shows its button). */
 export const syncShown = (): boolean => drive.driveConfigured() && meta.on;
+/** Something changed here that Drive doesn't have yet. */
+export const syncPending = (): boolean => !!meta.pending;
 
 // ---------------------------------------------------------------------------
 // Merging the Drive copy into this browser
@@ -239,7 +241,13 @@ async function runSync(interactive: boolean): Promise<void> {
         token = await drive.requestToken({ email: meta.email });
       }
       setStatus('syncing');
+      const started = Date.now();
       await syncWith(token);
+      // Changes made while this sync ran wait for the next one.
+      if (!meta.paused && (meta.pending ?? 0) <= started) {
+        delete meta.pending;
+        save();
+      }
       setStatus(meta.paused ? 'paused' : 'idle');
     } catch (e) {
       const message = (e as Error).message;
@@ -312,6 +320,7 @@ export function installSync(): void {
       return setStatus('off');
     }
     if (c === 'settings' || c === 'avatar' || c === 'header') meta.changed[c] = Date.now();
+    if (meta.on) meta.pending = Date.now();
     save();
     if (meta.on && !meta.paused) schedule();
   });

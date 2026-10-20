@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Owned } from '../../domain/owned';
-import { sortAction, sortItems, sortSpecs } from './sorting';
+import { sortAction, sortGroups, sortItems, sortSpecs } from './sorting';
 
 const owned = (potential: number, ts: number): Owned =>
   ({ copies: potential + 1, potential, acquisitions: [{ ts, extra: false }] }) as unknown as Owned;
@@ -35,7 +35,7 @@ describe('ranked sorting', () => {
   });
 
   it('takes a dragged order, and skips sorts turned off', () => {
-    sortAction('sort-order', 'char', 'potential,rarity,name,acquired,element,weapon,class');
+    sortAction('sort-order', 'char', 'potential,rarity,name,acquired,owned,element,weapon,class');
     expect(sortSpecs('char').map((s) => s.key).slice(0, 3)).toEqual(['potential', 'rarity', 'name']);
     expect(names()).toEqual(['Chen', 'Ardelia', 'Arcane', 'Ember']);
     sortAction('sort-toggle', 'char', 'potential');
@@ -44,6 +44,23 @@ describe('ranked sorting', () => {
     expect(names()).toEqual(['Arcane', 'Ardelia', 'Ember', 'Chen']);
     sortAction('sort-toggle', 'char', 'potential');
     expect(names()[0]).toBe('Chen');
+    sortAction('sort-reset', 'char');
+  });
+
+  it('splits the list into sections by the first sort', () => {
+    const groups = () => sortGroups('char', items, (x) => x).map((g) => `${g.label}: ${g.items.map((x) => x.name).join(' ')}`);
+    expect(groups()).toEqual(['6★: Arcane Ardelia Ember', '5★: Chen']);
+    sortAction('sort-front', 'char', 'element');
+    expect(groups()).toEqual(['Heat: Ember', 'Nature: Arcane Ardelia', 'Physical: Chen']);
+    sortAction('sort-front', 'char', 'potential');
+    expect(groups()).toEqual(['P5: Chen', 'P3: Ardelia', 'P0: Arcane', 'Not owned: Ember']);
+    // Owned first, then the next sort (potential) within each.
+    sortAction('sort-front', 'char', 'owned');
+    expect(groups()).toEqual(['Owned: Chen Ardelia Arcane', 'Not owned: Ember']);
+    sortAction('sort-dir', 'char', 'owned');
+    expect(groups()[0]).toBe('Not owned: Ember');
+    sortAction('sort-front', 'char', 'name');
+    expect(groups()).toEqual([': Arcane Ardelia Chen Ember']);
     sortAction('sort-reset', 'char');
   });
 });

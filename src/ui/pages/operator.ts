@@ -5,7 +5,7 @@ import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } f
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
 import { canShuffle, currentArt, gallerySection, positionOf } from './art';
-import { sortBar, sortItems } from './sorting';
+import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
@@ -37,7 +37,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
   const ops = Object.entries(f.operators)
     .filter(([id]) => !isEndministrator(id) || id === endmin)
     .filter(([, o]) => !seen.has(o.page) && !!seen.add(o.page));
-  const sorted = sortItems('char', ops, ([id, o]) => ({ rarity: o.rarity, name: o.name, owned: owned?.get(id), element: o.element, weapon: o.weapon, class: o.class }));
+  const groups = sortGroups('char', ops, ([id, o]) => ({ rarity: o.rarity, name: o.name, owned: owned?.get(id), element: o.element, weapon: o.weapon, class: o.class }));
   const have = owned ? ops.filter(([id]) => owned.get(id)?.copies).length : 0;
   const soon = Object.entries(previews?.operators ?? {}).filter(([id]) => !f.operators[id]);
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
@@ -61,20 +61,25 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
             </div>
           </section>`
         : ''}
-      <div class="section-head${soon.length ? ' wiki-all-head' : ''}"><h2 class="heading-20">All operators</h2>${sortBar('char')}</div>
-      <div class="wiki-grid">
-        ${sorted.map(([id, o]) => {
-          const mine = owned?.get(id);
-          return html`<a class="wiki-tile card${owned && !mine?.copies ? ' unowned' : ''}" href="${operatorInfoHref(id)}">
-            ${itemImg('char', id, 'wiki-tile-portrait')}
-            <span class="wiki-tile-text min0">
-              <span class="wiki-tile-name ellipsis">${o.name}</span>
-              <span class="label-12 secondary">${rarity(o.rarity)} · ${o.class} · ${o.element}</span>
-            </span>
-            ${ownedTag(mine)}
-          </a>`;
-        })}
-      </div>
+      <div class="section-head${soon.length ? ' wiki-all-head' : ''} wiki-sort-head">${sortBar('char')}</div>
+      ${groups.map(
+        (g) => html`<section class="section wiki-type">
+          <div class="section-head"><h2 class="heading-20">${g.label || 'All operators'}</h2><span class="label-13 secondary">${g.items.length}</span></div>
+          <div class="wiki-grid">
+            ${g.items.map(([id, o]) => {
+              const mine = owned?.get(id);
+              return html`<a class="wiki-tile card${owned && !mine?.copies ? ' unowned' : ''}" href="${operatorInfoHref(id)}">
+                ${itemImg('char', id, 'wiki-tile-portrait')}
+                <span class="wiki-tile-text min0">
+                  <span class="wiki-tile-name ellipsis">${o.name}</span>
+                  <span class="label-12 secondary">${rarity(o.rarity)} · ${o.class} · ${o.element}</span>
+                </span>
+                ${ownedTag(mine)}
+              </a>`;
+            })}
+          </div>
+        </section>`,
+      )}
       ${credit(f.attribution)}
     </main>`;
 }

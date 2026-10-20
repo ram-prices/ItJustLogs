@@ -1980,6 +1980,10 @@ code {
 .fade-in {
   animation: rise 0.3s var(--ease) both;
 }
+/* A redraw of the page already open (#app.settled, app.ts draw) doesn't fade it in again. */
+.settled .fade-in {
+  animation: none;
+}
 /* Banner cards come in one after another (--i is each card's place in the
    list, capped so long lists don't keep you waiting), then their colour
    glow fades up. The tint itself eases when tint.ts finds the real colour. */
@@ -2002,6 +2006,23 @@ code {
 }
 .header-sync.failed .icon {
   color: var(--red);
+}
+/* Changes waiting to go to Drive: an amber dot on the button. */
+.header-sync {
+  position: relative;
+}
+.sync-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 2px var(--background-100);
+}
+.header-sync.synced .icon {
+  color: var(--green);
 }
 @keyframes spin {
   to {

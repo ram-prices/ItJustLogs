@@ -23,7 +23,7 @@ import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage, togglePatch } from './pages/stats';
 import { cropAvatar } from './cropper';
-import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncShown, syncView } from './sync';
+import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncPending, syncShown, syncView } from './sync';
 import { whenNear } from './near';
 import { installTint, tintSixStrip, tintWeaponCards } from './tint';
 
@@ -97,17 +97,32 @@ function syncButton(): Html {
   if (!syncShown()) return html``;
   const { status, lastSynced, error } = syncView();
   const busy = status === 'syncing';
+  const pending = syncPending();
+  const when = lastSynced ? ` Last synced ${new Date(lastSynced).toLocaleString()}.` : '';
   const title =
     status === 'reconnect' || status === 'paused'
-      ? 'Sync with Google Drive (needs a click each visit)'
+      ? `${pending ? 'Changes here aren’t in Google Drive yet. ' : ''}Sync with Google Drive (needs a click each visit)`
       : status === 'error'
         ? `Sync failed: ${error}. Click to try again`
         : busy
           ? 'Syncing with Google Drive…'
-          : lastSynced
-            ? `Synced with Google Drive ${new Date(lastSynced).toLocaleString()}. Click to sync now`
-            : 'Sync with Google Drive';
-  return html`<button class="btn ${syncNeedsClick() ? 'primary' : 'secondary'} sm header-sync${busy ? ' busy' : ''}${status === 'error' ? ' failed' : ''}" data-action="sync-now" title="${title}" aria-label="${title}" ${raw(busy ? 'disabled' : '')}>${icon('sync')}<span class="hide-sm">${busy ? 'Syncing' : status === 'error' ? 'Retry sync' : 'Sync'}</span></button>`;
+          : pending
+            ? `Changes here are waiting to sync to Google Drive.${when} Click to sync now`
+            : lastSynced
+              ? `Everything is synced with Google Drive.${when} Click to sync now`
+              : 'Sync with Google Drive';
+  // Syncing (spinning), waiting changes (cloud with an arrow), all synced (cloud with a tick).
+  const [glyph, label] = busy
+    ? ['sync', 'Syncing']
+    : status === 'error'
+      ? ['sync', 'Retry sync']
+      : syncNeedsClick()
+        ? ['sync', 'Sync']
+        : pending
+          ? ['cloud_upload', 'Unsynced']
+          : ['cloud_done', 'Synced'];
+  const look = busy ? ' busy' : status === 'error' ? ' failed' : pending ? ' pending' : syncNeedsClick() ? '' : ' synced';
+  return html`<button class="btn ${syncNeedsClick() ? 'primary' : 'secondary'} sm header-sync${look}" data-action="sync-now" title="${title}" aria-label="${title}" ${raw(busy ? 'disabled' : '')}>${icon(glyph)}<span class="hide-sm">${label}</span>${pending && !busy ? html`<span class="sync-dot" aria-hidden="true"></span>` : ''}</button>`;
 }
 
 function header(route: Route): Html {
@@ -197,6 +212,9 @@ function page(route: Route): Html {
 }
 
 let lastKey = '';
+/** When the current page opened, and how long after it redraws still fade in (its data loading). */
+let openedAt = 0;
+const SETTLE_MS = 1500;
 
 function applyTheme(): void {
   const t = state.settings.theme;
@@ -215,7 +233,12 @@ function draw(): void {
     resetCardEntrance();
     // Operator pages pick a new random picture each time they open.
     resetArtPick();
+    openedAt = Date.now();
   }
+  // The page fades in when it opens (and as its data arrives just after);
+  // later redraws (a setting changed, Drive sync starting and finishing)
+  // swap the page in place instead of flashing it.
+  root().classList.toggle('settled', key === lastKey && Date.now() - openedAt > SETTLE_MS);
   render(root(), html`${header(route)}${page(route)}${footer()}`);
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.
@@ -563,6 +586,13 @@ async function onClick(e: MouseEvent): Promise<void> {
       const have = extrasOf(state.settings);
       const endmin = endministratorOf(have);
       if (preset) addExtras(preset.extras.filter((x) => !have.some((e) => e.id === x.id && e.note === x.note) && !(isEndministrator(x.id) && endmin)));
+      break;
+    }
+    case 'extra-ids': {
+      // One copy of each listed item (the page leaves out ones already there).
+      const ids = (el.dataset.value ?? '').split(',').filter(Boolean);
+      addExtras(ids.map((id) => ({ id, copies: 1, note: el.dataset.note ?? '' })));
+      if (ids.length) toast(`Added ${ids.length} ${el.dataset.note ?? ''} ${ids.length === 1 ? 'copy' : 'copies'}.`);
       break;
     }
     case 'extra-remove':

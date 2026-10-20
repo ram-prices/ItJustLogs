@@ -7,10 +7,11 @@ import { html, render, type Html } from '../html';
  * Ranked sorting for the operator and weapon lists: every sort key in a
  * priority order the player sets in the sort pop-up (drag to reorder, or
  * into Disabled to stop using one), each with its own direction. Ties on
- * one key fall to the next. Saved in settings.
+ * one key fall to the next, and the first one splits the list into
+ * sections (sortGroups). Saved in settings.
  */
 
-export type SortKey = 'rarity' | 'name' | 'acquired' | 'potential' | 'element' | 'weapon' | 'class';
+export type SortKey = 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'element' | 'weapon' | 'class';
 export interface SortSpec {
   key: SortKey;
   desc: boolean;
@@ -23,18 +24,24 @@ const LABEL: Record<SortKey, string> = {
   name: 'A–Z',
   acquired: 'Last acquired',
   potential: 'Potential',
+  owned: 'Owned',
   element: 'Element',
   weapon: 'Weapon',
   class: 'Class',
 };
 
-/** The keys each list offers, in their default order (rarity first, then name). */
+/** What a key is called in that list: a weapon's own type is just "Type". */
+const labelOf = (kind: Kind, key: SortKey): string => (kind === 'weap' && key === 'weapon' ? 'Type' : LABEL[key]);
+
+/** The keys each list offers, in their default order: operators by rarity, weapons by type, then rarity; then name. */
 const KEYS: Record<Kind, SortKey[]> = {
-  char: ['rarity', 'name', 'acquired', 'potential', 'element', 'weapon', 'class'],
-  weap: ['rarity', 'name', 'acquired', 'potential'],
+  char: ['rarity', 'name', 'acquired', 'potential', 'owned', 'element', 'weapon', 'class'],
+  weap: ['weapon', 'rarity', 'name', 'acquired', 'potential', 'owned'],
 };
-/** Which way each key goes until flipped: highest, newest and best first; names A to Z. */
-const DEFAULT_DESC: Record<SortKey, boolean> = { rarity: true, name: false, acquired: true, potential: true, element: false, weapon: false, class: false };
+/** Weapon types in the game's order (the rest after them, A to Z). */
+const WEAPON_TYPES = ['Sword', 'Great Sword', 'Polearm', 'Handcannon', 'Arts Unit'];
+/** Which way each key goes until flipped: highest, newest, best and owned first; names A to Z. */
+const DEFAULT_DESC: Record<SortKey, boolean> = { rarity: true, name: false, acquired: true, potential: true, owned: true, element: false, weapon: false, class: false };
 
 /** The list's sort order: the player's, with any keys it lacks added at the end. */
 export function sortSpecs(kind: Kind): SortSpec[] {
@@ -78,7 +85,7 @@ function summary(kind: Kind): string {
   if (!on.length) return 'Off';
   return on
     .slice(0, 2)
-    .map((s) => `${LABEL[s.key]} ${s.desc ? '↓' : '↑'}`)
+    .map((s) => `${labelOf(kind, s.key)} ${s.desc ? '↓' : '↑'}`)
     .join(', ') + (on.length > 2 ? ' …' : '');
 }
 
@@ -88,6 +95,10 @@ export function sortBar(kind: Kind): Html {
     <span class="icon">sort</span>Sort<span class="sort-summary">${summary(kind)}</span>
   </button>`;
 }
+
+/** The direction button's words: Owned reads "Owned first" rather than high to low. */
+const dirLabel = (s: SortSpec): string =>
+  s.key === 'owned' ? (s.desc ? 'Owned first ↓' : 'Not owned first ↑') : s.desc ? 'High to low ↓' : 'Low to high ↑';
 
 const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
 
@@ -107,12 +118,12 @@ export function openSortPopup(kind: Kind, anchor: HTMLElement): void {
 
   const row = (s: SortSpec, rank: number) => html`<li class="sort-row${s.off ? ' off' : ''}" data-sort-key="${s.key}">
     <span class="icon sort-grip" aria-hidden="true">drag_indicator</span>
-    <button type="button" class="sort-name" aria-label="${LABEL[s.key]}, ${s.off ? 'disabled' : `sorted ${ordinal(rank)}`}. Arrow keys move it">
-      ${s.off ? '' : html`<span class="sort-rank">${rank}</span>`}${LABEL[s.key]}
+    <button type="button" class="sort-name" aria-label="${labelOf(kind, s.key)}, ${s.off ? 'disabled' : `sorted ${ordinal(rank)}`}. Arrow keys move it">
+      ${s.off ? '' : html`<span class="sort-rank">${rank}</span>`}${labelOf(kind, s.key)}
     </button>
     ${s.off
       ? ''
-      : html`<button type="button" class="sort-dir" data-sort-dir aria-label="${s.desc ? 'Descending' : 'Ascending'}. Flip">${s.desc ? 'High to low ↓' : 'Low to high ↑'}</button>`}
+      : html`<button type="button" class="sort-dir" data-sort-dir aria-label="${s.desc ? 'Descending' : 'Ascending'}. Flip">${dirLabel(s)}</button>`}
     <button type="button" class="sort-move" data-sort-move title="${s.off ? 'Sort by this again' : 'Stop sorting by this'}">${s.off ? 'Enable' : 'Disable'}</button>
   </li>`;
 
@@ -126,7 +137,7 @@ export function openSortPopup(kind: Kind, anchor: HTMLElement): void {
           <h2 class="heading-16">Sort</h2>
           <button type="button" class="btn tertiary sm" data-sort-reset>Reset</button>
         </div>
-        <p class="copy-13 secondary">Drag to reorder: the first sort decides, the next ones break ties. Drag a sort into Disabled to stop using it.</p>
+        <p class="copy-13 secondary">Drag to reorder: the first sort splits the list into sections, the next ones order each section. Drag a sort into Disabled to stop using it.</p>
         <ol class="sort-list" data-zone="on">${on.map((s, i) => row(s, i + 1))}${on.length ? '' : html`<li class="sort-empty">Drag a sort here</li>`}</ol>
         <div class="sort-zone-label label-12">Disabled</div>
         <ul class="sort-list" data-zone="off">${off.map((s) => row(s, 0))}${off.length ? '' : html`<li class="sort-empty">Drag a sort here to disable it</li>`}</ul>`,
@@ -258,6 +269,13 @@ function value(f: SortFacts, key: SortKey): number | string | null {
       return lastAcquired(f.owned);
     case 'potential':
       return f.owned?.copies ? f.owned.potential : null;
+    case 'owned':
+      return f.owned?.copies ? 1 : 0;
+    case 'weapon': {
+      if (!f.weapon) return null;
+      const i = WEAPON_TYPES.indexOf(f.weapon);
+      return i >= 0 ? `${i} ${f.weapon}` : `9 ${f.weapon}`;
+    }
     default:
       return f[key] ?? null;
   }
@@ -281,4 +299,48 @@ export function sortItems<T>(kind: Kind, items: T[], facts: (t: T) => SortFacts)
       return 0;
     })
     .map((x) => x.t);
+}
+
+export interface SortGroup<T> {
+  /** The section's heading ("6★", "Nature", "P3"); empty when the list isn't split. */
+  label: string;
+  items: T[];
+}
+
+/** The section an item goes in under the list's first sort. */
+function groupLabel(key: SortKey, f: SortFacts): string {
+  const v = value(f, key);
+  switch (key) {
+    case 'rarity':
+      return `${v}★`;
+    case 'potential':
+      return v == null ? 'Not owned' : `P${v}`;
+    case 'owned':
+      return v ? 'Owned' : 'Not owned';
+    case 'acquired':
+      return v == null ? 'Not owned' : v === 0 ? 'Owned, no date' : new Date(v).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    default: {
+      const s = key === 'element' || key === 'weapon' || key === 'class' ? f[key] : null;
+      return s || 'Other';
+    }
+  }
+}
+
+/**
+ * `items` sorted (sortItems) and split into sections by the first sort in
+ * use: rarity gives 6★, 5★, 4★…; element one per element; last acquired one
+ * per month. A–Z (or no sort at all) leaves one section without a heading.
+ */
+export function sortGroups<T>(kind: Kind, items: T[], facts: (t: T) => SortFacts): SortGroup<T>[] {
+  const sorted = sortItems(kind, items, facts);
+  const first = sortSpecs(kind).find((s) => !s.off);
+  if (!first || first.key === 'name') return [{ label: '', items: sorted }];
+  const groups: SortGroup<T>[] = [];
+  for (const t of sorted) {
+    const label = groupLabel(first.key, facts(t));
+    const last = groups.at(-1);
+    if (last?.label === label) last.items.push(t);
+    else groups.push({ label, items: [t] });
+  }
+  return groups;
 }

@@ -59,6 +59,9 @@ export const EXTRA_PRESETS: { key: string; label: string; extras: ExtraCopy[] }[
   },
 ];
 
+/** The note on Protocol Pass weapons (Settings → Extra copies' quick add, built from the wiki's sources). */
+export const PROTOCOL_PASS = 'Protocol Pass';
+
 export const extraKind = (id: string): Kind => (id.startsWith('wpn_') ? 'weap' : 'char');
 
 /**

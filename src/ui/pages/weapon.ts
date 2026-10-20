@@ -5,7 +5,7 @@ import { badge, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { weaponRankCaps } from '../../domain/loadout';
 import { essenceLabel, weaponRanksOf, wieldersSection } from './loadout';
-import { sortBar, sortItems } from './sorting';
+import { sortBar, sortGroups } from './sorting';
 import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
@@ -24,11 +24,10 @@ export const weaponInfoHref = (id?: string): string => infoHref('weap', id);
 // Index: every weapon
 // ---------------------------------------------------------------------------
 
-const TYPES = ['Sword', 'Great Sword', 'Polearm', 'Handcannon', 'Arts Unit'];
 
 function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
   const all = Object.entries(f.weapons);
-  const types = [...new Set([...TYPES.filter((t) => all.some(([, w]) => w.type === t)), ...all.map(([, w]) => w.type)])];
+  const groups = sortGroups('weap', all, ([id, w]) => ({ rarity: w.rarity, name: w.name, owned: owned?.get(id), weapon: w.type }));
   const have = owned ? all.filter(([id]) => owned.get(id)?.copies).length : 0;
   const soon = Object.entries(previews?.weapons ?? {}).filter(([id]) => !f.weapons[id]);
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
@@ -53,12 +52,11 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
           </section>`
         : ''}
       <div class="section-head${soon.length ? ' wiki-all-head' : ''} wiki-sort-head">${sortBar('weap')}</div>
-      ${types.map((type) => {
-        const list = sortItems('weap', all.filter(([, w]) => w.type === type), ([id, w]) => ({ rarity: w.rarity, name: w.name, owned: owned?.get(id) }));
+      ${groups.map((g) => {
         return html`<section class="section wiki-type">
-          <div class="section-head"><h2 class="heading-20">${type}</h2><span class="label-13 secondary">${list.length}</span></div>
+          <div class="section-head"><h2 class="heading-20">${g.label || 'All weapons'}</h2><span class="label-13 secondary">${g.items.length}</span></div>
           <div class="wiki-grid">
-            ${list.map(([id, w]) => {
+            ${g.items.map(([id, w]) => {
               const mine = owned?.get(id);
               return html`<a class="wiki-tile card${owned && !mine?.copies ? ' unowned' : ''}" href="${weaponInfoHref(id)}">
                 ${itemImg('weap', id, 'wiki-tile-portrait')}
