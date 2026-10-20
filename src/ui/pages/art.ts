@@ -223,6 +223,36 @@ async function remove(opId: string, key: string): Promise<void> {
   forgetLoadedArt(opId);
 }
 
+/**
+ * A banner picture only moves along the axis it overflows: one wider than
+ * the header can slide left–right, one taller up–down. Turns off the other
+ * slider (or both, for a picture of the header's exact shape), once the
+ * thumbnail has loaded and the header's size is known.
+ */
+function lockSliders(root: HTMLElement): void {
+  const hero = document.querySelector<HTMLElement>('.wiki-hero');
+  const bw = hero?.clientWidth || 1200;
+  const bh = hero?.clientHeight || 224;
+  for (const box of root.querySelectorAll<HTMLElement>('.art-pos')) {
+    const img = box.closest('.art-item')?.querySelector<HTMLImageElement>('.art-thumb img');
+    if (!img) continue;
+    const apply = () => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const pic = img.naturalWidth / img.naturalHeight;
+      const banner = bw / bh;
+      const canX = pic > banner * 1.01;
+      const canY = pic < banner * 0.99;
+      for (const input of box.querySelectorAll<HTMLInputElement>('input[data-axis]')) {
+        const can = input.dataset.axis === '0' ? canX : canY;
+        input.disabled = !can;
+        input.title = can ? '' : input.dataset.axis === '0' ? 'This picture already fits the banner from side to side' : 'This picture already fits the banner from top to bottom';
+      }
+    };
+    if (img.complete) apply();
+    else img.addEventListener('load', apply, { once: true });
+  }
+}
+
 /** Sliders that move which part of a banner picture the header shows (left–right, up–down). */
 function positionControls(key: string): Html {
   const [x, y] = positionOf(key);
@@ -279,6 +309,7 @@ export function openArtManager(opId: string, name: string, redraw: () => void): 
         </div>
       </div>`,
     );
+    lockSliders(backdrop);
   };
 
   /** Runs one change with the dialog busy, then refreshes it, the page and sync. */

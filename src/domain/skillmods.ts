@@ -47,19 +47,52 @@ export function potentialSkillMods(o: Pick<WikiOperator, 'potentials' | 'skills'
     const skills = o.skills.filter((s) => s.type === type && head[2].includes(s.name));
     if (!skills.length) continue;
     const from = `P${p.rank}: ${p.name}`;
-    const mods: { label: RegExp; mod: ValueMod }[] = [];
+    // Each rule picks the rows it changes and how (the row's first value tells a % row from a plain one).
+    const rules: { rows: (label: string) => boolean; mod: (sample: string) => ValueMod }[] = [];
+    const rule = (rows: (label: string) => boolean, mod: (sample: string) => ValueMod) => rules.push({ rows, mod });
+    const handled = /Ultimate Energy cost|Length of cooldown|DMG Multiplier/i;
+
     const cost = text.match(/Ultimate Energy cost\s*-\s*(\d+(?:\.\d+)?)%/i);
-    if (cost) mods.push({ label: /^Ultimate Energy Cost$/i, mod: { from, kind: 'mult', value: 1 - Number(cost[1]) / 100 } });
+    if (cost) rule((l) => /^Ultimate Energy Cost$/i.test(l), () => ({ from, kind: 'mult', value: 1 - Number(cost[1]) / 100 }));
     const cd = text.match(/Length of cooldown\s*-\s*(\d+(?:\.\d+)?)s/i);
-    if (cd) mods.push({ label: /^Cooldown$/i, mod: { from, kind: 'add', value: -Number(cd[1]) } });
+    if (cd) rule((l) => /^Cooldown$/i.test(l), () => ({ from, kind: 'add', value: -Number(cd[1]) }));
     // "DMG Multiplier is increased to 1.3 times": every DMG multiplier row of the skill (Base, Explosion...).
     const dmg = text.match(/(?:^|[.:;]\s*)DMG Multiplier is increased to (\d+(?:\.\d+)?) times the original/i);
-    if (dmg) mods.push({ label: /DMG Multiplier$/i, mod: { from, kind: 'mult', value: Number(dmg[1]) } });
+    if (dmg) rule((l) => /DMG Multiplier$/i.test(l), () => ({ from, kind: 'mult', value: Number(dmg[1]) }));
     // "DMG Multiplier of Gloompurge Arcana (ultimate sequence 2) is increased to 1.3 times": that part's rows.
     for (const m of text.matchAll(/DMG Multiplier of ([A-Za-z][\w' -]*?)\s*(?:\([^)]*\))?\s+is increased to (\d+(?:\.\d+)?) times the original/gi)) {
-      const part = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      mods.push({ label: new RegExp(`^${part}\\b.*DMG Multiplier$`, 'i'), mod: { from, kind: 'mult', value: Number(m[2]) } });
+      const part = new RegExp(`^${m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b.*DMG Multiplier$`, 'i');
+      rule((l) => part.test(l), () => ({ from, kind: 'mult', value: Number(m[2]) }));
     }
+
+    // The rest, sentence by sentence, matched to rows by their words: "Electrification duration +75%"
+    // (Electrify Duration), "Shield duration +3s", "Duration of the Solidification applied by the skill
+    // is increased by 2s", "<thing> is increased to 1.33 times the original".
+    const body = text.slice(text.indexOf('improved:') + 'improved:'.length);
+    for (let sentence of body.split(/\n|(?<=[.;])\s+/)) {
+      sentence = sentence.replace(/^[^:]{1,40}:\s+(?=[A-Z])/, '').replace(/[.;]\s*$/, '').trim();
+      if (!sentence || handled.test(sentence)) continue;
+      let phrase: string | null = null;
+      let value = 0;
+      let unit = '';
+      let times = false;
+      let m: RegExpMatchArray | null;
+      if ((m = sentence.match(/^Duration of (?:the )?(.+?) applied by the skills? is increased by (\d+(?:\.\d+)?)(%|s)$/i))) [phrase, value, unit] = [`${m[1]} duration`, Number(m[2]), m[3]];
+      else if ((m = sentence.match(/^(?:the )?(.+?) (?:is|are) (?:increased|multiplied) to (\d+(?:\.\d+)?) times(?: the original)?$/i))) [phrase, value, times] = [m[1], Number(m[2]), true];
+      else if ((m = sentence.match(/^(?:the )?([A-Za-z][A-Za-z' -]{1,40}?)\s*\+\s*(\d+(?:\.\d+)?)(%|s)?$/i))) [phrase, value, unit] = [m[1], Number(m[2]), m[3] ?? ''];
+      if (!phrase) continue;
+      const words = phrase;
+      rule(
+        (l) => wordsMatch(words, l),
+        (sample) =>
+          times
+            ? { from, kind: 'mult', value }
+            : unit === '%' && !sample.trim().endsWith('%')
+              ? { from, kind: 'mult', value: 1 + value / 100 }
+              : { from, kind: 'add', value },
+      );
+    }
+
     // Operators with two skill sets list the same skill twice: change it once.
     const seen = new Set<string>();
     for (const s of skills) {
@@ -68,15 +101,43 @@ export function potentialSkillMods(o: Pick<WikiOperator, 'potentials' | 'skills'
       seen.add(key);
       const byLabel = out.get(key) ?? new Map<string, ValueMod[]>();
       // Every row of the skill, in either of its sets; each row takes each change once.
-      const rows = new Set(o.skills.filter((x) => x.type === s.type && x.name === s.name).flatMap((x) => x.values.map((v) => v.label)));
-      for (const label of rows) {
-        const hit = mods.find((x) => x.label.test(label));
-        if (hit) byLabel.set(label, [...(byLabel.get(label) ?? []), hit.mod]);
+      const rows = new Map(o.skills.filter((x) => x.type === s.type && x.name === s.name).flatMap((x) => x.values.map((v) => [v.label, v.ranks[0] ?? ''] as const)));
+      for (const [label, sample] of rows) {
+        for (const r of rules) if (r.rows(label)) byLabel.set(label, [...(byLabel.get(label) ?? []), r.mod(sample)]);
       }
       if (byLabel.size) out.set(key, byLabel);
     }
   }
   return out;
+}
+
+/** Words that say nothing about which row a Potential means. */
+const FILLER = new Set(['the', 'of', 'a', 'an', 'by', 'skill', "skill's", 'skills', 'applied', 'on', 'enemy', 'to', 'effect', 'effects']);
+const wordsOf = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .split(/[^a-z']+/)
+    .filter((w) => w && !FILLER.has(w));
+
+/**
+ * Whether a Potential's phrase names a row: each of its words matches a word
+ * of the label, allowing for word forms (Electrification / Electrify: a
+ * shared start of at least 6 letters, or the whole shorter word).
+ */
+export function wordsMatch(phrase: string, label: string): boolean {
+  const want = wordsOf(phrase);
+  const have = wordsOf(label);
+  if (!want.length) return false;
+  const same = (a: string, b: string) => {
+    if (a === b) return true;
+    let n = 0;
+    while (n < a.length && n < b.length && a[n] === b[n]) n++;
+    return n >= Math.min(6, a.length, b.length) && n >= 4;
+  };
+  // "Physical Susceptibility +5%" is the stat, not how long it lasts.
+  if (have.includes('duration') && !want.includes('duration')) return false;
+  return want.every((w) => have.some((h) => same(w, h)));
 }
 
 /** Which skill types each DMG bonus stat covers ("Skill DMG" is every skill, not basic attacks). */
@@ -107,9 +168,7 @@ export function applyMods(shown: string, mods: ValueMod[]): string | null {
   if (!m) return null;
   let n = Number(m[1]);
   for (const mod of mods) n = mod.kind === 'mult' ? n * mod.value : n + mod.value;
-  const decimals = (m[1].split('.')[1] ?? '').length;
-  const rounded = Math.round(n * 10 ** Math.max(decimals, 1)) / 10 ** Math.max(decimals, 1);
-  return `${Number(rounded.toFixed(2))}${m[2]}`;
+  return `${Math.round(n * 100) / 100}${m[2]}`;
 }
 
 /** Whether a change helps: lower costs and cooldowns, higher everything else. */

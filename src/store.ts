@@ -46,14 +46,17 @@ export interface Settings {
    */
   extras?: ExtraCopy[];
   /**
-   * Weapon skills count at the highest rank they can reach (max essence: 9,
-   * the Potential skill 4 + Potential). Unset = on; off = each loadout's set ranks.
+   * Each weapon's skill ranks as the player built them (their essence), set
+   * on the weapon's page. A weapon not listed has max essence: every skill
+   * at the highest rank it can reach (9; 4 + Potential for the last).
    */
-  maxEssence?: boolean;
+  weaponRanks?: Record<string, number[]>;
   /** Operator art the player removed (keys), so sync removes it on their other devices and in Drive too. */
   deletedArt?: string[];
   /** Where each operator picture shows (by its key); unset = the banner. See ui/pages/art.ts. */
   artPlaces?: Record<string, string[]>;
+  /** The operator and weapon lists' sort order (ui/pages/sorting.ts), when changed. */
+  infoSort?: Partial<Record<'char' | 'weap', { key: 'rarity' | 'name' | 'acquired' | 'potential' | 'element' | 'weapon' | 'class'; desc: boolean; off?: boolean }[]>>;
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;
   /** What each operator has equipped (weapon and gear), by operator id. */

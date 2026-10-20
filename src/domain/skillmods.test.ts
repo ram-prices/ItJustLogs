@@ -43,6 +43,25 @@ describe('skill changes from Potentials', () => {
     expect(potentialSkillMods(op, 5).get('Combo Skill:Blade')?.get('Cooldown')?.[0]).toMatchObject({ kind: 'add', value: -2 });
   });
 
+  it('matches other phrasings to rows by their words', () => {
+    const perlica = {
+      skills: [skill('Combo Skill', 'Instant Protocol: Chain', [['Electrify Duration (s)', ['5']], ['DMG Multiplier', ['180%']]])],
+      potentials: [{ rank: 1, name: 'Crisis Handling', description: 'Combo skill ⟦key|Instant Protocol: Chain⟧ improved: ⟦key|Electrification⟧ duration ⟦num|+75%⟧.' }],
+    } as unknown as WikiOperator;
+    const row = potentialSkillMods(perlica, 1).get('Combo Skill:Instant Protocol: Chain')?.get('Electrify Duration (s)');
+    expect(row?.[0]).toMatchObject({ kind: 'mult', value: 1.75 });
+    expect(applyMods('5', row!)).toBe('8.75');
+
+    const lifeng = {
+      skills: [skill('Battle Skill', 'Turbid Avatar', [['Physical Susceptibility', ['10%']], ['Physical Susceptibility Duration (s)', ['10']]])],
+      potentials: [{ rank: 1, name: 'X', description: 'Battle skill ⟦key|Turbid Avatar⟧ improved: Physical Susceptibility ⟦num|+5%⟧.' }],
+    } as unknown as WikiOperator;
+    const rows = potentialSkillMods(lifeng, 1).get('Battle Skill:Turbid Avatar');
+    // A % row takes the points; the duration row isn't the stat.
+    expect(rows?.get('Physical Susceptibility')?.[0]).toMatchObject({ kind: 'add', value: 5 });
+    expect(rows?.has('Physical Susceptibility Duration (s)')).toBe(false);
+  });
+
   it('applies changes to shown values, keeping their units', () => {
     expect(applyMods('100%', [{ from: 'P1', kind: 'mult', value: 1.3 }])).toBe('130%');
     expect(applyMods('100', [{ from: 'P4', kind: 'mult', value: 0.85 }])).toBe('85');

@@ -13,8 +13,6 @@ export interface Loadout {
   kit2?: string;
   /** Each gear piece's Artifice level (0 = none), when not the highest. */
   artifice?: Partial<Record<GearSlot, number>>;
-  /** The weapon's skill ranks, by skill, when max essence is off (missing: the highest it can reach). */
-  weaponRanks?: number[];
 }
 
 export type GearSlot = 'armor' | 'gloves' | 'kit1' | 'kit2';
@@ -48,8 +46,7 @@ export function withSlot(l: Loadout | undefined, slot: LoadoutSlot, id: string |
   const next: Loadout = { ...l };
   if (id) next[slot] = id;
   else delete next[slot];
-  // A new weapon starts at its top ranks again, a new piece at its highest Artifice level.
-  if (slot === 'weapon') delete next.weaponRanks;
+  // A new piece starts at its highest Artifice level again.
   if (slot !== 'weapon' && next.artifice?.[slot] != null) {
     const { [slot]: _, ...rest } = next.artifice;
     if (Object.keys(rest).length) next.artifice = rest;
@@ -75,16 +72,6 @@ export function weaponRankCaps(w: WikiWeapon, potential: number | null): number[
   return w.skills.map((_, i) =>
     i === w.skills.length - 1 && w.skills.length > 1 ? Math.min(WEAPON_SKILL_RANK, POTENTIAL_SKILL_BASE_CAP + (potential ?? 0)) : WEAPON_SKILL_RANK,
   );
-}
-
-/** `l` with weapon skill `i` at rank `rank` (null: back to its highest). */
-export function withWeaponRank(l: Loadout | undefined, i: number, rank: number | null): Loadout | undefined {
-  const ranks = [...(l?.weaponRanks ?? [])];
-  if (rank == null) delete ranks[i];
-  else ranks[i] = Math.max(1, Math.floor(rank));
-  const next: Loadout = { ...l, weaponRanks: ranks };
-  if (!ranks.some((r) => r != null)) delete next.weaponRanks;
-  return Object.keys(next).length ? next : undefined;
 }
 
 /** The Artifice level a slot's stats count at: the one set, else the piece's highest. */

@@ -1,6 +1,6 @@
 import type { Analysis } from '../../domain/analyze';
 import { gearIconUrl } from '../../domain/banners';
-import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, weaponRankCaps, withArtifice, withWeaponRank, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
+import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import { badge, icon, itemImg, rarity } from '../components';
@@ -58,38 +58,31 @@ function slotTile(
   </div>`;
 }
 
-/** Max essence (the default): weapon skills count at the highest rank they can reach. One setting for every loadout. */
-const maxEssence = (): boolean => state.settings.maxEssence !== false;
+/** A weapon's skill ranks as the player built it (set on its page); undefined = max essence. */
+export const weaponRanksOf = (wpnId: string): number[] | undefined => state.settings.weaponRanks?.[wpnId];
 
-function essenceToggle(): Html {
-  const on = maxEssence();
-  return html`<button type="button" class="attr-toggle loadout-essence" data-action="max-essence" aria-pressed="${String(on)}" title="${on ? 'Weapon skills count at the highest rank they can reach: 9, and 4 + Potential for the last. Press to set each rank' : 'Count weapon skills at the highest rank they can reach'}">Max essence</button>`;
+/** Max essence on (every skill at the highest rank it can reach), or off starting from `caps` to set each rank. */
+export function setMaxEssence(wpnId: string, on: boolean, caps: number[]): void {
+  const all = { ...state.settings.weaponRanks };
+  if (on) delete all[wpnId];
+  else all[wpnId] = [...caps];
+  updateSettings({ weaponRanks: all });
 }
 
-/** With max essence off: a rank picker per weapon skill, up to what it can reach. */
-function rankPickers(opId: string, l: Loadout, w: WikiWeapon, potential: number | null): Html {
-  const caps = weaponRankCaps(w, potential);
-  return html`<div class="loadout-ranks">
-    ${w.skills.map((s, i) => {
-      const at = Math.min(l.weaponRanks?.[i] ?? caps[i], caps[i]);
-      return html`<label class="loadout-rank min0" title="${i === w.skills.length - 1 && w.skills.length > 1 ? `Up to ${caps[i]}: 4 + the weapon's Potential` : 'Up to 9'}">
-        <span class="ellipsis">${s.name}</span>
-        <select data-rank-op="${opId}" data-rank-index="${i}" aria-label="${s.name} rank">
-          ${Array.from({ length: caps[i] }, (_, r) => html`<option value="${r + 1}" ${raw(r + 1 === at ? 'selected' : '')}>Rank ${r + 1}</option>`)}
-        </select>
-      </label>`;
-    })}
-  </div>`;
+/** One weapon skill's rank as the player built it (only kept while max essence is off). */
+export function setWeaponRank(wpnId: string, i: number, rank: number): void {
+  const now = weaponRanksOf(wpnId);
+  if (!now) return;
+  const next = [...now];
+  next[i] = Math.max(1, Math.floor(rank));
+  updateSettings({ weaponRanks: { ...state.settings.weaponRanks, [wpnId]: next } });
 }
 
-/** Sets a weapon skill's rank in an operator's loadout. */
-export function setWeaponRank(opId: string, i: number, rank: number): void {
-  const all = { ...state.settings.loadouts };
-  const next = withWeaponRank(all[opId], i, rank);
-  if (next) all[opId] = next;
-  else delete all[opId];
-  updateSettings({ loadouts: all });
-}
+/** "Maxed Essence" or "Ranks 5 · 9 · 4": how the player built a weapon. */
+export const essenceLabel = (wpnId: string): string => {
+  const r = weaponRanksOf(wpnId);
+  return r ? `Ranks ${r.join(' · ')}` : 'Maxed Essence';
+};
 
 /** A gear slot's Artifice level picker (pieces that can be refined only). */
 function artificePicker(opId: string, slot: GearSlot, l: Loadout, g: WikiGear): Html {
@@ -127,13 +120,11 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
       ? {
           img: itemImg('weap', l.weapon),
           name: w?.name ?? l.weapon,
-          sub: html`${w ? rarity(w.rarity) : ''}${ownedWeps?.get(l.weapon)?.copies ? html` · P${ownedWeps.get(l.weapon)!.potential}` : ''}`,
+          sub: html`${w ? rarity(w.rarity) : ''}${ownedWeps?.get(l.weapon)?.copies ? html` · P${ownedWeps.get(l.weapon)!.potential}` : ''} · ${essenceLabel(l.weapon)}`,
           href: infoHref('weap', l.weapon),
-          extra: essenceToggle(),
         }
       : null,
   );
-  const ranks = w && !maxEssence() ? rankPickers(opId, l, w, ownedWeps?.get(l.weapon!)?.copies ? ownedWeps.get(l.weapon!)!.potential : null) : '';
   const gearTiles = GEAR_SLOTS.map(({ slot, label }) => {
     const id = l[slot];
     const g = id ? gear?.gear.items[id] : undefined;
@@ -150,7 +141,7 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
       <h2 class="heading-20">Loadout</h2>
     </div>
     <div class="card loadout">
-      <div class="loadout-slots">${weaponTile}${ranks}${gearTiles}</div>
+      <div class="loadout-slots">${weaponTile}${gearTiles}</div>
       ${active.length || partial.length
         ? html`<div class="loadout-sets">
             ${active.map(
@@ -336,7 +327,7 @@ export function bonusesFor(opId: string, o: WikiOperator, a: Analysis | null, re
   return operatorBonuses(o, {
     potential,
     loadout: weps && gear ? l : null,
-    weapon: w ? { w, potential: mine?.copies ? mine.potential : null, ranks: maxEssence() ? undefined : l?.weaponRanks } : null,
+    weapon: w ? { w, potential: mine?.copies ? mine.potential : null, ranks: weaponRanksOf(l!.weapon!) } : null,
     items: gear?.gear.items,
     sets: gear?.gear.sets,
   });

@@ -1,6 +1,7 @@
 import type { Analysis } from '../../domain/analyze';
 import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type ExtraCopy, type Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
+import { scheduleLinks } from '../../domain/schedule';
 import { SITE_URL } from '../../domain/share';
 import {
   fmtSkillValue,
@@ -103,6 +104,22 @@ export function previewsOf(redraw: () => void): WikiPreviewFile | null {
   return wikiFile<WikiPreviewFile>('previews.json', redraw).data;
 }
 
+/**
+ * The banner an unreleased operator or weapon is the rate-up of, with a
+ * button to its page (`/banners/<name>`, which opens Home at its card) once
+ * the schedule has it.
+ */
+export function rateUpCard(banner: { name: string | null; poolId: string | null }): Html {
+  if (!banner.name) return html``;
+  const links = scheduleLinks(state.schedule);
+  const b = state.schedule.banners.find((x) => (banner.poolId && x.poolId === banner.poolId) || x.name.trim().toLowerCase() === banner.name!.trim().toLowerCase());
+  const href = b ? links.get(b) : undefined;
+  return html`<div class="card"><div class="card-body rate-up-card">
+    <span class="copy-14">Rate-up on <b>${banner.name}</b>.</span>
+    ${href ? html`<a class="btn secondary sm" href="${href}">${icon('event')}Go to banner</a>` : ''}
+  </div></div>`;
+}
+
 /** The "Coming soon" page of an operator or weapon the wiki doesn't have yet. */
 export function previewPage(
   kind: Kind,
@@ -120,7 +137,7 @@ export function previewPage(
         <div class="min0 wiki-hero-text">
           ${crumbs(kind, p.name)}
           <div class="wiki-stars" style="color:var(--r${p.rarity})" aria-label="${p.rarity} star">${'★'.repeat(p.rarity)}</div>
-          <h1 class="heading-32">${p.name} ${badge('Coming soon', 'amber')}</h1>
+          <h1 class="heading-32">${p.name} ${badge('Unreleased', 'amber')}</h1>
           <div class="wiki-facts">
             ${facts.filter(([, v]) => v).map(([label, v]) => html`<span class="wiki-fact"><span class="wiki-fact-label">${label}</span>${v}</span>`)}
           </div>
@@ -237,10 +254,11 @@ export const sliderRank = (key: string, max: number, start = max): number => Mat
  * A rank slider. Moving it updates the values in its `[data-rank-scope]`
  * (one weapon skill), or on the whole page when it has none.
  */
-export function rankSlider(key: string, max: number, rank = sliderRank(key, max)): Html {
+export function rankSlider(key: string, max: number, rank = sliderRank(key, max), save?: { wpn: string; index: number }): Html {
+  // `save`: the slider is the player's own rank for that weapon skill, kept on change (app.ts).
   return html`<label class="wiki-rank label-13 secondary">
-    <span>Rank</span>
-    <input type="range" min="1" max="${max}" value="${rank}" data-wiki-rank="${key}" aria-label="Skill rank" />
+    <span>${save ? 'Your rank' : 'Rank'}</span>
+    <input type="range" min="1" max="${max}" value="${rank}" data-wiki-rank="${key}" ${save ? html`data-save-wpn="${save.wpn}" data-save-index="${String(save.index)}"` : ''} aria-label="Skill rank" />
     <span class="num wiki-em wiki-rank-value">${rank}</span>
   </label>`;
 }

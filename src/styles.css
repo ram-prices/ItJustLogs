@@ -1780,7 +1780,47 @@ code {
     flex-basis: 100%;
   }
 }
-/* Settings → Sync with Google Drive: status badge, note, last synced. */
+/* Settings → Sync with Google Drive: what syncs how, then the status. */
+.sync-parts {
+  margin: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-border);
+  overflow: hidden;
+}
+.sync-parts > div {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 16px;
+  font: 400 13px/19px var(--font-sans);
+}
+.sync-parts > div + div {
+  border-top: 1px solid var(--ring);
+}
+.sync-parts dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sync-parts dt .icon {
+  font-size: 17px;
+  color: var(--gray-900);
+}
+.sync-parts dd {
+  margin: 0;
+  color: var(--gray-900);
+}
+.sync-parts + .sync-status {
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .sync-parts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
 .sync-status {
   display: flex;
   align-items: center;
@@ -3170,6 +3210,15 @@ a.patch-banner:hover {
 .wiki-hero.has-art::after {
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent 25%, transparent 45%, var(--background-100));
 }
+/* A vignette over the banner picture: darker toward its edges. */
+.wiki-hero.has-art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 120% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+}
 /* Text over the player's banner stays readable on bright art. */
 .wiki-hero.has-art .wiki-hero-text {
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
@@ -3197,7 +3246,8 @@ a.patch-banner:hover {
 .wiki-page.has-backdrop {
   animation: none;
 }
-.wiki-page.has-backdrop .card {
+.wiki-page.has-backdrop .card,
+.wiki-page.has-backdrop .metrics:not(.plain) {
   background: color-mix(in srgb, var(--background-100) 70%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(1.3);
   backdrop-filter: blur(20px) saturate(1.3);
@@ -3298,6 +3348,10 @@ a.patch-banner:hover {
 .art-pos input {
   width: 100%;
   accent-color: var(--gray-1000);
+}
+.art-pos input:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 /* The art dialog: each picture with where it shows. */
 .art-item {
@@ -3656,6 +3710,136 @@ a.patch-banner:hover {
 .wiki-acc-body .table-wrap {
   margin: 0 -20px -18px;
 }
+/* Operator and weapon lists: the Sort button and its pop-up (pages/sorting.ts). */
+.sort-summary {
+  margin-left: 6px;
+  color: var(--gray-900);
+  font-weight: 400;
+}
+.sort-pop {
+  position: fixed;
+  z-index: 950;
+  width: min(380px, calc(100vw - 16px));
+  padding: 16px;
+  box-shadow: var(--shadow-border), 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.sort-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.sort-pop > p {
+  margin-bottom: 12px;
+}
+.sort-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+}
+.sort-zone-label {
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-900);
+}
+.sort-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--background-100);
+  box-shadow: var(--shadow-border);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.sort-row.dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 0 2px var(--focus), 0 8px 20px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 1;
+}
+.sort-row.off {
+  opacity: 0.6;
+}
+.sort-grip {
+  font-size: 16px;
+  color: var(--gray-700);
+}
+.sort-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  color: var(--gray-1000);
+  font: 500 13px/20px var(--font-sans);
+  text-align: left;
+  cursor: inherit;
+}
+.sort-rank {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--gray-alpha-200);
+  font: 600 11px/1 var(--font-sans);
+}
+.sort-dir,
+.sort-move {
+  border: 0;
+  border-radius: 9999px;
+  padding: 3px 8px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
+  color: var(--gray-900);
+  font: 500 11px/16px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sort-dir:hover,
+.sort-move:hover {
+  color: var(--gray-1000);
+  background: var(--gray-alpha-100);
+}
+.sort-empty {
+  padding: 10px;
+  text-align: center;
+  color: var(--gray-700);
+  font: 400 12px/16px var(--font-sans);
+}
+.wiki-sort-head {
+  justify-content: flex-end;
+}
+/* Weapons list: whether the player's copy has max essence. */
+.essence-max {
+  color: var(--green);
+}
+.essence-part {
+  color: var(--amber);
+}
+/* Unreleased operators and weapons: their banner, with a button to it. */
+.rate-up-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+/* Weapon page with max essence off: a note above its skills. */
+.wiki-essence-note {
+  margin: -6px 0 12px;
+}
 /* A weapon skill's own rank: shown on its row, set with the slider inside. */
 .wiki-acc-rank {
   font: 500 12px/16px var(--font-sans);
@@ -3784,40 +3968,6 @@ a.patch-banner:hover {
 select option {
   background-color: var(--background-100);
   color: var(--gray-1000);
-}
-/* The weapon slot's Max essence toggle, left of its link. */
-.loadout-slot.has-extra:first-child .loadout-pick {
-  padding-right: 150px;
-}
-.loadout-essence {
-  position: absolute;
-  top: 50%;
-  right: 44px;
-  translate: 0 -50%;
-}
-/* Max essence off: the weapon's skill ranks, under its slot. */
-.loadout-ranks {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 0 16px 12px 72px;
-}
-.loadout-rank {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font: 400 12px/16px var(--font-sans);
-  color: var(--gray-900);
-}
-.loadout-rank select {
-  height: 28px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--background-200);
-  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
-  color: var(--gray-1000);
-  font: 500 12px/1 var(--font-sans);
 }
 /* A gear piece's Artifice level, at the right of its slot. */
 .loadout-slot.has-extra .loadout-pick {

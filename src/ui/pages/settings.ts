@@ -42,9 +42,10 @@ export function setConfirmingDelete(v: DeleteScope | null): void {
  * ever merged, so none can be lost; everything else is taken whole from
  * whichever device changed it last.
  */
-const syncParts = (): Html => html`<dl class="delete-options sync-parts">
-  <div><dt>Pull history</dt><dd>Only ever merged. Each device adds its pulls to your Drive copy and gets the others' back. Nothing here can remove a pull from your Drive copy.</dd></div>
-  <div><dt>Settings, extra copies, pictures</dt><dd>The newest version wins. Whichever device changed them last replaces them everywhere, so removing an extra copy removes it on your other devices too. Sync a device right after changing them there.</dd></div>
+const syncParts = (): Html => html`<dl class="sync-parts">
+  <div><dt>${icon('history')}Pull history</dt><dd>Only ever merged. Each device adds its pulls to your Drive copy and gets the others' back; nothing here can remove a pull from it.</dd></div>
+  <div><dt>${icon('tune')}Settings &amp; pictures</dt><dd>The newest change wins everywhere (extra copies, loadouts, your name and pictures), so removing something here removes it on your other devices too. Sync right after changing them.</dd></div>
+  <div><dt>${icon('image')}Operator art</dt><dd>Each picture is copied to Drive once and to your other devices when they sync; removing one removes it everywhere.</dd></div>
 </dl>`;
 
 /** Google Drive sync; only on builds with a client ID. */
@@ -75,7 +76,7 @@ function syncCard(): Html {
   return html`<section class="card">
     <div class="card-body">
       <h2 class="heading-20">Sync with Google Drive</h2>
-      <p class="copy-14">Signed in as <b>${v.email ?? 'your Google account'}</b>. Imports and changes are saved to your Drive and shared with your other devices, in two ways:</p>
+      <p class="copy-14">Signed in as <b>${v.email ?? 'your Google account'}</b>. Imports and changes are saved to your Drive and shared with your other devices:</p>
       ${syncParts()}
       <div class="sync-status">${line}${v.lastSynced ? html`<span class="tertiary">Last synced ${fmtDate(v.lastSynced, true)}</span>` : ''}</div>
     </div>

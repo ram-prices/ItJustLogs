@@ -5,11 +5,12 @@ import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } f
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
 import { canShuffle, currentArt, gallerySection, positionOf } from './art';
+import { sortBar, sortItems } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
-import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Operator info pages (/operators/info and /operators/info/<chr id>): class,
@@ -35,8 +36,8 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
   const endmin = endministratorOf(extrasOf(state.settings)) ?? ENDMINISTRATORS[0];
   const ops = Object.entries(f.operators)
     .filter(([id]) => !isEndministrator(id) || id === endmin)
-    .filter(([, o]) => !seen.has(o.page) && !!seen.add(o.page))
-    .sort(([, a], [, b]) => b.rarity - a.rarity || a.name.localeCompare(b.name));
+    .filter(([, o]) => !seen.has(o.page) && !!seen.add(o.page));
+  const sorted = sortItems('char', ops, ([id, o]) => ({ rarity: o.rarity, name: o.name, owned: owned?.get(id), element: o.element, weapon: o.weapon, class: o.class }));
   const have = owned ? ops.filter(([id]) => owned.get(id)?.copies).length : 0;
   const soon = Object.entries(previews?.operators ?? {}).filter(([id]) => !f.operators[id]);
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
@@ -47,7 +48,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
     <main class="container fade-in">
       ${soon.length
         ? html`<section class="section wiki-type">
-            <div class="section-head"><h2 class="heading-20">Coming soon</h2><span class="label-13 secondary">From the version guide</span></div>
+            <div class="section-head"><h2 class="heading-20">Unreleased</h2></div>
             <div class="wiki-grid">
               ${soon.map(([id, p]) => html`<a class="wiki-tile card" href="${operatorInfoHref(id)}">
                 ${itemImg('char', id, 'wiki-tile-portrait')}
@@ -55,14 +56,14 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
                   <span class="wiki-tile-name ellipsis">${p.name}</span>
                   <span class="label-12 secondary">${rarity(p.rarity)} · ${[p.class, p.element].filter(Boolean).join(' · ')}</span>
                 </span>
-                ${badge('Soon', 'amber')}
+                ${badge('Unreleased', 'amber')}
               </a>`)}
             </div>
           </section>`
         : ''}
-      ${soon.length ? html`<div class="section-head wiki-all-head"><h2 class="heading-20">All operators</h2><span class="label-13 secondary">${ops.length}</span></div>` : ''}
+      <div class="section-head${soon.length ? ' wiki-all-head' : ''}"><h2 class="heading-20">All operators</h2>${sortBar('char')}</div>
       <div class="wiki-grid">
-        ${ops.map(([id, o]) => {
+        ${sorted.map(([id, o]) => {
           const mine = owned?.get(id);
           return html`<a class="wiki-tile card${owned && !mine?.copies ? ' unowned' : ''}" href="${operatorInfoHref(id)}">
             ${itemImg('char', id, 'wiki-tile-portrait')}
@@ -272,7 +273,7 @@ function skillsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> 
   const mods = potentialSkillMods(o, potential);
   const touched = mods.size > 0 || o.skills.some((s) => skillDmgBonus(s, bonuses));
   return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">Combat skills</h2>${touched ? html`<span class="row label-13 secondary">${splitToggle()}</span>` : ''}</div>
+    <div class="section-head"><h2 class="heading-20">Skills</h2>${touched ? html`<span class="row label-13 secondary">${splitToggle()}</span>` : ''}</div>
     ${skillSets(o.skills).map(
       (set, si) => html`${set.variant ? html`<h3 class="wiki-skill-type wiki-variant">${set.variant}</h3>` : ''}
         <div class="card wiki-accs">${set.skills.map((s, i) =>
@@ -437,7 +438,7 @@ function operatorPreview(id: string, p: PreviewOperator, attribution: WikiPrevie
     <div class="card"><div class="card-body"><p class="copy-14 wiki-text">${p.summary ?? 'The guide has no summary of this kit yet.'}</p></div></div>
   </section>
   ${p.banner.name ? html`<section class="section"><div class="section-head"><h2 class="heading-20">Banner</h2></div>
-    <div class="card"><div class="card-body copy-14">Rate-up on <b>${p.banner.name}</b>. Its dates are on <a href="/">Home</a>.</div></div></section>` : ''}`;
+    ${rateUpCard(p.banner)}</section>` : ''}`;
   return previewPage('char', id, p, [['Class', p.class], ['Element', element], ['Weapon', p.weapon]], p.tags, about, attribution);
 }
 
