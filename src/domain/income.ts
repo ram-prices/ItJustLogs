@@ -14,14 +14,14 @@
  * it added, a rough estimate for the storage crates in the areas it added
  * (their count times an average Oroberyl per crate), the Origeometry their
  * Aurylene unlocks at TP Points, and hand-kept amounts from community guides
- * (version preview livestream, version survey, SKPORT web check-in, Combat
- * Drills). Plus the Crafting Manual's gathering milestones (by the version
+ * (version preview livestream, version survey, Combat Drills). Plus the Crafting Manual's gathering milestones (by the version
  * that added the item's area or enemy), one-time progression at launch
  * (Operational Manual Node milestones, Authority Level rewards) and our own
- * rough estimates: the Credit Store, and, for an event or mode the wiki names
- * without amounts, what others of its kind give (the median). Assumes every
- * daily and weekly is done; Regional Development, Intel Gathering,
- * achievements and launch-only mail aren't counted (no source lists them). Headhunting pulls are limited ones: Basic HH
+ * rough estimate for an event or mode the wiki names without amounts: what
+ * others of its kind give (the median). Assumes every daily and weekly is
+ * done; Regional Development, Intel Gathering, the Credit Store (what it
+ * offers varies by refresh), achievements and launch-only mail aren't
+ * counted. Headhunting pulls are limited ones: Basic HH
  * Permits are counted apart. The current version is projected to its end.
  * Pure logic, no DOM.
  */
@@ -81,9 +81,7 @@ export interface IncomeFile {
   extras?: {
     livestream?: Extra & { perVersion: Record<string, number>; fromVersion: number; confirmed: string[] };
     survey?: Extra & { perVersion: Record<string, number>; fromVersion: number };
-    checkIn?: Extra & { perMonth: Record<string, number>; firstTime: Record<string, number> };
     combatDrills?: Extra & { perBanner: Record<string, number>; kinds: string[] };
-    creditStore?: Extra & { perDay: Record<string, number> };
   };
   /** One-time rewards there from launch (Operational Manual Node milestones, Authority Level rewards). */
   progression?: { version: string; items: { name: string; url: string; rewards: Record<string, number> }[] };
@@ -105,9 +103,6 @@ export interface Extra {
   note: string;
   sources: string[];
 }
-
-/** Average days in a month, for monthly rewards spread over a version's days. */
-const DAYS_PER_MONTH = 365.25 / 12;
 
 export interface ModeReward {
   name: string;
@@ -213,9 +208,7 @@ export type IncomeSource =
   | 'aurylene'
   | 'livestream'
   | 'survey'
-  | 'checkIn'
   | 'combatDrills'
-  | 'creditStore'
   | 'crafting'
   | 'progression'
   | 'daily' | 'weekly' | 'pass' | 'compensation' | PaidIncome;
@@ -232,7 +225,7 @@ export interface IncomeLine {
   name?: string;
   url?: string;
   /** Events: each one counted, for links (`id`: a schedule event's page here; `url`: the wiki's, for events the schedule doesn't list). */
-  events?: { id?: number; url?: string; name: string; pulls: number; partial: boolean; estimated?: boolean }[];
+  events?: { id?: number; url?: string; name: string; pulls: number; totals: Record<string, number>; partial: boolean; estimated?: boolean }[];
   /** Quests: each mission counted. */
   quests?: Quest[];
   /** Crates: the areas counted. */
@@ -336,7 +329,7 @@ export function patchIncome(
         const fill = r?.partial && !pullsOf(r.totals).pulls ? typical(e.type) : undefined;
         const t = fill ?? r?.totals ?? {};
         plus(totals, t);
-        counted.push({ id: e.id, name: e.name, pulls: pullsOf(t).pulls, partial: fill ? false : !r || !!r.partial, ...(fill ? { estimated: true } : {}) });
+        counted.push({ id: e.id, name: e.name, pulls: pullsOf(t).pulls, totals: t, partial: fill ? false : !r || !!r.partial, ...(fill ? { estimated: true } : {}) });
       }
       // Events the schedule doesn't list (announced mid-version): by when they start.
       for (const x of Object.values(events.extra ?? {})) {
@@ -345,7 +338,7 @@ export function patchIncome(
         const fill = x.partial && !pullsOf(x.totals).pulls ? typical(x.type) : undefined;
         const t = fill ?? x.totals;
         plus(totals, t);
-        counted.push({ url: x.url, name: x.name, pulls: pullsOf(t).pulls, partial: fill ? false : !!x.partial, ...(fill ? { estimated: true } : {}) });
+        counted.push({ url: x.url, name: x.name, pulls: pullsOf(t).pulls, totals: t, partial: fill ? false : !!x.partial, ...(fill ? { estimated: true } : {}) });
       }
       if (counted.length)
         lines.push({
@@ -428,13 +421,6 @@ export function patchIncome(
       const newBanners = drills ? schedule.banners.filter((b) => b.version === w.version && drills.kinds.includes(b.kind)).length : 0;
       if (drills && newBanners)
         lines.push({ source: 'combatDrills', count: newBanners, totals: plus({}, drills.perBanner, newBanners), extra: drills });
-      if (x?.checkIn && days)
-        lines.push({
-          source: 'checkIn',
-          count: days,
-          totals: plus(i === 0 ? { ...x.checkIn.firstTime } : {}, x.checkIn.perMonth, days / DAYS_PER_MONTH),
-          extra: x.checkIn,
-        });
       const comp = income.compensation?.versions[w.version];
       if (comp)
         lines.push({
@@ -444,8 +430,6 @@ export function patchIncome(
           rows: comp.rows,
           url: comp.url,
         });
-      if (x?.creditStore && days)
-        lines.push({ source: 'creditStore', count: days, totals: plus({}, x.creditStore.perDay, days), extra: x.creditStore, estimate: true });
       const m = income.monthly;
       if (paid.includes('monthly') && m && days)
         lines.push({ source: 'monthly', count: days, paid: true, totals: plus(plus({}, m.daily, days), m.onPurchase, days / m.days), url: m.url });

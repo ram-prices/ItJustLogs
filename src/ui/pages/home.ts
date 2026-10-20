@@ -376,7 +376,7 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
   menu = document.createElement('div');
   menu.className = 'ctx-menu';
   menu.setAttribute('role', 'menu');
-  const item = (icon: string, label: string, run: () => Promise<void>) => {
+  const item = (icon: string, label: string, run: () => Promise<void>): HTMLButtonElement => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.setAttribute('role', 'menuitem');
@@ -386,6 +386,7 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
       void run();
     });
     menu!.append(btn);
+    return btn;
   };
   const link = el.dataset.link;
   if (link) {
@@ -397,14 +398,30 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
   const card = el.closest<HTMLElement>('[data-card-image]');
   if (card) {
     const prepared: PreparedImage | undefined = touch ? prepareCardImage(card) : undefined;
-    item('image', 'Copy image', async () => {
+    const btn = item('image', 'Copy image', async () => {
       try {
-        const done = await copyCardImage(card, card.dataset.cardImage!, prepared);
-        toast(done === 'copied' ? 'Image copied.' : done === 'shared' ? 'Shared.' : 'Image saved to your downloads.', 'info');
+        const { done, why } = await copyCardImage(card, card.dataset.cardImage!, prepared);
+        toast(
+          done === 'copied' ? 'Image copied.' : done === 'shared' ? 'Shared.' : `Saved to your downloads: this browser didn't allow copying it (${why}).`,
+          done === 'saved' ? 'error' : 'info',
+        );
       } catch {
         toast("Couldn't make the image here.", 'error');
       }
     });
+    // On a phone, offer it once the picture is drawn, so the tap doesn't wait (the clipboard and share sheet need the tap).
+    if (prepared) {
+      const label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = label.replace('Copy image', 'Preparing image…');
+      prepared.promise.then(
+        () => {
+          btn.disabled = false;
+          btn.innerHTML = label;
+        },
+        () => (btn.innerHTML = label.replace('Copy image', "Can't make the image")),
+      );
+    }
   }
   const first = menu.querySelector('button');
   document.body.append(menu);

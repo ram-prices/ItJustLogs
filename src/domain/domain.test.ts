@@ -151,6 +151,21 @@ describe('Arsenal sets of 10', () => {
     expect(b.guarantee).toMatchObject({ value: 8, done: true });
   });
 
+  it('Constant Issues have the 8th-set guarantee too', () => {
+    // Constant Issue 1: its rate-up is Khravengger (wpn_claym_0013); a player's first one came on pull 80.
+    const weapons = Array.from({ length: 80 }, (_, i) => ({
+      seqId: String(i + 1),
+      gachaTs: String(1_000_000 + i + 1),
+      weaponId: i === 79 ? 'wpn_claym_0013' : 'wpn_filler',
+      weaponName: i === 79 ? 'Khravengger' : 'wpn_filler',
+      rarity: i === 79 ? 6 : 4,
+      poolId: 'weaponbox_constant_1',
+    }));
+    const b = analyze({ characters: [], weapons } as unknown as PullHistory, bannerDb).banners.find((x) => x.poolId === 'weaponbox_constant_1')!;
+    expect(b.pulls.find((p) => p.rarity === 6)!.outcome).toBe('guaranteed');
+    expect(b.guarantee).toMatchObject({ value: 8, max: 8, done: true });
+  });
+
   it('rewards: Selector at set 10, then every 8 sets alternating rate-up copy and Selector', () => {
     expect(run(90, {}).rewards).toMatchObject({ earned: 0, progress: 9, goal: 10, nextReward: 'Selector', copies: 0 });
     expect(run(100, {}).rewards).toMatchObject({ earned: 1, progress: 0, goal: 8, nextReward: 'Rate-up copy', copies: 0 });

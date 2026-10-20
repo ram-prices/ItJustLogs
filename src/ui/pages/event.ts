@@ -95,7 +95,7 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
       ${r
         ? r.groups.length
           ? html`${summary(r)}${allItems(r)}${breakdown(r)}
-              <p class="copy-13 secondary">Rewards from the event's ${external(r.url, 'wiki page')}. Missing something? The wiki may not list it yet.</p>`
+              <p class="copy-13 secondary">Rewards from the wiki's ${external(r.url, 'event page')}. Missing something? The wiki may not have the information yet.</p>`
           : html`<section class="section"><p class="copy-14 secondary">The wiki's page for this event doesn't list its rewards (yet). ${external(r.url, 'Open it')}.</p></section>`
         : file.data
           ? html`<section class="section"><p class="copy-14 secondary">This event has no page on the wiki yet, so its rewards aren't listed.</p></section>`

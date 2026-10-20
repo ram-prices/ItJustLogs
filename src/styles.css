@@ -1951,27 +1951,30 @@ code {
   height: 100%;
   border-radius: 3px;
 }
-/* Stats → By patch: where the patch's free pulls reach, and how many. */
-.bar-mark {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 1px;
-  background: var(--gray-1000);
+.bar-cell > .num {
+  min-width: 36px;
+  text-align: right;
 }
-.bar-free {
-  min-width: 52px;
+/* Stats → By patch: pulls made (solid) over pulls earned (faded), one scale. */
+.bar-pair {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  gap: 3px 10px;
+  min-width: 160px;
+  padding: 6px 0;
+}
+.bar-pair > .num {
+  text-align: right;
+  font-size: 13px;
+  line-height: 16px;
+}
+.bar-pair > .num.secondary {
   font-size: 12px;
-  white-space: nowrap;
 }
-.legend i.mark {
-  width: 2px;
-  height: 12px;
-  border-radius: 1px;
-  vertical-align: -2px;
-  background: var(--gray-1000);
+.bar.earned i,
+.legend i.faded {
+  opacity: 0.38;
 }
 
 /* ---------- Toasts, drop overlay ---------------------------------------- */
@@ -2804,6 +2807,14 @@ a.sched-next:hover {
   background: var(--gray-alpha-200);
   outline: none;
 }
+/* Copy image while the picture is still being drawn (phones). */
+.ctx-menu button:disabled {
+  color: var(--gray-900);
+  cursor: progress;
+}
+.ctx-menu button:disabled:hover {
+  background: none;
+}
 .ctx-menu .icon {
   font-size: 16px;
   color: var(--gray-900);
@@ -2986,7 +2997,9 @@ a.patch-banner:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding-top: 0;
+  /* clear of the header's line above, and of the table below */
+  padding-top: 16px;
+  padding-bottom: 16px;
 }
 /* An opened patch's free pulls, source by source, above its banners. */
 .patch-income {
@@ -3034,6 +3047,14 @@ a.patch-banner:hover {
   text-decoration: underline;
   text-decoration-color: var(--gray-alpha-400);
   text-underline-offset: 2px;
+}
+/* The Protocol Pass row: its free track and the paid tiers turned on, one per line. */
+.patch-income-bullets {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+.patch-income-bullets li + li {
+  margin-top: 1px;
 }
 .patch-income-detail a:hover {
   text-decoration-color: currentColor;
@@ -4035,6 +4056,28 @@ a.patch-banner:hover {
   min-height: 220px;
   align-items: flex-end;
 }
+/* Over its key art an event's header stays dark in both themes, with white
+   text: the art is darkened toward the bottom, where the title and facts sit,
+   instead of fading into the (light) page. */
+.event-hero.has-art::after {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.45) 40%, rgba(0, 0, 0, 0.82));
+}
+.event-hero.has-art .wiki-hero-text,
+.event-hero.has-art .wiki-em,
+.event-hero.has-art .heading-32 {
+  color: #fff;
+}
+.event-hero.has-art .wiki-crumbs a,
+.event-hero.has-art .wiki-crumbs .icon,
+.event-hero.has-art .wiki-fact-label {
+  color: rgba(255, 255, 255, 0.72);
+}
+.event-hero.has-art .wiki-crumbs a:hover {
+  color: #fff;
+}
+.event-hero.has-art .wiki-hero-inner {
+  padding-bottom: 20px;
+}
 .event-details {
   margin-top: 8px;
   color: var(--gray-900);
@@ -4366,9 +4409,6 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   }
   .collection-tab {
     flex: none;
-  }
-  .collection-tab[aria-current='true'] {
-    box-shadow: inset 0 -2px 0 var(--gray-1000);
   }
   .reader-row {
     grid-template-columns: 20px minmax(0, 1fr) auto;
@@ -5144,8 +5184,9 @@ a.six-item {
    by side (no circle behind each), in the near-black ring a single pin
    wears. Same height as a single pin, so the pointer works the same. */
 .ruler-pin-heads.multi {
-  padding: 0 2px;
+  padding: 0 4px;
   border-radius: 999px;
+  overflow: hidden; /* the square weapon icons stay inside the oval's rounded ends */
   background: var(--pin-fill, var(--gray-100));
   box-shadow: 0 0 0 2px var(--pin-ring), 0 3px 8px 2px rgba(0, 0, 0, 0.55);
 }

@@ -103,9 +103,7 @@ const income: IncomeFile = {
   extras: {
     livestream: { label: '', note: '', sources: [], perVersion: { Oroberyl: 1000 }, fromVersion: 1, confirmed: [] },
     survey: { label: '', note: '', sources: [], perVersion: { Oroberyl: 300 }, fromVersion: 0 },
-    checkIn: { label: '', note: '', sources: [], perMonth: { Oroberyl: 260 }, firstTime: { Oroberyl: 300 } },
     combatDrills: { label: '', note: '', sources: [], perBanner: { Oroberyl: 100 }, kinds: ['chartered'] },
-    creditStore: { label: '', note: '', sources: [], perDay: { Oroberyl: 12.5 } },
   },
   modes: {
     source: '',
@@ -159,13 +157,11 @@ describe('free income per patch', () => {
     expect(by(launch).pass.name).toBe('One');
     expect(launch.partial).toBe(true);
     // 22×200 + 4×500 + 500 + 600 Oroberyl + 4 Origeometry from quests (300) = 7,800, plus 4 Origeometry from
-    // Aurylene (300), the survey (300) and check-in: 300 first time + 22 days of 260 a month (≈187.9)
-    // = 9,087.9 → 18.18 pulls. No livestream at launch. 400 + 990 tickets → 1,390 / 1,980 Issues × 10.
+    // Aurylene (300) and the survey (300) = 8,400 → 16.8 pulls.
+    // No livestream at launch. 400 + 990 tickets → 1,390 / 1,980 Issues × 10.
     expect(by(launch).quests.count).toBe(1);
     expect(by(launch).livestream).toBeUndefined();
-    expect(by(launch).checkIn.totals.Oroberyl).toBeCloseTo(300 + (22 * 260) / (365.25 / 12));
-    // Plus the Credit Store estimate, 22 days × 12.5.
-    expect(launch.headhunting).toBeCloseTo((7800 + 300 + 300 + 300 + (22 * 260) / (365.25 / 12) + 22 * 12.5) / 500);
+    expect(launch.headhunting).toBeCloseTo((7800 + 300 + 300) / 500);
     expect(launch.arsenal).toBeCloseTo((1390 / 1980) * 10);
 
     // Second: an event missing from the wiki file still counts (as partial); so does one not started yet.
@@ -195,9 +191,9 @@ describe('free income per patch', () => {
     expect(by(second).aurylene).toMatchObject({ totals: { Origeometry: 2 }, partial: true, note: "Wuling's table ends at 190" });
     expect(by(second).livestream).toMatchObject({ totals: { Oroberyl: 1000 }, estimate: true });
     // 1,300 events + 4,200 daily + 1,500 weekly + 600 pass + 900 compensation + 200 + 150 quests + 1,000 crates
-    // + 600 modes + 320 outpost + 150 Aurylene + 1,000 livestream + 300 survey + 21 days of check-in (≈179.4)
-    // + 500 mid-version sign-in + 100 Combat Drills ≈ 12,999.4 Oroberyl, plus 5 Sign-in permits; Basic HH Permits apart.
-    expect(second.headhunting).toBeCloseTo((12820 + (21 * 260) / (365.25 / 12) + 21 * 12.5) / 500 + 5);
+    // + 600 modes + 320 outpost + 150 Aurylene + 1,000 livestream + 300 survey + 500 mid-version sign-in
+    // + 100 Combat Drills = 12,820 Oroberyl, plus 5 Sign-in permits; Basic HH Permits apart.
+    expect(second.headhunting).toBeCloseTo(12820 / 500 + 5);
     expect(second.basic).toBe(4); // the pass's 2 and the mid-version sign-in's 2
   });
 
@@ -252,8 +248,6 @@ describe('free income per patch', () => {
     expect(by.events.events!.find((e) => e.name === 'Not on the wiki')).toMatchObject({ pulls: 1.2, partial: false, estimated: true });
     expect(by.events.estimate).toBe(true);
     expect(by.modes.modes![0]).toMatchObject({ rewards: { Oroberyl: 1200 }, estimated: true });
-    // The Credit Store: our estimate, every day.
-    expect(by.creditStore).toMatchObject({ count: 21, totals: { Oroberyl: 21 * 12.5 }, estimate: true });
   });
 
   it('works without the wiki files', () => {

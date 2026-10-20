@@ -46,7 +46,7 @@ function itemsText(totals: Record<string, number>): string {
 
 const plural = (n: number, one: string) => `${fmtInt(n)} ${one}${n === 1 ? '' : 's'}`;
 
-/** One source of free pulls in an opened patch. */
+/** One section of an opened patch's free pulls: its label, what's in it, and the pulls its lines come to. */
 function incomeRow(label: Html | string, detail: Html | string, headhunting: number, arsenal: number, partial = false, paid = false, estimate = false): Html {
   const n = (x: number) => (x ? fmtPulls(Math.round(x * 10) / 10) : '–');
   return html`<div class="patch-income-row">
@@ -56,188 +56,169 @@ function incomeRow(label: Html | string, detail: Html | string, headhunting: num
   </div>`;
 }
 
-/** The income file, for the rows' prices; set while the page draws. */
+/** The income file, for prices and rates; set while the page draws. */
 let income: IncomeFile | null = null;
 
-function incomeLine(l: IncomeLine): Html {
-  const { headhunting, arsenal } = pullsFrom(l.totals);
-  switch (l.source) {
-    case 'events':
-      return incomeRow(
-        plural(l.count, 'event'),
-        html`${l.events!.map((e, i) => html`${i ? ' · ' : ''}${e.id != null ? html`<a href="/event/${e.id}" data-link="/event/${e.id}">${e.name}</a>` : external(e.url!, e.name)}${e.partial ? '*' : ''}${e.estimated ? '≈' : ''}`)}${l.events!.some((e) => e.estimated) ? html`. ≈ No amounts on the wiki: what events of its kind give.` : ''}`,
-        headhunting,
-        arsenal,
-        l.partial,
-        false,
-        l.estimate,
-      );
-    case 'daily':
-      return incomeRow(html`${external(l.url!, 'Daily missions')}`, `${plural(l.count, 'day')} × ${itemsText(pullsDiv(l.totals, l.count))}`, headhunting, arsenal);
-    case 'weekly':
-      return incomeRow(html`${external(l.url!, 'Weekly Routine')}`, `${plural(l.count, 'week')} × ${itemsText(pullsDiv(l.totals, l.count))}`, headhunting, arsenal);
-    case 'pass': {
-      const c = l.crates;
-      const own = c ? Object.fromEntries(Object.entries(l.totals).map(([k, n]) => [k, k === 'Oroberyl' ? n - c.oroberyl : n])) : l.totals;
-      return incomeRow(
-        html`${external(l.url!, `Protocol Pass: ${l.name}`)}`,
-        `Free track: ${itemsText(own)}${c ? `, and ${c.count} ${c.item} boxes, about ${fmtInt(Math.round(c.oroberyl))} Oroberyl on average` : ''}`,
-        headhunting,
-        arsenal,
-        false,
-        false,
-        l.estimate,
-      );
-    }
-    case 'creditStore':
-      return incomeRow(
-        html`${external(l.extra!.sources[0], 'Credit Store')}`,
-        `${plural(l.count, 'day')} × ${fmtPulls(l.totals.Oroberyl / l.count)} Oroberyl. ${l.extra!.note}`,
-        headhunting,
-        arsenal,
-        false,
-        false,
-        true,
-      );
-    case 'crafting':
-      return incomeRow(
-        html`${external(l.url!, 'Crafting Manual')}`,
-        `${itemsText(l.totals)} for gathering ${plural(l.count, 'new item')}`,
-        headhunting,
-        arsenal,
-      );
-    case 'progression':
-      return incomeRow(
-        'One-time progression',
-        html`${l.items!.map((x, i) => html`${i ? ' · ' : ''}${external(x.url, x.name)} ${itemsText(x.rewards)}`)}`,
-        headhunting,
-        arsenal,
-      );
-    case 'quests': {
-      const kinds = new Map<string, number>();
-      for (const q of l.quests!) kinds.set(q.type, (kinds.get(q.type) ?? 0) + 1);
-      const order = ['Main Mission', 'Side Mission', 'Exploration Mission'];
-      const kindText = [...kinds]
-        .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
-        .map(([k, n]) => `${n} ${k.replace(' Mission', '').toLowerCase()}`)
-        .join(', ');
-      return incomeRow(
-        `${plural(l.count, 'permanent mission')} released`,
-        `${kindText}: ${itemsText(l.totals)}`,
-        headhunting,
-        arsenal,
-      );
-    }
-    case 'modes':
-      return incomeRow(
-        'Permanent modes',
-        html`${l.modes!.map((m, i) => html`${i ? ' · ' : ''}${external(m.url, m.name)} ${m.partial ? 'amount not listed' : itemsText(m.rewards)}${m.estimate ? ' (a share: the wiki doesn\'t say which milestones each version added)' : ''}${m.estimated ? ' (≈ no amounts listed: what it gives in other versions)' : ''}`)}`,
-        headhunting,
-        arsenal,
-        l.partial,
-        false,
-        l.estimate,
-      );
-    case 'outposts':
-      return incomeRow(
-        `${plural(l.count, 'new outpost')}`,
-        html`${l.outposts!.map((o, i) => html`${i ? ' · ' : ''}${external(o.url, o.outpost)} ${itemsText(o.rewards)}`)}, for raising its level`,
-        headhunting,
-        arsenal,
-      );
-    case 'aurylene':
-      return incomeRow(
-        html`${external(l.url!, 'Aurylene')}`,
-        `${itemsText(l.totals) || 'Nothing listed'} for handing in the new areas' Aurylene at TP Points (the region's reward table).${l.note ? ` ${l.note}: the rest isn't counted until the wiki lists those phases.` : ''}`,
-        headhunting,
-        arsenal,
-        l.partial,
-      );
-    case 'livestream':
-    case 'survey':
-    case 'checkIn':
-    case 'combatDrills': {
-      const x = l.extra!;
-      const what =
-        l.source === 'checkIn' ? `${plural(l.count, 'day')}: ${x.note}` : l.source === 'combatDrills' ? `${plural(l.count, 'new Chartered banner')}. ${x.note}` : x.note;
-      return incomeRow(
-        x.label,
-        html`${itemsText(Object.fromEntries(Object.entries(l.totals).map(([k, n]) => [k, Math.round(n)])))}. ${what} From community guides: ${x.sources.map((u, i) => html`${i ? ', ' : ''}${external(u, new URL(u).hostname.replace(/^www\./, ''))}`)}.${l.estimate ? ' Not confirmed for this version.' : ''}`,
-        headhunting,
-        arsenal,
-        false,
-        false,
-        l.estimate,
-      );
-    }
-    case 'crates': {
-      const per = income?.exploration?.perCrate ?? 0;
-      return incomeRow(
-        `${plural(l.count, 'storage crate')} in new areas`,
-        html`${l.areas!.map((a, i) => html`${i ? ' · ' : ''}${external(a.url, a.area)} ${fmtInt(a.crates)}`)}, at about ${fmtPulls(per)} Oroberyl a crate (Oroberyl by crate type, averaged over Wuling's mix of types)`,
-        headhunting,
-        arsenal,
-        false,
-        false,
-        true,
-      );
-    }
-    case 'compensation':
-      return incomeRow(
-        html`${external(l.url!, 'Maintenance compensation')}`,
-        l.rows!.map((r) => `${r.label}: ${itemsText(r.rewards)}`).join(' · '),
-        headhunting,
-        arsenal,
-      );
-    case 'originium': {
-      // Totals are net of the unlock cost: show what the tier gives and what it costs.
-      const cost = income?.passTiers?.originium.cost ?? {};
-      const gross = Object.fromEntries(Object.entries(l.totals).map(([k, n]) => [k, n + (cost[k] ?? 0)]));
-      return incomeRow(html`${external(l.url!, 'Originium Supply')}`, `${itemsText(gross)}, less the ${itemsText(cost)} it costs`, headhunting, arsenal, false, true);
-    }
-    case 'customized':
-      return incomeRow(
-        html`${external(l.url!, 'Protocol Customized')}`,
-        `${income?.passTiers?.customized.price ?? 'Bought'}: ${itemsText(l.totals)}, with what it hands out on purchase`,
-        headhunting,
-        arsenal,
-        false,
-        true,
-      );
-    case 'monthly': {
-      const m = income?.monthly;
-      return incomeRow(
-        html`${external(l.url!, 'Monthly Pass')}`,
-        m ? `${plural(l.count, 'day')} × ${itemsText(m.daily)}, and ${itemsText(m.onPurchase)} per ${m.days} days (${m.price ?? ''} each)` : itemsText(l.totals),
-        headhunting,
-        arsenal,
-        false,
-        true,
-      );
-    }
-    default:
-      return html``;
-  }
+/** A daily or weekly line's totals for one day or week. */
+const perOne = (totals: Record<string, number>, by: number) => Object.fromEntries(Object.entries(totals).map(([k, n]) => [k, n / by]));
+
+/** "1,600 Oroberyl (3.2 pulls)": what something gave, and the limited pulls it comes to. */
+function gave(totals: Record<string, number>): string {
+  const what = itemsText(Object.fromEntries(Object.entries(totals).map(([k, n]) => [k, Math.round(n)])));
+  const p = pullsFrom(totals).headhunting;
+  return what ? `${what}${p ? ` (${fmtPulls(Math.round(p * 10) / 10)} ${p === 1 ? 'pull' : 'pulls'})` : ''}` : 'no amounts listed';
 }
 
-/** A daily or weekly line's totals for one day or week. */
-const pullsDiv = (totals: Record<string, number>, by: number) => Object.fromEntries(Object.entries(totals).map(([k, n]) => [k, n / by]));
+const bullets = (items: (Html | string | false | null | undefined)[]): Html =>
+  html`<ul class="patch-income-bullets">${items.filter(Boolean).map((x) => html`<li>${x}</li>`)}</ul>`;
 
-/** An opened patch's free pulls, source by source. */
+/** "From community guides: gamsgo.com, game8.co". */
+const guides = (sources: string[]): Html =>
+  html`from ${sources.map((u, i) => html`${i ? ', ' : ''}${external(u, new URL(u).hostname.replace(/^www\./, ''))}`)}`;
+
+/**
+ * An opened patch's free pulls in eight sections, in this order: Daily
+ * Missions, Weekly Missions, Protocol Pass, Monthly Pass (when turned on),
+ * Permanent Modes, Events, Exploration, Mailbox; then the Arsenal Tickets
+ * Headhunting gave back, and the total.
+ */
 function patchIncomeList(inc: PatchIncome, tickets: number): Html {
   const back = (tickets / TICKETS_PER_ISSUE) * 10;
+  const of = (...sources: IncomeLine['source'][]) => inc.lines.filter((l) => sources.includes(l.source));
+  /** A section's row: its lines' pulls added up, their badges merged. */
+  const section = (label: Html | string, lines: IncomeLine[], detail: Html | string) => {
+    if (!lines.length) return '';
+    const sum = lines.reduce(
+      (a, l) => {
+        const p = pullsFrom(l.totals);
+        return { headhunting: a.headhunting + p.headhunting, arsenal: a.arsenal + p.arsenal };
+      },
+      { headhunting: 0, arsenal: 0 },
+    );
+    return incomeRow(label, detail, sum.headhunting, sum.arsenal, lines.some((l) => l.partial), lines.some((l) => l.paid), lines.some((l) => l.estimate));
+  };
+
+  // 1, 2. Daily and weekly missions.
+  const [daily] = of('daily');
+  const [weekly] = of('weekly');
+  // 3. The Protocol Pass: the free track, then the paid tiers turned on.
+  const [pass] = of('pass');
+  const tier = (source: IncomeLine['source']) => inc.lines.find((t) => t.source === source && t.name === pass?.name);
+  const originium = pass && tier('originium');
+  const customized = pass && tier('customized');
+  const cost = income?.passTiers?.originium.cost ?? {};
+  const crates = pass?.crates;
+  const freeTrack = pass && crates ? Object.fromEntries(Object.entries(pass.totals).map(([k, n]) => [k, k === 'Oroberyl' ? n - crates.oroberyl : n])) : pass?.totals;
+  // 4. The Monthly Pass.
+  const [monthly] = of('monthly');
+  const m = income?.monthly;
+  // 5. Permanent modes.
+  const [modes] = of('modes');
+  // 6. Events, each on its own line, and Combat Drills.
+  const [events] = of('events');
+  const [drills] = of('combatDrills');
+  // 7. Exploration.
+  const [craft] = of('crafting');
+  const [aur] = of('aurylene');
+  const [crateLine] = of('crates');
+  const [quests] = of('quests');
+  const [outposts] = of('outposts');
+  const [prog] = of('progression');
+  const questKinds = () => {
+    const kinds = new Map<string, number>();
+    for (const q of quests!.quests!) kinds.set(q.type, (kinds.get(q.type) ?? 0) + 1);
+    const order = ['Main Mission', 'Side Mission', 'Exploration Mission'];
+    return [...kinds]
+      .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+      .map(([k, n]) => `${n} ${k.replace(' Mission', '').toLowerCase()}`)
+      .join(', ');
+  };
+  // 8. Mailbox.
+  const [comp] = of('compensation');
+  const [survey] = of('survey');
+  const [live] = of('livestream');
+
   return html`<div class="patch-income">
     <div class="patch-income-row patch-income-head label-12">
       <span>${inc.lines.some((l) => l.paid) ? 'Pulls earned' : 'Free pulls'}${inc.projected ? `, projected to ${fmtDate(inc.end)}` : inc.ongoing ? ' so far' : ''}</span><span>Headhunting</span><span>Arsenal</span>
     </div>
-    ${inc.lines.map(incomeLine)}
+    ${daily ? section(html`${external(daily.url!, 'Daily Missions')}`, [daily], `${plural(daily.count, 'day')} × ${itemsText(perOne(daily.totals, daily.count))}`) : ''}
+    ${weekly ? section(html`${external(weekly.url!, 'Weekly Missions')}`, [weekly], `${plural(weekly.count, 'week')} × ${itemsText(perOne(weekly.totals, weekly.count))} (the Weekly Routine)`) : ''}
+    ${pass
+      ? section(
+          html`${external(pass.url!, `Protocol Pass: ${pass.name}`)}`,
+          [pass, originium, customized].filter((l): l is IncomeLine => !!l),
+          bullets([
+            html`Free track: ${itemsText(freeTrack!)}${crates ? `, and ${crates.count} ${crates.item} boxes, about ${fmtInt(Math.round(crates.oroberyl))} Oroberyl on average` : ''}`,
+            originium && html`Originium Supply: ${itemsText(Object.fromEntries(Object.entries(originium.totals).map(([k, n]) => [k, n + (cost[k] ?? 0)])))}, less the ${itemsText(cost)} it costs`,
+            customized && html`Protocol Customized (${income?.passTiers?.customized.price ?? 'bought'}): ${itemsText(customized.totals)}, with what it hands out on purchase`,
+          ]),
+        )
+      : ''}
+    ${monthly
+      ? section(
+          html`${external(monthly.url!, 'Monthly Pass')}`,
+          [monthly],
+          m ? `${plural(monthly.count, 'day')} × ${itemsText(m.daily)}, and ${itemsText(m.onPurchase)} per ${m.days} days (${m.price ?? ''} each)` : itemsText(monthly.totals),
+        )
+      : ''}
+    ${modes
+      ? section(
+          'Permanent Modes',
+          [modes],
+          bullets(
+            modes.modes!.map(
+              (x) =>
+                html`${external(x.url, x.name)}: ${x.partial ? 'amount not listed' : gave(x.rewards)}${x.estimate ? ' (a share: the wiki doesn\'t say which milestones each version added)' : ''}${x.estimated ? ' ≈ (no amounts listed: what it gives in other versions)' : ''}`,
+            ),
+          ),
+        )
+      : ''}
+    ${events || drills
+      ? section(
+          `Events${events ? ` (${events.count})` : ''}`,
+          [events, drills].filter((l): l is IncomeLine => !!l),
+          html`${bullets([
+            ...(events?.events ?? []).map(
+              (e) =>
+                html`${e.id != null ? html`<a href="/event/${e.id}" data-link="/event/${e.id}">${e.name}</a>` : external(e.url!, e.name)}: ${gave(e.totals)}${e.partial ? ' *' : ''}${e.estimated ? ' ≈' : ''}`,
+            ),
+            drills && html`Combat Drills (${plural(drills.count, 'new Chartered banner')}): ${gave(drills.totals)}, ${guides(drills.extra!.sources)}`,
+          ])}${events?.events?.some((e) => e.estimated) ? html`≈ No amounts on the wiki: what events of its kind give. ` : ''}${events?.partial ? html`* The wiki lists some of its rewards without amounts.` : ''}`,
+        )
+      : ''}
+    ${section(
+      'Exploration',
+      [crateLine, aur, craft, quests, outposts, prog].filter((l): l is IncomeLine => !!l),
+      bullets([
+        crateLine &&
+          html`Storage crates: ${crateLine.areas!.map((a, i) => html`${i ? ', ' : ''}${external(a.url, a.area)} ${fmtInt(a.crates)}`)}, at about ${fmtPulls(income?.exploration?.perCrate ?? 0)} Oroberyl a crate: ${gave(crateLine.totals)} (an estimate: Oroberyl by crate type, averaged over Wuling's mix of types)`,
+        aur &&
+          html`${external(aur.url!, 'Aurylene')} handed in at TP Points: ${itemsText(aur.totals) ? gave(aur.totals) : 'nothing listed'}${aur.note ? ` (${aur.note}: the rest isn't counted until the wiki lists those phases)` : ''}`,
+        'Regional Development: not counted (no source lists its rewards)',
+        craft && html`${external(craft.url!, 'Crafting Manual')}: ${gave(craft.totals)} for gathering ${plural(craft.count, 'new item')}`,
+        quests && html`Missions released: ${questKinds()}: ${gave(quests.totals)}`,
+        outposts && html`Outposts: ${outposts.outposts!.map((o, i) => html`${i ? ', ' : ''}${external(o.url, o.outpost)} ${gave(o.rewards)}`)}, for raising their level`,
+        prog && html`${prog.items!.map((x, i) => html`${i ? ' · ' : ''}${external(x.url, x.name)}: ${gave(x.rewards)}`)}`,
+      ]),
+    )}
+    ${section(
+      'Mailbox',
+      [comp, survey, live].filter((l): l is IncomeLine => !!l),
+      bullets([
+        ...(comp?.rows ?? []).map((r) => html`${external(comp!.url!, r.label)}: ${gave(r.rewards)}`),
+        survey && html`${survey.extra!.label}: ${gave(survey.totals)}, ${guides(survey.extra!.sources)}`,
+        live &&
+          html`${live.extra!.label}: ${gave(live.totals)}, ${guides(live.extra!.sources)}${live.estimate ? ' (not confirmed for this version)' : ''}`,
+      ]),
+    )}
     ${tickets ? incomeRow('Your Headhunting pulls', `${fmtInt(tickets)} Arsenal Tickets back (20, 200 or 2,000 for each 4★, 5★ or 6★)`, 0, back) : ''}
     <div class="patch-income-row patch-income-total">
       <span>In all${inc.basic ? html` <span class="secondary">· plus ${plural(inc.basic, 'Basic HH Permit')} (Basic Headhunting only)</span>` : ''}</span><span class="num">${fmtPulls(Math.round(inc.headhunting * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
     </div>
-    <p class="patch-income-note copy-13 secondary">If you did every daily and weekly${inc.lines.some((l) => l.source === 'monthly') ? ' and kept the Monthly Pass up all patch' : ''}.${inc.projected ? ` This patch is counted to its end (${fmtDate(inc.end)}, when its last banner or event closes), with every event it lists.` : ''}
+    <p class="patch-income-note copy-13 secondary">If you did every daily and weekly${monthly ? ' and kept the Monthly Pass up all patch' : ''}.${inc.projected ? ` This patch is counted to its end (${fmtDate(inc.end)}, when its last banner or event closes), with every event it lists.` : ''}
       Headhunting means limited banners: Oroberyl at 500 a pull, Origeometry at 75 Oroberyl, each limited HH Permit one pull. Arsenal Tickets at 1,980 for an Issue of 10.
-      Not counted: Regional Development, Intel Gathering, achievements and launch-only mail (no source lists their amounts)${inc.lines.some((l) => l.paid) ? ', and anything else bought' : ', and anything bought'}.${inc.partial ? ' * The wiki lists some of that event\'s rewards without amounts, so the totals are what\'s known so far.' : ''}</p>
+      Not counted: Regional Development, Intel Gathering, the Credit Store, achievements and launch-only mail (no source lists their amounts)${inc.lines.some((l) => l.paid) ? ', and anything else bought' : ', and anything bought'}.</p>
   </div>`;
 }
 
@@ -278,8 +259,37 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
   const maxPulls = Math.max(1, ...patches.map((p) => Math.max(p.charPulls, p.weapPulls, freeOf(p)?.char ?? 0, freeOf(p)?.weap ?? 0)));
   const weeks = weeklyTimeline(a);
   const activeWeeks = weeks.filter((w) => w.char + w.weap > 0).length;
-  const bar = (n: number, earned: number | undefined, color: string, projected = false) =>
-    html`<div class="bar-cell"><span class="num" style="min-width:36px;text-align:right">${fmtInt(n)}</span><div class="bar"><i style="width:${(n / maxPulls) * 100}%;background:${color}"></i>${earned ? html`<b class="bar-mark" style="left:${(earned / maxPulls) * 100}%"></b>` : ''}</div>${earned != null ? html`<span class="bar-free num secondary" title="${paid.length ? 'Pulls this patch hands out, with the paid options on' : 'Free pulls this patch hands out'}${projected ? ', projected to its end' : ''}">${projected ? '≈' : ''}${fmtInt(Math.round(earned))} ${paid.length ? 'earned' : 'free'}</span>` : ''}</div>`;
+  // Pulls earned per week: each patch's limited Headhunting pulls, for the part of it since the
+  // player's first pull and up to now (the current patch's projection prorated by time), over those weeks.
+  const now = Date.now();
+  const from = a.firstTs;
+  let earned = 0;
+  for (const inc of free.values()) {
+    const span = inc.end - inc.start;
+    const overlap = Math.min(inc.end, now) - Math.max(inc.start, from);
+    if (span > 0 && overlap > 0) earned += inc.headhunting * (overlap / span);
+  }
+  const weeksSince = (now - from) / (7 * 86_400_000);
+  const earnedPerWeek = free.size && weeksSince > 0 ? Math.round((earned / weeksSince) * 10) / 10 : null;
+  /**
+   * Pulls made over pulls earned, on one scale: the solid bar is what was
+   * pulled, the faded one under it what the patch handed out (≈ while it's
+   * projected). The hover tip says which is bigger, and by how much.
+   */
+  const bar = (n: number, earned: number | undefined, color: string, projected = false) => {
+    const pct = (x: number) => `${Math.min(100, (x / maxPulls) * 100)}%`;
+    if (earned == null)
+      return html`<div class="bar-cell"><span class="num">${fmtInt(n)}</span><div class="bar"><i style="width:${pct(n)};background:${color}"></i></div></div>`;
+    const e = Math.round(earned);
+    const diff = n - e;
+    const tip = `${fmtInt(n)} made · ${projected ? '≈' : ''}${fmtInt(e)} ${paid.length ? 'earned' : 'free'}${projected ? ' (projected to the patch end)' : ''}: ${
+      diff > 0 ? `${fmtInt(diff)} more than earned (savings or bought)` : diff < 0 ? `${fmtInt(-diff)} spare` : 'all of it'
+    }`;
+    return html`<div class="bar-pair" title="${tip}">
+      <span class="num">${fmtInt(n)}</span><div class="bar"><i style="width:${pct(n)};background:${color}"></i></div>
+      <span class="num secondary">${projected ? '≈' : ''}${fmtInt(e)}</span><div class="bar earned"><i style="width:${pct(earned)};background:${color}"></i></div>
+    </div>`;
+  };
   const anyFree = patches.some(freeOf);
 
   return html`
@@ -289,7 +299,11 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
         metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
         metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),
         metric({ label: 'Active weeks', value: activeWeeks, sub: `of ${weeks.length} since your first pull` }),
-        metric({ label: 'Pulls per active week', value: activeWeeks ? Math.round((a.char.pulls + a.weap.pulls) / activeWeeks) : '–' }),
+        metric({
+          label: 'Pulls earned per week',
+          value: earnedPerWeek ?? '–',
+          sub: earnedPerWeek == null ? 'loading…' : `${paid.length ? 'with your paid options, ' : ''}for Chartered banners (no Basic HH Permits), since your first pull`,
+        }),
       ], 'plain')}
 
       <div class="section card">
@@ -307,7 +321,12 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       <div class="section card">
         <div class="card-head">
           <h2 class="heading-16">By patch</h2>
-          ${anyFree ? html`<div class="legend"><span><i class="mark"></i>${paid.length ? 'Pulls' : 'Free pulls'} the patch handed out (open a patch for the sources)</span></div>` : ''}
+          ${anyFree
+            ? html`<div class="legend">
+                <span><i style="background:var(--gray-1000)"></i>Pulls made</span>
+                <span><i class="faded" style="background:var(--gray-1000)"></i>${paid.length ? 'Pulls earned' : 'Free pulls earned'} (open a patch for the sources)</span>
+              </div>`
+            : ''}
         </div>
         ${income?.passTiers || income?.monthly
           ? html`<div class="card-body paid-income">

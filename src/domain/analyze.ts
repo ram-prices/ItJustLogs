@@ -270,7 +270,8 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
               const guaranteed =
                 !alreadyWon &&
                 ((category === 'chartered' && b.paidPulls >= CHARTERED_GUARANTEE) ||
-                  (category === 'limited' && b.paidPulls > WEAPON_GUARANTEE - 10));
+                  // Every Arsenal Issue with a rate-up, Constant Issues too: the 8th set.
+                  (kind === 'weap' && b.paidPulls > WEAPON_GUARANTEE - 10));
               ap.outcome = guaranteed ? 'guaranteed' : 'won';
               ap.copy = ++b.rateUpCopies;
               wonOnBanner.set(b.poolId, true);
@@ -317,7 +318,7 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
         // A Joint Selector picks one of the banner's rate-ups.
         b.rewards = fixedRewards('Selector', 120, b.paidPulls, true);
       } else if (b.kind === 'weap') {
-        if (b.category === 'limited' && b.info) {
+        if (b.info) {
           b.guarantee = {
             label: 'Rate-up guarantee',
             value: won ? WEAPON_GUARANTEE_SETS : Math.min(setOf(b.paidPulls), WEAPON_GUARANTEE_SETS),
@@ -371,7 +372,7 @@ export function copyPmf(b: BannerSummary, copy: number): Float64Array | null {
   if (!profile) return null;
   return kthCopyPmf(profile, copy, {
     startPity: b.category === 'chartered' ? b.startPity : 0,
-    guaranteeAt: b.category === 'chartered' ? CHARTERED_GUARANTEE : b.category === 'limited' ? WEAPON_GUARANTEE : null,
+    guaranteeAt: b.category === 'chartered' ? CHARTERED_GUARANTEE : b.kind === 'weap' && b.info ? WEAPON_GUARANTEE : null,
   });
 }
 

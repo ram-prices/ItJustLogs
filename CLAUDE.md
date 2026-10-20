@@ -51,10 +51,11 @@ the storage crates in the areas it added (wiki crate counts times an average
 Oroberyl per crate, badged Estimate), the Origeometry its areas' Aurylene
 unlocks (each region's TP Point table; Partial past the table's end on the
 wiki), and hand-kept community-guide amounts with sources (version preview
-livestream, version survey, SKPORT web check-in, Combat Drills), the Crafting
+livestream, version survey, Combat Drills), the Crafting
 Manual's milestones, one-time progression at launch (Node milestones,
-Authority Level), and our own rough estimates (Credit Store; an event or mode
-the wiki names without amounts gets the median of its kind, marked ≈). No
+Authority Level), and our own rough estimate (an event or mode the wiki names
+without amounts gets the median of its kind, marked ≈); the SKPORT web
+check-in and the Credit Store are left out on purpose (owner's call). No
 third-party spreadsheet is used: the owner wants our own estimate. From
 ef-assets `wiki/income.json` (`scripts/income.mjs` there), plus the Arsenal
 Tickets Headhunting gives back; marked on the bars, listed by source when a

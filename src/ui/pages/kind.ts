@@ -613,7 +613,10 @@ function bannerBody(b: BannerSummary): Html {
 
   return html`
     <div class="card-head">
-      <span class="glance-stat"><b>${fmtInt(b.paidPulls)}</b>pulls</span>
+      ${b.kind === 'weap'
+        ? // An Issue is pulled a set of 10 at a time: count sets, like the pity and the list's set headings.
+          html`<span class="glance-stat" title="${fmtInt(b.paidPulls)} weapons"><b>${fmtInt(setOf(b.paidPulls))}</b>${setOf(b.paidPulls) === 1 ? 'set' : 'sets'}</span>`
+        : html`<span class="glance-stat"><b>${fmtInt(b.paidPulls)}</b>pulls</span>`}
       <div class="rarity-filter" role="group" aria-label="Rarity">
         ${hasRateUp ? html`<button type="button" class="filter-up" data-action="filter" data-value="up" aria-pressed="${String(f.has('up'))}" title="Rate-up: always listed" aria-label="Rate-up">${icon('stat_2')}</button>` : ''}
         ${(
