@@ -40,6 +40,8 @@ export interface HomeWidget {
   under?: boolean;
   /** Where in its row a narrower widget sits (a column: where its top widget does); left starts a new row. Unset: right after the one before it. */
   align?: 'left' | 'center' | 'right';
+  /** The grid column (1–12) a widget was dropped at, in a row's empty room; it beats `align`. */
+  col?: number;
   /** Starts a new row: a widget placed out of a column keeps its height on the page. */
   newRow?: boolean;
   /** Empty space (always full width): its height in px. */
@@ -57,6 +59,8 @@ export interface HomeWidget {
    */
   ambient?: boolean | 'picture' | 'card';
   bare?: boolean;
+  /** Character card: a drop shadow under it (not with an ambient glow). */
+  shadow?: boolean;
   /** Character card: no basic information (title, name, rarity, class, note); with nothing else shown, the picture alone. */
   hideBasic?: boolean;
   /** Character card: the picture as a round profile picture, a banner across the top, or the background (unset: profile picture for the portrait, else banner). */

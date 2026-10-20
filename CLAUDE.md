@@ -208,9 +208,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     Stats, Collection, Note and Character card (an operator, one of their
     pictures, title, note, chosen facts) and Empty space (full width, height
     dragged). Customize: drag to move (near a widget's top or bottom stacks
-    it in that widget's column), width, title, edit, remove, add, reset,
-    cancel; a narrower widget can be placed left, middle or right of its row
-    (`align`), each on its own: `gridPlaces` gives every widget or column an
+    it in that widget's column; into empty room in a row it lands there at
+    that column, `col`, shrunk to fit, outlined while dragging: `roomAt`),
+    width, title, edit, remove, add, reset, cancel; a narrower widget can be
+    placed left, middle or right of its row (`align`); width and place change
+    each widget on its own (`separate`): `gridPlaces` gives every widget or column an
     explicit row and column on wide screens (`newRow` keeps a widget placed
     out of a column at its height), and placing one pins the others in its
     row where they are. The profile picture can rise above its

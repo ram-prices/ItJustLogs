@@ -5681,6 +5681,17 @@ a.six-item {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 40px 16px;
   align-items: start;
+  position: relative;
+}
+/* While dragging a widget over empty room: where it would land, and how wide. */
+.drop-ghost {
+  position: absolute;
+  z-index: 4;
+  border-radius: var(--radius-lg);
+  outline: 2px dashed var(--focus);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--focus) 8%, transparent);
+  pointer-events: none;
 }
 /* On a wide screen each widget or column sits at the row and column worked
    out for it (homeWidgets.ts gridPlaces: its place left, middle or right,
@@ -5886,6 +5897,24 @@ a.six-item {
 .char-card-wrap {
   position: relative;
   isolation: isolate;
+}
+/* Drop shadow (not with an ambient glow): under the card, with its outline unless it has none. */
+.char-card-wrap.shadowed > .char-card {
+  box-shadow:
+    var(--shadow-card),
+    0 18px 36px -10px rgb(0 0 0 / 0.55),
+    0 6px 12px -4px rgb(0 0 0 / 0.4);
+}
+.char-card-wrap.shadowed.bare > .char-card {
+  box-shadow:
+    0 18px 36px -10px rgb(0 0 0 / 0.55),
+    0 6px 12px -4px rgb(0 0 0 / 0.4);
+}
+:root[data-theme='light'] .char-card-wrap.shadowed > .char-card {
+  box-shadow:
+    var(--shadow-card),
+    0 18px 36px -12px rgb(0 0 0 / 0.22),
+    0 6px 12px -6px rgb(0 0 0 / 0.16);
 }
 .char-card {
   position: relative;

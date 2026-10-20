@@ -130,7 +130,7 @@ const layout = (): HomeWidget[] =>
   (state.settings.home ?? DEFAULT_HOME)
     .filter((w) => WIDGETS[w.type])
     // An empty space is always full width, never in a column or placed.
-    .map((w) => (w.type === 'spacer' ? { ...w, size: 12 as const, under: undefined, align: undefined } : w));
+    .map((w) => (w.type === 'spacer' ? { ...w, size: 12 as const, under: undefined, align: undefined, col: undefined } : w));
 /** Saves the layout; a widget that can't stack (first, or under a full-width one) is unmarked. */
 const save = (next: HomeWidget[]) => updateSettings({ home: columns(next).flatMap((col) => col.map((w, i) => (i === 0 && w.under ? { ...w, under: undefined } : w))) });
 const newId = (type: string) => `${type}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -156,9 +156,10 @@ function columns(list: HomeWidget[]): HomeWidget[][] {
 
 /**
  * Where each grid item (a widget or a column, by its top widget) goes on a
- * wide screen: rows filled in order, each item at its place (left, middle or
- * right of the row) if that part of the row is free, else after the last
- * one; left, a row break (`newRow`) or no room starts the next row.
+ * wide screen: rows filled in order, each item at its column (`col`, where it
+ * was dropped) or place (left, middle or right of the row) if that part of
+ * the row is free, else after the last one; left, a row break (`newRow`) or
+ * no room starts the next row.
  */
 function gridPlaces(heads: HomeWidget[]): { row: number; start: number }[] {
   let row = 1;
@@ -172,13 +173,84 @@ function gridPlaces(heads: HomeWidget[]): { row: number; start: number }[] {
   };
   return heads.map((h) => {
     const n = h.size;
-    const at = () => (h.align === 'left' ? 1 : h.align === 'center' ? Math.floor((12 - n) / 2) + 1 : h.align === 'right' ? 13 - n : next);
+    const at = () =>
+      h.col ? Math.min(h.col, 13 - n) : h.align === 'left' ? 1 : h.align === 'center' ? Math.floor((12 - n) / 2) + 1 : h.align === 'right' ? 13 - n : next;
     if (used.size && (h.newRow || h.align === 'left' || !free(at(), n))) newRow();
     const start = at();
     for (let k = 0; k < n; k++) used.add(start + k);
     next = Math.max(next, start + n);
     return { row, start };
   });
+}
+
+/** Empty room in the grid where a dragged widget would land: its row's place, column and width, and the outline's box. */
+interface Room {
+  grid: HTMLElement;
+  /** The last widget (by id) of the row it joins; null: the very end. */
+  after: string | null;
+  /** Below every row: a row of its own. */
+  newRow: boolean;
+  start: number;
+  size: WidgetSize;
+  box: { left: number; top: number; width: number; height: number };
+}
+
+/**
+ * The empty room at a point while dragging (wide screens only): the run of
+ * free columns in the row there, the widget at its widest that fits (no wider
+ * than it is now) centred on the point. Below every row: a new row.
+ */
+function roomAt(x: number, y: number, dragged: HTMLElement): Room | null {
+  const grid = document.querySelector<HTMLElement>('.home-grid.editing');
+  if (!grid || !matchMedia('(min-width: 901px)').matches) return null;
+  const g = grid.getBoundingClientRect();
+  if (x < g.left || x > g.right || y < g.top) return null;
+  const colW = (g.width + 16) / 12;
+  const items = [...grid.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.matches('.widget, .widget-col') && el !== dragged);
+  const rows = new Map<number, HTMLElement[]>();
+  for (const el of items) {
+    const row = Number(el.style.getPropertyValue('--row'));
+    rows.set(row, [...(rows.get(row) ?? []), el]);
+  }
+  let row: HTMLElement[] = [];
+  let band: { top: number; bottom: number } | null = null;
+  for (const els of rows.values()) {
+    const top = Math.min(...els.map((el) => el.getBoundingClientRect().top));
+    const bottom = Math.max(...els.map((el) => el.getBoundingClientRect().bottom));
+    if (y >= top && y <= bottom) {
+      row = els;
+      band = { top, bottom };
+    }
+  }
+  const last = Math.max(0, ...items.map((el) => el.getBoundingClientRect().bottom));
+  const below = !band && y > last;
+  if (!band && !below) return null;
+  const used = new Set<number>();
+  for (const el of row) {
+    const start = Number(el.style.getPropertyValue('--start'));
+    const span = Number(el.style.getPropertyValue('--span'));
+    for (let k = 0; k < span; k++) used.add(start + k);
+  }
+  const c = Math.min(12, Math.max(1, Math.floor((x - g.left) / colW) + 1));
+  if (used.has(c)) return null;
+  let lo = c;
+  while (lo > 1 && !used.has(lo - 1)) lo--;
+  let hi = c;
+  while (hi < 12 && !used.has(hi + 1)) hi++;
+  const now = Number(dragged.dataset.size) as WidgetSize;
+  const size = ([12, 8, 6, 4] as WidgetSize[]).find((n) => n <= Math.min(hi - lo + 1, now)) ?? null;
+  if (!size) return null;
+  const start = Math.min(Math.max(c - Math.floor(size / 2), lo), hi - size + 1);
+  const ids = (below ? items : row).flatMap((el) => idsOf(el)).filter((id) => id !== dragged.dataset.widget);
+  const top = band ? band.top : last + 40;
+  return {
+    grid,
+    after: ids.length ? ids[ids.length - 1] : null,
+    newRow: below,
+    start,
+    size,
+    box: { left: (start - 1) * colW, top: top - g.top, width: size * colW - 16, height: band ? Math.max(80, band.bottom - band.top) : 120 },
+  };
 }
 
 /** The grid items (widgets and columns) in the row, as shown now, where widget `id`'s column sits. */
@@ -202,14 +274,16 @@ function rowEndOf(id: string): string {
  * for those that sit exactly at its left, middle or right: placing one widget
  * pins the others there, so they don't slide along after it.
  */
-function rowPlaces(id: string): Map<string, 'left' | 'center' | 'right'> {
+function rowPlaces(id: string, leftOnly = false): Map<string, 'left' | 'center' | 'right'> {
   const places = new Map<string, 'left' | 'center' | 'right'>();
   const row = rowOf(id);
   const grid = row[0]?.parentElement?.getBoundingClientRect();
   if (!grid) return places;
   const col = (grid.width + 16) / 12;
+  const own = row.find((x) => idsOf(x).includes(id))?.getBoundingClientRect().left ?? Infinity;
   for (const item of row) {
     const r = item.getBoundingClientRect();
+    if (leftOnly && r.left >= own) continue;
     const start = Math.round((r.left - grid.left) / col) + 1;
     const span = Math.round((r.width + 16) / col);
     const at = start === 1 ? 'left' : start === Math.floor((12 - span) / 2) + 1 ? 'center' : start + span === 13 ? 'right' : null;
@@ -218,10 +292,46 @@ function rowPlaces(id: string): Map<string, 'left' | 'center' | 'right'> {
   return places;
 }
 
+/**
+ * Gives widget `id` its own width or place (`patch`), touching no other
+ * widget; null when it already has it (`same`, asked of its column's top).
+ * Each widget keeps its height on the page: one from inside a column leaves
+ * it and starts a row below it; a column's top widget stays on top, and the
+ * rest of its column moves to a row below. What moves down goes after the
+ * last widget of the row on screen, and the widgets in that row are pinned
+ * where they are, so nothing beside it slides along (for a new width, only
+ * those to its left: the ones to its right shift over if it grows).
+ */
+function separate(id: string, patch: Partial<HomeWidget>, same: (head: HomeWidget) => boolean): HomeWidget[] | null {
+  const pinned = rowPlaces(id, 'size' in patch);
+  const list = layout().map((w) => (!w.align && pinned.has(w.id) ? { ...w, align: pinned.get(w.id) } : w));
+  const col = columns(list).find((x) => x.some((w) => w.id === id)) ?? [];
+  if (!col.length || same(col[0])) return null;
+  if (col.length === 1) return list.map((w) => (w.id === id ? { ...w, ...patch } : w));
+  const head = col[0];
+  const start = list.indexOf(head);
+  const rowLast = rowEndOf(id);
+  const i = list.findIndex((x) => x.id === id);
+  if (i === start) {
+    const rest = list.splice(start + 1, col.length - 1);
+    rest[0] = { ...rest[0], under: undefined, size: head.size, align: head.align, col: head.col, newRow: true };
+    list[start] = { ...head, ...patch };
+    const at = list.findIndex((x) => x.id === rowLast);
+    list.splice((at < 0 ? start : at) + 1, 0, ...rest);
+  } else {
+    // The row's last widget comes at or after this one; once this is taken out, insert right after it.
+    const found = list.findIndex((x) => x.id === rowLast);
+    const at = found < i ? list.indexOf(col[col.length - 1]) : found;
+    const [w] = list.splice(i, 1);
+    list.splice(at, 0, { ...w, under: undefined, size: head.size, align: head.align, col: head.col, newRow: true, ...patch });
+  }
+  return list;
+}
+
 /** Takes widget `i` out of the list; the one stacked under it, if any, takes its place at the column's top. */
 function detach(list: HomeWidget[], i: number): HomeWidget {
   const [w] = list.splice(i, 1);
-  if (!w.under && list[i]?.under) list[i] = { ...list[i], under: undefined, size: w.size, align: w.align, newRow: w.newRow };
+  if (!w.under && list[i]?.under) list[i] = { ...list[i], under: undefined, size: w.size, align: w.align, col: w.col, newRow: w.newRow };
   return w;
 }
 
@@ -417,7 +527,7 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
   // Basic information: the title, name (with Potential), rarity and class, and the note.
   const basic = !w.hideBasic;
   const pictureOnly = !basic && !chips.length && !stats?.length && !weapon && !gear;
-  return html`<div class="char-card-wrap${w.bare ? ' bare' : ''}${around ? ' around' : ''}">
+  return html`<div class="char-card-wrap${w.bare ? ' bare' : ''}${around ? ' around' : ''}${w.shadow && !w.ambient ? ' shadowed' : ''}">
     ${outside ? glow : ''}
     <a class="card char-card style-${style}${pictureOnly ? ' picture-only' : ''}" href="${infoHref('char', w.op)}" title="${basic ? '' : name}">
       ${outside ? '' : glow}
@@ -552,6 +662,12 @@ function configDialog(id: string): void {
           refresh();
         };
         form.querySelectorAll<HTMLInputElement>('[name=pic]').forEach((r) => (r.onchange = () => (draft.pic = r.value || undefined)));
+        // A drop shadow only without an ambient glow.
+        const shadow = form.querySelector<HTMLInputElement>('[name=shadow]')!;
+        form.querySelector<HTMLSelectElement>('[name=ambient]')!.onchange = (e) => {
+          shadow.disabled = !!(e.target as HTMLSelectElement).value;
+          if (shadow.disabled) shadow.checked = false;
+        };
         form.querySelector<HTMLButtonElement>('[data-art]')?.addEventListener('click', () => {
           keep(form);
           openArtManager(draft.op!, ops?.operators[draft.op!]?.name ?? '', refresh);
@@ -597,6 +713,7 @@ function configDialog(id: string): void {
         </label>
         <fieldset class="field char-fact-picks"><span class="label-13">Look</span>
           <label class="char-fact-pick"><input type="checkbox" class="check" name="bare" ${raw(draft.bare ? 'checked' : '')} />No outline</label>
+          <label class="char-fact-pick" title="Not with an ambient glow"><input type="checkbox" class="check" name="shadow" ${raw(draft.shadow && !draft.ambient ? 'checked' : '')} ${raw(draft.ambient ? 'disabled' : '')} />Drop shadow</label>
         </fieldset>
         <label class="field"><span class="label-13">Title</span><input class="input" name="title" placeholder="Main DPS, Favourite..." value="${draft.title ?? ''}" /></label>
         <label class="field"><span class="label-13">Note</span><textarea class="input" name="note" rows="3">${draft.note ?? ''}</textarea></label>
@@ -608,7 +725,7 @@ function configDialog(id: string): void {
     },
     (f) => {
       keep(f);
-      update(id, { op: draft.op, pic: draft.pic, title: draft.title, note: draft.note, facts: draft.facts, ambient: draft.ambient, bare: draft.bare, hideBasic: draft.hideBasic, artStyle: draft.artStyle });
+      update(id, { op: draft.op, pic: draft.pic, title: draft.title, note: draft.note, facts: draft.facts, ambient: draft.ambient, bare: draft.bare, shadow: draft.ambient ? undefined : draft.shadow, hideBasic: draft.hideBasic, artStyle: draft.artStyle });
     },
   );
   /** What's typed so far, so a re-render (new operator, new pictures) keeps it. */
@@ -618,6 +735,7 @@ function configDialog(id: string): void {
     draft.facts = [...f.querySelectorAll<HTMLInputElement>('[name=facts]:checked')].map((x) => x.value);
     draft.ambient = ((f.elements.namedItem('ambient') as HTMLSelectElement).value || undefined) as HomeWidget['ambient'];
     draft.bare = (f.elements.namedItem('bare') as HTMLInputElement).checked || undefined;
+    draft.shadow = (f.elements.namedItem('shadow') as HTMLInputElement).checked || undefined;
     draft.hideBasic = !(f.elements.namedItem('basic') as HTMLInputElement).checked || undefined;
     draft.artStyle = ((f.elements.namedItem('artStyle') as HTMLSelectElement | null)?.value as HomeWidget['artStyle']) || draft.artStyle;
   }
@@ -653,48 +771,14 @@ export function installHomeWidgets(): void {
       case 'add':
         return addDialog();
       case 'align': {
-        // Each widget is placed on its own and keeps its height on the page: one
-        // from inside a column starts a row below it; a column's top widget
-        // stays on top, and the rest of its column moves to a row below. What
-        // moves down goes after the last widget of the row on screen, so the
-        // widgets beside the column stay where they are.
-        const pinned = rowPlaces(id);
-        const list = layout().map((w) => (!w.align && pinned.has(w.id) ? { ...w, align: pinned.get(w.id) } : w));
-        const col = columns(list).find((x) => x.some((w) => w.id === id)) ?? [];
         const align = el.dataset.value as 'left' | 'center' | 'right';
-        if (!col.length || col[0].align === align) return;
-        if (col.length === 1) return save(list.map((w) => (w.id === id ? { ...w, align } : w)));
-        const head = col[0];
-        const start = list.indexOf(head);
-        const rowLast = rowEndOf(id);
-        const i = list.findIndex((x) => x.id === id);
-        if (i === start) {
-          const rest = list.splice(start + 1, col.length - 1);
-          rest[0] = { ...rest[0], under: undefined, size: head.size, align: head.align, newRow: true };
-          list[start] = { ...head, align };
-          const at = list.findIndex((x) => x.id === rowLast);
-          list.splice((at < 0 ? start : at) + 1, 0, ...rest);
-        } else {
-          // The row's last widget comes at or after this one; once this is taken out, insert right after it.
-          const found = list.findIndex((x) => x.id === rowLast);
-          const at = found < i ? list.indexOf(col[col.length - 1]) : found;
-          const [w] = list.splice(i, 1);
-          list.splice(at, 0, { ...w, under: undefined, align, newRow: true });
-        }
-        return save(list);
+        const list = separate(id, { align, col: undefined }, (head) => head.align === align && !head.col);
+        return list && save(list);
       }
       case 'size': {
-        // A column's widgets share its width; one made full width leaves its column, the rest keep theirs.
         const size = Number(el.dataset.value) as WidgetSize;
-        const list = layout();
-        const col = columns(list).find((x) => x.some((w) => w.id === id)) ?? [];
-        if (size === 12) {
-          const i = list.findIndex((w) => w.id === id);
-          if (list[i + 1]?.under) list[i + 1] = { ...list[i + 1], under: undefined, size: col[0].size };
-          list[i] = { ...list[i], under: undefined, size };
-          return save(list);
-        }
-        return save(list.map((w) => (col.includes(w) ? { ...w, size } : w)));
+        const list = separate(id, { size }, (head) => head.size === size);
+        return list && save(list);
       }
       case 'title': {
         const w = layout().find((x) => x.id === id);
@@ -716,8 +800,12 @@ export function installHomeWidgets(): void {
   let dragged: HTMLElement | null = null;
   type Where = 'before' | 'after' | 'above' | 'below';
   let target: { el: HTMLElement; where: Where } | null = null;
+  let room: Room | null = null;
   const DROPS = ['drop-before', 'drop-after', 'drop-above', 'drop-below'];
-  const clear = () => document.querySelectorAll(DROPS.map((x) => `.widget.${x}`).join()).forEach((x) => x.classList.remove(...DROPS));
+  const clear = () => {
+    document.querySelectorAll(DROPS.map((x) => `.widget.${x}`).join()).forEach((x) => x.classList.remove(...DROPS));
+    document.querySelector('.drop-ghost')?.remove();
+  };
   /**
    * The widget under a point and where the dragged one goes: full width, before
    * or after it by its half; narrower, stacked above or below it in its column
@@ -773,6 +861,14 @@ export function installHomeWidgets(): void {
     clear();
     target = over(e.clientX, e.clientY);
     target?.el.classList.add(`drop-${target.where}`);
+    // Not over a widget: empty room in a row, outlined where the widget would land.
+    room = target ? null : roomAt(e.clientX, e.clientY, dragged);
+    if (room) {
+      const ghost = document.createElement('div');
+      ghost.className = 'drop-ghost';
+      Object.assign(ghost.style, { left: `${room.box.left}px`, top: `${room.box.top}px`, width: `${room.box.width}px`, height: `${room.box.height}px` });
+      room.grid.append(ghost);
+    }
     // Near the screen's top or bottom edge, scroll to reach widgets out of view.
     if (e.clientY < 60) scrollBy(0, -12);
     else if (e.clientY > innerHeight - 60) scrollBy(0, 12);
@@ -783,8 +879,18 @@ export function installHomeWidgets(): void {
     dragged.classList.remove('dragging');
     clear();
     const t = target;
+    const r = room;
     dragged = null;
     target = null;
+    room = null;
+    if (r) {
+      // Into empty room: at that column, as wide as fits (never wider than it was), after that row's widgets.
+      const list = layout();
+      const w = detach(list, list.findIndex((x) => x.id === id));
+      const at = r.after ? list.findIndex((x) => x.id === r.after) : list.length - 1;
+      list.splice(at + 1, 0, { ...w, under: undefined, align: undefined, newRow: r.newRow || undefined, col: r.start, size: r.size });
+      return save(list);
+    }
     if (!t) return;
     const list = layout();
     const w = detach(list, list.findIndex((x) => x.id === id));
@@ -801,7 +907,7 @@ export function installHomeWidgets(): void {
       const head = at === top;
       if (head) list[at] = { ...list[at], under: true };
       list.splice(at, 0, { ...moved, under: head ? undefined : true, size, align: head ? list[at].align : w.align, newRow: head ? list[at].newRow : undefined });
-    } else list.splice(t.where === 'before' ? top : last + 1, 0, { ...moved, under: undefined });
+    } else list.splice(t.where === 'before' ? top : last + 1, 0, { ...moved, under: undefined, col: undefined });
     save(list);
   };
   document.addEventListener('pointerup', end);
