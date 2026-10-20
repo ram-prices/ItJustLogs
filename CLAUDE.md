@@ -173,11 +173,18 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     loaded with an explicit `icon_names=` list in index.html: add new names
     there (alphabetical).
   - Sentence-case labels; inline styles only for data-driven values.
+  - Oroberyl, wherever named, shows its game icon in red: `itemName` in
+    `ui/components.ts` (`public/icons/oroberyl.webp`, `--oroberyl`).
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
     `/operators`, `/operators/<poolId>`, `/arsenal[/<poolId>]`, `/stats`,
     `/settings`) with `history.pushState` for in-page links, rewrites
     old `#/...` links, and holds the delegated `data-action` click handlers.
+    Header tabs: Home, Database, Pulls, Essences, Achievements, Archive,
+    Settings. Database (`/operators/info`, `/arsenal/info`) and Pulls
+    (`/operators`, `/arsenal`, `/stats`) are sections whose pages keep their
+    own paths, picked with side tabs (`databaseTabs` / `pullsTabs` in
+    `pages/info.ts`); `/database` and `/pulls` open the page last used there.
     Pages live in `ui/pages/` (`home.ts` = the schedule: banners open now
     with your pity and rate-up status, events now, coming up, and a
     version/banner/event timeline; works without an import; anything with
@@ -191,9 +198,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   - Signature features of the old site (6★ portrait strip, pity ruler, luck
     curves, profile header) are being re-added one at a time in Geist style.
 - Achievements and Archive tabs (`ui/pages/collections.ts`, types in
-  `domain/collections.ts`): the game's Medal Album (154 medals) and Intel
-  Archive → Findings (Manuscripts, E-Files, Peculiars), one category tab at a
-  time; work without an import. Data is a wiki snapshot made by
+  `domain/collections.ts`): the game's Medal Album and Intel Archives
+  (Findings' Manuscripts, E-Files and Peculiars, then Audio Records, Nexus
+  Files and Intel Gathering), one category tab at a time; work without an
+  import. The reader only reads Findings. Data is a wiki snapshot made by
   `scripts/wiki-collections.mjs` into `src/data/medals.snapshot.json` and
   `findings.snapshot.json` (lazy-loaded chunks; pictures hotlink
   endfield.wiki.gg for now, to move to ef-assets with the script). The

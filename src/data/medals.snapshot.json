@@ -3,8 +3,8 @@
   "source": "endfield.wiki.gg",
   "url": "https://endfield.wiki.gg",
   "license": "CC BY-SA 4.0",
-  "fetched": "2026-10-20",
-  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "fetched": "2026-10-20"
  },
  "medals": [
   {
@@ -212,6 +212,42 @@
    }
   },
   {
+   "id": "enter-the-painted-world",
+   "name": "\"Enter the Painted World\"",
+   "category": "Chapter",
+   "group": "Main Mission",
+   "desc": "They saw the beautiful painting, and made their way deeper into the mountain.",
+   "cond": "Complete main mission Chapter Ⅱ Process Ⅷ: Inn the Painting",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Enter_the_Painted_World%22.png"
+   }
+  },
+  {
+   "id": "see-through-the-self",
+   "name": "\"See Through the Self\"",
+   "category": "Chapter",
+   "group": "Main Mission",
+   "desc": "To elucidate my obsession, and heal my deepest ills.",
+   "cond": "Complete main mission Chapter Ⅱ Process Ⅷ: Trial Ⅲ - A Path Where There's None",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22See_Through_the_Self%22.png"
+   }
+  },
+  {
+   "id": "paint-with-fresh-ink",
+   "name": "\"Paint with Fresh Ink\"",
+   "category": "Chapter",
+   "group": "Main Mission",
+   "desc": "Water down the old ink splotches, and more brilliant strokes can be made to make the painting anew.",
+   "cond": "Complete main mission Chapter Ⅱ Process Ⅷ: The Conclusion",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Paint_with_Fresh_Ink%22.png"
+   }
+  },
+  {
    "id": "true-altruist",
    "name": "True Altruist",
    "category": "Chapter",
@@ -364,6 +400,18 @@
    "reforge": [],
    "images": {
     "base": "https://endfield.wiki.gg/images/Medal-%22Let_Suiming_Light_the_Way%22.png"
+   }
+  },
+  {
+   "id": "a-day-to-remember",
+   "name": "\"A Day to Remember\"",
+   "category": "Chapter",
+   "group": "Exploration Mission",
+   "desc": "Truly wonderful. A fowlbeast who composes poetry, and a smoky stove that tugs at our hearts.",
+   "cond": "Complete side mission A Day to Remember",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22A_Day_to_Remember%22.png"
    }
   },
   {
@@ -710,6 +758,32 @@
    }
   },
   {
+   "id": "art-of-blanks",
+   "name": "\"Art of Blanks\"",
+   "category": "Technical",
+   "group": "Combat Technique",
+   "desc": "Know where to leave blanks, where to keep the inked strokes, and when to give way to prepare for an advance.",
+   "cond": "Let Si unleash her Painting ATK during the black-and-white state of Inkwashed Realm, and do not let the controlled operator take any DMG from the Painting ATK.",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Art_of_Blanks%22.png"
+   }
+  },
+  {
+   "id": "insight-of-rejuvenation",
+   "name": "\"Insight of Rejuvenation\"",
+   "category": "Technical",
+   "group": "Combat Technique",
+   "desc": "Where the material world ends in the illusory realm of the Protocol Space, there waits an elegant figure with a magic brush. And you, a soul with an enlightened mind, know it is time for rejuvenation.",
+   "cond": "Complete \"Crisis Calamity: Si\"",
+   "reforge": [],
+   "trim": "Complete \"Crisis Calamity: Si\" in 200s",
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Insight_of_Rejuvenation%22.png",
+    "trim": "https://endfield.wiki.gg/images/Medal-%22Insight_of_Rejuvenation%22_Trimmed.png"
+   }
+  },
+  {
    "id": "material-gathering",
    "name": "Material Gathering",
    "category": "Technical",
@@ -853,6 +927,20 @@
    "images": {
     "base": "https://endfield.wiki.gg/images/Medal-%22Marked_by_Dark_Shadows%22.png",
     "trim": "https://endfield.wiki.gg/images/Medal-%22Marked_by_Dark_Shadows%22_Trimmed.png"
+   }
+  },
+  {
+   "id": "murmurs-of-the-deep-forest",
+   "name": "\"Murmurs of the Deep Forest\"",
+   "category": "Technical",
+   "group": "Protocol Space",
+   "desc": "Victorious, you listened to the wrathful murmurs of the deep forest, and once again you etched your name upon the great monument.",
+   "cond": "In Umbral Monument, complete all \"Murmurs of the Deep Forest\" stages at Normal mode",
+   "reforge": [],
+   "trim": "In Umbral Monument, complete all \"Murmurs of the Deep Forest\" stages at Agony mode",
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Murmurs_of_the_Deep_Forest%22.png",
+    "trim": "https://endfield.wiki.gg/images/Medal-%22Murmurs_of_the_Deep_Forest%22_Trimmed.png"
    }
   },
   {
@@ -1250,6 +1338,66 @@
    "reforge": [],
    "images": {
     "base": "https://endfield.wiki.gg/images/Medal-%22A_Goal_Truly_Slugged%22.png"
+   }
+  },
+  {
+   "id": "regional-anchored-to-wuling",
+   "name": "Anchored to Wuling Ⅳ",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "You have extended the Protocol Network into the deeper reaches of Wuling, even if said reaches exist in outworldly realms.",
+   "cond": "In Snowy Forest and Si's Painting, unlock 18 TP-Points",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-Anchored_to_Wuling_%E2%85%A3.png"
+   }
+  },
+  {
+   "id": "regional-re-congregated-fragments",
+   "name": "\"Re-Congregated Fragments\" Ⅳ",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "Lost fragments of the primal artifact have once again gathered in your hands. They might be slivers of light found in an outwordly realm, but these ancient artifacts respond to you.",
+   "cond": "In Snowy Forest and Si's Painting, gather 41 Aurylenes",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Re-Congregated_Fragments%22_%E2%85%A3.png"
+   }
+  },
+  {
+   "id": "outworldly-crate-master",
+   "name": "Outworldly Crate Master",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "You have opened most storage crates in Wuling and recovered most of the sparkling points of wealth.",
+   "cond": "In Snowy Forest and Si's Painting, open 140 crates",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-Outworldly_Crate_Master.png"
+   }
+  },
+  {
+   "id": "brilliant-dabs-and-strokes",
+   "name": "\"Brilliant Dabs and Strokes\"",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "You solved the many puzzles that Si left behind. Even Ink Spirits that spend enough time in the painting will take on a playful nature.",
+   "cond": "In Si's Painting, solve 11 Stone Lantern puzzles",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Brilliant_Dabs_and_Strokes%22.png"
+   }
+  },
+  {
+   "id": "painting-mender",
+   "name": "\"Painting Mender\"",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "You recovered missing parts of the painting from the greedy little critters. And then with deftness and skill, you restored peace to the painted realm.",
+   "cond": "In Si's Painting, restore 16 Old Works of Si",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Painting_Mender%22.png"
    }
   },
   {
@@ -1717,6 +1865,20 @@
    }
   },
   {
+   "id": "happy-gourmand",
+   "name": "Happy Gourmand",
+   "category": "Construction",
+   "group": "AIC Factory",
+   "desc": "No Wulinger dining at Yuanyuan Manor can ever hope to resist your artful cuisine.",
+   "cond": "Achieve 5 Session Stars in 5 different themes (excludes Trial Runs)",
+   "reforge": [],
+   "trim": "Acquire 40 recipes",
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-Happy_Gourmand.png",
+    "trim": "https://endfield.wiki.gg/images/Medal-Happy_Gourmand_Trimmed.png"
+   }
+  },
+  {
    "id": "nexus-upgrader",
    "name": "Nexus Upgrader",
    "category": "Construction",
@@ -1876,6 +2038,20 @@
    }
   },
   {
+   "id": "fade-beyond-the-painting",
+   "name": "\"Fade Beyond the Painting\"",
+   "category": "Event",
+   "group": "Permanent",
+   "desc": "One by one you illuminated the fragmented Protocol Space, and fully grasped tales of the past that linger within the brushwork and even those beyond the painting.",
+   "cond": "In &#91;Delver of the Cryptic&#93;, complete all \"Fade Beyond the Painting\" Protocol Spaces",
+   "reforge": [],
+   "trim": "In [Delver of the Cryptic], complete all \"Fade Beyond the Painting\" Protocol Spaces",
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Fade_Beyond_the_Painting%22.png",
+    "trim": "https://endfield.wiki.gg/images/Medal-%22Fade_Beyond_the_Painting%22_Trimmed.png"
+   }
+  },
+  {
    "id": "totally-cleansed-and-rinsed",
    "name": "\"Totally Cleansed and Rinsed\"",
    "category": "Event",
@@ -1991,6 +2167,20 @@
    "images": {
     "base": "https://endfield.wiki.gg/images/Medal-%22Chubby_Lung_Explosion%22.png",
     "trim": "https://endfield.wiki.gg/images/Medal-%22Chubby_Lung_Explosion%22_Trimmed.png"
+   }
+  },
+  {
+   "id": "dataplate-counter",
+   "name": "\"Dataplate Counter\"",
+   "category": "Event",
+   "group": "Time-Limited",
+   "desc": "Not only are you an outstanding combatant, but you're also great with numbers and incredibly lucky.",
+   "cond": "From a single Trial, earn a high score of ≥ 500K",
+   "reforge": [],
+   "trim": "In &#91;Arena of Games&#93;, complete 15 Arena Tasks",
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Dataplate_Counter%22.png",
+    "trim": "https://endfield.wiki.gg/images/Medal-%22Dataplate_Counter%22_Trimmed.png"
    }
   },
   {
@@ -2173,6 +2363,45 @@
    "reforge": [],
    "images": {
     "base": "https://endfield.wiki.gg/images/Medal-%22Giant_Ice_Hammer%22.png"
+   }
+  },
+  {
+   "id": "a-view-of-the-southern-peak",
+   "name": "\"A View of the Southern Peak\"",
+   "category": "Wondrous",
+   "group": null,
+   "desc": "After a few twists and turns, the adventurer finally reaches the tallest peak, fashioned by the zenith of human technology.",
+   "cond": "",
+   "secret": "Reach the Vantage Islet",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22A_View_of_the_Southern_Peak%22.png"
+   }
+  },
+  {
+   "id": "involuntary-karma-recipient",
+   "name": "\"Involuntary Karma Recipient\"",
+   "category": "Wondrous",
+   "group": null,
+   "desc": "Perhaps Simmer's Purge only wanted to help you simmer down and cool things off.",
+   "cond": "",
+   "secret": "When fighting Simmer's Purge, Thunder Cloud can unleash Thunderbolts that inflict Stun.",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Involuntary_Karma_Recipient%22.png"
+   }
+  },
+  {
+   "id": "most-dashing-lung",
+   "name": "\"Most Dashing Lung\"",
+   "category": "Wondrous",
+   "group": null,
+   "desc": "Great. They're still arguing about who's the best looking.",
+   "cond": "",
+   "secret": "Find all the minimalist Lung-shaped Ink Spirits",
+   "reforge": [],
+   "images": {
+    "base": "https://endfield.wiki.gg/images/Medal-%22Most_Dashing_Lung%22.png"
    }
   }
  ]

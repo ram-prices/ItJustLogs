@@ -35,7 +35,7 @@ export interface MedalFile {
 export interface Finding {
   id: string;
   name: string;
-  /** Manuscripts, E-Files or Peculiars. */
+  /** Manuscripts, E-Files or Peculiars (Findings), Audio Records, Nexus Files or Intel Gathering. */
   category: string;
   /** Its place in the wiki's list, which follows the game's own order. */
   order: number;
@@ -44,6 +44,8 @@ export interface Finding {
   area?: string;
   parts?: number;
   text?: string;
+  /** Nexus Files: what unlocks it ("Chapter I Process II: Paving the Way"). */
+  unlock?: string;
   /** The archive's thumbnail, and a larger picture from its page. */
   icon?: string;
   image?: string;
@@ -65,6 +67,8 @@ export interface MedalProgress {
 export const MEDAL_CATEGORIES = ['Chapter', 'Technical', 'Regional', 'Progression', 'Construction', 'Social', 'Event', 'Wondrous'];
 /** The game's order of Findings categories (Intel Archives). */
 export const FINDING_CATEGORIES = ['Manuscripts', 'E-Files', 'Peculiars'];
+/** Every Archive tab: Findings' categories, then the rest of Intel Archives. */
+export const ARCHIVE_CATEGORIES = [...FINDING_CATEGORIES, 'Audio Records', 'Nexus Files', 'Intel Gathering'];
 
 /** The picture for a medal as the player has it: its Reforged or Trimmed look, else the base one. */
 export function medalImage(m: Medal, p: MedalProgress | undefined): string | undefined {

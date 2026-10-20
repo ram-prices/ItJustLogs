@@ -11,7 +11,7 @@ import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, sp
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, heroGlow, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
-import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
+import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Operator info pages (/operators/info and /operators/info/<chr id>): class,
@@ -48,12 +48,12 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
   ];
   const groups = sortGroups('char', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), element: r.element, weapon: r.weapon, class: r.class, unreleased: r.soon }));
   return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
-      ${crumbs('char')}
-      <h1 class="heading-32">Operator info</h1>
+      <h1 class="heading-32">Operators</h1>
       <p class="copy-16">${owned ? `${have}/${ops.length}` : `${ops.length} operators`}</p>
-    </div><div class="row">${kindNav('char', 'info')}</div></div></div>
-    <main class="container fade-in">
-      <div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
+    </div></div></div>
+    <main class="container fade-in">${databaseTabs(
+      'char',
+      html`<div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
       ${groups.map(
         (g) => html`<section class="section wiki-type">
           <div class="section-head"><h2 class="heading-20">${g.label || 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
@@ -72,7 +72,8 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
           </div>
         </section>`,
       )}
-      <p class="copy-14 secondary list-search-empty" hidden>No operators match your search.</p>
+      <p class="copy-14 secondary list-search-empty" hidden>No operators match your search.</p>`,
+    )}
       ${credit(f.attribution)}
     </main>`;
 }
@@ -445,18 +446,18 @@ export function operatorInfoPage(id: string | undefined, a: Analysis | null, red
   const f = wikiFile<WikiOperatorFile>('operators.json', redraw);
   file = f.data;
   previews = previewsOf(redraw);
-  if (!file) return loadingOrFailed('char', 'Operator info', f.failed);
+  if (!file) return loadingOrFailed('char', 'Operators', f.failed);
   if (!id) return indexPage(file, ownedOf(a, 'char'));
   const o = file.operators[wikiId(id)];
   // Not on the wiki yet: the version guide's preview, if it has one.
   const p = !o ? previews?.operators[id] : undefined;
   if (p && previews) return operatorPreview(id, p, previews.attribution);
-  if (!o) return statusPage('char', 'Operator info', html`There's no wiki data for this operator yet. <a href="${operatorInfoHref()}">See all operators</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
+  if (!o) return statusPage('char', 'Operators', html`There's no wiki data for this operator yet. <a href="${operatorInfoHref()}">See all operators</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
   return detailPage(wikiId(id), o, file.attribution, a, redraw);
 }
 
 /** Tab title for the operator info pages. */
 export function operatorInfoTitle(id: string | undefined): string {
   const o = id && (file?.operators[wikiId(id)] ?? previews?.operators[id]);
-  return o ? o.name : 'Operator info';
+  return o ? o.name : 'Operators';
 }

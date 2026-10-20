@@ -28,7 +28,7 @@ import { fmtDate, html, raw, type Html } from '../html';
 
 const PATH: Record<Kind, string> = { char: 'operators', weap: 'arsenal' };
 const NOUN: Record<Kind, string> = { char: 'Operators', weap: 'Arsenal' };
-/** What the banners page of each kind is called (breadcrumbs, the view switch). */
+/** What the banners view of each kind is called (its side tab and title). */
 const BANNERS_LABEL: Record<Kind, string> = { char: 'Headhunting', weap: 'Issues' };
 
 /** Link to an item's info page, or the list of all of them. */
@@ -216,16 +216,12 @@ export function credit(a: WikiAttribution, page?: string): Html {
 }
 
 /** Operators › Headhunting, Arsenal › Issues: the banners pages' breadcrumbs. */
-export function bannerCrumbs(kind: Kind): Html {
-  return html`<nav class="breadcrumb wiki-crumbs" aria-label="Breadcrumb">
-    <a href="/${PATH[kind]}">${NOUN[kind]}</a>${icon('chevron_right')}<span class="wiki-em">${BANNERS_LABEL[kind]}</span>
-  </nav>`;
-}
-
+/** Database › Operators › Si (an item's page), or Database › Operators (the list). */
 export function crumbs(kind: Kind, name?: string): Html {
+  const list = kind === 'char' ? 'Operators' : 'Weapons';
   return html`<nav class="breadcrumb wiki-crumbs" aria-label="Breadcrumb">
-    <a href="/${PATH[kind]}">${NOUN[kind]}</a>${icon('chevron_right')}
-    ${name ? html`<a href="${infoHref(kind)}">Info</a>${icon('chevron_right')}<span class="wiki-em">${name}</span>` : html`<span class="wiki-em">Info</span>`}
+    <a href="/database">Database</a>${icon('chevron_right')}
+    ${name ? html`<a href="${infoHref(kind)}">${list}</a>${icon('chevron_right')}<span class="wiki-em">${name}</span>` : html`<span class="wiki-em">${list}</span>`}
   </nav>`;
 }
 
@@ -432,12 +428,37 @@ export function ownedTag(owned: Owned | undefined): Html {
   return html`<span class="wiki-tile-tag" title="${owned.copies} cop${owned.copies > 1 ? 'ies' : 'y'}">${potentialLevel(owned)}</span>`;
 }
 
-/** Switches between the player's banners and the info pages for a kind. */
-export function kindNav(kind: Kind, current: 'banners' | 'info'): Html {
-  const link = (to: 'banners' | 'info', href: string, label: string, ic: string) =>
-    html`<a href="${href}" ${raw(current === to ? 'aria-current="page"' : '')}>${icon(ic)}${label}</a>`;
-  return html`<nav class="toggle kind-nav" aria-label="${NOUN[kind]} views">
-    ${link('banners', `/${PATH[kind]}`, BANNERS_LABEL[kind], 'inventory_2')}
-    ${link('info', infoHref(kind), kind === 'char' ? 'All operators' : 'All weapons', 'menu_book')}
-  </nav>`;
+/**
+ * A section's views as side tabs (a row on phones), like Essences': links,
+ * with a count where there is one. `body` is the view itself.
+ */
+function sideTabs(label: string, views: [href: string, name: string, count: string][], current: string, body: Html): Html {
+  return html`<div class="collection-layout">
+    <nav class="collection-tabs" aria-label="${label}">
+      ${views.map(
+        ([href, name, count]) =>
+          html`<a class="collection-tab" href="${href}" ${raw(href === current ? 'aria-current="true"' : '')}><span>${name}</span><span class="label-12 secondary num">${count}</span></a>`,
+      )}
+    </nav>
+    <div class="min0">${body}</div>
+  </div>`;
+}
+
+/** Database: every operator and weapon (wiki data, with the player's copies). */
+export const databaseTabs = (kind: Kind, body: Html): Html =>
+  sideTabs('Database', [[infoHref('char'), 'Operators', ''], [infoHref('weap'), 'Weapons', '']], infoHref(kind), body);
+
+/** Pulls: the player's banners of each kind (with how many they pulled on), and Stats. */
+export function pullsTabs(current: 'char' | 'weap' | 'stats', body: Html): Html {
+  const pulled = (kind: Kind) => String(state.analysis?.banners.filter((b) => b.kind === kind && b.paidPulls > 0).length ?? '');
+  return sideTabs(
+    'Pulls',
+    [
+      [`/${PATH.char}`, BANNERS_LABEL.char, pulled('char')],
+      [`/${PATH.weap}`, NOUN.weap, pulled('weap')],
+      ['/stats', 'Stats', ''],
+    ],
+    current === 'stats' ? '/stats' : `/${PATH[current]}`,
+    body,
+  );
 }

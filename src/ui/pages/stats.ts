@@ -16,9 +16,9 @@ import {
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
 import { weeklyChart } from '../charts';
-import { TAB_ICON, badge, icon, metric, metrics, pageHeader } from '../components';
+import { TAB_ICON, badge, icon, itemName, metric, metrics, pageHeader } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
-import { credit, external, wikiFile } from './info';
+import { credit, external, pullsTabs, wikiFile } from './info';
 
 /**
  * Stats: totals, pulls per week, and a per-patch breakdown table. Each patch
@@ -40,12 +40,13 @@ export function togglePatch(key: string): void {
 }
 
 /** What a set of totals comes to, written out: "1,600 Oroberyl, 5 Basic HH Permits" (Oroberyl and Origeometry have no plural). */
-function itemsText(totals: Record<string, number>): string {
-  return Object.entries(totals)
+function itemsText(totals: Record<string, number>): Html {
+  const items = Object.entries(totals)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${fmtInt(n)} ${n !== 1 && /(Permit|Ticket)$/.test(k) ? `${k}s` : k}`)
-    .join(', ');
+    .map(([k, n]) => html`${fmtInt(n)} ${itemName(n !== 1 && /(Permit|Ticket)$/.test(k) ? `${k}s` : k)}`);
+  return html`${items.flatMap((x, i) => (i ? [', ', x] : [x]))}`;
 }
+const hasItems = (totals: Record<string, number>) => Object.values(totals).some((n) => n > 0);
 
 const plural = (n: number, one: string) => `${fmtInt(n)} ${one}${n === 1 ? '' : 's'}`;
 
@@ -69,10 +70,10 @@ const perOne = (totals: Record<string, number>, by: number) => Object.fromEntrie
 const PULL_ITEM = /^(Oroberyl|Origeometry|Arsenal Ticket)$|HH Permit/;
 
 /** "1,600 Oroberyl (3.2 pulls)": the pull currencies something gave, and the limited pulls they come to. */
-function gave(totals: Record<string, number>): string {
-  const what = itemsText(Object.fromEntries(Object.entries(totals).filter(([k]) => PULL_ITEM.test(k)).map(([k, n]) => [k, Math.round(n)])));
+function gave(totals: Record<string, number>): Html {
+  const shown = Object.fromEntries(Object.entries(totals).filter(([k]) => PULL_ITEM.test(k)).map(([k, n]) => [k, Math.round(n)]));
   const p = pullsFrom(totals).headhunting;
-  return what ? `${what}${p ? ` (${fmtPulls(Math.round(p * 10) / 10)} ${p === 1 ? 'pull' : 'pulls'})` : ''}` : 'none';
+  return hasItems(shown) ? html`${itemsText(shown)}${p ? ` (${fmtPulls(Math.round(p * 10) / 10)} ${p === 1 ? 'pull' : 'pulls'})` : ''}` : html`none`;
 }
 
 const bullets = (items: (Html | string | false | null | undefined)[]): Html =>
@@ -142,18 +143,18 @@ function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossi
 
   return html`<div class="patch-income">
     <div class="patch-income-row patch-income-head label-12">
-      <span>${inc.lines.some((l) => l.paid) ? 'Pulls earned' : 'Free pulls'}${inc.projected ? `, projected to ${fmtDate(inc.end)}` : inc.ongoing ? ' so far' : ''}</span><span>Headhunting</span><span>Arsenal</span>
+      <span>Pull sources${inc.projected ? ` (projected to ${fmtDate(inc.end)})` : inc.ongoing ? ' (so far)' : ''}</span><span>Headhunting</span><span>Arsenal</span>
     </div>
-    ${daily ? section(html`${external(daily.url!, 'Daily Missions')}`, [daily], `${plural(daily.count, 'day')} × ${itemsText(perOne(daily.totals, daily.count))}`) : ''}
-    ${weekly ? section(html`${external(weekly.url!, 'Weekly Missions')}`, [weekly], `${plural(weekly.count, 'week')} × ${itemsText(perOne(weekly.totals, weekly.count))}`) : ''}
+    ${daily ? section(html`${external(daily.url!, 'Daily Missions')}`, [daily], html`${plural(daily.count, 'day')} × ${itemsText(perOne(daily.totals, daily.count))}`) : ''}
+    ${weekly ? section(html`${external(weekly.url!, 'Weekly Missions')}`, [weekly], html`${plural(weekly.count, 'week')} × ${itemsText(perOne(weekly.totals, weekly.count))}`) : ''}
     ${pass
       ? section(
           html`${external(pass.url!, `Protocol Pass: ${pass.name}`)}`,
           [pass, originium, customized].filter((l): l is IncomeLine => !!l),
           bullets([
-            `Free track: ${gave(pass.totals)}`,
-            originium && `Originium Supply: ${gave(originium.totals)}`,
-            customized && `Protocol Customized: ${gave(customized.totals)}`,
+            html`Free track: ${gave(pass.totals)}`,
+            originium && html`Originium Supply: ${gave(originium.totals)}`,
+            customized && html`Protocol Customized: ${gave(customized.totals)}`,
           ]),
         )
       : ''}
@@ -175,7 +176,7 @@ function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossi
               (e) =>
                 html`${e.id != null ? html`<a href="/event/${e.id}" data-link="/event/${e.id}">${e.name}</a>` : external(e.url!, e.name)}: ${gave(e.totals)}${e.partial ? html` ${PARTIAL}` : ''}${e.estimated ? html` ${ESTIMATED}` : ''}`,
             ),
-            drills && `Combat Drills: ${gave(drills.totals)}`,
+            drills && html`Combat Drills: ${gave(drills.totals)}`,
           ]),
         )
       : ''}
@@ -183,11 +184,11 @@ function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossi
       'Exploration',
       [crateLine, aur, craft, quests, outposts, prog, onceExplore].filter((l): l is IncomeLine => !!l),
       bullets([
-        crateLine && `Storage crates (${fmtInt(crateLine.count)}): ${gave(crateLine.totals)}`,
-        aur && html`${external(aur.url!, 'Aurylene')}: ${itemsText(aur.totals) ? gave(aur.totals) : 'none listed'}`,
+        crateLine && html`Storage crates (${fmtInt(crateLine.count)}): ${gave(crateLine.totals)}`,
+        aur && html`${external(aur.url!, 'Aurylene')}: ${hasItems(aur.totals) ? gave(aur.totals) : 'none listed'}`,
         craft && html`${external(craft.url!, 'Crafting Manual')}: ${gave(craft.totals)}`,
-        quests && `Missions: ${gave(quests.totals)}`,
-        outposts && `Outposts: ${gave(outposts.totals)}`,
+        quests && html`Missions: ${gave(quests.totals)}`,
+        outposts && html`Outposts: ${gave(outposts.totals)}`,
         ...(prog?.items ?? []).map((x) => html`${external(x.url, x.name)}: ${gave(x.rewards)}`),
         ...onceBullets(onceExplore),
       ]),
@@ -197,8 +198,8 @@ function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossi
       [comp, survey, live, onceMail].filter((l): l is IncomeLine => !!l),
       bullets([
         ...(comp?.rows ?? []).map((r) => html`${external(comp!.url!, r.label)}: ${gave(r.rewards)}`),
-        survey && `${survey.extra!.label}: ${gave(survey.totals)}`,
-        live && `${live.extra!.label}: ${gave(live.totals)}`,
+        survey && html`${survey.extra!.label}: ${gave(survey.totals)}`,
+        live && html`${live.extra!.label}: ${gave(live.totals)}`,
         ...onceBullets(onceMail),
       ]),
     )}
@@ -250,16 +251,14 @@ interface Tickets {
 }
 
 function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: Tickets, bond: number, dossiers: Dossiers | undefined): Html {
-  return html`<tr class="patch-banners"><td colspan="5"><div class="patch-banner-list">
+  return html`<tr class="patch-banners"><td colspan="3"><div class="patch-banner-list">
     ${p.banners.map((b) => {
       const s = b.summary;
-      const six = s ? s.pulls.filter((x) => x.rarity === 6).length : 0;
       const kind = b.kind === 'weap' ? 'Arsenal' : 'Headhunting';
       const inner = html`${TAB_ICON[b.kind === 'weap' ? 'arsenal' : 'operators']}
         <span class="patch-banner-name ellipsis">${b.name}</span>
         <span class="patch-banner-when secondary">${b.start ? fmtDate(b.start) : kind}</span>
-        <span class="patch-banner-pulls num${s?.paidPulls ? '' : ' tertiary'}">${s?.paidPulls ? `${fmtInt(s.paidPulls)} pulls` : 'No pulls'}</span>
-        <span class="patch-banner-six num${six ? '' : ' tertiary'}">${six ? `${six} × 6★` : ''}</span>`;
+        <span class="patch-banner-pulls num${s?.paidPulls ? '' : ' tertiary'}">${s?.paidPulls ? `${fmtInt(s.paidPulls)} pulls` : 'No pulls'}</span>`;
       return s?.paidPulls && b.poolId
         ? html`<a class="patch-banner ${b.kind}" href="/${b.kind === 'weap' ? 'arsenal' : 'operators'}/${b.poolId}" title="${kind}">${inner}</a>`
         : html`<div class="patch-banner ${b.kind} unpulled" title="${kind}">${inner}</div>`;
@@ -361,7 +360,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
   }
   earnedArsenal += (ticketsFromPulls(a.banners.flatMap((b) => (b.kind === 'char' ? b.pulls : []))) / TICKETS_PER_ISSUE) * 10;
   const weeksSince = (now - from) / (7 * 86_400_000);
-  const perWeek = (n: number) => (free.size && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)} / week` : '–');
+  const perWeek = (n: number, unit = '') => (free.size && weeksSince > 0 ? `${fmtPulls(Math.round((n / weeksSince) * 10) / 10)}${unit} / week` : '–');
   /**
    * Pulls made over pulls earned, on one scale: the solid bar is what was
    * pulled, the faded one under it what the patch handed out (≈ while it's
@@ -422,12 +421,13 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
 
   return html`
     ${pageHeader('Stats', `${fmtDate(a.firstTs)} – ${fmtDate(a.lastTs)}`)}
-    <main class="container fade-in">
-      ${metrics([
+    <main class="container fade-in">${pullsTabs(
+      'stats',
+      html`${metrics([
         metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
         metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),
         metric({ label: 'Chartered permits earned', value: perWeek(earned) }),
-        metric({ label: 'Arsenal Issues earned', value: perWeek(earnedArsenal / 10) }),
+        metric({ label: 'Arsenal Issues earned', value: perWeek(earnedArsenal / 10, ' (×10)') }),
       ], 'plain')}
 
       <div class="section card">
@@ -461,21 +461,15 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
             </div>`
           : ''}
         <div class="table-wrap"><table class="table">
-          <thead><tr><th>Patch</th><th>Operator pulls</th><th>Arsenal pulls</th><th class="right hide-sm" title="Operator 6★ only: Arsenal pity counts sets of 10, so the two can't be averaged together">Avg. operator pity</th><th class="right hide-sm">Banners pulled</th></tr></thead>
+          <thead><tr><th>Patch</th><th>Operator pulls</th><th>Arsenal pulls</th></tr></thead>
           <tbody>
             ${patches.map((p) => {
-              // Operators only: Arsenal pity is counted in sets of 10, a different unit.
-              const six = p.sixStars.filter((s) => s.pity !== null && s.kind === 'char');
-              const avg = six.length ? (six.reduce((n, s) => n + s.pity!, 0) / six.length).toFixed(1) : '–';
-              const pulled = p.banners.filter((b) => (b.summary?.paidPulls ?? 0) > 0).length;
               const open = openPatches.has(p.patch.key);
               const earned = freeOf(p);
               return html`<tr class="patch-row${open ? ' open' : ''}">
                 <td class="label-14"><button type="button" class="patch-toggle" data-action="patch-toggle" data-value="${p.patch.key}" aria-expanded="${String(open)}">${icon('chevron_right')}${p.patch.major === -1 ? 'Permanent' : `Patch ${p.patch.key}`}</button></td>
                 <td>${bar(p.charPulls, earned?.char, 'var(--op)', earned?.projected)}</td>
                 <td>${bar(weapMadeOf(p), earned?.weap, 'var(--ars)', earned?.projected)}</td>
-                <td class="right num secondary hide-sm">${avg}</td>
-                <td class="right num secondary hide-sm">${pulled} / ${p.banners.length}</td>
               </tr>${open ? patchBanners(p, free.get(p.patch.key), ticketsOf(p), bondOf(p), dossiersOf(p)) : ''}`;
             })}
           </tbody>
@@ -485,13 +479,12 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
                   <td class="label-14">In all<div class="label-12 secondary">To today</div></td>
                   <td title="Patch banners only (not the Permanent row)">${totalCell(total.charMade, total.charEarned, 'var(--op)')}</td>
                   <td title="Patch Issues, and Constant Issues by the patch you pulled them in">${totalCell(total.weapMade, total.weapEarned, 'var(--ars)')}</td>
-                  <td class="hide-sm"></td>
-                  <td class="hide-sm"></td>
                 </tr>
               </tfoot>`
             : ''}
         </table></div>
-      </div>
+      </div>`,
+    )}
       ${anyFree && income ? credit(income.attribution) : ''}
     </main>`;
 }

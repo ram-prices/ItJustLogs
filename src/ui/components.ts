@@ -47,6 +47,10 @@ export function metric(o: MetricOpts): Html {
   </div>`;
 }
 
+/** An item's name; Oroberyl gets its game icon and colour: "[icon] Oroberyl". */
+export const itemName = (name: string): Html =>
+  /^oroberyls?$/i.test(name) ? html`<span class="oroberyl"><img class="oroberyl-icon" src="/icons/oroberyl.webp" alt="" />${name}</span>` : html`${name}`;
+
 /** `plain` is the borderless page-level stat row; the default is a bordered panel. */
 export const metrics = (items: Html[], variant: '' | 'plain' = ''): Html =>
   html`<div class="metrics${variant ? ` ${variant}` : ''}">${items}</div>`;
@@ -109,6 +113,8 @@ export const TAB_ICON: Record<string, Html> = {
   ),
   // Material Symbols, filled to match the solid shapes above.
   home: raw('<span class="tab-icon icon filled" aria-hidden="true">home</span>'),
+  database: raw('<span class="tab-icon icon filled" aria-hidden="true">menu_book</span>'),
+  pulls: raw('<span class="tab-icon icon filled" aria-hidden="true">inventory_2</span>'),
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
   essences: raw(`<svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${ESSENCE_PATH}"/></svg>`),
   achievements: raw('<span class="tab-icon icon filled" aria-hidden="true">military_tech</span>'),

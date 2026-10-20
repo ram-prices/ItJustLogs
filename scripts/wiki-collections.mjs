@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Snapshots the game's medals (Path of Glory) and Findings (Intel Archives)
+ * Snapshots the game's medals (Path of Glory) and Intel Archives (Findings,
+ * Audio Records, Nexus Files, Intel Gathering)
  * from endfield.wiki.gg into src/data/medals.snapshot.json and
  * src/data/findings.snapshot.json, for the Achievements and Archives pages.
  * The wiki's text is CC BY-SA 4.0: the pages credit it.
@@ -252,11 +253,62 @@ async function findings() {
   return out;
 }
 
+// --- The rest of Intel Archives: Audio Records, Nexus Files, Intel Gathering ---
+
+/** Links listed under a page's "== List of ... ==" section (or its table), in order. */
+function listed(text) {
+  const out = [];
+  for (const m of text.matchAll(/\[\[([^|\]#]+)(?:\|([^\]]+))?\]\]/g)) {
+    const page = m[1].trim();
+    if (/^(Category|File):/i.test(page) || out.some((x) => x.page === page)) continue;
+    out.push({ page, name: plain(m[2] ?? m[1]).replace(/^Nexus Files:\s*/, '') });
+  }
+  return out;
+}
+
+async function moreArchives(start) {
+  const index = await pages(['Audio Records', 'Nexus Files', 'Intel Gathering']);
+  const lists = [
+    ['Audio Records', listed(index.get('Audio Records')?.split(/^==\s*List of Audio Records\s*==/m)[1] ?? '')],
+    ['Nexus Files', listed((index.get('Nexus Files') ?? '').match(/\{\|[\s\S]*?\n\|\}/)?.[0] ?? '')],
+    ['Intel Gathering', listed(index.get('Intel Gathering')?.split(/^==\s*List of Intel Gathering\s*==/m)[1] ?? '')],
+  ];
+  const texts = await pages(lists.flatMap(([, l]) => l.map((e) => e.page)));
+  const out = [];
+  let order = start;
+  for (const [category, list] of lists) {
+    for (const e of list) {
+      const text = texts.get(e.page) ?? '';
+      const nexus = params(templates(text, 'Nexus Files')[0]?.body ?? '');
+      // Audio Records: each {{Audio Record cell|speaker|line}}, as "Speaker: line".
+      const audio = templates(text, 'Audio Record cell')
+        .map((t) => t.body.replace(/^\s*\|/, '').split('|'))
+        .map(([who, ...said]) => `${plain(who)}: ${plain(said.join('|'))}`);
+      const reports = (text.split(/^==\s*Needed Files\s*==/m)[1]?.split(/^==[^=]/m)[0].match(/^!\s*[^!\n]+?\s*!!/gm) ?? []).length;
+      out.push({
+        id: slug(`${category}-${e.name}`),
+        name: e.name,
+        category,
+        order: order++,
+        type: category === 'Intel Gathering' ? 'Investigation' : undefined,
+        parts: reports || undefined,
+        text: (audio.length ? audio.join('\n\n') : plain(nexus.desc ?? '')) || undefined,
+        unlock: plain(nexus.obtain ?? '') || undefined,
+        missing: !text || undefined,
+      });
+    }
+  }
+  for (const f of out) for (const k of Object.keys(f)) if (f[k] === undefined) delete f[k];
+  return out;
+}
+
 const fetched = new Date().toISOString().slice(0, 10);
 const attribution = { source: 'endfield.wiki.gg', url: 'https://endfield.wiki.gg', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/', fetched };
 const m = await medals();
 writeFileSync('src/data/medals.snapshot.json', JSON.stringify({ attribution, medals: m }, null, 1) + '\n');
 console.log(`medals: ${m.length} (${m.filter((x) => !x.images.base).length} without a picture)`);
-const f = await findings();
+const found = await findings();
+const f = [...found, ...(await moreArchives(found.length))];
 writeFileSync('src/data/findings.snapshot.json', JSON.stringify({ attribution, findings: f }, null, 1) + '\n');
+console.log(`archive: ${f.length} (${['Audio Records', 'Nexus Files', 'Intel Gathering'].map((c) => `${c} ${f.filter((x) => x.category === c).length}`).join(', ')})`);
 console.log(`findings: ${f.length} (${f.filter((x) => x.missing).length} without a page, ${f.filter((x) => !x.icon).length} without an icon)`);

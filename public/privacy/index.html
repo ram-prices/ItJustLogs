@@ -79,7 +79,7 @@
     <main>
       <a class="back" href="/">&larr; ItJustLogs</a>
       <h1>Privacy policy</h1>
-      <p class="muted">Effective October 19, 2026</p>
+      <p class="muted">Effective October 20, 2026</p>
 
       <p>
         ItJustLogs (<a href="https://itjustlogs.dev">itjustlogs.dev</a>) is a free, fan-made pull-history tracker for
@@ -89,14 +89,21 @@
 
       <h2>What stays in your browser</h2>
       <ul>
-        <li>Your pull history (the file you import or paste), your settings, and any profile picture you add.</li>
+        <li>
+          Your pull history (the file you import or paste), your settings (including your Achievements, Archive and
+          Essences progress), your profile picture and any operator pictures you add.
+        </li>
+        <li>
+          Version history: a copy of your pulls saved before each import, delete, restore or sync change (the last 15),
+          so you can undo it.
+        </li>
         <li>
           These are kept in your browser's own storage (IndexedDB and localStorage) on your device. They are never sent
           to ItJustLogs or anyone else, except to your own Google Drive if you turn on sync (below).
         </li>
         <li>
-          You can delete them at any time in Settings &rarr; Delete saved data, or by clearing this site's data in your
-          browser.
+          You can delete them at any time in Settings &rarr; Delete locally saved data (Delete pull history keeps your
+          version history; Delete everything removes it too), or by clearing this site's data in your browser.
         </li>
       </ul>
 
@@ -108,8 +115,8 @@
           belongs to ItJustLogs alone. It cannot see, open or change any of your other Drive files.
         </li>
         <li>
-          It stores one file there, a backup of your pulls, settings and profile picture, and reads it back on your other
-          devices.
+          It stores there a backup of your pulls, settings and profile picture, a file for each operator picture you
+          add, and your version history copies (the last 30), and reads them back on your other devices.
         </li>
         <li>
           It reads your Google account's email address only to show which account is syncing. That email is kept in your
@@ -132,6 +139,19 @@
         for advertising, or shared with anyone.
       </p>
 
+      <h2>Pictures, screenshots and videos</h2>
+      <ul>
+        <li>
+          Operator pictures you upload stay on your device (and in your Drive if you sync). If you add one by link, your
+          browser downloads it once from that link's site, which sees the request as it would any visit.
+        </li>
+        <li>
+          "Read from video or screenshots" (Achievements, Archive, Essences) reads your files in your browser. They are
+          never uploaded. The text reader it uses (Tesseract.js) is downloaded only when you use it.
+        </li>
+        <li>Copy image and Copy link put the picture or link on your device's clipboard; nothing is sent anywhere.</li>
+      </ul>
+
       <h2>The pull-history exporter</h2>
       <p>
         The optional PowerShell script shown in Settings reads the game's own cache on your PC to find your history link,
@@ -143,8 +163,13 @@
       <p>To show the page, your browser loads files from these services, which receive your IP address as any website does:</p>
       <ul>
         <li>Google Fonts (fonts.googleapis.com, fonts.gstatic.com) for the typeface and icons.</li>
-        <li>GitHub and jsDelivr (raw.githubusercontent.com, cdn.jsdelivr.net) for banner names, the schedule and game art.</li>
-        <li>Gryphline's image server (web-static.hg-cdn.com) for art of new banners.</li>
+        <li>
+          GitHub and jsDelivr (raw.githubusercontent.com, cdn.jsdelivr.net) for banner names, the schedule, game data and
+          art, and the text reader.
+        </li>
+        <li>Gryphline's image server (web-static.hg-cdn.com) for art of new banners and events.</li>
+        <li>The Arknights: Endfield Wiki (endfield.wiki.gg) for medal and Archive pictures.</li>
+        <li>Project Naptha's server (tessdata.projectnaptha.com) for the text reader's language data, only when you use it.</li>
         <li>GitHub Pages, which hosts the site.</li>
       </ul>
       <p>ItJustLogs itself uses no analytics, no advertising and no tracking cookies.</p>

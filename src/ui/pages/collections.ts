@@ -1,4 +1,4 @@
-import { FINDING_CATEGORIES, MEDAL_CATEGORIES, medalImage, type Finding, type FindingFile, type Medal, type MedalFile, type MedalProgress } from '../../domain/collections';
+import { ARCHIVE_CATEGORIES, FINDING_CATEGORIES, MEDAL_CATEGORIES, medalImage, type Finding, type FindingFile, type Medal, type MedalFile, type MedalProgress } from '../../domain/collections';
 import { state, updateSettings } from '../../state';
 import { icon, pageHeader, toggleGroup } from '../components';
 import { html, raw, render, type Html } from '../html';
@@ -62,7 +62,7 @@ export async function readMedalsFrom(files: File[]): Promise<void> {
 /** Reads findings from pasted or dropped files (app.ts), loading the list first if needed. */
 export async function readFindingsFrom(files: File[]): Promise<void> {
   const data = findingFile ?? ((await import('../../data/findings.snapshot.json')).default as unknown as FindingFile);
-  await readFindingFiles(files, data.findings);
+  await readFindingFiles(files, data.findings.filter((f) => FINDING_CATEGORIES.includes(f.category)));
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ export function collectionAction(action: string, el: HTMLElement): boolean {
       if (medalFile) readMedals(medalFile.medals);
       return true;
     case 'finding-read':
-      if (findingFile) readFindings(findingFile.findings);
+      if (findingFile) readFindings(findingFile.findings.filter((f) => FINDING_CATEGORIES.includes(f.category)));
       return true;
     case 'medal-toggle':
       setMedal(id, medalsOwned()[id] ? null : {});
@@ -253,13 +253,16 @@ export function subTabs(action: string, cats: string[], current: string, count: 
 // Archive
 // ---------------------------------------------------------------------------
 
+/** Tiles without a picture: an icon for what they are. */
+const ARCHIVE_ICON: Record<string, string> = { 'Audio Records': 'mic', 'Nexus Files': 'menu_book', 'Intel Gathering': 'search' };
+
 function findingTile(f: Finding, got: boolean): Html {
   const where = [f.region, f.area].filter(Boolean).join(' · ');
   return html`<div class="finding card${got ? ' got' : ''}" data-search-item>
     <button type="button" class="finding-open" data-action="finding-open" data-value="${f.id}" title="${f.name}">
-      <span class="finding-art">${f.icon ? html`<img src="${f.icon}" alt="" loading="lazy" decoding="async" />` : icon('description')}</span>
+      <span class="finding-art">${f.icon ? html`<img src="${f.icon}" alt="" loading="lazy" decoding="async" />` : icon(ARCHIVE_ICON[f.category] ?? 'description')}</span>
       <span class="finding-name">${f.name}</span>
-      <span class="finding-where label-12 secondary">${where || f.type || ''}</span>
+      <span class="finding-where label-12 secondary">${where || f.unlock?.replace(/^Complete the (?:main |side )?mission\s*/i, '') || f.type || ''}</span>
     </button>
     <button type="button" class="finding-check" data-action="finding-toggle" data-value="${f.id}" aria-pressed="${String(got)}" aria-label="${got ? `${f.name}: collected` : `Mark ${f.name} collected`}" title="${got ? 'Collected' : 'Mark collected'}">${icon(got ? 'check_circle' : 'add')}</button>
   </div>`;
@@ -272,22 +275,22 @@ export function archivesPage(redraw: () => void): Html {
   const all = data.findings;
   const got = all.filter((f) => owned.has(f.id)).length;
   const keep = (f: Finding) => (show.findings === 'have' ? owned.has(f.id) : show.findings === 'missing' ? !owned.has(f.id) : true);
-  if (!FINDING_CATEGORIES.includes(tab.findings)) tab.findings = FINDING_CATEGORIES[0];
+  if (!ARCHIVE_CATEGORIES.includes(tab.findings)) tab.findings = ARCHIVE_CATEGORIES[0];
   const count = (cat: string) => {
     const inCat = all.filter((f) => f.category === cat);
     return `${inCat.filter((f) => owned.has(f.id)).length}/${inCat.length}`;
   };
   return html`${pageHeader(
       'Archive',
-      `${got}/${all.length} Findings`,
+      `${got}/${all.length} collected`,
       html`<button type="button" class="btn secondary sm" data-action="finding-read" title="Read collected findings from a recording or screenshots of Intel Archives → Findings. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
     )}
     <main class="container fade-in">
       <div class="collection-layout">
-        ${subTabs('finding-tab', FINDING_CATEGORIES, tab.findings, count)}
+        ${subTabs('finding-tab', ARCHIVE_CATEGORIES, tab.findings, count)}
         <div class="min0 collection-panes">
-          <div class="section-head wiki-sort-head">${searchBox('findings', 'Search findings')}${showToggle('finding-show', show.findings, 'Collected', 'Not yet')}</div>
-          ${FINDING_CATEGORIES.map((cat) => {
+          <div class="section-head wiki-sort-head">${searchBox('findings', 'Search the archive')}${showToggle('finding-show', show.findings, 'Collected', 'Not yet')}</div>
+          ${ARCHIVE_CATEGORIES.map((cat) => {
             const shown = all.filter((f) => f.category === cat && keep(f)).sort((a, b) => a.order - b.order);
             return html`<section class="collection-pane${cat === tab.findings ? ' active' : ''}" data-pane>
               <div class="section-head collection-pane-head"><h2 class="heading-20">${cat}</h2><span class="label-13 secondary">${count(cat)}</span></div>
@@ -296,10 +299,10 @@ export function archivesPage(redraw: () => void): Html {
                 : html`<p class="copy-14 secondary">${show.findings === 'have' ? 'None collected here yet.' : 'All collected here.'}</p>`}
             </section>`;
           })}
-          <p class="copy-14 secondary list-search-empty" hidden>No findings match your search.</p>
+          <p class="copy-14 secondary list-search-empty" hidden>Nothing matches your search.</p>
         </div>
       </div>
-      ${credit(data.attribution, 'https://endfield.wiki.gg/wiki/Findings')}
+      ${credit(data.attribution, 'https://endfield.wiki.gg/wiki/Intel_Archives')}
     </main>`;
 }
 
@@ -320,7 +323,7 @@ function openFinding(id: string): void {
     dlg,
     html`<div class="finding-dialog-head">
         <div class="min0">
-          <div class="label-13 secondary">${[f.category, f.type, f.region, f.area].filter(Boolean).join(' · ')}</div>
+          <div class="label-13 secondary">${[f.category, f.type, f.region, f.area, f.unlock].filter(Boolean).join(' · ')}</div>
           <h2 class="heading-24">${f.name}</h2>
         </div>
         <button type="button" class="btn tertiary sm" data-close aria-label="Close">${icon('close')}</button>

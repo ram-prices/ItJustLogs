@@ -7,12 +7,12 @@ import type { Schedule, Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
 import { badge, heat, icon, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
-import { bannerCrumbs, infoHref, kindNav } from './info';
+import { infoHref, pullsTabs } from './info';
 
 /** Operators / Arsenal: list of banners, and a page per banner with its pull history. */
 
 const KIND = {
-  char: { title: 'Operators', path: 'operators', flip: '50/50', items: 'operators' },
+  char: { title: 'Headhunting', path: 'operators', flip: '50/50', items: 'operators' },
   weap: { title: 'Arsenal', path: 'arsenal', flip: '25/75', items: 'weapons' },
 } as const;
 
@@ -245,9 +245,10 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
   const list = bannerCards(kind, banners, opts);
 
   return html`
-    ${pageHeader(k.title, `${banners.length} banners · ${s.uniqueItems} unique ${k.items}`, kindNav(kind, 'banners'), bannerCrumbs(kind))}
-    <main class="container fade-in">
-      ${metrics(
+    ${pageHeader(k.title, `${banners.length} banners · ${s.uniqueItems} unique ${k.items}`)}
+    <main class="container fade-in">${pullsTabs(
+      kind,
+      html`${metrics(
         [
           metric({ label: 'Pulls', value: fmtInt(s.pulls), sub: s.freePulls ? `+${fmtInt(s.freePulls)} free` : undefined }),
           metric({ label: '6★ rate', value: `${(s.rate * 100).toFixed(2)}%`, sub: html`${luckWord(rateTier)} · expected ${(s.expectedRate * 100).toFixed(2)}%` }),
@@ -269,8 +270,8 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
           </div>
         </div>
         <div class="banner-list">${list.cards}</div>
-      </div>
-    </main>`;
+      </div>`,
+    )}</main>`;
 }
 
 // ---------------------------------------------------------------------------

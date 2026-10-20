@@ -1,7 +1,7 @@
 import { fmtPulls, pullsOf, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
 import { SERVER_LABEL, timeOn, type ScheduleEvent } from '../../domain/schedule';
 import { currentServer, state } from '../../state';
-import { badge, icon } from '../components';
+import { badge, icon, itemName } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { credit, external, wikiFile } from './info';
 
@@ -19,14 +19,14 @@ export const eventOf = (id: string | undefined): ScheduleEvent | undefined =>
 const count = ([, n]: Reward) => (n === null ? '' : `×${fmtInt(n)}`);
 
 function rewardChips(rewards: Reward[]): Html {
-  return html`<span class="reward-chips">${rewards.map((r) => html`<span class="reward-chip${/oroberyl|origeometry|hh permit|arsenal ticket/i.test(r[0]) ? ' currency' : ''}">${r[0]} <b>${count(r)}</b></span>`)}</span>`;
+  return html`<span class="reward-chips">${rewards.map((r) => html`<span class="reward-chip${/oroberyl|origeometry|hh permit|arsenal ticket/i.test(r[0]) ? ' currency' : ''}">${itemName(r[0])} <b>${count(r)}</b></span>`)}</span>`;
 }
 
 function summary(r: EventRewards): Html {
   const p = pullsOf(r.totals);
   const atLeast = r.partial ? 'at least ' : '';
   const parts: Html[] = [];
-  if (p.oroberyl) parts.push(html`<div class="metric"><div class="metric-label"><span>Oroberyl</span></div><div class="metric-value num">${atLeast ? '≥ ' : ''}${fmtInt(p.oroberyl)}</div><div class="metric-sub">${fmtPulls(p.fromOroberyl)} pulls</div></div>`);
+  if (p.oroberyl) parts.push(html`<div class="metric"><div class="metric-label"><span>${itemName('Oroberyl')}</span></div><div class="metric-value num">${atLeast ? '≥ ' : ''}${fmtInt(p.oroberyl)}</div><div class="metric-sub">${fmtPulls(p.fromOroberyl)} pulls</div></div>`);
   for (const [name, n] of p.permits)
     parts.push(html`<div class="metric"><div class="metric-label"><span>${name}</span></div><div class="metric-value num">${fmtInt(n)}</div><div class="metric-sub">${n === 1 ? 'pull' : 'pulls'}</div></div>`);
   if (p.basicPermits)

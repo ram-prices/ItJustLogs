@@ -107,15 +107,15 @@ function writeJson(key: string, value: unknown): void {
 }
 
 /**
- * Which view the Operators and Arsenal tabs open: the banners or the full
- * list ("info"), whichever the player was last on. This browser only (not
- * synced: it's where they left off, not a setting).
+ * Which view the Database and Pulls tabs open: the path of the one the
+ * player was last on. This browser only (not synced: it's where they left
+ * off, not a setting).
  */
-export type TabView = 'banners' | 'info';
-export const loadTabViews = (): Partial<Record<'operators' | 'arsenal', TabView>> => readJson(KEYS.tabViews) ?? {};
-export function saveTabView(tab: 'operators' | 'arsenal', view: TabView): void {
+export type Section = 'database' | 'pulls';
+export const loadTabViews = (): Partial<Record<Section, string>> => readJson(KEYS.tabViews) ?? {};
+export function saveTabView(tab: Section, path: string): void {
   const all = loadTabViews();
-  if (all[tab] !== view) writeJson(KEYS.tabViews, { ...all, [tab]: view });
+  if (all[tab] !== path) writeJson(KEYS.tabViews, { ...all, [tab]: path });
 }
 
 export async function loadHistory(): Promise<PullHistory | null> {
