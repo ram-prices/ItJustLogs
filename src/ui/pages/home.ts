@@ -158,7 +158,7 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
   return html`<div class="sched-next evt" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
     ${e.art
-      ? html`<div class="sched-thumb evt-art"><img src="${e.art}" alt="" loading="lazy" decoding="async" /></div>`
+      ? html`<div class="sched-thumb evt-art"><img src="${e.art}" alt="" loading="lazy" decoding="async" /><span class="evt-art-type" title="${e.type}">${icon(eventIcon(e))}</span></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>

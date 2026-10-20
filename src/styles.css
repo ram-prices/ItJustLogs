@@ -2407,6 +2407,24 @@ code {
 .sched-thumb.evt-art img {
   object-position: 80% center;
 }
+/* The event type's icon in the art's dark lower-left corner (the guide
+   art darkens it for its own text). */
+.sched-thumb.evt-art {
+  position: relative;
+}
+.evt-art-type {
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0.9;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+.evt-art-type .icon {
+  font-size: 15px;
+}
 /* No art yet: a small calendar leaf with the opening day. */
 .sched-date {
   display: flex;
@@ -3557,6 +3575,10 @@ a.patch-banner:hover {
 .attr-toggle[aria-pressed='true'] {
   color: var(--green);
   box-shadow: inset 0 0 0 1px currentColor;
+}
+/* A change that makes a skill worse (rare): shown, but not as a gain. */
+.attr-loss {
+  color: var(--amber);
 }
 .attr-bonus {
   margin-left: 8px;

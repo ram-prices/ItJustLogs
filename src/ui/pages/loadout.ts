@@ -356,6 +356,8 @@ export function bonusChip(b: Bonus | undefined): Html {
 /** The Attributes card shows totals; the Breakdown toggle splits them into base + bonuses. Kept across redraws. */
 let split = false;
 export const toggleBonusSplit = (): void => void (split = !split);
+/** Whether Breakdown is on (also splits the combat skill tables). */
+export const isSplit = (): boolean => split;
 
 /**
  * A stat with the loadout added: the total, or (split) the base value then

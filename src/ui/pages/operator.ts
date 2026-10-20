@@ -1,10 +1,11 @@
 import type { Analysis } from '../../domain/analyze';
 import { endministratorOf, ENDMINISTRATORS, extrasOf, isEndministrator, type Owned } from '../../domain/owned';
 import { state } from '../../state';
+import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } from '../../domain/skillmods';
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
 import { canShuffle, currentArt, gallerySection, positionOf } from './art';
-import { atkValue, bonusesFor, hpValue, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
+import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
@@ -219,8 +220,22 @@ const rowHead = (type: string | null, name: string): Html =>
   html`<span class="wiki-acc-title min0">${type ? html`<span class="wiki-skill-type">${type}</span>` : ''}<span class="wiki-acc-name">${name}</span></span>`;
 
 /** One combat skill, with its own rank slider (each skill levels on its own; Lv 12 until moved). */
-function skillRow(key: string, sliderKey: string, s: WikiSkill): Html {
+/** A value change as a short chip: ×1.3, −15%, −2s. */
+function modChip(label: string, m: ValueMod): string {
+  const unit = /cooldown/i.test(label) ? 's' : '';
+  if (m.kind === 'add') return `${m.value > 0 ? '+' : '−'}${Math.abs(m.value)}${unit}`;
+  return m.value >= 1 ? `×${m.value}` : `−${Math.round((1 - m.value) * 1000) / 10}%`;
+}
+
+/**
+ * One combat skill, with its own rank slider (each skill levels on its own;
+ * Lv 12 until moved). Values a Potential changes show changed, in green
+ * (Breakdown shows the original and the change), and gear and set skill
+ * DMG bonuses get a row of their own.
+ */
+function skillRow(key: string, sliderKey: string, s: WikiSkill, mods: Map<string, ValueMod[]> | undefined, dmg: ReturnType<typeof skillDmgBonus>): Html {
   const rank = sliderRank(sliderKey, MAX_RANK);
+  const split = isSplit();
   return accordion(
     key,
     html`${rowHead(s.type, s.name)}${s.values.length ? html`<span class="num wiki-acc-rank" title="Rank">${rank}</span>` : ''}`,
@@ -230,22 +245,39 @@ function skillRow(key: string, sliderKey: string, s: WikiSkill): Html {
       ${s.info ? html`<p class="copy-13 secondary wiki-text">${rich(s.info)}</p>` : ''}
       ${s.values.length
         ? html`<dl class="wiki-values">
-            ${s.values.map(
-              (v) => html`<div><dt>${v.label}</dt><dd class="num" data-ranks="${v.ranks.join('|')}">${v.ranks[Math.min(rank, v.ranks.length) - 1] ?? '–'}</dd></div>`,
-            )}
+            ${s.values.map((v) => {
+              const m = mods?.get(v.label);
+              const changed = m?.length ? v.ranks.map((r) => applyMods(r, m) ?? r) : null;
+              const list = changed && !split ? changed : v.ranks;
+              const shown = list[Math.min(rank, list.length) - 1] ?? '–';
+              if (!changed) return html`<div><dt>${v.label}</dt><dd class="num" data-ranks="${list.join('|')}">${shown}</dd></div>`;
+              const why = m!.map((x) => `${x.from}: ${modChip(v.label, x)}`).join('\n');
+              return html`<div><dt>${v.label}</dt><dd class="num">
+                <span class="${split ? '' : isGain(v.label, m!) ? 'attr-total' : 'attr-loss'}" data-ranks="${list.join('|')}" title="${why}">${shown}</span>${split
+                  ? m!.map((x) => html`<span class="attr-bonus" title="${x.from}">${modChip(v.label, x)}</span>`)
+                  : ''}
+              </dd></div>`;
+            })}
+            ${dmg
+              ? html`<div><dt>DMG bonus</dt><dd class="num"><span class="attr-total" title="${dmg.sources.map((x) => `${x.from}: +${Math.round(x.pct * 10) / 10}%`).join('\n')}">+${Math.round(dmg.pct * 10) / 10}%</span></dd></div>`
+              : ''}
           </dl>`
         : ''}
     </div>`,
   );
 }
 
-function skillsSection(id: string, o: WikiOperator): Html {
+function skillsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> | null, potential: number | null): Html {
   if (!o.skills.length) return html``;
+  const mods = potentialSkillMods(o, potential);
+  const touched = mods.size > 0 || o.skills.some((s) => skillDmgBonus(s, bonuses));
   return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">Combat skills</h2></div>
+    <div class="section-head"><h2 class="heading-20">Combat skills</h2>${touched ? html`<span class="row label-13 secondary">${splitToggle()}</span>` : ''}</div>
     ${skillSets(o.skills).map(
       (set, si) => html`${set.variant ? html`<h3 class="wiki-skill-type wiki-variant">${set.variant}</h3>` : ''}
-        <div class="card wiki-accs">${set.skills.map((s, i) => skillRow(`skill-${si}-${i}`, `${id}:${si}:${i}`, s))}</div>`,
+        <div class="card wiki-accs">${set.skills.map((s, i) =>
+          skillRow(`skill-${si}-${i}`, `${id}:${si}:${i}`, s, mods.get(`${s.type}:${s.name}`), skillDmgBonus(s, bonuses)),
+        )}</div>`,
     )}
   </section>`;
 }
@@ -381,7 +413,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
         <div class="wiki-col">${loadoutSection(id, a, redraw)}</div>
       </div>
       <div class="wiki-cols even">
-        <div class="wiki-col">${skillsSection(id, o)}</div>
+        <div class="wiki-col">${skillsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
         <div class="wiki-col">${potentialsSection(o, owned, !!a)}</div>
       </div>
       <div class="wiki-cols even">
