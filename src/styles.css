@@ -3848,6 +3848,26 @@ a.patch-banner:hover {
 }
 .essence-part {
   color: var(--amber);
+  white-space: nowrap;
+}
+.essence-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: -1px 0;
+  vertical-align: -4px;
+}
+/* The Maxed Essence toggle on weapon pages: the icon, then its name. */
+.attr-toggle:has(.essence-icon) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 7px;
+}
+.attr-toggle .essence-icon {
+  width: 14px;
+  height: 14px;
+  margin: 0;
 }
 /* Unreleased operators and weapons: their banner, with a button to it. */
 .rate-up-card {

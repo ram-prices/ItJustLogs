@@ -65,6 +65,21 @@ export function withArtifice(l: Loadout | undefined, slot: GearSlot, level: numb
 }
 
 /**
+ * A weapon's skill ranks with no essence infused: the two stat skills at 3
+ * (a Flawless Essence adds the other 6), the last (Potential) skill at
+ * 1 + the weapon's Potential (essence adds up to 3 more).
+ */
+export function weaponBaseRanks(w: WikiWeapon, potential: number | null): number[] {
+  return w.skills.map((_, i) =>
+    i === w.skills.length - 1 && w.skills.length > 1
+      ? Math.min(WEAPON_SKILL_RANK, 1 + (potential ?? 0))
+      : WEAPON_SKILL_RANK - ESSENCE_STAT_LEVELS,
+  );
+}
+/** Levels a Flawless Essence adds to a weapon's two stat skills. */
+const ESSENCE_STAT_LEVELS = 6;
+
+/**
  * The highest rank each of a weapon's skills can reach: 9 for the stat
  * skills, and for the last (Potential) skill 4 + the weapon's Potential.
  */

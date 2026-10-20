@@ -420,8 +420,8 @@ function installProfile(): void {
     if (el.dataset?.extraId) editExtra(Number(el.dataset.extraId), { id: el.value });
     // Loadout: a gear piece's Artifice level.
     if (el.dataset?.artificeOp) setArtifice(el.dataset.artificeOp, el.dataset.artificeSlot!, Number(el.value));
-    // A weapon's page with max essence off: its skill sliders are the player's ranks.
-    if (el.dataset?.saveWpn) setWeaponRank(el.dataset.saveWpn, Number(el.dataset.saveIndex), Number(el.value));
+    // A weapon's page without Maxed Essence: its skill sliders are the player's ranks.
+    if (el.dataset?.saveWpn) setWeaponRank(el.dataset.saveWpn, Number(el.dataset.saveIndex), Number(el.value), (el.dataset.saveBase ?? '').split(',').map(Number));
   });
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLInputElement;
@@ -563,7 +563,7 @@ async function onClick(e: MouseEvent): Promise<void> {
       openSortPopup(el.dataset.kind as Kind, el);
       break;
     case 'weapon-essence':
-      setMaxEssence(el.dataset.wpn!, el.getAttribute('aria-pressed') !== 'true', el.dataset.caps!.split(',').map(Number));
+      setMaxEssence(el.dataset.wpn!, el.getAttribute('aria-pressed') !== 'true', (el.dataset.caps ?? '').split(',').filter(Boolean).map(Number));
       break;
     case 'attr-split':
       toggleBonusSplit();

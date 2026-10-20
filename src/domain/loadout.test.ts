@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bannerEnded } from './catalog';
-import { atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, weaponRankCaps, setCounts, statBonuses, wieldersOf, withSlot, type Loadout } from './loadout';
+import { atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, weaponBaseRanks, weaponRankCaps, setCounts, statBonuses, wieldersOf, withSlot, type Loadout } from './loadout';
 import type { Schedule } from './schedule';
 import type { WikiGear, WikiWeapon } from './wiki';
 
@@ -77,6 +77,11 @@ describe('loadout bonuses', () => {
     expect(b.get('Treatment Efficiency')?.pct).toBe(9);
     expect(b.get('Will')?.pct).toBe(25.6);
     expect(weaponRankCaps(weapon, 5)).toEqual([9, 9, 9]);
+  });
+
+  it('starts weapons without essence: 3, 3 and 1 + Potential', () => {
+    expect(weaponBaseRanks(weapon, null)).toEqual([3, 3, 1]);
+    expect(weaponBaseRanks(weapon, 2)).toEqual([3, 3, 3]);
   });
 
   it('reads stat bonuses out of talent and Potential text', () => {

@@ -1,10 +1,10 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, icon, itemImg, rarity } from '../components';
+import { badge, essenceIcon, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { weaponRankCaps } from '../../domain/loadout';
-import { essenceLabel, weaponRanksOf, wieldersSection } from './loadout';
+import { weaponBaseRanks, weaponRankCaps } from '../../domain/loadout';
+import { essenceTag, isMaxEssence, weaponRanksOf, wieldersSection } from './loadout';
 import { sortBar, sortGroups } from './sorting';
 import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
@@ -62,7 +62,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
                 ${itemImg('weap', id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${w.name}</span>
-                  <span class="label-12 secondary">${rarity(w.rarity)} · ${w.skills[w.skills.length - 1]?.tag ?? w.type}${mine?.copies ? html` · <span class="${weaponRanksOf(id) ? 'essence-part' : 'essence-max'}">${essenceLabel(id)}</span>` : ''}</span>
+                  <span class="label-12 secondary">${rarity(w.rarity)} · ${w.skills[w.skills.length - 1]?.tag ?? w.type}${mine?.copies && essenceTag(id, weaponRankCaps(w, mine.potential)) ? html` · ${essenceTag(id, weaponRankCaps(w, mine.potential))}` : ''}</span>
                 </span>
                 ${ownedTag(mine)}
               </a>`;
@@ -135,11 +135,11 @@ function statsSection(w: WikiWeapon): Html {
  * One skill, with its own rank slider (each skill levels on its own). The
  * last skill is the one Potential raises: each copy adds 1 to its base rank
  * and its rank limit (1–4 at P0, up to 6–9 at P5), so its slider starts at
- * the player's limit. The first two rise with essence instead. With max
- * essence off (`mine`), the slider is the player's own rank for the skill:
+ * the player's limit. The first two rise with essence instead. Without
+ * Maxed Essence (`mine`), the slider is the player's own rank for the skill:
  * it starts there, can't pass what they can reach, and is saved.
  */
-function skillRow(id: string, i: number, s: WikiWeaponSkill, isLast: boolean, owned: Owned | undefined, caps: number[], mine: number[] | undefined): Html {
+function skillRow(id: string, i: number, s: WikiWeaponSkill, isLast: boolean, owned: Owned | undefined, caps: number[], mine: number[] | undefined, base: number[]): Html {
   const p = owned?.copies ? owned.potential : null;
   const key = `${id}:${i}`;
   const rank = mine ? Math.min(mine[i] ?? caps[i], caps[i]) : sliderRank(key, MAX_RANK, isLast && p !== null ? Math.min(MAX_RANK, 4 + p) : MAX_RANK);
@@ -147,7 +147,7 @@ function skillRow(id: string, i: number, s: WikiWeaponSkill, isLast: boolean, ow
     `skill-${i}`,
     html`<span class="wiki-acc-title min0"><span class="wiki-acc-name">${s.name}</span></span><span class="num wiki-acc-rank" title="Rank">${rank}</span>`,
     html`<div class="wiki-rank-scope" data-rank-scope>
-      ${s.values.length ? (mine ? rankSlider(key, caps[i], rank, { wpn: id, index: i }) : rankSlider(key, MAX_RANK, rank)) : ''}
+      ${s.values.length ? (mine ? rankSlider(key, caps[i], rank, { wpn: id, index: i, base }) : rankSlider(key, MAX_RANK, rank)) : ''}
       <p class="copy-14 wiki-text">${s.text ? rich(s.text, s.values, rank) : html`<span class="secondary">No description on the wiki yet.</span>`}</p>
       ${isLast
         ? html`<p class="copy-13 secondary wiki-note">
@@ -160,22 +160,26 @@ function skillRow(id: string, i: number, s: WikiWeaponSkill, isLast: boolean, ow
 }
 
 /**
- * The skills, with the player's essence for this weapon: Max essence (the
- * default) counts every skill at the highest rank it can reach in loadouts;
- * turned off, each skill's slider sets the rank they've built it to.
+ * The skills, with the player's essence for this weapon. By default it has
+ * none: each skill's slider starts at its rank without essence (3, 3 and
+ * 1 + Potential) and sets the rank they've built it to. Maxed Essence counts
+ * every skill at the highest rank it can reach in loadouts instead.
  */
 function skillsSection(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
   if (!w.skills.length) return html``;
-  const caps = weaponRankCaps(w, owned?.copies ? owned.potential : null);
-  const mine = weaponRanksOf(id);
+  const p = owned?.copies ? owned.potential : null;
+  const caps = weaponRankCaps(w, p);
+  const base = weaponBaseRanks(w, p);
+  const maxed = isMaxEssence(id, caps);
+  const mine = maxed ? undefined : (weaponRanksOf(id) ?? base);
   return html`<section class="section">
     <div class="section-head">
       <h2 class="heading-20">Skills</h2>
-      <button type="button" class="attr-toggle" data-action="weapon-essence" data-wpn="${id}" data-caps="${caps.join(',')}" aria-pressed="${String(!mine)}"
-        title="${mine ? 'Count every skill at the highest rank it can reach (Maxed Essence)' : 'Every skill counts at the highest rank it can reach in your loadouts. Press to set the ranks you have'}">Maxed Essence</button>
+      <button type="button" class="attr-toggle" data-action="weapon-essence" data-wpn="${id}" data-caps="${caps.join(',')}" aria-pressed="${String(maxed)}"
+        title="${maxed ? 'Maxed Essence: every skill counts at the highest rank it can reach in your loadouts. Press to set the ranks you have' : 'Count every skill at the highest rank it can reach (Maxed Essence)'}">${essenceIcon()}Maxed Essence</button>
     </div>
-    ${mine ? html`<p class="copy-13 secondary wiki-essence-note">Set each skill to the rank you've built it to; loadouts use these.</p>` : ''}
-    <div class="card wiki-accs">${w.skills.map((s, i) => skillRow(id, i, s, i === w.skills.length - 1 && w.skills.length > 1, owned, caps, mine))}</div>
+    ${mine ? html`<p class="copy-13 secondary wiki-essence-note">Without essence: ranks ${base.join(' · ')}. Set each skill to the rank you've built it to; loadouts use these.</p>` : ''}
+    <div class="card wiki-accs">${w.skills.map((s, i) => skillRow(id, i, s, i === w.skills.length - 1 && w.skills.length > 1, owned, caps, mine, base))}</div>
   </section>`;
 }
 

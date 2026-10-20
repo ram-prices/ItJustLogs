@@ -254,11 +254,11 @@ export const sliderRank = (key: string, max: number, start = max): number => Mat
  * A rank slider. Moving it updates the values in its `[data-rank-scope]`
  * (one weapon skill), or on the whole page when it has none.
  */
-export function rankSlider(key: string, max: number, rank = sliderRank(key, max), save?: { wpn: string; index: number }): Html {
+export function rankSlider(key: string, max: number, rank = sliderRank(key, max), save?: { wpn: string; index: number; base: number[] }): Html {
   // `save`: the slider is the player's own rank for that weapon skill, kept on change (app.ts).
   return html`<label class="wiki-rank label-13 secondary">
     <span>${save ? 'Your rank' : 'Rank'}</span>
-    <input type="range" min="1" max="${max}" value="${rank}" data-wiki-rank="${key}" ${save ? html`data-save-wpn="${save.wpn}" data-save-index="${String(save.index)}"` : ''} aria-label="Skill rank" />
+    <input type="range" min="1" max="${max}" value="${rank}" data-wiki-rank="${key}" ${save ? html`data-save-wpn="${save.wpn}" data-save-index="${String(save.index)}" data-save-base="${save.base.join(',')}"` : ''} aria-label="Skill rank" />
     <span class="num wiki-em wiki-rank-value">${rank}</span>
   </label>`;
 }

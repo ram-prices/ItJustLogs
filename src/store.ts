@@ -47,10 +47,12 @@ export interface Settings {
   extras?: ExtraCopy[];
   /**
    * Each weapon's skill ranks as the player built them (their essence), set
-   * on the weapon's page. A weapon not listed has max essence: every skill
-   * at the highest rank it can reach (9; 4 + Potential for the last).
+   * on the weapon's page. A weapon not listed has no essence (3, 3 and
+   * 1 + Potential, see weaponBaseRanks), unless it's in `maxEssence`.
    */
   weaponRanks?: Record<string, number[]>;
+  /** Weapons the player marked Maxed Essence: every skill at the highest rank it can reach (9; 4 + Potential for the last). */
+  maxEssence?: string[];
   /** Operator art the player removed (keys), so sync removes it on their other devices and in Drive too. */
   deletedArt?: string[];
   /** Where each operator picture shows (by its key); unset = the banner. See ui/pages/art.ts. */

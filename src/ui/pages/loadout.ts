@@ -1,9 +1,9 @@
 import type { Analysis } from '../../domain/analyze';
 import { gearIconUrl } from '../../domain/banners';
-import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
+import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, weaponBaseRanks, weaponRankCaps, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { badge, icon, itemImg, rarity } from '../components';
+import { badge, essenceIcon, icon, itemImg, rarity } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
 
@@ -58,30 +58,47 @@ function slotTile(
   </div>`;
 }
 
-/** A weapon's skill ranks as the player built it (set on its page); undefined = max essence. */
+/**
+ * Whether this weapon has Maxed Essence (off by default): marked so, or
+ * with every skill set to the highest rank it can reach (`caps`).
+ */
+export const isMaxEssence = (wpnId: string, caps?: number[]): boolean => {
+  if (state.settings.maxEssence?.includes(wpnId)) return true;
+  const r = weaponRanksOf(wpnId);
+  return !!(r && caps?.length && caps.every((c, i) => (r[i] ?? 0) >= c));
+};
+
+/** The skill ranks the player set on the weapon's page (none: no essence, weaponBaseRanks). */
 export const weaponRanksOf = (wpnId: string): number[] | undefined => state.settings.weaponRanks?.[wpnId];
 
-/** Max essence on (every skill at the highest rank it can reach), or off starting from `caps` to set each rank. */
-export function setMaxEssence(wpnId: string, on: boolean, caps: number[]): void {
-  const all = { ...state.settings.weaponRanks };
-  if (on) delete all[wpnId];
-  else all[wpnId] = [...caps];
-  updateSettings({ weaponRanks: all });
+/** The ranks a weapon's skills count at: unset (each at its cap) when maxed, else the player's or no essence. */
+export const weaponRanksFor = (wpnId: string, w: WikiWeapon, potential: number | null): number[] | undefined =>
+  isMaxEssence(wpnId, weaponRankCaps(w, potential)) ? undefined : (weaponRanksOf(wpnId) ?? weaponBaseRanks(w, potential));
+
+/**
+ * Maxed Essence on or off. Ranks set while it was off are kept for when it's
+ * off again, except ranks already at `caps` (they'd keep it maxed): turning
+ * it off then goes back to no essence.
+ */
+export function setMaxEssence(wpnId: string, on: boolean, caps: number[] = []): void {
+  const list = (state.settings.maxEssence ?? []).filter((id) => id !== wpnId);
+  const ranks = { ...state.settings.weaponRanks };
+  if (!on && isMaxEssence(wpnId, caps) && !state.settings.maxEssence?.includes(wpnId)) delete ranks[wpnId];
+  updateSettings({ maxEssence: on ? [...list, wpnId] : list.length ? list : undefined, weaponRanks: Object.keys(ranks).length ? ranks : undefined });
 }
 
-/** One weapon skill's rank as the player built it (only kept while max essence is off). */
-export function setWeaponRank(wpnId: string, i: number, rank: number): void {
-  const now = weaponRanksOf(wpnId);
-  if (!now) return;
-  const next = [...now];
+/** One weapon skill's rank as the player built it (`base`: the ranks to start from if none are set yet). */
+export function setWeaponRank(wpnId: string, i: number, rank: number, base: number[]): void {
+  const next = [...(weaponRanksOf(wpnId) ?? base)];
   next[i] = Math.max(1, Math.floor(rank));
   updateSettings({ weaponRanks: { ...state.settings.weaponRanks, [wpnId]: next } });
 }
 
-/** "Maxed Essence" or "Ranks 5 · 9 · 4": how the player built a weapon. */
-export const essenceLabel = (wpnId: string): string => {
+/** How the player built a weapon: the green essence icon for Maxed Essence, "Ranks 5 · 9 · 4" if they set ranks, else nothing. */
+export const essenceTag = (wpnId: string, caps?: number[]): Html | null => {
+  if (isMaxEssence(wpnId, caps)) return html`<span class="essence-max">${essenceIcon()}</span>`;
   const r = weaponRanksOf(wpnId);
-  return r ? `Ranks ${r.join(' · ')}` : 'Maxed Essence';
+  return r ? html`<span class="essence-part">Ranks ${r.join(' · ')}</span>` : null;
 };
 
 /** A gear slot's Artifice level picker (pieces that can be refined only). */
@@ -112,6 +129,8 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
   const ownedWeps = ownedOf(a, 'weap');
 
   const w = l.weapon ? weps?.weapons[l.weapon] : undefined;
+  const wp = l.weapon && ownedWeps?.get(l.weapon)?.copies ? ownedWeps.get(l.weapon)!.potential : null;
+  const tag = l.weapon ? essenceTag(l.weapon, w ? weaponRankCaps(w, wp) : undefined) : null;
   const weaponTile = slotTile(
     opId,
     'weapon',
@@ -120,7 +139,7 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
       ? {
           img: itemImg('weap', l.weapon),
           name: w?.name ?? l.weapon,
-          sub: html`${w ? rarity(w.rarity) : ''}${ownedWeps?.get(l.weapon)?.copies ? html` · P${ownedWeps.get(l.weapon)!.potential}` : ''} · ${essenceLabel(l.weapon)}`,
+          sub: html`${w ? rarity(w.rarity) : ''}${ownedWeps?.get(l.weapon)?.copies ? html` · P${ownedWeps.get(l.weapon)!.potential}` : ''}${tag ? html` · ${tag}` : ''}`,
           href: infoHref('weap', l.weapon),
         }
       : null,
@@ -327,7 +346,7 @@ export function bonusesFor(opId: string, o: WikiOperator, a: Analysis | null, re
   return operatorBonuses(o, {
     potential,
     loadout: weps && gear ? l : null,
-    weapon: w ? { w, potential: mine?.copies ? mine.potential : null, ranks: weaponRanksOf(l!.weapon!) } : null,
+    weapon: w ? { w, potential: mine?.copies ? mine.potential : null, ranks: weaponRanksFor(l!.weapon!, w, mine?.copies ? mine.potential : null) } : null,
     items: gear?.gear.items,
     sets: gear?.gear.sets,
   });
