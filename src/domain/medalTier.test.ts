@@ -19,5 +19,8 @@ describe('medal looks', () => {
     expect(tierOf(look('trimmed-vivid'), trim)).toEqual({ trim: true });
     expect(tierOf(look('dark'), trim)).toEqual({ trim: false });
     expect(tierOf(look('gold-plain'), trim)).toEqual({ trim: false });
+    // A boss medal: pale silver-white at base, a rainbow sheen when Trimmed.
+    expect(tierOf(look('white-base'), trim)).toEqual({ trim: false });
+    expect(tierOf(look('white-trimmed'), trim)).toEqual({ trim: true });
   });
 });

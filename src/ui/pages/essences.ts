@@ -1,11 +1,14 @@
 import { ALL_STATS, STAT_ALIASES, byFit, fitOf, parseEssenceKey, type EssenceStat } from '../../domain/essences';
 import type { WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
-import { state } from '../../state';
+import { state, updateSettings } from '../../state';
+import { toast } from '../common';
 import { icon, itemImg, pageHeader, rarity, toggleGroup } from '../components';
 import { html, type Html } from '../html';
 import { credit, infoHref, ownedOf, wikiFile } from './info';
 import { searchBox } from './search';
 import { subTabs } from './collections';
+import { isMaxEssence } from './loadout';
+import { weaponRankCaps } from '../../domain/loadout';
 
 /**
  * Essences: the player's essences (read from the game: ui/essenceReader.ts)
@@ -13,13 +16,13 @@ import { subTabs } from './collections';
  * with every stat the weapon wants. "By weapon" lists each weapon with the
  * essences that fit it (most levels first); "By essence" lists each kind of
  * essence with the weapons it fits, and which fit none (safe to use for
- * etching). Works without an
+ * etching). Weapons marked Maxed Essence are left out: they're done. Works without an
  * import; with one, it starts from the weapons the player owns.
  */
 
 type View = 'By weapon' | 'By essence';
-const VIEWS: View[] = ['By weapon', 'By essence'];
-let view: View = 'By weapon';
+const VIEWS: View[] = ['By essence', 'By weapon'];
+let view: View = 'By essence';
 let weaponsShown: 'owned' | 'all' | null = null;
 let essencesShown: 'all' | 'fits' | 'none' = 'all';
 
@@ -32,8 +35,27 @@ export function wantsOf(w: WikiWeapon): string[] {
 }
 
 /** The pages' clicks (app.ts passes them on, then redraws). True if it was one of theirs. */
+/** Clearing asks twice: the first click arms it for a few seconds. */
+let clearArmed = 0;
+/** The page's redraw, for putting the Clear button back once it times out. */
+let redrawPage: (() => void) | null = null;
+
 export function essenceAction(action: string, el: HTMLElement): boolean {
   const v = el.dataset.value ?? '';
+  if (action === 'essence-clear') {
+    if (Date.now() - clearArmed < 5000) {
+      // Essences get used up as fodder: start over from the next reading.
+      clearArmed = 0;
+      const n = Object.values(state.settings.essences ?? {}).reduce((a, c) => a + c, 0);
+      updateSettings({ essences: undefined, essencesRead: undefined });
+      toast(`Cleared ${n} ${n === 1 ? 'essence' : 'essences'}.`);
+    } else {
+      clearArmed = Date.now();
+      // Back to its plain label if not confirmed in time.
+      setTimeout(() => clearArmed && Date.now() - clearArmed >= 5000 && redrawPage?.(), 5100);
+    }
+    return true;
+  }
   if (action === 'essence-view') view = v as View;
   else if (action === 'essence-weapons') weaponsShown = v as 'owned' | 'all';
   else if (action === 'essence-show') essencesShown = v as 'all' | 'fits' | 'none';
@@ -45,6 +67,7 @@ const statChips = (stats: EssenceStat[], hit: string[] = []): Html =>
   html`<span class="essence-stats">${stats.map(([s, l]) => html`<span class="essence-stat${hit.includes(s) ? ' hit' : ''}">${s} <b>+${l}</b></span>`)}</span>`;
 
 export function essencesPage(redraw: () => void): Html {
+  redrawPage = redraw;
   const file = wikiFile<WikiWeaponFile>('weapons.json', redraw);
   const stash = state.settings.essences ?? {};
   const kinds = Object.entries(stash).map(([key, n]) => ({ key, n, stats: parseEssenceKey(key) }));
@@ -54,9 +77,14 @@ export function essencesPage(redraw: () => void): Html {
   const header = pageHeader(
     'Essences',
     kinds.length
-      ? `${total} essences (${kinds.length} different), read ${read ?? 'from the game'}. Which weapons each one fits. Paste or drop a new recording to update them.`
+      ? `${total} essences (${kinds.length} different), read ${read ?? 'from the game'}.`
       : 'Which weapons your essences fit. Read them from a recording of the game: Valuables → Essences, selecting each one, or Etch Essence.',
-    html`<button type="button" class="btn secondary sm" data-action="essence-read" title="Read your essences from a recording or screenshots of Valuables → Essences or Etch Essence. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
+    html`${kinds.length
+        ? Date.now() - clearArmed < 5000
+          ? html`<button type="button" class="btn error sm" data-action="essence-clear" title="Removes every saved essence">${icon('delete')}Click again to clear</button>`
+          : html`<button type="button" class="btn tertiary sm" data-action="essence-clear" title="Remove every saved essence (they're used up as fodder anyway); read them again any time">${icon('delete')}Clear</button>`
+        : ''}
+      <button type="button" class="btn secondary sm" data-action="essence-read" title="Read your essences from a recording or screenshots of Valuables → Essences or Etch Essence. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
   );
   if (!kinds.length)
     return html`${header}<main class="container fade-in">
@@ -72,9 +100,10 @@ export function essencesPage(redraw: () => void): Html {
       </main>`;
   if (!file.data) return html`${header}<main class="container fade-in"><p class="copy-14 secondary">Loading weapons…</p></main>`;
 
+  // Weapons marked Maxed Essence already have their perfect essence: they're left out of both views.
   const weapons = Object.entries(file.data.weapons)
     .map(([id, w]) => ({ id, w, wants: wantsOf(w), mine: owned?.get(id)?.copies ? owned.get(id)! : null }))
-    .filter((x) => x.wants.length >= 2);
+    .filter((x) => x.wants.length >= 2 && !isMaxEssence(x.id, weaponRankCaps(x.w, x.mine ? x.mine.potential : null)));
   // Start from the weapons the player owns, if they own any (story extras alone own no weapons).
   const ownsSome = weapons.some((x) => x.mine);
   const shownWeapons = ownsSome ? (weaponsShown ?? 'owned') : 'all';

@@ -16,6 +16,12 @@ export interface Look {
   gold: number;
   /** Spread of hue among faintly coloured pixels (degrees): a holographic sheen. */
   spread: number;
+  /**
+   * How many of twelve hue bands hold at least 5% of the coloured pixels. A
+   * holographic medal shows a rainbow (4+); a plain silver or white one, even
+   * tinted, stays in one or two.
+   */
+  bands: number;
 }
 
 /** Colour statistics of a square of RGBA pixels. */
@@ -26,6 +32,8 @@ export function lookOf(rgba: Uint8ClampedArray): Look {
   let coloured = 0;
   let gold = 0;
   const faint: number[] = [];
+  const band = new Array<number>(12).fill(0);
+  let tinted = 0;
   for (let i = 0; i < rgba.length; i += 4) {
     const r = rgba[i] / 255;
     const g = rgba[i + 1] / 255;
@@ -48,10 +56,15 @@ export function lookOf(rgba: Uint8ClampedArray): Look {
       if (hue >= 25 && hue <= 65) gold++;
     }
     if (sat > 0.08 && max > 0.5) faint.push(hue);
+    if (sat > 0.12 && max > 0.45) {
+      band[Math.floor(hue / 30) % 12]++;
+      tinted++;
+    }
   }
+  const bands = band.filter((c) => c >= Math.max(2, tinted * 0.05)).length;
   const mean = faint.reduce((a, h) => a + h, 0) / (faint.length || 1);
   const spread = faint.length > n * 0.05 ? Math.sqrt(faint.reduce((a, h) => a + (h - mean) ** 2, 0) / faint.length) : 0;
-  return { s: s / (n || 1), v: v / (n || 1), gold: coloured ? gold / coloured : 0, spread };
+  return { s: s / (n || 1), v: v / (n || 1), gold: coloured ? gold / coloured : 0, spread, bands };
 }
 
 export type TierLook = { tier: 1 | 2 | 3 } | { trim: boolean };
@@ -70,8 +83,9 @@ export function tierOf(look: Look, can: { reforge: boolean; trim: boolean }): Ti
     return null;
   }
   if (can.trim) {
-    // Holographic: pale with a spread of colours, or much more vivid than a medal's gold.
-    if ((look.v > 0.68 && look.s < 0.25 && look.spread > 12) || look.s > 0.65) return { trim: true };
+    // Holographic: pale with a rainbow (many hue bands, widely spread), or much more vivid than a
+    // medal's gold. Some base medals are pale silver-white themselves: a tint alone isn't a sheen.
+    if ((look.v > 0.55 && look.s < 0.3 && look.bands >= 4 && look.spread > 40) || look.s > 0.65) return { trim: true };
     return { trim: false };
   }
   return null;
