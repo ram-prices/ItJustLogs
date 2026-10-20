@@ -54,8 +54,14 @@ wiki), and hand-kept community-guide amounts with sources (version preview
 livestream, version survey, Combat Drills), the Crafting
 Manual's milestones, one-time progression at launch (Node milestones,
 Authority Level), and our own rough estimate (an event or mode the wiki names
-without amounts gets the median of its kind, marked ≈); the SKPORT web
-check-in and the Credit Store are left out on purpose (owner's call). The
+without amounts gets the median of its kind, marked ≈); one-time rewards by
+the version that added them (`oneTime`: Operational Manual stage first
+clears, Regional Development levels, Intel Gathering, mail events, launch
+codes) and the Credit Store's daily stock on average (Estimate); the SKPORT
+web check-in, Twitch drops and birthday mail are left out (owner's call). Each
+Headhunting Dossier (60 paid pulls on a Chartered banner) is 10 pulls for the
+next Chartered banner's patch; Basic Headhunting pulls' Arsenal Tickets and
+Bond Quota count for the patch they were made in. The
 quota shops count too: the AIC Quota Exchange's banner HH Permits (official
 notes, else 5 per Chartered/Special banner) and the Bond Quota the player's
 duplicate 5★/6★ operators gave (25 per Chartered HH Permit). The breakdown

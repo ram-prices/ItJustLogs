@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EventRewardsFile } from './eventRewards';
 import { dailyResets, patchIncome, patchWindows, ticketsFromPulls, weeklyResets, type IncomeFile } from './income';
-import type { Schedule } from './schedule';
+import { hasDailyRewards, type Schedule, type ScheduleEvent } from './schedule';
 
 const at = (americas: string, asia: string) => ({ americas, asia });
 const attribution = { source: '', url: '', license: '', licenseUrl: '', note: '', fetched: '' };
@@ -250,11 +250,54 @@ describe('free income per patch', () => {
     expect(by.modes.modes![0]).toMatchObject({ rewards: { Oroberyl: 1200 }, estimated: true });
   });
 
+  it('adds one-time rewards by section, and the Credit Store every day', () => {
+    const more: IncomeFile = {
+      ...income,
+      shops: { aic: { url: '', price: 175, perBanner: 0, kinds: [], versions: {} }, bond: { url: '', price: 25, duplicate: {} }, credit: { url: 'c', perDay: { Oroberyl: 12.5, 'Arsenal Ticket': 10 } } },
+      oneTime: {
+        source: '',
+        versions: {
+          Launch: [
+            { name: 'Simulations', section: 'modes', url: '', rewards: { Oroberyl: 1570 }, count: 36 },
+            { name: 'Regional Development: Wuling', section: 'exploration', url: '', rewards: { Oroberyl: 1000, 'Basic HH Permit': 5 }, count: 5, estimate: true },
+            { name: 'Launch codes', section: 'mailbox', url: '', rewards: { Oroberyl: 2150 }, count: 3 },
+          ],
+        },
+      },
+    };
+    const [launch, second] = patchIncome(schedule, 'americas', NOW, null, more);
+    const once = launch.lines.filter((l) => l.source === 'oneTime');
+    expect(once.map((l) => [l.section, l.count, l.totals.Oroberyl, !!l.estimate])).toEqual([
+      ['modes', 36, 1570, false],
+      ['exploration', 5, 1000, true],
+      ['mailbox', 3, 2150, false],
+    ]);
+    expect(second.lines.some((l) => l.source === 'oneTime')).toBe(false);
+    // 22 days at launch: 275 Oroberyl and 220 Arsenal Tickets.
+    expect(launch.lines.find((l) => l.source === 'creditStore')).toMatchObject({ count: 22, totals: { Oroberyl: 275, 'Arsenal Ticket': 220 }, estimate: true });
+  });
+
   it('works without the wiki files', () => {
     expect(patchIncome(schedule, 'asia', NOW, null, null).every((p) => p.lines.length === 0 && p.headhunting === 0)).toBe(true);
   });
 
   it('gives Arsenal Tickets back for Headhunting results only', () => {
     expect(ticketsFromPulls([{ kind: 'char', rarity: 6 }, { kind: 'char', rarity: 5 }, { kind: 'char', rarity: 4 }, { kind: 'weap', rarity: 6 }])).toBe(2220);
+  });
+});
+
+describe('daily rewards', () => {
+  const ev = (type: string, details: string | null, name = 'X'): ScheduleEvent => ({ name, type, details, version: null, start: null, end: null, post: '' });
+  it('tags sign-ins, daily logins and daily missions', () => {
+    expect(hasDailyRewards(ev('Sign-In Event', null))).toBe(true);
+    expect(hasDailyRewards(ev('Tribute Event', 'Log in every day during the event to receive [Oroberyl]×200'))).toBe(true);
+    expect(hasDailyRewards(ev('Limited-Time Event', 'During the event, complete specified missions every day to claim rewards'))).toBe(true);
+    expect(hasDailyRewards(ev('Narrative Event', 'Complete event missions to earn [Oroberyl]'))).toBe(false);
+  });
+  it('takes a detail-less event from another of its name', () => {
+    const daily = ev('Limited-Time Event', 'complete specified missions every day', 'Sanity Supply');
+    const bare = ev('Limited-Time Event', null, 'Sanity Supply');
+    expect(hasDailyRewards(bare, { versions: [], banners: [], events: [daily, bare] } as unknown as Schedule)).toBe(true);
+    expect(hasDailyRewards(bare)).toBe(false);
   });
 });

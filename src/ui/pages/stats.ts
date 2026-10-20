@@ -1,4 +1,6 @@
 import type { Analysis } from '../../domain/analyze';
+import { canonicalPoolId } from '../../domain/banners';
+import { timeOn } from '../../domain/schedule';
 import { fmtPulls, type EventRewardsFile } from '../../domain/eventRewards';
 import {
   bondQuota,
@@ -87,8 +89,9 @@ const PARTIAL = html`<span title="The wiki lists some of its rewards without amo
  * Headhunting gave back, and the total. Only pull currencies are listed.
  * `bond`: the Bond Quota the player's duplicate operators gave this patch.
  */
-function patchIncomeList(inc: PatchIncome, tickets: number, bond: number): Html {
-  const back = (tickets / TICKETS_PER_ISSUE) * 10;
+function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossiers: Dossiers | undefined): Html {
+  const dossierPulls = (dossiers?.count ?? 0) * DOSSIER_PULLS;
+  const back = ((tickets.patch + tickets.other) / TICKETS_PER_ISSUE) * 10;
   const of = (...sources: IncomeLine['source'][]) => inc.lines.filter((l) => sources.includes(l.source));
   /** A section's row: its lines' pulls added up, their badges merged. */
   const section = (label: Html | string, lines: IncomeLine[], detail: Html | string) => {
@@ -123,6 +126,13 @@ function patchIncomeList(inc: PatchIncome, tickets: number, bond: number): Html 
   const [survey] = of('survey');
   const [live] = of('livestream');
   const [aic] = of('aicShop');
+  const [credit] = of('creditStore');
+  const once = (section: IncomeLine['section']) => inc.lines.find((l) => l.source === 'oneTime' && l.section === section);
+  const onceModes = once('modes');
+  const onceExplore = once('exploration');
+  const onceMail = once('mailbox');
+  const onceBullets = (l: IncomeLine | undefined) =>
+    (l?.oneTime ?? []).map((x) => html`${external(x.url, x.count > 1 ? `${x.name} (${fmtInt(x.count)})` : x.name)}: ${gave(x.rewards)}${x.estimate ? html` ${ESTIMATED}` : ''}`);
   // The player's Bond Quota this patch, as whole Chartered HH Permits.
   const bondPrice = income?.shops?.bond.price ?? 0;
   const bondPermits = bondPrice ? Math.floor(bond / bondPrice) : 0;
@@ -148,13 +158,14 @@ function patchIncomeList(inc: PatchIncome, tickets: number, bond: number): Html 
         )
       : ''}
     ${monthly ? section(html`${external(monthly.url!, 'Monthly Pass')}`, [monthly], `${plural(monthly.count, 'day')}: ${gave(monthly.totals)}`) : ''}
-    ${modes
-      ? section(
-          'Permanent Modes',
-          [modes],
-          bullets(modes.modes!.map((x) => html`${external(x.url, x.name)}: ${x.partial ? 'amount not listed' : gave(x.rewards)}${x.estimated ? html` ${ESTIMATED}` : ''}`)),
-        )
-      : ''}
+    ${section(
+      'Permanent Modes',
+      [modes, onceModes].filter((l): l is IncomeLine => !!l),
+      bullets([
+        ...(modes?.modes ?? []).map((x) => html`${external(x.url, x.name)}: ${x.partial ? 'amount not listed' : gave(x.rewards)}${x.estimated ? html` ${ESTIMATED}` : ''}`),
+        ...onceBullets(onceModes),
+      ]),
+    )}
     ${events || drills
       ? section(
           `Events${events ? ` (${events.count})` : ''}`,
@@ -170,7 +181,7 @@ function patchIncomeList(inc: PatchIncome, tickets: number, bond: number): Html 
       : ''}
     ${section(
       'Exploration',
-      [crateLine, aur, craft, quests, outposts, prog].filter((l): l is IncomeLine => !!l),
+      [crateLine, aur, craft, quests, outposts, prog, onceExplore].filter((l): l is IncomeLine => !!l),
       bullets([
         crateLine && `Storage crates (${fmtInt(crateLine.count)}): ${gave(crateLine.totals)}`,
         aur && html`${external(aur.url!, 'Aurylene')}: ${itemsText(aur.totals) ? gave(aur.totals) : 'none listed'}`,
@@ -178,35 +189,68 @@ function patchIncomeList(inc: PatchIncome, tickets: number, bond: number): Html 
         quests && `Missions: ${gave(quests.totals)}`,
         outposts && `Outposts: ${gave(outposts.totals)}`,
         ...(prog?.items ?? []).map((x) => html`${external(x.url, x.name)}: ${gave(x.rewards)}`),
+        ...onceBullets(onceExplore),
       ]),
     )}
     ${section(
       'Mailbox',
-      [comp, survey, live].filter((l): l is IncomeLine => !!l),
+      [comp, survey, live, onceMail].filter((l): l is IncomeLine => !!l),
       bullets([
         ...(comp?.rows ?? []).map((r) => html`${external(comp!.url!, r.label)}: ${gave(r.rewards)}`),
         survey && `${survey.extra!.label}: ${gave(survey.totals)}`,
         live && `${live.extra!.label}: ${gave(live.totals)}`,
+        ...onceBullets(onceMail),
       ]),
     )}
     ${section(
       'Shops',
-      [aic, bondLine].filter((l): l is IncomeLine => !!l),
+      [aic, credit, bondLine].filter((l): l is IncomeLine => !!l),
       bullets([
         aic && html`${external(aic.url!, 'AIC Quota Exchange')}: ${gave(aic.totals)}`,
+        credit && html`${external(credit.url!, 'Credit Store')} (${plural(credit.count, 'day')}): ${gave(credit.totals)} ${ESTIMATED}`,
         bondLine && html`${external(bondLine.url!, 'Bond Quota Exchange')}: ${gave(bondLine.totals)}, from ${fmtInt(bond)} Bond Quota`,
       ]),
     )}
-    ${tickets ? incomeRow('Your Headhunting pulls', `${fmtInt(tickets)} Arsenal Tickets back`, 0, back) : ''}
+    ${dossiers ? incomeRow('Headhunting Dossiers', `${plural(dossiers.count, 'Dossier')} × 10 pulls, from ${dossiers.from.join(', ')}`, dossierPulls, 0) : ''}
+    ${tickets.patch + tickets.other
+      ? incomeRow(
+          'Your Headhunting pulls',
+          tickets.other
+            ? bullets([
+                tickets.patch > 0 && `Patch banners: ${fmtInt(tickets.patch)} Arsenal Tickets`,
+                `Basic Headhunting and other banners: ${fmtInt(tickets.other)} Arsenal Tickets`,
+              ])
+            : `${fmtInt(tickets.patch)} Arsenal Tickets back`,
+          0,
+          back,
+        )
+      : ''}
     <div class="patch-income-row patch-income-total">
-      <span>In all${inc.basic ? html` <span class="secondary">· plus ${plural(inc.basic, 'Basic HH Permit')}</span>` : ''}</span><span class="num">${fmtPulls(Math.round((inc.headhunting + (bondLine ? bondPermits : 0)) * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
+      <span>${inc.basic ? `Plus ${plural(inc.basic, 'Basic HH Permit')}` : 'In all'}</span><span class="num">${fmtPulls(Math.round((inc.headhunting + (bondLine ? bondPermits : 0) + dossierPulls) * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
     </div>
   </div>`;
 }
 
 /** An open patch's free pulls, then its banners: every one, pulled on or not, in opening order. */
-function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: number, bond: number): Html {
-  return html`<tr class="patch-banners"><td colspan="6">${inc?.lines.length ? patchIncomeList(inc, tickets, bond) : ''}<div class="patch-banner-list">
+/** A Headhunting Dossier: a 10-pull for the next Chartered banner, given at 60 paid pulls on one. */
+const DOSSIER_AT = 60;
+const DOSSIER_PULLS = 10;
+
+/** The Dossiers usable on a patch's banners: how many, the banners that gave them, and how many of those banners have opened. */
+interface Dossiers {
+  count: number;
+  from: string[];
+  opened: number;
+}
+
+/** Arsenal Tickets back from a patch's own banners, and from pulls made then on banners outside any patch. */
+interface Tickets {
+  patch: number;
+  other: number;
+}
+
+function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: Tickets, bond: number, dossiers: Dossiers | undefined): Html {
+  return html`<tr class="patch-banners"><td colspan="6"><div class="patch-banner-list">
     ${p.banners.map((b) => {
       const s = b.summary;
       const six = s ? s.pulls.filter((x) => x.rarity === 6).length : 0;
@@ -220,7 +264,7 @@ function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: numb
         ? html`<a class="patch-banner ${b.kind}" href="/${b.kind === 'weap' ? 'arsenal' : 'operators'}/${b.poolId}" title="${kind}">${inner}</a>`
         : html`<div class="patch-banner ${b.kind} unpulled" title="${kind}">${inner}</div>`;
     })}
-  </div></td></tr>`;
+  </div>${inc?.lines.length ? patchIncomeList(inc, tickets, bond, dossiers) : ''}</td></tr>`;
 }
 
 export function statsPage(a: Analysis, redraw: () => void): Html {
@@ -229,16 +273,63 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
   income = incomeFile.data;
   const paid = state.settings.paidIncome ?? [];
   const free = new Map(patchIncome(state.schedule, currentServer(), Date.now(), events.data, income, paid).map((p) => [p.key, p]));
+  // Operator pulls on banners outside any patch (Basic Headhunting, New Horizons) count for the patch they were made in.
+  const otherPulls = a.banners.filter((b) => b.kind === 'char' && b.patch.major === -1).flatMap((b) => b.pulls);
+  const otherIn = (p: PatchStats) => {
+    const inc = p.patch.major === -1 ? undefined : free.get(p.patch.key);
+    return inc ? otherPulls.filter((x) => x.ts >= inc.start && x.ts < inc.end) : [];
+  };
   /** Arsenal Tickets a patch's Headhunting results gave back. */
-  const ticketsOf = (p: PatchStats) => ticketsFromPulls(p.banners.flatMap((b) => (b.kind === 'char' ? (b.summary?.pulls ?? []) : [])));
+  const ticketsOf = (p: PatchStats): Tickets => ({
+    patch: ticketsFromPulls(p.banners.flatMap((b) => (b.kind === 'char' ? (b.summary?.pulls ?? []) : []))),
+    other: ticketsFromPulls(otherIn(p)),
+  });
+  const ticketPulls = (p: PatchStats) => {
+    const t = ticketsOf(p);
+    return ((t.patch + t.other) / TICKETS_PER_ISSUE) * 10;
+  };
   // Bond Quota: what each duplicate 5★ / 6★ operator gave, then by patch, as whole Chartered HH Permits.
   const bondByPull = income?.shops ? bondQuota(a.banners.flatMap((b) => b.pulls), income.shops.bond.duplicate) : new Map<object, number>();
-  const bondOf = (p: PatchStats) => p.banners.reduce((n, b) => n + (b.summary?.pulls ?? []).reduce((m, x) => m + (bondByPull.get(x) ?? 0), 0), 0);
+  const bondOf = (p: PatchStats) =>
+    [...p.banners.flatMap((b) => b.summary?.pulls ?? []), ...otherIn(p)].reduce((n, x) => n + (bondByPull.get(x) ?? 0), 0);
+  // Headhunting Dossiers: the export's records where it lists a banner's rewards, else one per Chartered banner at
+  // 60 paid pulls. Each is a 10-pull on the next Chartered banner, so it counts for that banner's patch.
+  const giftPools = new Set(a.gifts.filter((g) => g.kind === 'char').map((g) => canonicalPoolId(g.poolId)));
+  const released = state.schedule.versions.filter((v) => v.release).map((v) => v.name);
+  const charteredOrder = state.schedule.banners
+    .filter((b) => ['chartered', 'special', 'refactor'].includes(b.kind))
+    .map((b) => ({
+      poolId: b.poolId ? canonicalPoolId(b.poolId) : null,
+      minor: b.version ? released.indexOf(b.version) : -1,
+      start: timeOn(b.start, currentServer()) ?? Infinity,
+    }))
+    .sort((x, y) => x.start - y.start);
+  const dossiers = new Map<string, Dossiers>();
+  for (const s of a.banners) {
+    if (s.kind !== 'char' || s.category !== 'chartered') continue;
+    const n = giftPools.has(s.poolId)
+      ? a.gifts.filter((g) => g.gift === 'gift_intel_book' && canonicalPoolId(g.poolId) === s.poolId).length
+      : s.paidPulls >= DOSSIER_AT
+        ? 1
+        : 0;
+    if (!n) continue;
+    const at = charteredOrder.findIndex((b) => b.poolId === s.poolId);
+    const next = at >= 0 ? charteredOrder[at + 1] : undefined;
+    // Not in the schedule: its own patch. Its next banner not announced yet: nowhere so far.
+    const key = at < 0 ? s.patch.key : next && next.minor >= 0 ? `1.${next.minor}` : null;
+    if (!key) continue;
+    const d = dossiers.get(key) ?? { count: 0, from: [], opened: 0 };
+    d.count += n;
+    d.from.push(s.name);
+    if (!next || next.start <= Date.now()) d.opened += n;
+    dossiers.set(key, d);
+  }
+  const dossiersOf = (p: PatchStats) => (p.patch.major === -1 ? undefined : dossiers.get(p.patch.key));
   const bondPermitsOf = (p: PatchStats) => (income?.shops ? Math.floor(bondOf(p) / income.shops.bond.price) : 0);
   const freeOf = (p: PatchStats) => {
     const inc = free.get(p.patch.key);
     return inc?.lines.length
-      ? { char: inc.headhunting + bondPermitsOf(p), weap: inc.arsenal + (ticketsOf(p) / TICKETS_PER_ISSUE) * 10, projected: inc.projected }
+      ? { char: inc.headhunting + bondPermitsOf(p) + (dossiersOf(p)?.count ?? 0) * DOSSIER_PULLS, weap: inc.arsenal + ticketPulls(p), projected: inc.projected }
       : null;
   };
   const patches = patchStats(a, state.db, state.schedule)
@@ -299,8 +390,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       return {
         charMade: t.charMade + p.charPulls,
         weapMade: t.weapMade + p.weapPulls,
-        charEarned: t.charEarned + (inc ? inc.headhunting * f : 0) + bondPermitsOf(p),
-        weapEarned: t.weapEarned + (inc ? inc.arsenal * f : 0) + (ticketsOf(p) / TICKETS_PER_ISSUE) * 10,
+        charEarned: t.charEarned + (inc ? inc.headhunting * f : 0) + bondPermitsOf(p) + (dossiersOf(p)?.opened ?? 0) * DOSSIER_PULLS,
+        weapEarned: t.weapEarned + (inc ? inc.arsenal * f : 0) + ticketPulls(p),
       };
     },
     { charMade: 0, weapMade: 0, charEarned: 0, weapEarned: 0 },
@@ -350,7 +441,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
           ${anyFree
             ? html`<div class="legend">
                 <span><i style="background:var(--gray-1000)"></i>Pulls made</span>
-                <span><i class="faded" style="background:var(--gray-1000)"></i>${paid.length ? 'Pulls earned' : 'Free pulls earned'} (open a patch for the breakdown)</span>
+                <span><i class="faded" style="background:var(--gray-1000)"></i>${paid.length ? 'Pulls earned' : 'Free pulls earned'}</span>
               </div>`
             : ''}
         </div>
@@ -379,7 +470,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
                 <td class="right num">${p.sixStars.length}</td>
                 <td class="right num secondary hide-sm">${avg}</td>
                 <td class="right num secondary hide-sm">${pulled} / ${p.banners.length}</td>
-              </tr>${open ? patchBanners(p, free.get(p.patch.key), ticketsOf(p), bondOf(p)) : ''}`;
+              </tr>${open ? patchBanners(p, free.get(p.patch.key), ticketsOf(p), bondOf(p), dossiersOf(p)) : ''}`;
             })}
           </tbody>
           ${anyFree

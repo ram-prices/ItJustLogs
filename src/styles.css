@@ -2853,6 +2853,16 @@ a.sched-next:hover {
   flex-direction: column;
   gap: 10px;
 }
+.image-dialog img {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+  max-height: 65vh;
+  object-fit: contain;
+  -webkit-touch-callout: default;
+  user-select: auto;
+}
+
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;

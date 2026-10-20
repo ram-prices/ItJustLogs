@@ -6,13 +6,16 @@
  *
  * Copying an image needs the async Clipboard API. Where that's refused (some
  * phone browsers, Firefox before 127), the share sheet opens instead (it has
- * a Copy action on phones), and as a last resort the PNG is downloaded.
+ * a Copy action on phones). As a last resort, on a phone the picture opens in
+ * a dialog, where holding it brings up the browser's own image menu (Firefox
+ * for Android allows neither: no images on the clipboard, no files to share);
+ * elsewhere the PNG is downloaded.
  *
  * Phones only allow the clipboard and the share sheet during the tap itself,
  * and drawing the card takes a moment: so the long-press menu starts drawing
  * it as it opens (`prepareCardImage`) and only offers Copy image once it's
- * ready, so the tap never waits. When it ends up saved, `why` says what the
- * browser refused.
+ * ready, so the tap never waits. When it ends up shown or saved, `why` says
+ * what the browser refused.
  */
 
 /** Controls (Expand), menus and toasts don't belong in the picture. */
@@ -38,9 +41,9 @@ export async function render(el: HTMLElement): Promise<Blob> {
   }
 }
 
-/** What happened to the picture, and, when it was saved, what the browser refused. */
+/** What happened to the picture, and, when it was shown or saved, what the browser refused. */
 export interface CardImageResult {
-  done: 'copied' | 'shared' | 'saved';
+  done: 'copied' | 'shared' | 'shown' | 'saved';
   why?: string;
 }
 
@@ -85,7 +88,37 @@ export async function copyCardImage(el: HTMLElement, name: string, prepared: Pre
     }
   } else refused.push('share: files not supported');
   const url = URL.createObjectURL(file);
-  Object.assign(document.createElement('a'), { href: url, download: file.name }).click();
+  const save = () => Object.assign(document.createElement('a'), { href: url, download: file.name }).click();
+  if (matchMedia('(pointer: coarse)').matches) {
+    showImage(url, save);
+    return { done: 'shown', why: refused.join('; ') };
+  }
+  save();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return { done: 'saved', why: refused.join('; ') };
+}
+
+/** The picture in a dialog: holding it opens the browser's own image menu (share, save, copy where it has one). */
+function showImage(url: string, save: () => void) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'dialog-backdrop';
+  backdrop.innerHTML = `<div class="card dialog image-dialog" role="dialog" aria-modal="true" aria-label="Banner image">
+    <img alt="Banner card" />
+    <p class="copy-14 secondary">This browser doesn't let sites copy pictures. Press and hold it to share or save it.</p>
+    <div class="dialog-actions">
+      <button class="btn secondary sm" data-choice="save">Download</button>
+      <button class="btn primary sm" data-choice="close">Close</button>
+    </div>
+  </div>`;
+  backdrop.querySelector('img')!.src = url;
+  const close = () => {
+    backdrop.remove();
+    URL.revokeObjectURL(url);
+  };
+  backdrop.addEventListener('click', (e) => {
+    const choice = (e.target as HTMLElement).closest<HTMLElement>('[data-choice]')?.dataset.choice;
+    if (choice === 'save') save();
+    if (choice === 'close' || e.target === backdrop) close();
+  });
+  document.body.append(backdrop);
 }

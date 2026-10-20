@@ -280,7 +280,7 @@ function versionHistory(synced: boolean): Html {
         ? html`<div class="versions">${list.map(
             (s) => html`<div class="version">
               <div class="min0">
-                <div class="version-when">${fmtDate(s.at, true)}${inDrive.has(s.id) ? html`<span class="version-drive" title="${s.local ? 'Also saved in Google Drive' : 'In Google Drive (saved on another device)'}">${icon(s.local ? 'cloud_done' : 'cloud')}${s.local ? '' : 'Google Drive'}</span>` : ''}</div>
+                <div class="version-when">${fmtDate(s.at, true)}${s.local ? html`<span class="version-drive" title="Saved in this browser">${icon('devices')}This browser</span>` : ''}${inDrive.has(s.id) ? html`<span class="version-drive" title="Saved in your Google Drive">${icon('cloud')}Google Drive</span>` : ''}</div>
                 <div class="version-what copy-13 secondary">${s.reason} · ${fmtInt(s.chars)} operator, ${fmtInt(s.weaps)} arsenal records</div>
               </div>
               <button class="btn secondary sm" data-action="${s.local ? 'restore-snapshot' : 'restore-drive-snapshot'}" data-value="${s.id}">Restore</button>

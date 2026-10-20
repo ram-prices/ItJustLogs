@@ -330,20 +330,31 @@ function draw(): void {
 // Banner cards: fixed height with a scrolling list until expanded
 // ---------------------------------------------------------------------------
 
+/** Hides a card's Expand when its list fits without scrolling. */
+function measureCard(card: HTMLElement): void {
+  if (card.classList.contains('expanded')) return;
+  const list = card.querySelector<HTMLElement>('.banner-scroll');
+  // Measure with Expand hidden (the list is taller then), so the answer
+  // doesn't depend on whether the button was showing.
+  card.classList.add('fits');
+  card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
+}
+
 /** Cards whose list fits without scrolling don't need the Expand button. */
 function markOverflow(): void {
   for (const card of document.querySelectorAll<HTMLElement>('.banner')) {
     if (card.classList.contains('expanded')) continue;
     // Offscreen cards skip layout (content-visibility), so measure each one
     // as it nears the screen rather than forcing them all now.
-    whenNear(card, () => {
-      if (card.classList.contains('expanded')) return;
-      const list = card.querySelector<HTMLElement>('.banner-scroll');
-      // Measure with Expand hidden (the list is taller then), so the answer
-      // doesn't depend on whether the button was showing.
-      card.classList.add('fits');
-      card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
-    });
+    whenNear(card, () => measureCard(card));
+    // A card the browser hasn't laid out yet (content-visibility skips it; Firefox further out
+    // than "near") measures wrong: measure again once it's drawn.
+    if (!card.dataset.cvWatch) {
+      card.dataset.cvWatch = '1';
+      card.addEventListener('contentvisibilityautostatechange', (e) => {
+        if (!(e as Event & { skipped?: boolean }).skipped) measureCard(card);
+      });
+    }
   }
   // The 6★ history only needs Show all when it runs past two rows.
   for (const section of document.querySelectorAll<HTMLElement>('.six-section:not(.open)')) {

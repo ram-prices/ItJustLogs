@@ -4,6 +4,7 @@ import {
   KIND_LABEL,
   SERVER_LABEL,
   endOrGuess,
+  hasDailyRewards,
   isWeaponBanner,
   packLanes,
   scheduleLinks,
@@ -18,7 +19,7 @@ import {
 import { tip, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { toast } from '../common';
-import { heat, icon } from '../components';
+import { badge, heat, icon } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
 
@@ -155,7 +156,7 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
   </div>`;
 }
 
-function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
+function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule): Html {
   // Each event opens its own page (rewards and dates): pages/event.ts.
   return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
     ${e.art
@@ -163,7 +164,7 @@ function eventRow(e: ScheduleEvent, now: number, server: Server): Html {
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>
-      <div class="sched-next-meta ellipsis"><span>${e.type}</span></div>
+      <div class="sched-next-meta ellipsis"><span>${e.type}</span>${hasDailyRewards(e, schedule) ? html` ${badge('Daily Rewards', 'blue')}` : ''}</div>
     </div>
     <div class="sched-next-when">${rowWhen(timeOn(e.start, server), timeOn(e.end, server), now)}</div>
   </a>`;
@@ -401,6 +402,7 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
     const btn = item('image', 'Copy image', async () => {
       try {
         const { done, why } = await copyCardImage(card, card.dataset.cardImage!, prepared);
+        if (done === 'shown') return; // the picture's dialog says what to do
         toast(
           done === 'copied' ? 'Image copied.' : done === 'shared' ? 'Shared.' : `Saved to your downloads: this browser didn't allow copying it (${why}).`,
           done === 'saved' ? 'error' : 'info',
@@ -515,7 +517,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
   // Coming up: banners and events together, soonest first.
   const next = [
     ...schedule.banners.filter((b) => statusOf(b, now, server) === 'upcoming').map((b) => ({ at: startOf(b), row: bannerRow(b, now, server) })),
-    ...events.filter((e) => statusOf(e, now, server) === 'upcoming').map((e) => ({ at: startOf(e), row: eventRow(e, now, server) })),
+    ...events.filter((e) => statusOf(e, now, server) === 'upcoming').map((e) => ({ at: startOf(e), row: eventRow(e, now, server, schedule) })),
   ].sort((p, q) => p.at - q.at);
 
   return html`
@@ -531,7 +533,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null)
       ${liveEvents.length
         ? html`<div class="section">
             <div class="section-head"><h2 class="heading-20">Current</h2></div>
-            <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server))}</div>
+            <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server, schedule))}</div>
           </div>`
         : ''}
 

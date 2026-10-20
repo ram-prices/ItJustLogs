@@ -16,12 +16,13 @@
  * Aurylene unlocks at TP Points, and hand-kept amounts from community guides
  * (version preview livestream, version survey, Combat Drills). Plus the Crafting Manual's gathering milestones (by the version
  * that added the item's area or enemy), one-time progression at launch
- * (Operational Manual Node milestones, Authority Level rewards) and our own
+ * (Operational Manual Node milestones, Authority Level rewards), other
+ * one-time rewards by the version that added them (`oneTime`: Operational
+ * Manual stages, Regional Development levels, Intel Gathering, mail events,
+ * launch codes), the Credit Store's daily stock on average, and our own
  * rough estimate for an event or mode the wiki names without amounts: what
  * others of its kind give (the median). Assumes every daily and weekly is
- * done; Regional Development, Intel Gathering, the Credit Store (what it
- * offers varies by refresh), achievements and launch-only mail aren't
- * counted. Headhunting pulls are limited ones: Basic HH
+ * done; achievements aren't counted. Headhunting pulls are limited ones: Basic HH
  * Permits are counted apart. The current version is projected to its end.
  * Pure logic, no DOM.
  */
@@ -92,7 +93,11 @@ export interface IncomeFile {
   shops?: {
     aic: { url: string; price: number; perBanner: number; kinds: string[]; versions: Record<string, { permit: string; count: number }[]> };
     bond: { url: string; price: number; duplicate: Record<string, number> };
+    /** The Credit Store's daily stock on average (Oroberyl or Arsenal Tickets, never both). */
+    credit?: { url: string; perDay: Record<string, number> };
   };
+  /** One-time rewards by the version that added them, and the breakdown section they're listed in. */
+  oneTime?: { source: string; versions: Record<string, OneTimeReward[]> };
   /** One-time rewards there from launch (Operational Manual Node milestones, Authority Level rewards). */
   progression?: { version: string; items: { name: string; url: string; rewards: Record<string, number> }[] };
   /** What each version's permanent modes hand out anew, by version name. */
@@ -209,6 +214,16 @@ export function patchWindows(schedule: Schedule, server: Server, now: number): P
   });
 }
 
+export interface OneTimeReward {
+  name: string;
+  section: 'modes' | 'exploration' | 'mailbox';
+  url: string;
+  rewards: Record<string, number>;
+  count: number;
+  /** Partly our own rule (Wuling's Regional Development caps, voucher averages). */
+  estimate?: boolean;
+}
+
 export type IncomeSource =
   | 'events'
   | 'quests'
@@ -223,6 +238,8 @@ export type IncomeSource =
   | 'bondShop'
   | 'crafting'
   | 'progression'
+  | 'oneTime'
+  | 'creditStore'
   | 'daily' | 'weekly' | 'pass' | 'compensation' | PaidIncome;
 
 export interface IncomeLine {
@@ -252,6 +269,9 @@ export interface IncomeLine {
   extra?: Extra;
   /** Why it's partial, when the data says. */
   note?: string;
+  /** One-time rewards: the section they belong to, and each kind counted. */
+  section?: OneTimeReward['section'];
+  oneTime?: OneTimeReward[];
   /** Progression: each one-time reward set. */
   items?: { name: string; url: string; rewards: Record<string, number> }[];
   /** Pass: its free-track crates' average Oroberyl, included in `totals`. */
@@ -432,6 +452,21 @@ export function patchIncome(
       const prog = income.progression;
       if (prog && prog.version === w.version && prog.items.length)
         lines.push({ source: 'progression', count: prog.items.length, totals: prog.items.reduce((t, x) => plus(t, x.rewards), {} as Record<string, number>), items: prog.items });
+      const once = income.oneTime?.versions[w.version] ?? [];
+      for (const section of ['modes', 'exploration', 'mailbox'] as const) {
+        const items = once.filter((x) => x.section === section);
+        if (items.length)
+          lines.push({
+            source: 'oneTime',
+            section,
+            count: items.reduce((n, x) => n + x.count, 0),
+            totals: items.reduce((t, x) => plus(t, x.rewards), {} as Record<string, number>),
+            oneTime: items,
+            estimate: items.some((x) => x.estimate),
+          });
+      }
+      const credit = income.shops?.credit;
+      if (credit && days) lines.push({ source: 'creditStore', count: days, totals: plus({}, credit.perDay, days), url: credit.url, estimate: true });
       const ex = income.exploration;
       const areas = (ex?.versions[w.version] ?? []).filter((a) => a.crates > 0);
       const crates = areas.reduce((n, a) => n + a.crates, 0);

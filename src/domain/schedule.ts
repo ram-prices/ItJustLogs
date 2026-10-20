@@ -56,6 +56,18 @@ export interface ScheduleEvent {
   needsReview?: boolean;
 }
 
+const DAILY = /\b(sign in|log in|every day|each day|daily)\b/i;
+
+/**
+ * Events that hand out rewards day by day: sign-ins, daily logins, daily
+ * missions. An event without details counts if another of the same name does
+ * (Sanity Supply returns every version).
+ */
+export function hasDailyRewards(e: ScheduleEvent, schedule?: Schedule): boolean {
+  const daily = (x: ScheduleEvent) => /sign-in/i.test(x.type) || DAILY.test(x.details ?? '');
+  return daily(e) || (!e.details && !!schedule?.events?.some((x) => x.name === e.name && daily(x)));
+}
+
 export interface Schedule {
   versions: ScheduleVersion[];
   banners: ScheduleBanner[];
