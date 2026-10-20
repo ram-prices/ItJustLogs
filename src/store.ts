@@ -1,6 +1,7 @@
 import snapshot from './data/banners.snapshot.json';
 import scheduleSnapshot from './data/schedule.snapshot.json';
 import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
+import type { PaidIncome } from './domain/income';
 import type { Loadout } from './domain/loadout';
 import type { ExtraCopy } from './domain/owned';
 import type { Schedule, Server } from './domain/schedule';
@@ -41,6 +42,8 @@ export interface Settings {
   server?: Server;
   /** Operators/Arsenal list every banner that has opened, not just the ones pulled on. */
   showAllBanners?: boolean;
+  /** Paid income Stats → By patch adds to each patch's free pulls (paid pass tiers, Monthly Pass). */
+  paidIncome?: PaidIncome[];
   /**
    * Copies from outside pulls (story operators, event gifts); counted on the
    * info pages, never added to the pull history. Unset = DEFAULT_EXTRAS.

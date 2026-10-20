@@ -1414,6 +1414,7 @@ select.input {
 }
 .ruler-pin {
   --pin-ring: #0b0b0b;
+  --pin-fill: var(--gray-100);
   position: absolute;
   transform: translateX(-50%);
   display: flex;
@@ -1436,12 +1437,26 @@ select.input {
 .ruler-pin.below .ruler-pin-label {
   margin: 2px 0 0;
 }
+/* Light mode: the 6★ pins keep a dark head, ringed in white, so the art reads on the pale ruler. */
+:root[data-theme='light'] .ruler-pin {
+  --pin-ring: #fff;
+  --pin-fill: #161616;
+}
+/* A 6★ that came from the rate-up guarantee: a blue ring and a blue pull number. */
+.ruler-pin.guaranteed,
+:root[data-theme='light'] .ruler-pin.guaranteed {
+  --pin-ring: var(--blue);
+}
+.ruler-pin.guaranteed .ruler-pin-label {
+  color: var(--blue);
+  font-weight: 600;
+}
 .ruler-portrait {
   width: 26px;
   height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--gray-100);
+  background: var(--pin-fill, var(--gray-100));
   /* teardrop head: a thick near-black ring with a soft drop shadow */
   box-shadow: 0 0 0 2px var(--pin-ring), 0 3px 8px 2px rgba(0, 0, 0, 0.55);
 }
@@ -2964,6 +2979,14 @@ a.patch-banner:hover {
   .patch-banner-six {
     display: none;
   }
+}
+/* Stats → By patch: the toggles that add paid income. */
+.paid-income {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 0;
 }
 /* An opened patch's free pulls, source by source, above its banners. */
 .patch-income {
@@ -5123,7 +5146,7 @@ a.six-item {
 .ruler-pin-heads.multi {
   padding: 0 2px;
   border-radius: 999px;
-  background: var(--gray-100);
+  background: var(--pin-fill, var(--gray-100));
   box-shadow: 0 0 0 2px var(--pin-ring), 0 3px 8px 2px rgba(0, 0, 0, 0.55);
 }
 .ruler-pin-heads.multi .ruler-portrait {

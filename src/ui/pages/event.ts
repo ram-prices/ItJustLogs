@@ -29,6 +29,8 @@ function summary(r: EventRewards): Html {
   if (p.oroberyl) parts.push(html`<div class="metric"><div class="metric-label"><span>Oroberyl</span></div><div class="metric-value num">${atLeast ? '≥ ' : ''}${fmtInt(p.oroberyl)}</div><div class="metric-sub">${fmtPulls(p.fromOroberyl)} pulls</div></div>`);
   for (const [name, n] of p.permits)
     parts.push(html`<div class="metric"><div class="metric-label"><span>${name}</span></div><div class="metric-value num">${fmtInt(n)}</div><div class="metric-sub">${n === 1 ? 'pull' : 'pulls'}</div></div>`);
+  if (p.basicPermits)
+    parts.push(html`<div class="metric"><div class="metric-label"><span>Basic HH Permit</span></div><div class="metric-value num">${fmtInt(p.basicPermits)}</div><div class="metric-sub">Basic Headhunting only</div></div>`);
   if (p.arsenalTickets) parts.push(html`<div class="metric"><div class="metric-label"><span>Arsenal Tickets</span></div><div class="metric-value num">${fmtInt(p.arsenalTickets)}</div></div>`);
   return html`<section class="section">
     <div class="section-head"><h2 class="heading-20">${p.pulls ? `${atLeast}${fmtPulls(p.pulls)} Headhunting ${p.pulls === 1 ? 'pull' : 'pulls'}` : 'Rewards'}</h2>${r.partial ? badge('Partial', 'amber') : ''}</div>
@@ -51,6 +53,7 @@ function breakdown(r: EventRewards): Html {
   return html`${r.groups.map(
     (g) => html`<section class="section">
       <div class="section-head"><h2 class="heading-20">${g.title}</h2>${g.partial ? badge('Partial', 'amber') : ''}</div>
+      ${g.exchange ? html`<p class="copy-14 secondary event-partial">Bought with ${g.exchange}, which only this event hands out. Counted as if you buy the whole stock.</p>` : ''}
       <div class="card event-rows">
         ${g.rows.map(
           (row) => html`<div class="event-row">

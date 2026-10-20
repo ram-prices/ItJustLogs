@@ -1,3 +1,4 @@
+import { PAID_INCOME, type PaidIncome } from '../domain/income';
 import { endministratorOf, EXTRA_PRESETS, extrasOf, isEndministrator, type ExtraCopy } from '../domain/owned';
 import { legacyEventLinks } from '../domain/schedule';
 import { RESERVED_PATHS } from '../domain/wiki';
@@ -609,6 +610,11 @@ async function onClick(e: MouseEvent): Promise<void> {
       togglePatch(el.dataset.value!);
       draw();
       break;
+    case 'paid-income': {
+      const v = el.dataset.value as PaidIncome;
+      const now = state.settings.paidIncome ?? [];
+      return updateSettings({ paidIncome: now.includes(v) ? now.filter((x) => x !== v) : PAID_INCOME.filter((x) => x === v || now.includes(x)) });
+    }
     case 'art-manage':
       openArtManager(el.dataset.op!, el.dataset.name!, draw);
       break;

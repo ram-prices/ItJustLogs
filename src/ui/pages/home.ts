@@ -16,7 +16,7 @@ import {
   type Server,
 } from '../../domain/schedule';
 import { tip, tipRow } from '../charts';
-import { copyCardImage } from '../cardImage';
+import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { toast } from '../common';
 import { heat, icon } from '../components';
 import { fmtInt, html, type Html } from '../html';
@@ -367,8 +367,11 @@ export async function copyText(text: string): Promise<boolean> {
 /**
  * The menu for a copyable element: "Copy link" for `data-link`, and
  * "Copy image" for banner cards (`data-card-image`, the picture's name).
+ * Opened by a long-press (`touch`), it starts drawing the card's picture
+ * straight away: phones only allow copying or sharing during the tap, and the
+ * picture has to be ready by then.
  */
-function openMenu(x: number, y: number, el: HTMLElement): void {
+function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
   closeMenu();
   menu = document.createElement('div');
   menu.className = 'ctx-menu';
@@ -393,9 +396,10 @@ function openMenu(x: number, y: number, el: HTMLElement): void {
   }
   const card = el.closest<HTMLElement>('[data-card-image]');
   if (card) {
+    const prepared: PreparedImage | undefined = touch ? prepareCardImage(card) : undefined;
     item('image', 'Copy image', async () => {
       try {
-        const done = await copyCardImage(card, card.dataset.cardImage!);
+        const done = await copyCardImage(card, card.dataset.cardImage!, prepared);
         toast(done === 'copied' ? 'Image copied.' : done === 'shared' ? 'Shared.' : 'Image saved to your downloads.', 'info');
       } catch {
         toast("Couldn't make the image here.", 'error');
@@ -437,7 +441,7 @@ export function installCopyMenu(): void {
       clearTimeout(timer);
       timer = window.setTimeout(() => {
         swallowClick = true;
-        openMenu(t.clientX, t.clientY, el);
+        openMenu(t.clientX, t.clientY, el, true);
       }, 500);
     },
     { passive: true },

@@ -567,14 +567,16 @@ function pityRuler(b: BannerSummary, ended = false): Html {
       else bySpot.push([p]);
     }
     const pinTitle = (p: AnalyzedPull) =>
-      sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`;
+      (sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`) +
+      (p.outcome === 'guaranteed' ? ' · the rate-up guarantee' : '');
     const all = [
       ...items[side],
       ...bySpot.map((g): Item => ({
         at: pct(posOf(g[0])),
         hi: 100,
         w: pinWidth(g.length),
-        draw: (left, dx) => html`<div class="ruler-pin ${side}" style="left:${left}%;--dx:${dx}" title="${g.map(pinTitle).join('\n')}">
+        // The guarantee's 6★: blue ring and number.
+        draw: (left, dx) => html`<div class="ruler-pin ${side}${g.some((p) => p.outcome === 'guaranteed') ? ' guaranteed' : ''}" style="left:${left}%;--dx:${dx}" title="${g.map(pinTitle).join('\n')}">
           <span class="ruler-pin-label">${posOf(g[0])}</span>
           <span class="ruler-pin-heads${g.length > 1 ? ' multi' : ''}">${g.map((p) => html`<a href="${infoHref(p.kind, p.itemId)}" aria-label="${p.name} info">${itemImg(p.kind, p.itemId, 'ruler-portrait')}</a>`)}</span>
           <span class="ruler-pin-point"></span>

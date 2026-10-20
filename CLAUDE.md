@@ -39,11 +39,30 @@ Headhunting pulls at 500 Oroberyl each, `domain/eventRewards.ts`; `partial`
 when the wiki names rewards without amounts). Home's event rows and
 timeline bars link to it, and Home's right-click menu has "Copy link".
 Stats → By patch adds each version's free pulls (`domain/income.ts`): its
-events, daily missions and Weekly Routine for every day and week of the
-version (resets at 04:00 server time) and the Protocol Pass free track, from
+events (plus events.json `extra`: the wiki's mid-version events, by start), daily missions and Weekly Routine for every day and week of the
+version (resets at 04:00 server time), the Protocol Pass free track, the
+maintenance compensation in its official Version Update Notes and the
+permanent missions it released (main story by the notes' "available up to",
+others by the wiki's version pages or their region), what its permanent
+modes hand out anew (Echoes of War seasons, Monumental Etching, Delver of the
+Cryptic...: its notes' Event & Gameplay Updates, else the wiki) and its new
+outposts, a rough estimate for
+the storage crates in the areas it added (wiki crate counts times an average
+Oroberyl per crate, badged Estimate), the Origeometry its areas' Aurylene
+unlocks (each region's TP Point table; Partial past the table's end on the
+wiki), and hand-kept community-guide amounts with sources (version preview
+livestream, version survey, SKPORT web check-in, Combat Drills), the Crafting
+Manual's milestones, one-time progression at launch (Node milestones,
+Authority Level), and our own rough estimates (Credit Store; an event or mode
+the wiki names without amounts gets the median of its kind, marked ≈). No
+third-party spreadsheet is used: the owner wants our own estimate. From
 ef-assets `wiki/income.json` (`scripts/income.mjs` there), plus the Arsenal
 Tickets Headhunting gives back; marked on the bars, listed by source when a
-patch is opened. All pages are kept; if their number ever becomes a problem, drop old
+patch is opened. Headhunting counts limited pulls (Basic HH Permits are
+listed apart, as community pull counts do). The current patch is projected
+to the next version's release, or else its last banner or event end.
+Toggles (setting `paidIncome`) add Originium Supply, Protocol Customized
+and the Monthly Pass. All pages are kept; if their number ever becomes a problem, drop old
 ones then.
 
 ## Commands
