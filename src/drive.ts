@@ -227,3 +227,46 @@ export async function updateFile(token: string, id: string, body: string): Promi
   });
   return r.json();
 }
+
+// --- Operator art: one file per picture, named by its IndexedDB key ---------
+
+export interface DriveArt {
+  id: string;
+  name: string;
+}
+
+/** Every operator art file in the app's hidden folder. */
+export async function listArt(token: string): Promise<DriveArt[]> {
+  const out: DriveArt[] = [];
+  const q = encodeURIComponent("name contains 'art:' and trashed = false");
+  for (let page: string | undefined = ''; page !== undefined; ) {
+    const r = await call(token, `${API}/files?spaces=appDataFolder&q=${q}&pageSize=1000&fields=nextPageToken,files(id,name)${page ? `&pageToken=${page}` : ''}`);
+    const body = (await r.json()) as { files: DriveArt[]; nextPageToken?: string };
+    out.push(...body.files.filter((f) => f.name.startsWith('art:')));
+    page = body.nextPageToken;
+  }
+  return out;
+}
+
+export async function uploadArt(token: string, name: string, blob: Blob): Promise<void> {
+  const boundary = `ijl${crypto.randomUUID()}`;
+  const meta = JSON.stringify({ name, parents: ['appDataFolder'], mimeType: blob.type || 'image/webp' });
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${blob.type || 'image/webp'}\r\n\r\n`,
+    blob,
+    `\r\n--${boundary}--`,
+  ]);
+  await call(token, `${UPLOAD}/files?uploadType=multipart&fields=id`, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+}
+
+export const downloadArt = async (token: string, id: string): Promise<Blob> => (await call(token, `${API}/files/${id}?alt=media`)).blob();
+
+export const deleteFile = async (token: string, id: string): Promise<void> => {
+  await call(token, `${API}/files/${id}`, { method: 'DELETE' }).catch((e) => {
+    if (!(e instanceof DriveNotFound)) throw e;
+  });
+};

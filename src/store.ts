@@ -1,6 +1,7 @@
 import snapshot from './data/banners.snapshot.json';
 import scheduleSnapshot from './data/schedule.snapshot.json';
 import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
+import type { Loadout } from './domain/loadout';
 import type { ExtraCopy } from './domain/owned';
 import type { Schedule, Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
@@ -44,6 +45,19 @@ export interface Settings {
    * info pages, never added to the pull history. Unset = DEFAULT_EXTRAS.
    */
   extras?: ExtraCopy[];
+  /**
+   * Weapon skills count at the highest rank they can reach (max essence: 9,
+   * the Potential skill 4 + Potential). Unset = on; off = each loadout's set ranks.
+   */
+  maxEssence?: boolean;
+  /** Operator art the player removed (keys), so sync removes it on their other devices and in Drive too. */
+  deletedArt?: string[];
+  /** Where each operator picture shows (by its key); unset = the banner. See ui/pages/art.ts. */
+  artPlaces?: Record<string, string[]>;
+  /** A banner picture's focus (x, y in %), when moved from where it starts. */
+  artPos?: Record<string, [number, number]>;
+  /** What each operator has equipped (weapon and gear), by operator id. */
+  loadouts?: Record<string, Loadout>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -300,6 +314,37 @@ export const saveImage = (slot: ImageSlot, blob: Blob): Promise<void> =>
   idb('images', 'readwrite', (s) => s.put(blob, slot));
 export const deleteImage = (slot: ImageSlot): Promise<void> =>
   idb<void>('images', 'readwrite', (s) => s.delete(slot)).catch(() => undefined);
+
+/**
+ * Art the player added to an operator's page (uploaded, or downloaded from a
+ * link), in the same IndexedDB store as the profile pictures, keyed
+ * `art:<operator id>:<id>`. Drive sync copies each picture to its own file
+ * (ui/sync.ts); it isn't in the backup file. "Delete everything" clears it.
+ */
+const artRange = (opId: string) => IDBKeyRange.bound(`art:${opId}:`, `art:${opId}:\uffff`);
+export async function loadArt(opId: string): Promise<{ key: string; blob: Blob }[]> {
+  try {
+    const keys = await idb<IDBValidKey[]>('images', 'readonly', (s) => s.getAllKeys(artRange(opId)));
+    const blobs = await idb<Blob[]>('images', 'readonly', (s) => s.getAll(artRange(opId)));
+    return keys.map((k, i) => ({ key: String(k), blob: blobs[i] })).filter((x) => x.blob);
+  } catch {
+    return [];
+  }
+}
+export async function saveArt(opId: string, blob: Blob): Promise<string> {
+  const key = `art:${opId}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  await idb('images', 'readwrite', (s) => s.put(blob, key));
+  return key;
+}
+export const deleteArt = (key: string): Promise<void> => idb<void>('images', 'readwrite', (s) => s.delete(key)).catch(() => undefined);
+/** Every operator's art, by key (for sync). */
+export const allArtKeys = (): Promise<string[]> =>
+  idb<IDBValidKey[]>('images', 'readonly', (s) => s.getAllKeys(IDBKeyRange.bound('art:', 'art:\uffff')))
+    .then((keys) => keys.map(String))
+    .catch(() => []);
+export const artBlob = (key: string): Promise<Blob | undefined> => idb<Blob | undefined>('images', 'readonly', (s) => s.get(key)).catch(() => undefined);
+/** Stores a picture under a key it already has (one synced from another device). */
+export const putArt = (key: string, blob: Blob): Promise<void> => idb('images', 'readwrite', (s) => s.put(blob, key));
 
 export function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {

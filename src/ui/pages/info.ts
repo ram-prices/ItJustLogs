@@ -41,26 +41,34 @@ interface Loaded<T> {
   data: T | null;
   failed: boolean;
 }
-const files = new Map<string, Loaded<unknown> & { loading: boolean }>();
+const files = new Map<string, Loaded<unknown> & { loading: boolean; waiting: Set<() => void> }>();
 
-/** The wiki file if it's loaded; starts loading it (and redraws when done) if not. */
+/**
+ * The wiki file if it's loaded; starts loading it if not, and redraws (with
+ * every `redraw` asked for while it loaded) when it's in.
+ */
 export function wikiFile<T>(file: string, redraw: () => void): Loaded<T> {
   let f = files.get(file);
-  if (!f) files.set(file, (f = { data: null, failed: false, loading: false }));
+  if (!f) files.set(file, (f = { data: null, failed: false, loading: false, waiting: new Set() }));
+  if (!f.data) f.waiting.add(redraw);
   if (!f.data && !f.loading) {
     const entry = f;
     entry.loading = true;
     entry.failed = false;
+    const done = () => {
+      entry.loading = false;
+      const fns = [...entry.waiting];
+      entry.waiting.clear();
+      fns.forEach((fn) => fn());
+    };
     loadWikiFile<T>(file).then(
       (d) => {
         entry.data = d;
-        entry.loading = false;
-        redraw();
+        done();
       },
       () => {
-        entry.loading = false;
         entry.failed = true;
-        redraw();
+        done();
       },
     );
   }
@@ -222,11 +230,14 @@ export function loadingOrFailed(kind: Kind, title: string, failed: boolean): Htm
 
 const ranks = new Map<string, number>();
 
-/** The rank a page's slider is at (`max` until moved). */
-export const sliderRank = (key: string, max: number): number => Math.min(ranks.get(key) ?? max, max);
+/** The rank a slider is at (`start`, else `max`, until moved). */
+export const sliderRank = (key: string, max: number, start = max): number => Math.min(ranks.get(key) ?? start, max);
 
-export function rankSlider(key: string, max: number): Html {
-  const rank = sliderRank(key, max);
+/**
+ * A rank slider. Moving it updates the values in its `[data-rank-scope]`
+ * (one weapon skill), or on the whole page when it has none.
+ */
+export function rankSlider(key: string, max: number, rank = sliderRank(key, max)): Html {
   return html`<label class="wiki-rank label-13 secondary">
     <span>Rank</span>
     <input type="range" min="1" max="${max}" value="${rank}" data-wiki-rank="${key}" aria-label="Skill rank" />
@@ -234,14 +245,44 @@ export function rankSlider(key: string, max: number): Html {
   </label>`;
 }
 
+/** Collapsible rows (skills, talents, Potentials) the player opened; kept across redraws. */
+const openRows = new Set<string>();
+
+/**
+ * One collapsible row in a `.wiki-accs` card: `head` always shows, `body`
+ * when opened. `key` must be unique on the page (it keeps the row open
+ * across redraws).
+ */
+export function accordion(key: string, head: Html, body: Html): Html {
+  return html`<details class="wiki-acc" data-row="${key}" ${raw(openRows.has(key) ? 'open' : '')}>
+    <summary>${head}<span class="wiki-acc-chev">${icon('chevron_right')}</span></summary>
+    <div class="wiki-acc-body">${body}</div>
+  </details>`;
+}
+
 export function installWikiControls(): void {
+  // 'toggle' doesn't bubble.
+  document.addEventListener(
+    'toggle',
+    (e) => {
+      const el = e.target as HTMLDetailsElement;
+      const key = el.dataset?.row;
+      if (!key) return;
+      if (el.open) openRows.add(key);
+      else openRows.delete(key);
+    },
+    true,
+  );
   document.addEventListener('input', (e) => {
     const el = e.target as HTMLInputElement;
     if (!el.matches?.('[data-wiki-rank]')) return;
     const rank = Number(el.value) || 1;
     ranks.set(el.dataset.wikiRank!, rank);
     el.parentElement?.querySelector('.wiki-rank-value')?.replaceChildren(String(rank));
-    for (const v of document.querySelectorAll<HTMLElement>('[data-ranks]')) {
+    const scope = el.closest('[data-rank-scope]');
+    // A weapon skill's slider also updates the rank shown on its row.
+    scope?.closest('.wiki-acc')?.querySelector('.wiki-acc-rank')?.replaceChildren(String(rank));
+    for (const v of (scope ?? document).querySelectorAll<HTMLElement>('[data-ranks]')) {
       const list = v.dataset.ranks!.split('|');
       v.textContent = list[Math.min(rank, list.length) - 1] ?? '–';
     }

@@ -1,7 +1,8 @@
 import { compareHistories, mergeHistories, missingPulls } from '../domain/parse';
 import * as drive from '../drive';
-import { clearHistory, importHistory, onChange, setImage, state, updateSettings } from '../state';
-import { blobToDataUrl, dataUrlToBlob, loadSyncMeta, saveSyncMeta, type ChangeTimes } from '../store';
+import { artChanged, clearHistory, importHistory, onChange, setImage, state, updateSettings } from '../state';
+import { allArtKeys, artBlob, blobToDataUrl, dataUrlToBlob, deleteArt, loadSyncMeta, putArt, saveSyncMeta, type ChangeTimes } from '../store';
+import { forgetLoadedArt } from './pages/art';
 import { toast } from './common';
 import { askSamePlayer } from './dialog';
 import { buildBackup, type Backup } from './io';
@@ -16,7 +17,10 @@ import { buildBackup, type Backup } from './io';
  *   them last (`changed` times; a tie goes to Drive, so a fresh device picks
  *   up the saved name and picture);
  * - Drive's file version is checked again right before uploading, so a
- *   newer copy from another device is merged in rather than overwritten.
+ *   newer copy from another device is merged in rather than overwritten;
+ * - operator art isn't in that file: each picture is a file of its own,
+ *   named by its key (syncArt), so the backup stays small and a picture is
+ *   uploaded once, then downloaded only by devices without it.
  */
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'reconnect' | 'paused' | 'error';
@@ -46,6 +50,8 @@ export interface SyncView {
 export const syncView = (): SyncView => ({ status, email: meta.email, lastSynced: meta.lastSynced, error: errorText });
 /** Signed in, but this visit needs a click before it can reach Drive. */
 export const syncNeedsClick = (): boolean => drive.driveConfigured() && meta.on && (status === 'reconnect' || status === 'paused');
+/** Sync is set up here (the header shows its button). */
+export const syncShown = (): boolean => drive.driveConfigured() && meta.on;
 
 // ---------------------------------------------------------------------------
 // Merging the Drive copy into this browser
@@ -166,9 +172,44 @@ async function syncWith(token: string): Promise<void> {
     }
     meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), paused: false };
     save();
+    await syncArt(token);
     return;
   }
   throw new Error('Another device kept changing the Drive copy. Try Sync now again in a moment.');
+}
+
+/**
+ * Operator art, after the backup file (so settings, with the list of removed
+ * pictures, are already merged): pictures removed anywhere are removed in
+ * Drive and here; Drive's pictures this browser lacks are downloaded; this
+ * browser's that Drive lacks are uploaded.
+ */
+async function syncArt(token: string): Promise<void> {
+  const remote = await drive.listArt(token);
+  const removed = new Set(state.settings.deletedArt ?? []);
+  const local = new Set(await allArtKeys());
+  const inDrive = new Set(remote.map((f) => f.name));
+  let changedHere = false;
+  for (const f of remote) {
+    if (removed.has(f.name)) await drive.deleteFile(token, f.id);
+    else if (!local.has(f.name)) {
+      await putArt(f.name, await drive.downloadArt(token, f.id));
+      changedHere = true;
+    }
+  }
+  for (const key of local) {
+    if (removed.has(key)) {
+      await deleteArt(key);
+      changedHere = true;
+    } else if (!inDrive.has(key)) {
+      const blob = await artBlob(key);
+      if (blob) await drive.uploadArt(token, key, blob);
+    }
+  }
+  if (changedHere) {
+    forgetLoadedArt();
+    artChanged(true);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,218 @@
+import { describe, expect, it } from 'vitest';
+import { bannerEnded } from './catalog';
+import { atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, weaponRankCaps, setCounts, statBonuses, wieldersOf, withSlot, type Loadout } from './loadout';
+import type { Schedule } from './schedule';
+import type { WikiGear, WikiWeapon } from './wiki';
+
+const piece = (set: string | null): WikiGear => ({
+  name: 'x',
+  type: 'Armor',
+  rarity: 5,
+  level: 70,
+  artifice: false,
+  region: null,
+  set,
+  defense: null,
+  stats: [],
+  source: null,
+  page: '',
+});
+
+describe('loadouts', () => {
+  it('sets and empties slots, dropping an empty loadout', () => {
+    const l = withSlot(undefined, 'weapon', 'wpn_a');
+    expect(l).toEqual({ weapon: 'wpn_a' });
+    expect(withSlot(l, 'armor', 'g1')).toEqual({ weapon: 'wpn_a', armor: 'g1' });
+    expect(withSlot(l, 'weapon', null)).toBeUndefined();
+  });
+
+  it('counts equipped pieces per gear set', () => {
+    const items = { a: piece('Æthertech'), b: piece('Æthertech'), c: piece('Æthertech'), d: piece(null) };
+    const l: Loadout = { armor: 'a', gloves: 'b', kit1: 'c', kit2: 'd', weapon: 'a' };
+    expect([...setCounts(l, items)]).toEqual([['Æthertech', 3]]);
+  });
+
+  it('finds the operators using a weapon', () => {
+    expect(wieldersOf({ chr_1: { weapon: 'w' }, chr_2: { weapon: 'v' }, chr_3: { weapon: 'w' } }, 'w')).toEqual(['chr_1', 'chr_3']);
+    expect(wieldersOf(undefined, 'w')).toEqual([]);
+  });
+});
+
+describe('loadout bonuses', () => {
+  const op = { mainAttribute: 'Intellect', secondaryAttribute: 'Will', talents: [], potentials: [] };
+  const weapon: WikiWeapon = {
+    name: 'Dreams',
+    rarity: 6,
+    type: 'Arts Unit',
+    source: null,
+    description: [],
+    stats: { levels: [1, 90], baseAtk: [50, 495] },
+    potential: null,
+    tuning: [],
+    page: '',
+    skills: [
+      { name: 'Intellect [L]', tag: null, text: 'Intellect ⟦num|+{0}⟧', values: [[20, 36, 52, 68, 84, 100, 116, 132, 156]] },
+      { name: 'Treatment [L]', tag: null, text: 'Treatment Efficiency ⟦num|+{0}%⟧.', values: [[1, 2, 3, 4, 5, 6, 7, 8, 9]] },
+      { name: 'Infliction', tag: null, text: 'Secondary attribute ⟦num|+{0}%⟧. After the wielder…', values: [[16, 19.2, 22.4, 25.6, 28.8, 32, 35.2, 38.4, 44.8]] },
+    ],
+  };
+  const armor: WikiGear = { ...piece('S'), defense: 56, stats: [{ stat: 'Strength', values: [87, 95] }, { stat: 'Main Attribute', values: [0.1] }] };
+
+  it('adds base ATK, skill stats at their ranks and gear stats', () => {
+    const b = operatorBonuses(op, { loadout: { weapon: 'w', armor: 'a' }, weapon: { w: weapon, potential: 2 }, items: { a: armor } });
+    expect(b.get('ATK')?.flat).toBe(495);
+    expect(b.get('Intellect')).toMatchObject({ flat: 156, pct: 10 });
+    expect(b.get('Treatment Efficiency')?.pct).toBe(9);
+    // The last skill counts at rank 4 + Potential (P2: rank 6).
+    expect(b.get('Will')?.pct).toBe(32);
+    // Gear counts at its highest Artifice level unless one is set.
+    expect(b.get('Strength')?.flat).toBe(95);
+    expect(b.get('DEF')?.flat).toBe(56);
+  });
+
+  it('counts weapon skills at the ranks set, never past what they can reach', () => {
+    // P0: the last skill tops out at rank 4 (25.6%) even when set to 9.
+    const b = operatorBonuses(op, { loadout: { weapon: 'w' }, weapon: { w: weapon, potential: 0, ranks: [5, undefined, 9] } });
+    expect(b.get('Intellect')?.flat).toBe(84);
+    expect(b.get('Treatment Efficiency')?.pct).toBe(9);
+    expect(b.get('Will')?.pct).toBe(25.6);
+    expect(weaponRankCaps(weapon, 5)).toEqual([9, 9, 9]);
+  });
+
+  it('reads stat bonuses out of talent and Potential text', () => {
+    expect(statBonuses('Operator Intellect and Will +8.')).toEqual([{ stats: ['Intellect', 'Will'], value: 8, pct: false }]);
+    expect(statBonuses('Intellect and Will ⟦num|+15⟧, Arts Intensity ⟦num|+16⟧.')).toEqual([
+      { stats: ['Intellect', 'Will'], value: 15, pct: false },
+      { stats: ['Arts Intensity'], value: 16, pct: false },
+    ]);
+    expect(statBonuses('Agility +⟦num|10⟧, Intellect +⟦num|12⟧.').map((b) => b.value)).toEqual([10, 12]);
+    expect(statBonuses('Intellect ⟦num|+10⟧, Max HP ⟦num|+8%⟧.')[1]).toEqual({ stats: ['Max HP'], value: 8, pct: true });
+    expect(statBonuses('All attributes ⟦num|+10⟧.')[0].stats).toHaveLength(4);
+    expect(statBonuses('DMG Dealt ⟦num|+20%⟧ to enemies below 50% HP.')).toEqual([]);
+    expect(statBonuses('Combo skill ⟦key|X⟧ improved:\nDMG +10%')).toEqual([]);
+  });
+
+  it("adds every talent stage, and Potentials up to the player's", () => {
+    const arcane = {
+      mainAttribute: 'Intellect',
+      secondaryAttribute: 'Will',
+      talents: [
+        { name: 'Keen Mind/Stalwart', levels: [8, 10, 10, 15].map((n) => ({ requires: `Elite ${n}`, description: `Operator Intellect and Will +${n}.` })) },
+        { name: 'Weapon Honing', levels: [{ requires: '', description: 'Corrosion lasts ⟦num|5⟧s longer.' }] },
+      ],
+      potentials: [
+        { rank: 1, name: 'A', description: 'Combo skill improved.' },
+        { rank: 2, name: 'B', description: 'Intellect and Will ⟦num|+15⟧, Arts Intensity ⟦num|+16⟧.' },
+      ],
+    };
+    expect(operatorBonuses(arcane).get('Will')?.flat).toBe(43);
+    expect(operatorBonuses(arcane, { potential: 1 }).get('Arts Intensity')).toBeUndefined();
+    const p2 = operatorBonuses(arcane, { potential: 2 });
+    expect(p2.get('Intellect')?.flat).toBe(58);
+    expect(p2.get('Arts Intensity')?.flat).toBe(16);
+    expect(p2.get('HP')).toBeUndefined();
+  });
+});
+
+describe('ATK total', () => {
+  it("matches the game's breakdown for Arcane", () => {
+    const t = atkTotal(312, { flat: 505, pct: 25.6, sources: [] }, 430, 765);
+    expect(t.base).toBe(817);
+    expect(Math.round(t.basic)).toBe(1026);
+    expect(t.fromMain).toBe(215);
+    expect(t.fromSecondary).toBe(153);
+    expect(Math.round(t.total)).toBe(4802);
+  });
+
+  it('works out HP, DEF reduction and treatment received like the game', () => {
+    const hp = hpTotal(5495, { flat: 1000, pct: 0, sources: [] }, 91);
+    expect(hp.base).toBe(5950);
+    expect(hp.total).toBe(6950);
+    expect(Math.round(defReduction(140) * 10) / 10).toBe(58.3);
+    expect(Math.round(765 * TREATMENT_PER_WILL * 10) / 10).toBe(76.5);
+  });
+});
+
+describe("Arcane's in-game stats", () => {
+  // Her loadout: Type 42 (P0) and four Eternal Xiranite pieces at their top Artifice level.
+  const gear = (name: string, type: string, defense: number, stats: [string, number[]][]): WikiGear => ({
+    ...piece('Eternal Xiranite'),
+    name,
+    type,
+    defense,
+    artifice: true,
+    stats: stats.map(([stat, values]) => ({ stat, values })),
+  });
+  const items = {
+    armor: gear('Light Armor', 'Armor', 56, [['Will', [110, 121, 132, 143]], ['Ultimate Gain Efficiency', [0.123, 0.136, 0.148, 0.16]]]),
+    hand: gear('Wraps', 'Gloves', 42, [['Will', [65, 71, 78, 84]], ['Intellect', [43, 47, 51, 55]]]),
+    slab: gear('Bracing Slab', 'Kit', 21, [['Will', [41, 45, 49, 53]], ['Secondary Attribute', [0.207, 0.228, 0.248, 0.269]]]),
+  };
+  const sets = { 'Eternal Xiranite': { name: 'Eternal Xiranite', level: 70, region: null, manufacturer: null, page: '', effect: "3-piece set effect: Wearer's HP +1000.\nAfter the wearer applies Amp, teammates gain DMG Dealt +16%." } };
+  const type42: WikiWeapon = {
+    name: 'Type 42',
+    rarity: 6,
+    type: 'Arts Unit',
+    source: null,
+    description: [],
+    stats: { levels: [1, 90], baseAtk: [51, 505] },
+    potential: null,
+    tuning: [],
+    page: '',
+    skills: [
+      { name: 'Intellect [L]', tag: null, text: 'Intellect ⟦num|+{0}⟧', values: [[20, 36, 52, 68, 84, 100, 116, 132, 156]] },
+      { name: 'ULT Efficiency [L]', tag: null, text: 'Ultimate Gain Efficiency ⟦num|+{0}%⟧', values: [[5.95, 10.71, 15.48, 20.24, 25, 29.76, 34.52, 39.29, 46.43]] },
+      { name: 'Detonate', tag: null, text: 'ATK ⟦num|+{0}%⟧. Wielder…', values: [[16, 19.2, 22.4, 25.6, 28.8, 32, 35.2, 38.4, 44.8]] },
+    ],
+  };
+  const arcane = {
+    mainAttribute: 'Intellect',
+    secondaryAttribute: 'Will',
+    talents: [{ name: 'Keen Mind/Stalwart', levels: [8, 10, 10, 15].map((n) => ({ requires: '', description: `Operator Intellect and Will +${n}.` })) }],
+    potentials: [],
+  };
+  const loadout: Loadout = { weapon: 'w', armor: 'armor', gloves: 'hand', kit1: 'slab', kit2: 'slab' };
+  const b = operatorBonuses(arcane, { potential: 0, loadout, weapon: { w: type42, potential: 0 }, items, sets });
+
+  it('matches Intellect 430, Will 765, HP 6950, ATK 4802 and DEF 140', () => {
+    const int = statTotal(176.44, b.get('Intellect'));
+    const will = statTotal(121.499, b.get('Will'));
+    expect(Math.trunc(int)).toBe(430);
+    expect(Math.round(will)).toBe(765);
+    // Attributes feed HP and ATK as whole numbers: Strength 91.855 → 91 → 455 HP.
+    expect(hpTotal(5495, b.get('HP'), Math.floor(statTotal(91.855, b.get('Strength')))).total).toBe(6950);
+    expect(Math.round(atkTotal(312, b.get('ATK'), Math.trunc(int), Math.round(will)).total)).toBe(4802);
+    expect(b.get('DEF')?.flat).toBe(140);
+  });
+
+  it('counts a lower Artifice level when one is set', () => {
+    const low = operatorBonuses(arcane, { loadout: { ...loadout, artifice: { gloves: 0 } }, weapon: { w: type42, potential: 0 }, items, sets });
+    expect(Math.trunc(statTotal(176.44, low.get('Intellect')))).toBe(418);
+  });
+});
+
+describe('ended banners', () => {
+  const at = (iso: string) => ({ americas: iso, asia: iso });
+  const schedule = {
+    versions: [],
+    banners: [
+      { name: 'Old', kind: 'chartered', rateUps: [], poolId: 'special_1_0_1', version: null, start: at('2026-01-01T00:00:00Z'), end: at('2026-02-01T00:00:00Z'), availability: null, art: null, posts: [] },
+      { name: 'Unpooled', kind: 'special', rateUps: [], poolId: null, version: null, start: at('2026-01-01T00:00:00Z'), end: at('2026-02-01T00:00:00Z'), availability: null, art: null, posts: [] },
+      { name: 'Now', kind: 'chartered', rateUps: [], poolId: 'special_1_1_1', version: null, start: at('2026-03-01T00:00:00Z'), end: at('2026-04-01T00:00:00Z'), availability: null, art: null, posts: [] },
+    ],
+  } as Schedule;
+  const ended = bannerEnded(schedule, 'americas', Date.parse('2026-03-10T00:00:00Z'));
+  const b = (poolId: string, name: string, category = 'chartered', done = false) => ({ poolId, name, category, pity: { done } });
+
+  it('goes by the schedule, by pool id or else by name', () => {
+    expect(ended(b('special_1_0_1', 'Old'))).toBe(true);
+    expect(ended(b('joint_9', 'Unpooled', 'joint'))).toBe(true);
+    expect(ended(b('special_1_1_1', 'Now'))).toBe(false);
+  });
+
+  it('never ends unscheduled pools; New Horizons ends at its 6★', () => {
+    expect(ended(b('standard', 'Basic Headhunting', 'basic'))).toBe(false);
+    expect(ended(b('beginner', 'New Horizons', 'newHorizons'))).toBe(false);
+    expect(ended(b('beginner', 'New Horizons', 'newHorizons', true))).toBe(true);
+  });
+});

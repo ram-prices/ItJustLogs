@@ -2,7 +2,7 @@ import type { Analysis } from '../../domain/analyze';
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { state } from '../../state';
 import { weeklyChart } from '../charts';
-import { icon, metric, metrics, pageHeader } from '../components';
+import { TAB_ICON, icon, metric, metrics, pageHeader } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 
 /** Stats: totals, pulls per week, and a per-patch breakdown table. */
@@ -20,7 +20,7 @@ function patchBanners(p: PatchStats): Html {
       const s = b.summary;
       const six = s ? s.pulls.filter((x) => x.rarity === 6).length : 0;
       const kind = b.kind === 'weap' ? 'Arsenal' : 'Headhunting';
-      const inner = html`${icon(b.kind === 'weap' ? 'swords' : 'inventory_2')}
+      const inner = html`${TAB_ICON[b.kind === 'weap' ? 'arsenal' : 'operators']}
         <span class="patch-banner-name ellipsis">${b.name}</span>
         <span class="patch-banner-when secondary">${b.start ? fmtDate(b.start) : kind}</span>
         <span class="patch-banner-pulls num${s?.paidPulls ? '' : ' tertiary'}">${s?.paidPulls ? `${fmtInt(s.paidPulls)} pulls` : 'No pulls'}</span>

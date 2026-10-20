@@ -3,7 +3,8 @@ import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { wieldersSection } from './loadout';
+import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Weapon info pages (/arsenal/info and /arsenal/info/<wpn id>): base ATK,
@@ -101,53 +102,65 @@ function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
   </section>`;
 }
 
+/** Base ATK at Lv 90, with every level's value one click away. */
 function statsSection(w: WikiWeapon): Html {
   const s = w.stats;
   if (!s) return html``;
+  let at = s.levels.indexOf(90);
+  if (at < 0) at = s.levels.length - 1;
   return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">Base ATK</h2></div>
-    <div class="card">
-      <div class="table-wrap">
-        <table class="table wiki-stats">
-          <thead><tr><th></th>${s.levels.map((l) => html`<th class="num">Lv ${l}</th>`)}</tr></thead>
-          <tbody><tr><td><span class="wiki-stat-name">Base ATK</span></td>${s.baseAtk.map((v) => html`<td class="num">${v ?? '–'}</td>`)}</tr></tbody>
-        </table>
-      </div>
+    <div class="section-head"><h2 class="heading-20">Base ATK</h2><span class="label-13 secondary">Lv ${s.levels[at] ?? 90}</span></div>
+    <div class="card wiki-accs">
+      <dl class="wiki-attrs">
+        <div class="main"><dt><span class="wiki-stat-name">Base ATK</span></dt><dd class="num">${s.baseAtk[at] ?? '–'}</dd></div>
+      </dl>
+      ${s.levels.length > 1
+        ? accordion(
+            'stats-levels',
+            html`<span class="wiki-acc-name secondary">Every level</span>`,
+            html`<div class="table-wrap">
+              <table class="table wiki-stats">
+                <thead><tr><th></th>${s.levels.map((l) => html`<th class="num">Lv ${l}</th>`)}</tr></thead>
+                <tbody><tr><td><span class="wiki-stat-name">Base ATK</span></td>${s.baseAtk.map((v) => html`<td class="num">${v ?? '–'}</td>`)}</tr></tbody>
+              </table>
+            </div>`,
+          )
+        : ''}
     </div>
   </section>`;
 }
 
 /**
- * The last skill is the one Potential raises: each copy adds 1 to its base
- * rank and its rank limit (1–4 at P0, up to 6–9 at P5). The first two rise
- * with tuning instead.
+ * One skill, with its own rank slider (each skill levels on its own). The
+ * last skill is the one Potential raises: each copy adds 1 to its base rank
+ * and its rank limit (1–4 at P0, up to 6–9 at P5), so its slider starts at
+ * the player's limit. The first two rise with essence instead.
  */
-function skillCard(s: WikiWeaponSkill, rank: number, isLast: boolean, owned: Owned | undefined): Html {
+function skillRow(id: string, i: number, s: WikiWeaponSkill, isLast: boolean, owned: Owned | undefined): Html {
   const p = owned?.copies ? owned.potential : null;
-  return html`<article class="card wiki-skill">
-    <div class="wiki-skill-head">
-      <span class="wiki-skill-type">${isLast ? 'Weapon skill · Potential' : `Weapon skill${s.tag ? ` · ${s.tag}` : ''}`}</span>
-      <h3 class="heading-16">${s.name}</h3>
-    </div>
-    <p class="copy-14 wiki-text">${s.text ? rich(s.text, s.values, rank) : html`<span class="secondary">No description on the wiki yet.</span>`}</p>
-    ${isLast
-      ? html`<p class="copy-13 secondary wiki-note">
-          Ranks 1–4 at P0; each Potential adds one, up to ${1 + MAX_POTENTIAL}–${MAX_RANK} at P${MAX_POTENTIAL}.
-          ${p !== null ? html`<span class="wiki-em">Yours: P${p}, ranks ${1 + p}–${4 + p}.</span>` : ''}
-        </p>`
-      : ''}
-  </article>`;
+  const key = `${id}:${i}`;
+  const rank = sliderRank(key, MAX_RANK, isLast && p !== null ? Math.min(MAX_RANK, 4 + p) : MAX_RANK);
+  return accordion(
+    `skill-${i}`,
+    html`<span class="wiki-acc-title min0"><span class="wiki-acc-name">${s.name}</span></span><span class="num wiki-acc-rank" title="Rank">${rank}</span>`,
+    html`<div class="wiki-rank-scope" data-rank-scope>
+      ${s.values.length ? rankSlider(key, MAX_RANK, rank) : ''}
+      <p class="copy-14 wiki-text">${s.text ? rich(s.text, s.values, rank) : html`<span class="secondary">No description on the wiki yet.</span>`}</p>
+      ${isLast
+        ? html`<p class="copy-13 secondary wiki-note">
+            Ranks 1–4 at P0; each Potential adds one, up to ${1 + MAX_POTENTIAL}–${MAX_RANK} at P${MAX_POTENTIAL}.
+            ${p !== null ? html`<span class="wiki-em">Yours: P${p}, ranks ${1 + p}–${4 + p}.</span>` : ''}
+          </p>`
+        : ''}
+    </div>`,
+  );
 }
 
-function skillsSection(w: WikiWeapon, owned: Owned | undefined): Html {
+function skillsSection(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
   if (!w.skills.length) return html``;
-  const rank = sliderRank('weap', MAX_RANK);
   return html`<section class="section">
-    <div class="section-head">
-      <h2 class="heading-20">Skills</h2>
-      ${rankSlider('weap', MAX_RANK)}
-    </div>
-    <div class="wiki-skills">${w.skills.map((s, i) => skillCard(s, rank, i === w.skills.length - 1 && w.skills.length > 1, owned))}</div>
+    <div class="section-head"><h2 class="heading-20">Skills</h2></div>
+    <div class="card wiki-accs">${w.skills.map((s, i) => skillRow(id, i, s, i === w.skills.length - 1 && w.skills.length > 1, owned))}</div>
   </section>`;
 }
 
@@ -192,15 +205,16 @@ function aboutSection(w: WikiWeapon): Html {
   </section>`;
 }
 
-function detailPage(id: string, w: WikiWeapon, attribution: WikiAttribution, a: Analysis | null): Html {
+function detailPage(id: string, w: WikiWeapon, attribution: WikiAttribution, a: Analysis | null, redraw: () => void): Html {
   const owned = ownedOf(a, 'weap')?.get(id);
   return html`${hero(id, w, owned)}
     <main class="container fade-in wiki-page">
       ${ownedSection('weap', w.name, a, owned)}
-      ${statsSection(w)}
-      ${skillsSection(w, owned)}
-      ${potentialSection(w, owned, !!a)}
-      ${tuningSection(w)}
+      ${wieldersSection(id, redraw)}
+      <div class="wiki-cols">
+        <div class="wiki-col">${statsSection(w)}${potentialSection(w, owned, !!a)}</div>
+        <div class="wiki-col">${skillsSection(id, w, owned)}${tuningSection(w)}</div>
+      </div>
       ${aboutSection(w)}
       ${credit(attribution, w.page)}
     </main>`;
@@ -232,7 +246,7 @@ export function weaponInfoPage(id: string | undefined, a: Analysis | null, redra
   const p = !w ? previews?.weapons[id] : undefined;
   if (p && previews) return weaponPreview(id, p, previews.attribution);
   if (!w) return statusPage('weap', 'Weapon info', html`There's no wiki data for this weapon yet. <a href="${weaponInfoHref()}">See all weapons</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
-  return detailPage(id, w, file.attribution, a);
+  return detailPage(id, w, file.attribution, a, redraw);
 }
 
 export function weaponInfoTitle(id: string | undefined): string {

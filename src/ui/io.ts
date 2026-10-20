@@ -1,8 +1,9 @@
 import { compareHistories, parseHistoryJson, type HistoryMatch } from '../domain/parse';
 import type { PullHistory } from '../domain/types';
-import { clearHistory, importHistory, setImage, state, updateSettings } from '../state';
-import { blobToDataUrl, dataUrlToBlob, type ChangeTimes, type Settings } from '../store';
+import { artChanged, clearHistory, importHistory, setImage, state, updateSettings } from '../state';
+import { allArtKeys, artBlob, blobToDataUrl, dataUrlToBlob, putArt, type ChangeTimes, type Settings } from '../store';
 import { toast } from './common';
+import { forgetLoadedArt } from './pages/art';
 
 /** Import (any supported file) and backup export. */
 
@@ -14,6 +15,12 @@ export interface Backup {
   history?: PullHistory | null;
   settings?: Settings;
   images?: Partial<Record<'avatar' | 'header', string>>;
+  /**
+   * The player's operator art (pages/art.ts), by key, as data URLs. Only in
+   * downloaded backups: the Drive copy leaves it out, since sync keeps each
+   * picture as a file of its own.
+   */
+  art?: Record<string, string>;
   changed?: ChangeTimes;
 }
 
@@ -30,8 +37,11 @@ export function exportHistory(): void {
   if (state.history) download(`endfield_pulls_${stamp()}.json`, JSON.stringify(state.history, null, 2));
 }
 
-/** Everything saved in this browser: pulls, settings and pictures (as data URLs). */
-export async function buildBackup(): Promise<Backup> {
+/**
+ * Everything saved in this browser: pulls, settings and pictures (as data
+ * URLs). `art`: also the operator art (downloaded backups; not the Drive copy).
+ */
+export async function buildBackup(opts: { art?: boolean } = {}): Promise<Backup> {
   const backup: Backup = {
     app: 'itjustlogs',
     version: 1,
@@ -44,11 +54,36 @@ export async function buildBackup(): Promise<Backup> {
     const url = state.images[slot];
     if (url) backup.images![slot] = await blobToDataUrl(await fetch(url).then((r) => r.blob()));
   }
+  if (opts.art) {
+    backup.art = {};
+    for (const key of await allArtKeys()) {
+      const blob = await artBlob(key);
+      if (blob) backup.art[key] = await blobToDataUrl(blob);
+    }
+  }
   return backup;
 }
 
 export async function exportBackup(): Promise<void> {
-  download(`itjustlogs_backup_${stamp()}.json`, JSON.stringify(await buildBackup()));
+  download(`itjustlogs_backup_${stamp()}.json`, JSON.stringify(await buildBackup({ art: true })));
+}
+
+/** A backup's operator art: the pictures this browser doesn't have (and wasn't told were removed). Returns how many. */
+async function restoreArt(art: Record<string, string> | undefined): Promise<number> {
+  if (!art) return 0;
+  const have = new Set(await allArtKeys());
+  const removed = new Set(state.settings.deletedArt ?? []);
+  let added = 0;
+  for (const [key, url] of Object.entries(art)) {
+    if (!key.startsWith('art:') || !url.startsWith('data:image/') || have.has(key) || removed.has(key)) continue;
+    await putArt(key, await dataUrlToBlob(url));
+    added++;
+  }
+  if (added) {
+    forgetLoadedArt();
+    artChanged();
+  }
+  return added;
 }
 
 /**
@@ -100,7 +135,8 @@ export async function importText(text: string, source: string, mode: ImportMode 
       const img = b.images?.[slot];
       if (img?.startsWith('data:image/')) await setImage(slot, await dataUrlToBlob(img));
     }
-    toast('Backup restored.');
+    const art = await restoreArt(b.art);
+    toast(art ? `Backup restored, with ${art} operator ${art === 1 ? 'picture' : 'pictures'}.` : 'Backup restored.');
     return;
   }
   const incoming = parseHistoryJson(text);

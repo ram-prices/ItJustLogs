@@ -12,16 +12,24 @@
 /** Controls (Expand), menus and toasts don't belong in the picture. */
 const skip = (node: Node) => !(node instanceof Element && node.matches('.ctx-menu, .toast, [data-action="expand-card"]'));
 
-/** The card as a PNG. */
+/**
+ * The card as a PNG: at rest (no hover glow or lift) and with square corners,
+ * which `.capturing` sets while it's drawn.
+ */
 export async function render(el: HTMLElement): Promise<Blob> {
   const { toBlob } = await import('html-to-image');
-  const blob = await toBlob(el, {
-    pixelRatio: Math.max(2, devicePixelRatio),
-    backgroundColor: getComputedStyle(document.body).backgroundColor,
-    filter: skip,
-  });
-  if (!blob) throw new Error("Couldn't draw the card.");
-  return blob;
+  el.classList.add('capturing');
+  try {
+    const blob = await toBlob(el, {
+      pixelRatio: Math.max(2, devicePixelRatio),
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
+      filter: skip,
+    });
+    if (!blob) throw new Error("Couldn't draw the card.");
+    return blob;
+  } finally {
+    el.classList.remove('capturing');
+  }
 }
 
 /** What happened to the picture. */

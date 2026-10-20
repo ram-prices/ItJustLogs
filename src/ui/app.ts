@@ -13,13 +13,17 @@ import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
 import { copyText, focusScheduleItem, homePage, installCopyMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
-import { bannerBodyFor, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
+import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
+import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
+import { pickLoadoutSlot, setArtifice, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage, togglePatch } from './pages/stats';
-import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow } from './sync';
+import { cropAvatar } from './cropper';
+import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncShown, syncView } from './sync';
+import { whenNear } from './near';
 import { installTint, tintSixStrip, tintWeaponCards } from './tint';
 
 /**
@@ -84,6 +88,27 @@ const root = () => document.getElementById('app')!;
 // Rendering
 // ---------------------------------------------------------------------------
 
+/**
+ * The header's right side once pulls are imported: the Google Drive sync
+ * button while sync is on, else nothing (Import lives in Settings then).
+ */
+function syncButton(): Html {
+  if (!syncShown()) return html``;
+  const { status, lastSynced, error } = syncView();
+  const busy = status === 'syncing';
+  const title =
+    status === 'reconnect' || status === 'paused'
+      ? 'Sync with Google Drive (needs a click each visit)'
+      : status === 'error'
+        ? `Sync failed: ${error}. Click to try again`
+        : busy
+          ? 'Syncing with Google Drive…'
+          : lastSynced
+            ? `Synced with Google Drive ${new Date(lastSynced).toLocaleString()}. Click to sync now`
+            : 'Sync with Google Drive';
+  return html`<button class="btn ${syncNeedsClick() ? 'primary' : 'secondary'} sm header-sync${busy ? ' busy' : ''}${status === 'error' ? ' failed' : ''}" data-action="sync-now" title="${title}" aria-label="${title}" ${raw(busy ? 'disabled' : '')}>${icon('sync')}<span class="hide-sm">${busy ? 'Syncing' : status === 'error' ? 'Retry sync' : 'Sync'}</span></button>`;
+}
+
 function header(route: Route): Html {
   const has = !!state.analysis;
   const name = state.settings.displayName || 'Endministrator';
@@ -98,8 +123,7 @@ function header(route: Route): Html {
             </div>`
         : ''}
       <span class="spacer"></span>
-      ${syncNeedsClick() ? html`<button class="btn secondary sm" data-action="sync-now" title="Sync with Google Drive">${icon('sync')}<span class="hide-sm">Sync</span></button>` : ''}
-      <button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>
+      ${has ? syncButton() : html`<button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>`}
     </div>
     <nav class="tabs" aria-label="Sections">
       ${TABS.map(([page, label]) => {
@@ -184,8 +208,14 @@ function draw(): void {
   const route = parseRoute();
   // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
   const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
-  render(root(), html`${header(route)}${page(route)}${footer()}`);
   const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}`;
+  // Banner cards fade in when a page opens, not again on every redraw.
+  if (key !== lastKey) {
+    resetCardEntrance();
+    // Operator pages pick a new random picture each time they open.
+    resetArtPick();
+  }
+  render(root(), html`${header(route)}${page(route)}${footer()}`);
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.
     const target = route.id && !route.info && document.getElementById(`banner-${route.id}`);
@@ -217,11 +247,16 @@ function draw(): void {
 function markOverflow(): void {
   for (const card of document.querySelectorAll<HTMLElement>('.banner')) {
     if (card.classList.contains('expanded')) continue;
-    const list = card.querySelector<HTMLElement>('.banner-scroll');
-    // Measure with Expand hidden (the list is taller then), so the answer
-    // doesn't depend on whether the button was showing.
-    card.classList.add('fits');
-    card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
+    // Offscreen cards skip layout (content-visibility), so measure each one
+    // as it nears the screen rather than forcing them all now.
+    whenNear(card, () => {
+      if (card.classList.contains('expanded')) return;
+      const list = card.querySelector<HTMLElement>('.banner-scroll');
+      // Measure with Expand hidden (the list is taller then), so the answer
+      // doesn't depend on whether the button was showing.
+      card.classList.add('fits');
+      card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
+    });
   }
   // The 6★ history only needs Show all when it runs past two rows.
   for (const section of document.querySelectorAll<HTMLElement>('.six-section:not(.open)')) {
@@ -334,17 +369,6 @@ function installImport(): void {
   });
 }
 
-/** Centre-crops a picture to a 256px square so the saved copy stays small. */
-async function squareAvatar(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 256;
-  canvas.getContext('2d')!.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 256, 256);
-  bitmap.close();
-  return new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error('Could not read the picture'))), 'image/webp', 0.9));
-}
-
 /** Personalization in Settings: profile picture and display name. */
 function installProfile(): void {
   document.getElementById('avatarInput')!.addEventListener('change', async (e) => {
@@ -353,7 +377,9 @@ function installProfile(): void {
     input.value = '';
     if (!file) return;
     try {
-      await setImage('avatar', await squareAvatar(file));
+      // The player frames it first (cropper.ts); Cancel keeps the old picture.
+      const blob = await cropAvatar(file);
+      if (blob) await setImage('avatar', blob);
     } catch {
       toast("That picture couldn't be opened. Try a PNG or JPG.", 'error');
     }
@@ -368,6 +394,9 @@ function installProfile(): void {
     if (el.dataset?.extraCopies) editExtra(Number(el.dataset.extraCopies), { copies: Math.max(1, Math.min(99, Math.floor(Number(el.value)) || 1)) });
     if (el.dataset?.extraNote) editExtra(Number(el.dataset.extraNote), { note: el.value.trim() });
     if (el.dataset?.extraId) editExtra(Number(el.dataset.extraId), { id: el.value });
+    // Loadout: a gear piece's Artifice level.
+    if (el.dataset?.artificeOp) setArtifice(el.dataset.artificeOp, el.dataset.artificeSlot!, Number(el.value));
+    if (el.dataset?.rankOp) setWeaponRank(el.dataset.rankOp, Number(el.dataset.rankIndex), Number(el.value));
   });
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLInputElement;
@@ -498,6 +527,23 @@ async function onClick(e: MouseEvent): Promise<void> {
       togglePatch(el.dataset.value!);
       draw();
       break;
+    case 'art-manage':
+      openArtManager(el.dataset.op!, el.dataset.name!, draw);
+      break;
+    case 'art-shuffle':
+      shuffleArt(el.dataset.op!, draw);
+      draw();
+      break;
+    case 'max-essence':
+      updateSettings({ maxEssence: state.settings.maxEssence === false });
+      break;
+    case 'attr-split':
+      toggleBonusSplit();
+      draw();
+      break;
+    case 'loadout-pick':
+      await pickLoadoutSlot(el.dataset.op!, el.dataset.slot!, state.analysis, draw);
+      break;
     case 'extra-add': {
       const id = (document.getElementById('extraItem') as HTMLSelectElement | null)?.value;
       if (!id) break;
@@ -567,6 +613,8 @@ async function onClick(e: MouseEvent): Promise<void> {
 export function mount(): void {
   installImageFallback();
   installTint();
+  installCardGlow();
+  installSlideshows();
   installTooltips();
   installImport();
   installTimelineLabels();

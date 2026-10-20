@@ -91,6 +91,9 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
   return `${EF_ASSETS}/${kind === 'char' ? 'operators' : 'arsenals'}/${id}.webp`;
 }
 
+/** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
+export const gearIconUrl = (gearId: string): string => `${EF_ASSETS}/gear/${gearId}.webp`;
+
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
   // Constant Issues have ef-assets art (rebuilt from the weapon render); other constant pools don't.

@@ -5,6 +5,7 @@
  * weapon's main colour instead (`weaponTint`). Results are cached by image
  * URL so re-renders paint the glow immediately.
  */
+import { whenNear } from './near';
 
 /** Shown until the art has loaded (or if the colour can't be read). */
 export const DEFAULT_TINT = 'rgba(255, 255, 255, 0.1)';
@@ -129,37 +130,44 @@ export function tintSixStrip(): void {
 /**
  * Tints each card that has one rate-up from that item's icon
  * (`data-tint-item`): the weapon for Arsenal, the operator (skin left out,
- * `data-tint-skin`) for Headhunting. The icon is loaded off-page; call after
- * each render.
+ * `data-tint-skin`) for Headhunting. The icon is loaded off-page, for each
+ * card as it nears the screen; call after each render.
  */
 export function tintWeaponCards(): void {
-  for (const card of document.querySelectorAll<HTMLElement>('.banner[data-tint-item]')) {
-    const url = card.dataset.tintItem!;
-    const skipSkin = card.hasAttribute('data-tint-skin');
-    if (cache.has(url) || pending.has(url)) continue;
-    pending.add(url);
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      let tint = DEFAULT_TINT;
-      try {
-        tint = weaponColour(img, skipSkin);
-      } catch {
-        // not CORS-clean: keep the default glow
-      }
-      cache.set(url, tint);
-      pending.delete(url);
-      paintSix(url, tint);
-      for (const c of document.querySelectorAll<HTMLElement>('.banner[data-tint-item]')) {
-        if (c.dataset.tintItem === url) c.style.setProperty('--banner-tint', tint);
-      }
-    };
-    img.onerror = () => {
-      pending.delete(url);
-      cache.set(url, DEFAULT_TINT);
-    };
-    img.src = url;
+  for (const card of document.querySelectorAll<HTMLElement>('.banner[data-tint-item]')) whenNear(card, () => tintCard(card));
+}
+
+function tintCard(card: HTMLElement): void {
+  const url = card.dataset.tintItem!;
+  const skipSkin = card.hasAttribute('data-tint-skin');
+  const known = cache.get(url);
+  if (known) {
+    card.style.setProperty('--banner-tint', known);
+    return;
   }
+  if (pending.has(url)) return;
+  pending.add(url);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    let tint = DEFAULT_TINT;
+    try {
+      tint = weaponColour(img, skipSkin);
+    } catch {
+      // not CORS-clean: keep the default glow
+    }
+    cache.set(url, tint);
+    pending.delete(url);
+    paintSix(url, tint);
+    for (const c of document.querySelectorAll<HTMLElement>('.banner[data-tint-item]')) {
+      if (c.dataset.tintItem === url) c.style.setProperty('--banner-tint', tint);
+    }
+  };
+  img.onerror = () => {
+    pending.delete(url);
+    cache.set(url, DEFAULT_TINT);
+  };
+  img.src = url;
 }
 
 function extract(img: HTMLImageElement): string {

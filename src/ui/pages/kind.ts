@@ -2,7 +2,7 @@ import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPu
 import { bannerArtUrl, itemIconUrl } from '../../domain/banners';
 import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
-import { poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
+import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
 import type { Schedule, Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
 import { badge, heat, icon, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
@@ -166,17 +166,23 @@ export interface ListOptions {
  * A banner the player didn't pull on (shown with "All banners"): its art,
  * name, rate-up and dates, nothing to expand.
  */
-function unpulledCard(c: CatalogBanner): Html {
+function unpulledCard(c: CatalogBanner, i = 0): Html {
   const weaponId = c.rateUpIds.find((id) => id.startsWith('wpn_'));
   const weapon = weaponId ? itemIconUrl('weap', weaponId) : '';
   const url = c.art ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
+  // Coloured like a pulled card: from its one rate-up when it has one (see
+  // tintWeaponCards), else from the art.
+  const operators = c.rateUpIds.filter((id) => id.startsWith('chr_'));
+  const item = (c.kind === 'weap' ? weapon : operators.length === 1 ? itemIconUrl('char', operators[0]) : '') ?? '';
+  const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${c.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
+  const tint = item ? '' : raw('data-tint');
   const img = url
-    ? html`<img src="${url}" alt="" loading="lazy" decoding="async" data-fallback data-alt="${weapon}" />`
+    ? html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`
     : weapon
-      ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" data-fallback />`
+      ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`
       : '';
   const when = c.start ? `${fmtDate(c.start)} – ${c.end ? fmtDate(c.end) : 'open'}` : 'Permanent';
-  return html`<article class="card banner unpulled" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}">
+  return html`<article class="card banner unpulled${enter(`unpulled:${c.poolId ?? c.name}`)}" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}" ${tintAttr} style="--banner-tint:${tintFor(item || url)};--i:${i}">
     <div class="banner-art">
       ${img}
       <div class="banner-art-text">
@@ -191,16 +197,39 @@ function unpulledCard(c: CatalogBanner): Html {
   </article>`;
 }
 
+/**
+ * Banner cards light up under the pointer: a glow in the banner's colour
+ * follows it around the card (--mx/--my, see .banner in styles.css).
+ */
+export function installCardGlow(): void {
+  document.addEventListener('pointermove', (e) => {
+    const card = (e.target as Element | null)?.closest?.<HTMLElement>('.banner, .sched-card');
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+    card.style.setProperty('--my', `${e.clientY - r.top}px`);
+  });
+}
+
+/**
+ * Cards that have played their fade-in since the page opened: a redraw
+ * (data loading, sync, a setting) draws them without it.
+ */
+const entered = new Set<string>();
+export const resetCardEntrance = (): void => entered.clear();
+const enter = (key: string): string => (entered.has(key) ? '' : (entered.add(key), ' enter'));
+
 /** The banner cards: pulled ones, plus (with `showAll`) every other banner that has opened, by opening date. */
 function bannerCards(kind: Kind, banners: BannerSummary[], opts: ListOptions): { cards: Html[]; total: number } {
-  if (!opts.showAll) return { cards: banners.map((b) => bannerSection(b)), total: banners.length };
+  const ended = bannerEnded(opts.schedule, opts.server);
+  if (!opts.showAll) return { cards: banners.map((b, i) => bannerSection(b, ended(b), i)), total: banners.length };
   const starts = poolStarts(opts.schedule, opts.server);
   const extra = unpulledBanners(kind, banners, opts.db, opts.schedule, opts.server);
   const items = [
-    ...banners.map((b) => ({ basic: b.category === 'basic', at: starts.get(b.poolId) ?? b.firstTs, card: () => bannerSection(b) })),
-    ...extra.map((c) => ({ basic: c.poolId === 'standard', at: c.start ?? -Infinity, card: () => unpulledCard(c) })),
+    ...banners.map((b) => ({ basic: b.category === 'basic', at: starts.get(b.poolId) ?? b.firstTs, card: (i: number) => bannerSection(b, ended(b), i) })),
+    ...extra.map((c) => ({ basic: c.poolId === 'standard', at: c.start ?? -Infinity, card: (i: number) => unpulledCard(c, i) })),
   ].sort((x, y) => Number(y.basic) - Number(x.basic) || y.at - x.at);
-  return { cards: items.map((i) => i.card()), total: items.length };
+  return { cards: items.map((it, i) => it.card(i)), total: items.length };
 }
 
 export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
@@ -323,16 +352,36 @@ function rewardProgress(b: BannerSummary): string {
   return `${fmtInt(n)} ${n === 1 ? 'pull' : 'pulls'}`;
 }
 
-function bannerSection(b: BannerSummary): Html {
+/**
+ * The pity counter at the top of a card. New Horizons ends at its first 6★
+ * (by pull 40 at the latest), so it shows the pull that 6★ came on.
+ */
+function pityStat(b: BannerSummary, ended: boolean): Html {
+  const unit = b.kind === 'weap' ? ' sets of 10' : '';
+  const color = ended || b.pity.done ? 'var(--gray-700)' : heat(b.pity.value, b.pity.max);
+  if (b.category === 'newHorizons') {
+    const six = b.pulls.find((p) => p.rarity === 6 && p.pity !== null);
+    const n = six ? six.pity! : b.pity.value;
+    const say = six ? `First 6★ on pull ${n} of ${b.pity.max}; the banner has ended` : `${n} of ${b.pity.max}: a 6★ is certain by pull ${b.pity.max}, and the banner ends at the first one`;
+    return html`<span class="glance-stat" style="color:${color}" title="${say}" aria-label="6★ pity: ${say}">${hourglass(six ? 1 : n / b.pity.max)}<b>${n}</b><i>/${b.pity.max} or first 6★</i></span>`;
+  }
+  const say = b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${unit}${ended ? ' (banner ended)' : ''}`;
+  return html`<span class="glance-stat" style="color:${color}" title="6★ pity: ${say}" aria-label="6★ pity ${say}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>`;
+}
+
+/**
+ * One banner card. `ended`: the banner has closed, so its counters and ruler
+ * go gray. `i`: its place in the list, which staggers the cards' fade-in.
+ */
+function bannerSection(b: BannerSummary, ended = false, i = 0): Html {
   const key = bannerKey(b);
-  const pityColor = b.pity.done ? 'var(--gray-700)' : heat(b.pity.value, b.pity.max);
   const { art: artSrc, weapon, item } = artUrls(b);
   const src = artSrc || weapon;
   // Cards with one rate-up glow in its own colour (the weapon's, or the
   // operator's with skin left out), not the banner art's.
   const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${b.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
   const open = expanded.has(key);
-  return html`<article class="card banner${open ? ' expanded' : ''}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)}">
+  return html`<article class="card banner${open ? ' expanded' : ''}${ended ? ' ended' : ''}${enter(key)}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)};--i:${i}">
     <div class="banner-summary">
       <div class="banner-art">
         ${art(b)}
@@ -343,12 +392,12 @@ function bannerSection(b: BannerSummary): Html {
       </div>
       <div class="banner-glance">
         <div class="glance-row">
-          <span class="glance-stat" style="color:${pityColor}" title="6★ pity: ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}" aria-label="6★ pity ${b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${b.kind === 'weap' ? ' sets of 10' : ''}`}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>
+          ${pityStat(b, ended)}
           ${b.rewards
             ? html`<span class="glance-stat glance-reward" title="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()} (${b.rewards.goal})" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${b.rewards.nextReward === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
             : ''}
         </div>
-        ${pityRuler(b)}
+        ${pityRuler(b, ended)}
       </div>
     </div>
     <div class="banner-body">${bannerBody(b)}</div>
@@ -368,6 +417,12 @@ function bannerSection(b: BannerSummary): Html {
 // % of the axis between pin centres: a 26px portrait plus its 2px ring (30px)
 // on a ~300px ruler, so neighbours sit side by side (just touching on phones).
 const PIN_MIN_GAP = 10;
+/**
+ * How wide a pin holding `n` portraits is, in single pins: a single pin is
+ * 30px with its ring; an oval is 26px per icon, 2px padding each side and
+ * the 2px ring.
+ */
+const pinWidth = (n: number) => (n > 1 ? 26 * n + 8 : 30) / 30;
 /** More pins than this on one side of the track switch to compact markers. */
 const MAX_FULL_PINS = 10;
 /** Basic Headhunting's ruler covers only this many of the latest pulls. */
@@ -376,30 +431,36 @@ const BASIC_WINDOW = 300;
 const CROWDED_STYLE: 'tick' | 'dot' = 'tick';
 /**
  * Lays out pins and teardrop markers on one side of the track. Items that would
- * touch form a group, PIN_MIN_GAP apart and centred on the mean of their true
- * spots, so neighbours spread out evenly either side of where they point.
- * Groups stay inside [3.5, hi of their last item]; groups that meet merge and
- * are re-centred. `pcts` must be in ascending order.
+ * touch form a group, spaced by their widths (`ws`, in pins: a pin holding two
+ * portraits is wider) and centred on the mean of their true spots, so
+ * neighbours spread out evenly either side of where they point. Groups stay
+ * inside [0, hi of their last item], squeezing if they must; groups that meet
+ * merge and are re-centred. `pcts` must be in ascending order.
  */
-function declutter(pcts: number[], his: number[]): number[] {
+function declutter(pcts: number[], his: number[], ws: number[] = pcts.map(() => 1)): number[] {
   // The ruler's padding leaves room for half a pin past either end, so a pin
   // at the very first or last pull sits straight over its spot.
   const lo = 0;
-  type Group = { first: number; n: number; sum: number; gap: number; left: number };
+  const gapAfter = (i: number) => (PIN_MIN_GAP * (ws[i] + ws[i + 1])) / 2;
+  type Group = { first: number; n: number; sum: number; offsets: number[]; left: number };
   const place = (g: Group) => {
     const hi = his[g.first + g.n - 1];
-    g.gap = g.n > 1 ? Math.min(PIN_MIN_GAP, (hi - lo) / (g.n - 1)) : 0;
-    const span = (g.n - 1) * g.gap;
-    g.left = Math.max(lo, Math.min(hi - span, g.sum / g.n - span / 2));
+    const full: number[] = [0];
+    for (let k = 1; k < g.n; k++) full.push(full[k - 1] + gapAfter(g.first + k - 1));
+    const span = full[g.n - 1];
+    const squeeze = span > hi - lo ? (hi - lo) / span : 1;
+    g.offsets = full.map((x) => x * squeeze);
+    const mean = g.offsets.reduce((s, x) => s + x, 0) / g.n;
+    g.left = Math.max(lo, Math.min(hi - span * squeeze, g.sum / g.n - mean));
   };
-  let groups: Group[] = pcts.map((p, i) => ({ first: i, n: 1, sum: p, gap: 0, left: p }));
+  let groups: Group[] = pcts.map((p, i) => ({ first: i, n: 1, sum: p, offsets: [0], left: p }));
   groups.forEach(place);
   for (let merged = true; merged; ) {
     merged = false;
     const out: Group[] = [];
     for (const g of groups) {
       const prev = out[out.length - 1];
-      if (prev && g.left - (prev.left + (prev.n - 1) * prev.gap) < PIN_MIN_GAP - 0.01) {
+      if (prev && g.left - (prev.left + prev.offsets[prev.n - 1]) < gapAfter(g.first - 1) - 0.01) {
         prev.n += g.n;
         prev.sum += g.sum;
         place(prev);
@@ -409,11 +470,11 @@ function declutter(pcts: number[], his: number[]): number[] {
     groups = out;
   }
   const out: number[] = [];
-  for (const g of groups) for (let k = 0; k < g.n; k++) out.push(g.left + k * g.gap);
+  for (const g of groups) for (let k = 0; k < g.n; k++) out.push(g.left + g.offsets[k]);
   return out;
 }
 
-function pityRuler(b: BannerSummary): Html {
+function pityRuler(b: BannerSummary, ended = false): Html {
   const max = b.pity.max;
   // Arsenal rulers count sets of 10 (the game treats each set as one pull);
   // everything else counts single pulls.
@@ -426,20 +487,21 @@ function pityRuler(b: BannerSummary): Html {
   const from = b.category === 'basic' ? Math.max(0, done - BASIC_WINDOW) : 0;
   const pct = (n: number) => Math.max(0, Math.min(100, ((n - from) / (axis - from)) * 100));
   const clamp = (x: number) => Math.max(3.5, Math.min(96.5, x));
-  const fillColor = b.kind === 'char' ? 'var(--op)' : 'var(--ars)';
-  const heatColor = heat(b.pity.value, max);
+  // A closed banner's ruler is a record, not a goal: all gray, nothing ahead.
+  const fillColor = ended ? 'var(--gray-600)' : b.kind === 'char' ? 'var(--op)' : 'var(--ars)';
+  const heatColor = ended ? 'var(--gray-700)' : heat(b.pity.value, max);
 
   // Second line: the current pity run, from the last 6★ (or carried-in pity)
   // to now, then faintly on to where hard pity would hit.
   const runStart = done - b.pity.value;
   const hardAt = runStart + max;
   const run = b.pity.done ? '' : html`<i class="ruler-run" style="left:${pct(runStart)}%;width:${pct(done) - pct(runStart)}%;background:${heatColor}"></i>`;
-  const ahead = !b.pity.done && hardAt > done ? html`<i class="ruler-ahead" style="left:${pct(done)}%;width:${pct(hardAt) - pct(done)}%;background:${heatColor}"></i>` : '';
+  const ahead = !ended && !b.pity.done && hardAt > done ? html`<i class="ruler-ahead" style="left:${pct(done)}%;width:${pct(hardAt) - pct(done)}%;background:${heatColor}"></i>` : '';
 
   // One item per pin or teardrop; `draw` gets its laid-out spot and `dx`, how
   // far its true spot is from there (in % of the ruler). CSS turns each tip
   // to aim at the true spot (see .ruler-body).
-  type Item = { at: number; hi: number; draw: (left: number, dx: number) => Html };
+  type Item = { at: number; hi: number; w?: number; draw: (left: number, dx: number) => Html };
   const items = { above: [] as Item[], below: [] as Item[] };
 
   // Milestones as teardrop markers: the rate-up guarantee (when it lands
@@ -468,7 +530,7 @@ function pityRuler(b: BannerSummary): Html {
       items[below ? 'below' : 'above'].push({
         at: pct(at),
         hi: 100,
-        draw: (left, dx) => html`<div class="ruler-mark ${passed ? 'passed' : 'ahead'}${below ? ' below' : ''}" style="left:${left}%;--dx:${dx}" aria-label="${name}, ${where}" data-tip="${tip(name, [tipNote(rewardInfo(name, b.kind)), tipRow(sets ? 'Set' : 'Pull', String(at)), tipRow('Status', passed ? 'Earned' : at === nextReward ? 'Next' : 'Coming up')])}">
+        draw: (left, dx) => html`<div class="ruler-mark ${passed ? 'passed' : 'ahead'}${below ? ' below' : ''}" style="left:${left}%;--dx:${dx}" aria-label="${name}, ${where}" data-tip="${tip(name, [tipNote(rewardInfo(name, b.kind)), tipRow(sets ? 'Set' : 'Pull', String(at)), tipRow('Status', passed ? 'Earned' : ended ? 'Not reached' : at === nextReward ? 'Next' : 'Coming up')])}">
           <span class="ruler-mark-label">${at}</span><span class="ruler-mark-drop">${name === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(name), true)}</span>
         </div>`,
       });
@@ -495,19 +557,31 @@ function pityRuler(b: BannerSummary): Html {
         }),
       ];
     }
+    // 6★ from the same Arsenal set share one pin: their portraits side by
+    // side in one oval over a single pointer. `list` is in pull
+    // order, so a set's 6★ are next to each other.
+    const bySpot: AnalyzedPull[][] = [];
+    for (const p of list) {
+      const last = bySpot[bySpot.length - 1];
+      if (last && posOf(last[0]) === posOf(p)) last.push(p);
+      else bySpot.push([p]);
+    }
+    const pinTitle = (p: AnalyzedPull) =>
+      sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`;
     const all = [
       ...items[side],
-      ...list.map((p): Item => ({
-        at: pct(posOf(p)),
+      ...bySpot.map((g): Item => ({
+        at: pct(posOf(g[0])),
         hi: 100,
-        draw: (left, dx) => html`<div class="ruler-pin ${side}" style="left:${left}%;--dx:${dx}" title="${sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`}">
-          <span class="ruler-pin-label">${posOf(p)}</span>
-          <a href="${infoHref(p.kind, p.itemId)}" aria-label="${p.name} info">${itemImg(p.kind, p.itemId, 'ruler-portrait')}</a>
+        w: pinWidth(g.length),
+        draw: (left, dx) => html`<div class="ruler-pin ${side}" style="left:${left}%;--dx:${dx}" title="${g.map(pinTitle).join('\n')}">
+          <span class="ruler-pin-label">${posOf(g[0])}</span>
+          <span class="ruler-pin-heads${g.length > 1 ? ' multi' : ''}">${g.map((p) => html`<a href="${infoHref(p.kind, p.itemId)}" aria-label="${p.name} info">${itemImg(p.kind, p.itemId, 'ruler-portrait')}</a>`)}</span>
           <span class="ruler-pin-point"></span>
         </div>`,
       })),
     ].sort((x, y) => x.at - y.at);
-    const spots = declutter(all.map((it) => it.at), all.map((it) => it.hi));
+    const spots = declutter(all.map((it) => it.at), all.map((it) => it.hi), all.map((it) => it.w ?? 1));
     return all.map((it, i) => it.draw(spots[i], Math.round((it.at - spots[i]) * 100) / 100));
   };
   const above = sideOf('above', sixes.filter((p) => p.isRateUp));

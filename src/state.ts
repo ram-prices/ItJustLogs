@@ -30,10 +30,16 @@ export const subscribe = (fn: () => void): void => void listeners.add(fn);
 const emit = () => listeners.forEach((fn) => fn());
 
 /** What a change touched: Google Drive sync uploads after the player's own changes. */
-export type Change = 'history' | 'historyCleared' | 'settings' | store.ImageSlot | 'everything';
+export type Change = 'history' | 'historyCleared' | 'settings' | store.ImageSlot | 'art' | 'everything';
 const changeListeners = new Set<(c: Change) => void>();
 export const onChange = (fn: (c: Change) => void): void => void changeListeners.add(fn);
 const changed = (c: Change) => changeListeners.forEach((fn) => fn(c));
+
+/** Operator art changed (pages/art.ts): redraw, and (unless sync brought it) let sync upload it. */
+export function artChanged(fromSync = false): void {
+  emit();
+  if (!fromSync) changed('art');
+}
 
 /** Newest pull time in a history (ms), 0 if empty. */
 function newestPull(h: PullHistory): number {

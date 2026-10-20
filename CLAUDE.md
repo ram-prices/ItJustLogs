@@ -77,6 +77,17 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   them: each visit needs one click (header Sync button / Sync now). The token
   lives in sessionStorage only. Google's script is loaded only when the sync
   card is shown or sync is on; no other visitor ever contacts Google.
+  - Operator art (`ui/pages/art.ts`): pictures the player uploads or links
+    to on an operator's page (a link is downloaded once, never hotlinked;
+    sites that block cross-site downloads get an "upload it instead"
+    message). Stored in IndexedDB (`art:<op id>:<id>`), shrunk to 2560px
+    WebP. Each picture shows where the player picks (`settings.artPlaces`:
+    banner, character picture, page background, Gallery slideshow), a random
+    one per spot each visit. Sync copies each picture to its own appData
+    file named by its key (`syncArt`), not into the backup file; removals
+    travel as `settings.deletedArt` tombstones. Downloaded full backups do
+    include it (`Backup.art`, data URLs; `buildBackup({ art: true })`), and
+    importing one restores pictures this browser lacks.
   - It's off unless the build has `VITE_GOOGLE_CLIENT_ID` (a public value).
     Locally: put `VITE_GOOGLE_CLIENT_ID=...` in `.env.local` (gitignored). On
     Pages: the deploy workflow reads the repo variable `GOOGLE_CLIENT_ID`

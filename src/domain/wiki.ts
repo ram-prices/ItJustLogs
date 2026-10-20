@@ -251,6 +251,36 @@ export interface WikiWeaponFile {
   weapons: Record<string, WikiWeapon>;
 }
 
+/** A gear piece (wiki/gear.json); `type` is Armor, Gloves or Kit. */
+export interface WikiGear {
+  name: string;
+  type: string;
+  rarity: number;
+  level: number | null;
+  artifice: boolean;
+  region: string | null;
+  set: string | null;
+  defense: number | null;
+  /** Up to three stats, each with its value at every Artifice level. */
+  stats: { stat: string; values: number[] }[];
+  source: string | null;
+  page: string;
+}
+
+export interface WikiGearSet {
+  name: string;
+  level: number | null;
+  region: string | null;
+  manufacturer: string | null;
+  effect: string;
+  page: string;
+}
+
+export interface WikiGearFile {
+  attribution: WikiAttribution;
+  gear: { items: Record<string, WikiGear>; sets: Record<string, WikiGearSet> };
+}
+
 /** "ATK +{0}%" → ['ATK +', 0, '%']: text pieces and placeholder indexes. */
 export function splitPlaceholders(s: string): (string | number)[] {
   return s.split(/\{(\d+)\}/).map((part, i) => (i % 2 ? Number(part) : part)).filter((p) => p !== '');

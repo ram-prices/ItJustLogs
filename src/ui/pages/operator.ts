@@ -1,10 +1,14 @@
 import type { Analysis } from '../../domain/analyze';
 import { endministratorOf, ENDMINISTRATORS, extrasOf, isEndministrator, type Owned } from '../../domain/owned';
 import { state } from '../../state';
+import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
+import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
+import { canShuffle, currentArt, gallerySection, positionOf } from './art';
+import { atkValue, bonusesFor, hpValue, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
-import { copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
+import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
  * Operator info pages (/operators/info and /operators/info/<chr id>): class,
@@ -55,6 +59,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
             </div>
           </section>`
         : ''}
+      ${soon.length ? html`<div class="section-head wiki-all-head"><h2 class="heading-20">All operators</h2><span class="label-13 secondary">${ops.length}</span></div>` : ''}
       <div class="wiki-grid">
         ${ops.map(([id, o]) => {
           const mine = owned?.get(id);
@@ -76,11 +81,20 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
 // One operator
 // ---------------------------------------------------------------------------
 
-function hero(id: string, o: WikiOperator, owned: Owned | undefined): Html {
-  return html`<section class="wiki-hero">
-    ${itemImg('char', id, 'wiki-hero-bg')}
+/**
+ * The page's header: the operator's facts over the player's banner art (or a
+ * soft glow of their portrait), with the player's character picture in place
+ * of the portrait when they picked one (pages/art.ts).
+ */
+function hero(id: string, o: WikiOperator, owned: Owned | undefined, redraw: () => void, overBackdrop = false): Html {
+  const banner = currentArt(id, 'banner', redraw);
+  const portrait = currentArt(id, 'portrait', redraw);
+  return html`<section class="wiki-hero${banner ? ' has-art' : ''}${overBackdrop ? ' over-backdrop' : ''}">
+    ${banner
+      ? html`<img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="object-position:${positionOf(banner.id)[0]}% ${positionOf(banner.id)[1]}%" alt="" decoding="async" />`
+      : itemImg('char', id, 'wiki-hero-bg')}
     <div class="container wiki-hero-inner">
-      ${itemImg('char', id, 'wiki-hero-portrait')}
+      ${portrait ? html`<img class="wiki-hero-portrait user-art" src="${portrait.src}" alt="" decoding="async" />` : itemImg('char', id, 'wiki-hero-portrait')}
       <div class="min0 wiki-hero-text">
         ${crumbs('char', o.name)}
         <div class="wiki-stars" style="color:var(--r${o.rarity})" aria-label="${o.rarity} star">${'★'.repeat(o.rarity)}</div>
@@ -95,12 +109,17 @@ function hero(id: string, o: WikiOperator, owned: Owned | undefined): Html {
         ${o.tags.length ? html`<div class="wiki-tags">${o.tags.map((t) => badge(t, 'outline'))}</div>` : ''}
       </div>
       <div class="row wiki-hero-link">
+        ${canShuffle(id, redraw) ? html`<button type="button" class="btn secondary sm" data-action="art-shuffle" data-op="${id}" title="Pick other pictures for the banner, picture and background">${icon('shuffle')}<span class="hide-sm">Shuffle</span></button>` : ''}
+        <button type="button" class="btn secondary sm" data-action="art-manage" data-op="${id}" data-name="${o.name}" title="Add pictures for this page's banner">${icon('image')}<span class="hide-sm">Art</span></button>
         ${copyLinkButton(id)}
         <a class="btn secondary sm" href="${o.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
       </div>
     </div>
   </section>`;
 }
+
+/** Stats every operator starts with (in %), which bonuses add to: the game shows 100% + 89.1% as 189.1%. */
+const BASE_PERCENT: Record<string, number> = { 'Ultimate Gain Efficiency': 100 };
 
 const STAT_ROWS: [keyof NonNullable<WikiOperator['stats']>, string][] = [
   ['hp', 'HP'],
@@ -111,15 +130,72 @@ const STAT_ROWS: [keyof NonNullable<WikiOperator['stats']>, string][] = [
   ['will', 'Will'],
 ];
 
-function statsSection(o: WikiOperator): Html {
+/**
+ * Attributes at Lv 90 (where nearly everyone's operators sit), with every
+ * level's table one click away. `bonuses`: what talents, the player's
+ * Potential and loadout add; values show totals (Breakdown splits them), and
+ * stats without a base value (DEF, DMG bonuses...) get rows of their own.
+ */
+function statsSection(o: WikiOperator, bonuses: Map<string, Bonus> | null, potential: number | null): Html {
   const s = o.stats;
   if (!s) return html``;
   const tag = (label: string) =>
     label === o.mainAttribute ? badge('Main', 'purple') : label === o.secondaryAttribute ? badge('Secondary') : '';
+  // Lv 90, else the highest level the wiki lists.
+  let at = s.levels.findIndex((l) => l.level === 90);
+  if (at < 0) at = s.levels.length - 1;
+  const rows = STAT_ROWS.filter(([k]) => Array.isArray(s[k]));
+  const shown = new Set<string>([...rows.map(([, label]) => label), 'Critical rate', 'DEF', 'Ultimate Gain Efficiency']);
+  // Ultimate Gain Efficiency (100% + bonuses) opens the breakpoint table.
+  const ugeBonus = bonuses?.get('Ultimate Gain Efficiency');
+  const ugeValue = withBonus(100, ugeBonus, (n) => `${Math.round(n * 10) / 10}%`, true);
+  const ult = ultimateEnergy(o, potential);
+  const def = bonuses?.get('DEF');
+  // ATK and HP grow with the attributes' totals (atkTotal, hpTotal), as the
+  // whole numbers the game shows: Strength 91.855 gives 91 × 5 HP, not 459.
+  const totalOf = (label: string | null) => {
+    const k = STAT_ROWS.find(([, l]) => l === label)?.[0];
+    return k && Array.isArray(s[k]) ? Math.floor(statTotal((s[k] as number[])[at], bonuses?.get(label!))) : 0;
+  };
+  const opAtk = s.atk?.[at] ?? 0;
+  const opHp = s.hp?.[at] ?? 0;
+  const hp = hpTotal(opHp, bonuses?.get('HP'), totalOf('Strength'));
+  const treatment = totalOf('Will') * TREATMENT_PER_WILL;
+  const atk = atkTotal(opAtk, bonuses?.get('ATK'), totalOf(o.mainAttribute), totalOf(o.secondaryAttribute));
+  const others = [...(bonuses ?? [])].filter(([k]) => !shown.has(k)).sort(([x], [y]) => x.localeCompare(y));
   return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">Attributes</h2></div>
-    <div class="card">
-      <div class="table-wrap">
+    <div class="section-head"><h2 class="heading-20">Attributes</h2><span class="row label-13 secondary">Lv ${s.levels[at]?.level ?? 90}${bonuses?.size ? splitToggle() : ''}</span></div>
+    <div class="card wiki-accs">
+      <dl class="wiki-attrs">
+        ${rows.map(
+          ([k, label]) => html`<div class="${label === o.mainAttribute ? 'main' : ''}">
+            <dt><span class="wiki-stat-name">${label}${tag(label)}</span></dt>
+            <dd class="num">${k === 'atk' ? atkValue(opAtk, bonuses?.get('ATK'), atk, o.mainAttribute, o.secondaryAttribute) : k === 'hp' ? hpValue(opHp, bonuses?.get('HP'), hp) : withBonus((s[k] as number[])[at], bonuses?.get(label))}</dd>
+          </div>`,
+        )}
+        <div class="minor"><dt>Critical rate</dt><dd class="num">${s.critRate != null ? withBonus(s.critRate * 100, bonuses?.get('Critical rate'), (n) => `${Math.round(n * 10) / 10}%`, true) : '–'}</dd></div>
+        <div class="minor"><dt>Attack speed</dt><dd class="num">${s.attackSpeed ?? '–'}</dd></div>
+        <div class="minor"><dt>Range</dt><dd>${s.range ?? '–'}</dd></div>
+        ${def ? html`<div class="minor loadout-only"><dt>DEF</dt><dd class="num"><span class="attr-note">${defReduction(def.flat).toFixed(1)}% less DMG taken</span>${loadoutOnly(def)}</dd></div>` : ''}
+        ${treatment ? html`<div class="minor"><dt>Treatment received</dt><dd class="num" title="0.1% per point of Will">+${Math.round(treatment * 10) / 10}%</dd></div>` : ''}
+        ${others.map(([k, b]) =>
+          BASE_PERCENT[k] != null
+            ? html`<div class="minor"><dt>${k}</dt><dd class="num">${withBonus(BASE_PERCENT[k], b, (n) => `${Math.round(n * 10) / 10}%`, true)}</dd></div>`
+            : html`<div class="minor loadout-only"><dt>${k}</dt><dd class="num">${loadoutOnly(b)}</dd></div>`,
+        )}
+      </dl>
+      ${ult
+        ? html`<div class="bp-acc">${accordion(
+            'ult-breakpoints',
+            html`<span class="wiki-acc-title min0"><span>Ultimate Gain Efficiency</span><span class="bp-hint">Breakpoints</span></span><span class="num bp-value">${ugeValue}</span>`,
+            breakpointsTable(o, ult, ugeBonus?.pct ?? 0),
+          )}</div>`
+        : html`<dl class="wiki-attrs"><div class="minor"><dt>Ultimate Gain Efficiency</dt><dd class="num">${ugeValue}</dd></div></dl>`}
+      ${s.levels.length > 1
+        ? accordion(
+            'stats-levels',
+            html`<span class="wiki-acc-name secondary">Every level</span>`,
+            html`<div class="table-wrap">
         <table class="table wiki-stats">
           <thead><tr><th></th>${s.levels.map((l) => html`<th class="num">Lv ${l.level}${l.promotion && l.level !== 90 ? html`<span class="wiki-promo" title="Elite ${l.promotion}">E${l.promotion}</span>` : ''}</th>`)}</tr></thead>
           <tbody>
@@ -131,45 +207,45 @@ function statsSection(o: WikiOperator): Html {
             )}
           </tbody>
         </table>
-      </div>
-      <div class="card-footer">
-        <span>Critical rate <b class="num wiki-em">${s.critRate != null ? `${Math.round(s.critRate * 1000) / 10}%` : '–'}</b></span>
-        <span>Attack speed <b class="num wiki-em">${s.attackSpeed ?? '–'}</b></span>
-        <span>Range <b class="wiki-em">${s.range ?? '–'}</b></span>
-      </div>
+      </div>`,
+          )
+        : ''}
     </div>
   </section>`;
 }
 
-function skillCard(s: WikiSkill, rank: number): Html {
-  return html`<article class="card wiki-skill">
-    <div class="wiki-skill-head">
-      <span class="wiki-skill-type">${s.type}</span>
-      <h3 class="heading-16">${s.name}</h3>
-    </div>
-    <p class="copy-14 wiki-text">${rich(s.description)}</p>
-    ${s.info ? html`<p class="copy-13 secondary wiki-text">${rich(s.info)}</p>` : ''}
-    ${s.values.length
-      ? html`<dl class="wiki-values">
-          ${s.values.map(
-            (v) => html`<div><dt>${v.label}</dt><dd class="num" data-ranks="${v.ranks.join('|')}">${v.ranks[Math.min(rank, v.ranks.length) - 1] ?? '–'}</dd></div>`,
-          )}
-        </dl>`
-      : ''}
-  </article>`;
+/** The head of a collapsible row: a small type label over the name. */
+const rowHead = (type: string | null, name: string): Html =>
+  html`<span class="wiki-acc-title min0">${type ? html`<span class="wiki-skill-type">${type}</span>` : ''}<span class="wiki-acc-name">${name}</span></span>`;
+
+/** One combat skill, with its own rank slider (each skill levels on its own; Lv 12 until moved). */
+function skillRow(key: string, sliderKey: string, s: WikiSkill): Html {
+  const rank = sliderRank(sliderKey, MAX_RANK);
+  return accordion(
+    key,
+    html`${rowHead(s.type, s.name)}${s.values.length ? html`<span class="num wiki-acc-rank" title="Rank">${rank}</span>` : ''}`,
+    html`<div class="wiki-rank-scope" data-rank-scope>
+      ${s.values.length ? rankSlider(sliderKey, MAX_RANK, rank) : ''}
+      <p class="copy-14 wiki-text">${rich(s.description)}</p>
+      ${s.info ? html`<p class="copy-13 secondary wiki-text">${rich(s.info)}</p>` : ''}
+      ${s.values.length
+        ? html`<dl class="wiki-values">
+            ${s.values.map(
+              (v) => html`<div><dt>${v.label}</dt><dd class="num" data-ranks="${v.ranks.join('|')}">${v.ranks[Math.min(rank, v.ranks.length) - 1] ?? '–'}</dd></div>`,
+            )}
+          </dl>`
+        : ''}
+    </div>`,
+  );
 }
 
-function skillsSection(o: WikiOperator): Html {
+function skillsSection(id: string, o: WikiOperator): Html {
   if (!o.skills.length) return html``;
-  const rank = sliderRank('char', MAX_RANK);
   return html`<section class="section">
-    <div class="section-head">
-      <h2 class="heading-20">Combat skills</h2>
-      ${rankSlider('char', MAX_RANK)}
-    </div>
+    <div class="section-head"><h2 class="heading-20">Combat skills</h2></div>
     ${skillSets(o.skills).map(
-      (set) => html`${set.variant ? html`<h3 class="heading-16 wiki-variant">${set.variant}</h3>` : ''}
-        <div class="wiki-skills">${set.skills.map((s) => skillCard(s, rank))}</div>`,
+      (set, si) => html`${set.variant ? html`<h3 class="wiki-skill-type wiki-variant">${set.variant}</h3>` : ''}
+        <div class="card wiki-accs">${set.skills.map((s, i) => skillRow(`skill-${si}-${i}`, `${id}:${si}:${i}`, s))}</div>`,
     )}
   </section>`;
 }
@@ -181,17 +257,17 @@ function potentialsSection(o: WikiOperator, owned: Owned | undefined, imported: 
   return html`<section class="section">
     <div class="section-head">
       <h2 class="heading-20">Potentials</h2>
-      ${imported ? html`<span class="label-13 secondary">${have > 0 ? `${have} of ${o.potentials.length} unlocked by your copies` : 'None unlocked yet'}</span>` : ''}
     </div>
-    <ol class="card wiki-list">
+    <div class="card wiki-accs wiki-pots">
       ${o.potentials.map((p) => {
         const on = p.rank <= have;
-        return html`<li class="${imported ? (on ? 'on' : 'off') : ''}">
-          <span class="wiki-pot" title="Unlocked at P${p.rank}">${on ? icon('check') : `P${p.rank}`}</span>
-          <div class="min0"><div class="label-14">${p.name}</div><p class="copy-14 secondary wiki-text">${rich(p.description)}</p></div>
-        </li>`;
+        return html`<div class="${imported ? (on ? 'on' : 'off') : ''}">${accordion(
+          `pot-${p.rank}`,
+          html`<span class="wiki-pot">${on ? icon('check') : `P${p.rank}`}</span>${rowHead(null, p.name)}`,
+          html`<p class="copy-14 secondary wiki-text">${rich(p.description)}</p>`,
+        )}</div>`;
       })}
-    </ol>
+    </div>
   </section>`;
 }
 
@@ -199,14 +275,15 @@ function talentsSection(o: WikiOperator): Html {
   if (!o.talents.length) return html``;
   return html`<section class="section">
     <div class="section-head"><h2 class="heading-20">Talents</h2></div>
-    <div class="wiki-skills">
-      ${o.talents.map(
-        (t) => html`<article class="card wiki-skill">
-          <div class="wiki-skill-head"><h3 class="heading-16">${t.name}</h3></div>
-          <ul class="wiki-levels">
+    <div class="card wiki-accs">
+      ${o.talents.map((t, i) =>
+        accordion(
+          `talent-${i}`,
+          rowHead(null, t.name),
+          html`<ul class="wiki-levels">
             ${t.levels.map((l) => html`<li>${l.requires ? html`<span class="wiki-req">${l.requires}</span>` : ''}<span class="copy-14 wiki-text">${rich(l.description)}</span></li>`)}
-          </ul>
-        </article>`,
+          </ul>`,
+        ),
       )}
     </div>
   </section>`;
@@ -216,14 +293,15 @@ function baseSkillsSection(o: WikiOperator): Html {
   if (!o.baseSkills.length) return html``;
   return html`<section class="section">
     <div class="section-head"><h2 class="heading-20">Base skills</h2></div>
-    <div class="wiki-skills">
-      ${o.baseSkills.map(
-        (b) => html`<article class="card wiki-skill">
-          <div class="wiki-skill-head"><span class="wiki-skill-type">${b.facility}</span><h3 class="heading-16">${b.name}</h3></div>
-          <ul class="wiki-levels">
+    <div class="card wiki-accs">
+      ${o.baseSkills.map((b, i) =>
+        accordion(
+          `base-${i}`,
+          rowHead(b.facility, b.name),
+          html`<ul class="wiki-levels">
             ${b.levels.map((l) => html`<li><span class="wiki-req">${[b.name + (l.grade ? ` ${l.grade}` : ''), l.requires].filter(Boolean).join(' · ')}</span><span class="copy-14 wiki-text">${rich(l.description)}</span></li>`)}
-          </ul>
-        </article>`,
+          </ul>`,
+        ),
       )}
     </div>
   </section>`;
@@ -250,16 +328,67 @@ function profileSection(o: WikiOperator): Html {
   </section>`;
 }
 
-function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a: Analysis | null): Html {
+/** Battle skills per rotation the breakpoint table goes through, and own combo skills. */
+const BP_BATTLE_SKILLS = [3, 4, 5, 6, 7, 8, 9];
+const BP_COMBOS = [1, 2, 3];
+
+/**
+ * How much Ultimate Gain Efficiency it takes to have the ultimate ready
+ * again after N battle skills (anyone's) and M of the operator's own combo
+ * skills (domain/ultimate.ts), with the player's own UGE marking what they
+ * already reach. Opens from the Ultimate Gain Efficiency row of Attributes.
+ */
+function breakpointsTable(o: WikiOperator, u: UltimateEnergy, uge: number): Html {
+  const combos = u.comboGain > 0 ? BP_COMBOS : [0];
+  const cols = u.teamEnergy ? BP_BATTLE_SKILLS : [0];
+  const pct = (n: number) => `${Math.round(n * 10) / 10}%`;
+  const cell = (b: number, c: number) => {
+    const need = requiredGain(u, b, c);
+    if (!Number.isFinite(need)) return html`<td class="num bp-none">–</td>`;
+    const met = uge + 1e-9 >= need;
+    return html`<td class="num${met ? ' bp-met' : ''}" title="${`${b} battle skills, ${c} combo skills: ${Math.round(rotationEnergy(u, b, c) * 10) / 10} energy; ${need ? `needs +${pct(need)}` : 'enough without any bonus'}`}">${need ? `+${Math.ceil(need)}%` : '0%'}</td>`;
+  };
+  return html`<div class="table-wrap">
+        <table class="table bp-table">
+          <thead>
+            ${u.teamEnergy ? html`<tr class="bp-group"><th></th><th colspan="${cols.length}">Battle skills per rotation</th></tr>` : ''}
+            <tr><th>Combos</th>${cols.map((b) => html`<th class="num">${u.teamEnergy ? b : 'Need'}</th>`)}</tr>
+          </thead>
+          <tbody>
+            ${combos.map((c) => html`<tr><td>${c}</td>${cols.map((b) => cell(b, c))}</tr>`)}
+          </tbody>
+        </table>
+      </div>
+      <p class="bp-note copy-13 secondary">
+          Ultimate Gain Efficiency needed, on top of 100%, to fill ${o.name}'s ultimate
+          (${Math.round(u.cost * 10) / 10} energy${u.cost !== u.baseCost ? `, ${u.baseCost} before Potential` : ''}) in one rotation.
+          ${u.teamEnergy ? `Each battle skill, anyone's, gives ${TEAM_ENERGY_PER_BATTLE_SKILL}; ` : `${o.name} gets no energy from teammates' battle skills; `}each of ${o.name}'s combo skills gives ${u.comboGain}.
+          Green: your ${pct(100 + uge)} reaches it.
+          ${u.extras.length ? html`<br />Not counted (depends on hits or stacks): ${u.extras.join(' · ')}.` : ''}
+      </p>`;
+}
+
+function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a: Analysis | null, redraw: () => void): Html {
   const owned = ownedOf(a, 'char')?.get(id);
-  return html`${hero(id, o, owned)}
-    <main class="container fade-in wiki-page">
+  const bonuses = bonusesFor(id, o, a, redraw);
+  const backdrop = currentArt(id, 'background', redraw);
+  return html`${backdrop ? html`<img class="op-backdrop" src="${backdrop.src}" alt="" decoding="async" />` : ''}
+    ${hero(id, o, owned, redraw, !!backdrop)}
+    <main class="container fade-in wiki-page${backdrop ? ' has-backdrop' : ''}">
       ${ownedSection('char', o.name, a, owned)}
-      ${statsSection(o)}
-      ${skillsSection(o)}
-      ${potentialsSection(o, owned, !!a)}
-      ${talentsSection(o)}
-      ${baseSkillsSection(o)}
+      <div class="wiki-cols even">
+        <div class="wiki-col">${statsSection(o, bonuses, owned?.copies ? owned.potential : null)}</div>
+        <div class="wiki-col">${loadoutSection(id, a, redraw)}</div>
+      </div>
+      <div class="wiki-cols even">
+        <div class="wiki-col">${skillsSection(id, o)}</div>
+        <div class="wiki-col">${potentialsSection(o, owned, !!a)}</div>
+      </div>
+      <div class="wiki-cols even">
+        <div class="wiki-col">${talentsSection(o)}</div>
+        <div class="wiki-col">${baseSkillsSection(o)}</div>
+      </div>
+      ${gallerySection(id, redraw)}
       ${profileSection(o)}
       ${credit(attribution, o.page)}
     </main>`;
@@ -292,7 +421,7 @@ export function operatorInfoPage(id: string | undefined, a: Analysis | null, red
   const p = !o ? previews?.operators[id] : undefined;
   if (p && previews) return operatorPreview(id, p, previews.attribution);
   if (!o) return statusPage('char', 'Operator info', html`There's no wiki data for this operator yet. <a href="${operatorInfoHref()}">See all operators</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
-  return detailPage(wikiId(id), o, file.attribution, a);
+  return detailPage(wikiId(id), o, file.attribution, a, redraw);
 }
 
 /** Tab title for the operator info pages. */

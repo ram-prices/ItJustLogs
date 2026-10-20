@@ -34,6 +34,26 @@ export function poolStarts(schedule: Schedule, server: Server): Map<string, numb
 }
 
 /**
+ * Whether a pulled-on banner is over: its scheduled window has closed (matched
+ * by pool id, else by name, since some scheduled banners have no pool id yet),
+ * or it's New Horizons and its one 6★ has dropped. Basic and other unscheduled
+ * pools never end.
+ */
+export function bannerEnded(schedule: Schedule, server: Server, now = Date.now()): (b: { poolId: string; name: string; category: string; pity: { done?: boolean } }) => boolean {
+  const byPool = new Map<string, Schedule['banners'][number]>();
+  const byName = new Map<string, Schedule['banners'][number]>();
+  for (const s of schedule.banners) {
+    if (s.poolId) byPool.set(canonicalPoolId(s.poolId), s);
+    byName.set(s.name.trim().toLowerCase(), s);
+  }
+  return (b) => {
+    if (b.category === 'newHorizons') return !!b.pity.done;
+    const s = byPool.get(canonicalPoolId(b.poolId)) ?? byName.get(b.name.trim().toLowerCase());
+    return !!s && statusOf(s, now, server) === 'ended';
+  };
+}
+
+/**
  * Banners of `kind` that have opened and that `pulled` (the player's banners,
  * by pool id and name) doesn't include. Newest first; unscheduled pools
  * (Basic, New Horizons, constant Issues) last.

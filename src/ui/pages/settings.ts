@@ -170,6 +170,11 @@ export function settingsPage(redraw: () => void): Html {
           <h2 class="heading-20">Pull history</h2>
           <p class="copy-14">${count ? `${fmtInt(count)} records saved. ` : ''}Each import is merged into what's saved, so pulls the game no longer shows are kept. You can also drop a file anywhere, or press <kbd>Ctrl</kbd> <kbd>V</kbd>.</p>
         </div>
+        <div class="card-body settings-sub">
+          <h3 class="heading-16">Get your pull history</h3>
+          <p class="copy-14">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. It needs no admin rights, changes no settings and downloads nothing else.</p>
+          ${getDataSteps()}
+        </div>
         <div class="card-footer"><span>Exports from the PowerShell script, EF Tracker or track.py all work.</span>
           <button class="btn primary sm" data-action="import">${icon('upload_file')}Import file</button></div>
       </section>
@@ -177,43 +182,30 @@ export function settingsPage(redraw: () => void): Html {
       <section class="card">
         <div class="card-body">
           <h2 class="heading-20">Personalization</h2>
-          <p class="copy-14">The name and picture at the top of every page.</p>
+          <p class="copy-14">Your name and picture at the top of every page, how the site looks, and your game server.</p>
           <div class="profile-edit">
             ${state.images.avatar ? html`<img class="avatar lg" src="${state.images.avatar}" alt="" />` : html`<span class="avatar lg"></span>`}
             <label class="field">
               <span>Display name</span>
               <input class="input" id="displayName" data-setting="displayName" maxlength="32" placeholder="Endministrator" value="${s.displayName}" autocomplete="off" spellcheck="false" />
             </label>
+            <div class="row profile-buttons">
+              ${state.images.avatar ? html`<button class="btn tertiary sm" data-action="avatar-remove">Remove</button>` : ''}
+              <button class="btn secondary sm" data-action="avatar-upload">${icon('upload_file')}Upload picture</button>
+            </div>
           </div>
         </div>
-        <div class="card-footer"><span>Pictures are cropped square and kept in this browser.</span>
-          <div class="row">
-            ${state.images.avatar ? html`<button class="btn tertiary sm" data-action="avatar-remove">Remove</button>` : ''}
-            <button class="btn secondary sm" data-action="avatar-upload">${icon('upload_file')}Upload picture</button>
-          </div></div>
-      </section>
-
-      <section class="card">
-        <div class="card-body">
-          <h2 class="heading-20">Get your pull history</h2>
-          <p class="copy-14">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. It needs no admin rights, changes no settings and downloads nothing else.</p>
-          ${getDataSteps()}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-body">
-          <h2 class="heading-20">Theme</h2>
-          <p class="copy-14">Follow your device, or pick one.</p>
-          ${toggleGroup('theme', [['dark', 'Dark'], ['light', 'Light'], ['system', 'System']], s.theme)}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-body">
-          <h2 class="heading-20">Server</h2>
-          <p class="copy-14">Banners open at the same local time on each server, 13 hours apart, so the schedule needs to know yours.${s.server ? '' : ' Guessed from your time zone for now.'}</p>
-          ${toggleGroup('server', [['americas', SERVER_LABEL.americas], ['asia', SERVER_LABEL.asia]], currentServer())}
+        <div class="card-body settings-sub settings-split">
+          <div>
+            <h3 class="heading-16">Theme</h3>
+            <p class="copy-14">Follow your device, or pick one.</p>
+            ${toggleGroup('theme', [['dark', 'Dark'], ['light', 'Light'], ['system', 'System']], s.theme)}
+          </div>
+          <div>
+            <h3 class="heading-16">Server</h3>
+            <p class="copy-14">Banners open at the same local time on each server, 13 hours apart.${s.server ? '' : ' Guessed from your time zone for now.'}</p>
+            ${toggleGroup('server', [['americas', SERVER_LABEL.americas], ['asia', SERVER_LABEL.asia]], currentServer())}
+          </div>
         </div>
       </section>
 
