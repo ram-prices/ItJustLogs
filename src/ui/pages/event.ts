@@ -1,5 +1,5 @@
-import { fmtPulls, pullsOf, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
-import { SERVER_LABEL, timeOn, type ScheduleEvent } from '../../domain/schedule';
+import { fmtPulls, pullsOf, withWikiEnds, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
+import { SERVER_LABEL, timeOn, type Server, type ScheduleEvent } from '../../domain/schedule';
 import { currentServer, state } from '../../state';
 import { badge, icon, itemName } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
@@ -11,10 +11,37 @@ import { credit, external, wikiFile } from './info';
  * pulls (Oroberyl over a pull's cost, plus HH Permits); then every item in
  * all; then the rewards mission by mission, day by day. Events whose wiki
  * page names rewards without amounts say so: their totals are "at least".
+ * An event the update notes leave open-ended takes the wiki's end, and one
+ * the wiki splits into phases lists them, with the one running now marked.
  */
 
-export const eventOf = (id: string | undefined): ScheduleEvent | undefined =>
-  id === undefined ? undefined : state.schedule.events?.find((e) => String(e.id) === id);
+export const eventOf = (id: string | undefined, file?: EventRewardsFile | null): ScheduleEvent | undefined =>
+  id === undefined ? undefined : withWikiEnds(state.schedule, file).events?.find((e) => String(e.id) === id);
+
+/** The event's phases with their dates on the player's server: each until the next starts, the last until the event ends. */
+function phases(r: EventRewards, e: ScheduleEvent, server: Server): Html {
+  if (!r.phases?.length) return html``;
+  const now = Date.now();
+  const starts = r.phases.map((p) => timeOn(p.start ?? e.start, server));
+  const ends = [...starts.slice(1), timeOn(e.end, server)];
+  return html`<section class="section">
+    <div class="section-head"><h2 class="heading-20">Phases</h2></div>
+    <div class="card event-phases">
+      ${r.phases.map((p, i) => {
+        const from = starts[i];
+        const to = ends[i];
+        const live = from != null && from <= now && (to == null || now < to);
+        return html`<div class="event-phase">
+          <div class="event-phase-head">
+            <b>${p.name}</b>${live ? badge('Now', 'green') : ''}
+            <span class="label-13 secondary">${from ? fmtDate(from, true) : 'Not announced'} – ${to ? fmtDate(to, true) : 'end TBA'}</span>
+          </div>
+          ${p.about ? html`<p class="copy-14">${p.about}</p>` : ''}
+        </div>`;
+      })}
+    </div>
+  </section>`;
+}
 
 const count = ([, n]: Reward) => (n === null ? '' : `×${fmtInt(n)}`);
 
@@ -67,12 +94,12 @@ function breakdown(r: EventRewards): Html {
 }
 
 export function eventPage(id: string | undefined, redraw: () => void): Html {
-  const e = eventOf(id);
+  const file = wikiFile<EventRewardsFile>('events.json', redraw);
+  const e = eventOf(id, file.data);
   const server = currentServer();
   if (!e)
     return html`<div class="page-header"><div class="container page-header-inner"><div class="min0"><h1 class="heading-32">Event not found</h1>
         <p class="copy-16">There's no event with that link in the schedule. <a href="/">Back to Home</a>.</p></div></div></div>`;
-  const file = wikiFile<EventRewardsFile>('events.json', redraw);
   const r = file.data?.events[String(e.id)];
   const start = timeOn(e.start, server);
   const end = timeOn(e.end, server);
@@ -92,6 +119,7 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
     </section>
     <main class="container fade-in">
       ${e.details ? html`<p class="copy-16 event-details">${e.details.replace(/\[|\]/g, '')}</p>` : ''}
+      ${r ? phases(r, e, server) : ''}
       ${r
         ? r.groups.length
           ? html`${summary(r)}${allItems(r)}${breakdown(r)}

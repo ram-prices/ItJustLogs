@@ -18,7 +18,8 @@ import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
 import { installParallax } from './parallax';
 import { syncVideoBackground } from './videoBackground';
 import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
-import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
+import { installWikiControls, shortLinkMap, statusPage, wikiFile } from './pages/info';
+import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
@@ -229,7 +230,7 @@ function page(route: Route): Html {
         : html`Nothing lives at <b>/${route.short}</b>. <a href="/">Go home</a>, or browse <a href="/operators/info">operators</a> and <a href="/arsenal/info">weapons</a>.`,
     );
   }
-  if (route.page === 'home') return homePage(state.schedule, currentServer(), a, draw);
+  if (route.page === 'home') return homePage(withWikiEnds(state.schedule, wikiFile<EventRewardsFile>('events.json', draw).data), currentServer(), a, draw);
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);

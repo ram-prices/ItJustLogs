@@ -4247,6 +4247,31 @@ a.patch-banner:hover {
   margin-top: 8px;
   color: var(--gray-900);
 }
+/* An event's phases (wiki), each with its dates on the player's server. */
+.event-phases {
+  overflow: hidden;
+}
+.event-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+}
+.event-phase + .event-phase {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.event-phase-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.event-phase-head .label-13 {
+  margin-left: auto;
+}
+.event-phase p {
+  color: var(--gray-900);
+}
 .event-partial {
   margin: -8px 0 12px;
 }
@@ -6261,10 +6286,11 @@ a.six-item {
   filter: blur(2px) saturate(0.85);
   -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
   mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
-  transition: opacity 1.2s var(--ease);
 }
+/* Fades in on Home; gone at once on leaving it, so it never lingers behind the next page. */
 .video-bg.shown {
   opacity: 0.35;
+  transition: opacity 1.2s var(--ease);
 }
 :root[data-theme='light'] .video-bg.shown {
   opacity: 0.22;
