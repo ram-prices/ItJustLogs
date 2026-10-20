@@ -3913,7 +3913,7 @@ a.patch-banner:hover {
   transform: translate(-50%, -50%);
   transition-duration: 0.1s;
 }
-/* Achievements and Archives (pages/collections.ts): category tabs down the side, one list at a time. */
+/* Achievements and Archive (pages/collections.ts): category tabs down the side, one list at a time. */
 .collection-layout {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);
@@ -3967,6 +3967,14 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   display: none;
 }
 /* Reading medals from a recording or screenshots (ui/medalReader.ts). */
+/* The drop overlay says what a drop will do: import pulls, or read medals on Achievements. */
+.drop-overlay .drop-medals,
+.drop-overlay.medals .drop-import {
+  display: none;
+}
+.drop-overlay.medals .drop-medals {
+  display: block;
+}
 .reader-dialog {
   width: min(620px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
@@ -4056,7 +4064,7 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
     text-align: left;
   }
 }
-/* Achievements and Archives (pages/collections.ts). */
+/* Achievements and Archive (pages/collections.ts). */
 .collection-group + .collection-group {
   margin-top: 20px;
 }

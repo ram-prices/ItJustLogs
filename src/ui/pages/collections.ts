@@ -3,11 +3,11 @@ import { state, updateSettings } from '../../state';
 import { icon, pageHeader, toggleGroup } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { credit } from './info';
-import { readMedals } from '../medalReader';
+import { readMedalFiles, readMedals } from '../medalReader';
 import { searchBox } from './search';
 
 /**
- * Achievements (the game's Medal Album) and Archives (its Intel Archives →
+ * Achievements (the game's Medal Album) and Archive (its Intel Archives →
  * Findings): every medal and finding from the wiki snapshots
  * (scripts/wiki-collections.mjs), and which ones the player has. That's
  * kept in settings (`medals`, `findings`), so it's in exports and Drive
@@ -50,6 +50,12 @@ function findingData(redraw: () => void): FindingFile | null {
     });
   }
   return null;
+}
+
+/** Reads medals from pasted or dropped files (app.ts), loading the medal list first if needed. */
+export async function readMedalsFrom(files: File[]): Promise<void> {
+  const data = medalFile ?? ((await import('../../data/medals.snapshot.json')).default as unknown as MedalFile);
+  await readMedalFiles(files, data.medals);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,8 +190,8 @@ export function achievementsPage(redraw: () => void): Html {
   };
   return html`${pageHeader(
       'Achievements',
-      `The game's Medal Album. You have ${got} of ${all.length} medals.`,
-      html`<button type="button" class="btn secondary sm" data-action="medal-read" title="Read acquired medals and their dates from a recording or screenshots of the Medal Album">${icon('document_scanner')}Read from video or screenshots</button>`,
+      `The game's Medal Album. You have ${got} of ${all.length} medals. Paste or drop a recording or screenshots of it here to fill this in.`,
+      html`<button type="button" class="btn secondary sm" data-action="medal-read" title="Read acquired medals and their dates from a recording or screenshots of the Medal Album. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
     )}
     <main class="container fade-in">
       <div class="collection-layout">
@@ -234,7 +240,7 @@ function subTabs(action: string, cats: string[], current: string, count: (cat: s
 }
 
 // ---------------------------------------------------------------------------
-// Archives
+// Archive
 // ---------------------------------------------------------------------------
 
 function findingTile(f: Finding, got: boolean): Html {
@@ -251,7 +257,7 @@ function findingTile(f: Finding, got: boolean): Html {
 
 export function archivesPage(redraw: () => void): Html {
   const data = findingData(redraw);
-  if (!data) return loadingPage('Archives');
+  if (!data) return loadingPage('Archive');
   const owned = findingsOwned();
   const all = data.findings;
   const got = all.filter((f) => owned.has(f.id)).length;
@@ -261,7 +267,7 @@ export function archivesPage(redraw: () => void): Html {
     const inCat = all.filter((f) => f.category === cat);
     return `${inCat.filter((f) => owned.has(f.id)).length}/${inCat.length}`;
   };
-  return html`${pageHeader('Archives', `The game's Intel Archives: every Finding. You have ${got} of ${all.length}.`)}
+  return html`${pageHeader('Archive', `The game's Intel Archives: every Finding. You have ${got} of ${all.length}.`)}
     <main class="container fade-in">
       <div class="collection-layout">
         ${subTabs('finding-tab', FINDING_CATEGORIES, tab.findings, count)}

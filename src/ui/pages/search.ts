@@ -3,7 +3,7 @@ import { html, type Html } from '../html';
 
 /**
  * Type-to-search for the operator and weapon lists (and Achievements and
- * Archives: anything marked data-search-item inside a data-search-section,
+ * Archive: anything marked data-search-item inside a data-search-section,
  * besides .wiki-tile / .wiki-type): typing anywhere on the
  * page shows the search in big letters in the middle of the screen (fading
  * a second after the last key) and hides the tiles whose text (name,
@@ -33,7 +33,7 @@ export function applyListSearch(): void {
   const main = input.closest('main');
   if (!main) return;
   const words = fold(input.value).split(/\s+/).filter(Boolean);
-  // Pages with category tabs (Achievements, Archives) show every tab's matches while searching.
+  // Pages with category tabs (Achievements, Archive) show every tab's matches while searching.
   main.classList.toggle('searching', words.length > 0);
   let shown = 0;
   for (const section of main.querySelectorAll<HTMLElement>('.wiki-type, [data-search-section]')) {

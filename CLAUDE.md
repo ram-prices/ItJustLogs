@@ -146,9 +146,9 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     `ui/html.ts` (`raw()` only for trusted markup).
   - Signature features of the old site (6★ portrait strip, pity ruler, luck
     curves, profile header) are being re-added one at a time in Geist style.
-- Achievements and Archives tabs (`ui/pages/collections.ts`, types in
+- Achievements and Archive tabs (`ui/pages/collections.ts`, types in
   `domain/collections.ts`): the game's Medal Album (154 medals) and Intel
-  Archives → Findings (Manuscripts, E-Files, Peculiars), one category tab at a
+  Archive → Findings (Manuscripts, E-Files, Peculiars), one category tab at a
   time; work without an import. Data is a wiki snapshot made by
   `scripts/wiki-collections.mjs` into `src/data/medals.snapshot.json` and
   `findings.snapshot.json` (lazy-loaded chunks; pictures hotlink

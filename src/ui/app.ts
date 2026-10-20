@@ -19,7 +19,7 @@ import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
-import { achievementsPage, archivesPage, collectionAction, collectionChange } from './pages/collections';
+import { achievementsPage, archivesPage, collectionAction, collectionChange, readMedalsFrom } from './pages/collections';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
@@ -42,7 +42,7 @@ const TABS: [Page, string][] = [
   ['arsenal', 'Arsenal'],
   ['stats', 'Stats'],
   ['achievements', 'Achievements'],
-  ['archives', 'Archives'],
+  ['archives', 'Archive'],
   ['settings', 'Settings'],
 ];
 const DATA_PAGES: Page[] = ['operators', 'arsenal', 'stats'];
@@ -376,6 +376,8 @@ function installImport(): void {
   addEventListener('dragenter', (e) => {
     if (!e.dataTransfer?.types.includes('Files')) return;
     depth++;
+    // On Achievements a dropped recording or screenshot is read for medals, not imported.
+    overlay.classList.toggle('medals', parseRoute().page === 'achievements');
     overlay.classList.add('on');
   });
   addEventListener('dragleave', () => {
@@ -389,11 +391,13 @@ function installImport(): void {
     e.preventDefault();
     depth = 0;
     overlay.classList.remove('on');
-    const file = e.dataTransfer?.files[0];
-    if (file) await runImport(await file.text(), file.name);
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (mediaToMedals(files)) return;
+    if (files[0]) await runImport(await files[0].text(), files[0].name);
   });
   addEventListener('paste', async (e) => {
     if ((e.target as HTMLElement).closest('input, textarea, [contenteditable]')) return;
+    if (mediaToMedals([...(e.clipboardData?.files ?? [])])) return e.preventDefault();
     const file = e.clipboardData?.files[0];
     const text = (e.clipboardData?.getData('text') ?? '').trim();
     if (file) await runImport(await file.text(), file.name);
@@ -408,6 +412,20 @@ function installImport(): void {
     input.value = '';
     if (file) await runImport(await file.text(), file.name);
   });
+}
+
+/**
+ * Videos and pictures pasted or dropped on the page: on Achievements they're
+ * read for medals (like its Read from video or screenshots button);
+ * elsewhere they can't be pull history, so say where to take them. True if
+ * there were any.
+ */
+function mediaToMedals(files: File[]): boolean {
+  const media = files.filter((f) => f.type.startsWith('video/') || f.type.startsWith('image/'));
+  if (!media.length) return false;
+  if (parseRoute().page === 'achievements') void readMedalsFrom(media);
+  else toast('To read medals from a recording or screenshots, open Achievements and paste or drop them there.', 'error');
+  return true;
 }
 
 /** Personalization in Settings: profile picture and display name. */
@@ -492,7 +510,7 @@ async function onClick(e: MouseEvent): Promise<void> {
   if (navigate(e)) return;
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
-  // Achievements and Archives handle their own buttons.
+  // Achievements and Archive handle their own buttons.
   if (collectionAction(el.dataset.action ?? '', el)) return draw();
   switch (el.dataset.action) {
     case 'import':

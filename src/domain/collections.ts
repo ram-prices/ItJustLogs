@@ -1,6 +1,6 @@
 /**
  * The game's medals (Path of Glory, shown as Achievements) and Findings
- * (Intel Archives, shown as Archives): types for the snapshots that
+ * (Intel Archives, shown as Archive): types for the snapshots that
  * scripts/wiki-collections.mjs takes from endfield.wiki.gg, and the
  * player's progress, which lives in settings (synced like the rest).
  */
