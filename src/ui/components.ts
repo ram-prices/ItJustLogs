@@ -1,6 +1,7 @@
 import { itemIconUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { html, raw, type Html } from './html';
+import { tintFor } from './tint';
 
 /** Small Geist-style building blocks shared by every page. */
 
@@ -51,6 +52,16 @@ export function itemImg(kind: Kind, itemId: string, cls = 'item-icon'): Html {
   const src = itemIconUrl(kind, itemId);
   if (!src) return html`<span class="${cls}"></span>`;
   return html`<img class="${cls}${kind === 'weap' ? ' weapon' : ''}" src="${src}" alt="" loading="lazy" decoding="async" data-fallback />`;
+}
+
+/**
+ * The soft colour glow behind an operator or weapon page's header: the item's
+ * main colour, like its banner card's (tint.ts tintHeroes fills it in).
+ */
+export function heroGlow(kind: Kind, itemId: string): Html {
+  const src = itemIconUrl(kind, itemId);
+  if (!src) return html``;
+  return html`<div class="wiki-hero-glow" data-hero-tint="${src}" ${raw(kind === 'char' ? 'data-hero-tint-skin' : '')} style="--banner-tint:${tintFor(src)}" aria-hidden="true"></div>`;
 }
 
 export const RARITY_COLOR: Record<number, string> = { 6: 'var(--r6)', 5: 'var(--r5)', 4: 'var(--r4)', 3: 'var(--r3)' };

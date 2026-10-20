@@ -265,6 +265,41 @@ export async function uploadArt(token: string, name: string, blob: Blob): Promis
 
 export const downloadArt = async (token: string, id: string): Promise<Blob> => (await call(token, `${API}/files/${id}?alt=media`)).blob();
 
+/**
+ * Version history copies in Drive: one JSON file each, named
+ * "snapshot:<id>", with what Version history lists in its appProperties
+ * (so listing them downloads none).
+ */
+export interface DriveSnapshot {
+  id: string;
+  name: string;
+  appProperties?: Record<string, string>;
+}
+
+export async function listSnapshotFiles(token: string): Promise<DriveSnapshot[]> {
+  const out: DriveSnapshot[] = [];
+  const q = encodeURIComponent("name contains 'snapshot:' and trashed = false");
+  for (let page: string | undefined = ''; page !== undefined; ) {
+    const r = await call(token, `${API}/files?spaces=appDataFolder&q=${q}&pageSize=1000&fields=nextPageToken,files(id,name,appProperties)${page ? `&pageToken=${page}` : ''}`);
+    const body = (await r.json()) as { files: DriveSnapshot[]; nextPageToken?: string };
+    out.push(...body.files.filter((f) => f.name.startsWith('snapshot:')));
+    page = body.nextPageToken;
+  }
+  return out;
+}
+
+export async function uploadSnapshot(token: string, name: string, props: Record<string, string>, json: string): Promise<void> {
+  const boundary = `ijl${crypto.randomUUID()}`;
+  const meta = JSON.stringify({ name, parents: ['appDataFolder'], mimeType: 'application/json', appProperties: props });
+  await call(token, `${UPLOAD}/files?uploadType=multipart&fields=id`, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body: `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`,
+  });
+}
+
+export const downloadText = async (token: string, id: string): Promise<string> => (await call(token, `${API}/files/${id}?alt=media`)).text();
+
 export const deleteFile = async (token: string, id: string): Promise<void> => {
   await call(token, `${API}/files/${id}`, { method: 'DELETE' }).catch((e) => {
     if (!(e instanceof DriveNotFound)) throw e;

@@ -2,13 +2,13 @@ import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator,
 import { SERVER_LABEL } from '../../domain/schedule';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
-import { MAX_SNAPSHOTS } from '../../store';
+import { MAX_DRIVE_SNAPSHOTS, MAX_SNAPSHOTS } from '../../store';
 import { EXPORTER_SOURCE } from '../guide';
 import { badge, icon, itemImg, pageHeader, toggleGroup } from '../components';
 import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { driveConfigured } from '../../drive';
-import { preloadSync, syncPending, syncView } from '../sync';
+import { driveSnapshots, preloadSync, syncPending, syncView } from '../sync';
 
 /** Settings, laid out like Vercel's: one card per topic with a footer for its action. */
 
@@ -161,7 +161,7 @@ function extrasCard(redraw: () => void): Html {
           : ''}
       </div>
     </div>
-    <div class="card-footer"><span>Saved with your settings: included in full backups and Google Drive sync, never in your pull history. Copies 1 = P0, 6 = max.</span></div>
+    <div class="card-footer"><span>Saved with your settings: included in exports of everything and Google Drive sync, never in your pull history. Copies 1 = P0, 6 = max.</span></div>
   </section>`;
 }
 
@@ -224,13 +224,13 @@ export function settingsPage(redraw: () => void): Html {
 
       <section class="card">
         <div class="card-body">
-          <h2 class="heading-20">Backup</h2>
-          <p class="copy-14">Download your pulls to keep a copy, or a full backup (pulls and settings) to move to another browser.</p>
+          <h2 class="heading-20">Export</h2>
+          <p class="copy-14">Export a copy of your pulls, or of everything (pulls, settings and your operator pictures), into a JSON file to keep or to move to another browser.</p>
         </div>
-        <div class="card-footer"><span>Restore a backup with Import file.</span>
+        <div class="card-footer"><span>Bring an export back in with Import file.</span>
           <div class="row">
             <button class="btn secondary sm" data-action="export-history" ${count ? '' : 'disabled'}>${icon('download')}Pulls</button>
-            <button class="btn secondary sm" data-action="export-backup">${icon('download')}Full backup</button>
+            <button class="btn secondary sm" data-action="export-backup">${icon('download')}Everything</button>
           </div></div>
       </section>
 
@@ -251,7 +251,7 @@ export function settingsPage(redraw: () => void): Html {
                     <button class="btn secondary sm" data-action="clear-cancel">Cancel</button>
                     <button class="btn error sm" data-action="clear-confirm" data-value="${confirmingDelete}">${icon('delete')}${confirmingDelete === 'pulls' ? 'Delete pulls' : 'Delete everything'}</button>
                   </div>`
-              : html`<span>Download a backup first if you want to keep anything.</span>
+              : html`<span>Export a copy first if you want to keep anything.</span>
                   <div class="row">
                     <button class="btn secondary sm" data-action="clear-all" data-value="all">Delete everything</button>
                     <button class="btn error sm" data-action="clear-all" data-value="pulls">${icon('delete')}Delete pull history</button>
@@ -267,19 +267,23 @@ export function settingsPage(redraw: () => void): Html {
  * saves the current pulls first, so it can be undone too.
  */
 function versionHistory(synced: boolean): Html {
-  const list = state.snapshots;
+  // This browser's copies, and (while synced) the ones in Google Drive from every device.
+  const here = new Set(state.snapshots.map((s) => s.id));
+  const drive = driveSnapshots();
+  const inDrive = new Set(drive.map((s) => s.id));
+  const list = [...state.snapshots.map((s) => ({ ...s, local: true })), ...drive.filter((s) => !here.has(s.id)).map((s) => ({ ...s, local: false }))].sort((a, b) => b.at - a.at);
   return html`<section class="card">
     <div class="card-body">
       <h2 class="heading-20">Version history</h2>
-      <p class="copy-14">A copy of your pulls is saved in this browser before anything changes them (an import, a delete, a restore or a Google Drive merge). The last ${MAX_SNAPSHOTS} are kept. Restore one if something went wrong; your current pulls are saved here first, so you can undo it.</p>
+      <p class="copy-14">A copy of your pulls is saved in this browser before anything changes them (an import, a delete, a restore or a Google Drive merge). The last ${MAX_SNAPSHOTS} are kept${driveConfigured() ? html`, and with Google Drive sync on, each copy is saved to your Drive too (the last ${MAX_DRIVE_SNAPSHOTS}), so any of your devices can restore it` : ''}. Restore one if something went wrong; your current pulls are saved here first, so you can undo it.</p>
       ${list.length
         ? html`<div class="versions">${list.map(
             (s) => html`<div class="version">
               <div class="min0">
-                <div class="version-when">${fmtDate(s.at, true)}</div>
+                <div class="version-when">${fmtDate(s.at, true)}${inDrive.has(s.id) ? html`<span class="version-drive" title="${s.local ? 'Also saved in Google Drive' : 'In Google Drive (saved on another device)'}">${icon(s.local ? 'cloud_done' : 'cloud')}${s.local ? '' : 'Google Drive'}</span>` : ''}</div>
                 <div class="version-what copy-13 secondary">${s.reason} · ${fmtInt(s.chars)} operator, ${fmtInt(s.weaps)} arsenal records</div>
               </div>
-              <button class="btn secondary sm" data-action="restore-snapshot" data-value="${s.id}">Restore</button>
+              <button class="btn secondary sm" data-action="${s.local ? 'restore-snapshot' : 'restore-drive-snapshot'}" data-value="${s.id}">Restore</button>
             </div>`,
           )}</div>`
         : html`<p class="copy-13 secondary versions-empty">No earlier versions yet.</p>`}

@@ -5,10 +5,11 @@ import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } f
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
 import { canShuffle, currentArt, gallerySection, positionOf } from './art';
+import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, icon, itemImg, rarity } from '../components';
+import { badge, heroGlow, icon, itemImg, rarity } from '../components';
 import { html, type Html } from '../html';
 import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
@@ -46,6 +47,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
       <p class="copy-16">Class, attributes, skills and talents for every operator${owned ? html`. You have ${have} of ${ops.length}` : ''}.</p>
     </div><div class="row">${kindNav('char', 'info')}</div></div></div>
     <main class="container fade-in">
+      <div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
       ${soon.length
         ? html`<section class="section wiki-type">
             <div class="section-head"><h2 class="heading-20">Unreleased</h2></div>
@@ -61,10 +63,9 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
             </div>
           </section>`
         : ''}
-      <div class="section-head${soon.length ? ' wiki-all-head' : ''} wiki-sort-head">${sortBar('char')}</div>
       ${groups.map(
         (g) => html`<section class="section wiki-type">
-          <div class="section-head"><h2 class="heading-20">${g.label || 'All operators'}</h2><span class="label-13 secondary">${g.items.length}</span></div>
+          <div class="section-head"><h2 class="heading-20">${g.label || 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
           <div class="wiki-grid">
             ${g.items.map(([id, o]) => {
               const mine = owned?.get(id);
@@ -80,6 +81,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
           </div>
         </section>`,
       )}
+      <p class="copy-14 secondary list-search-empty" hidden>No operators match your search.</p>
       ${credit(f.attribution)}
     </main>`;
 }
@@ -99,7 +101,7 @@ function hero(id: string, o: WikiOperator, owned: Owned | undefined, redraw: () 
   return html`<section class="wiki-hero${banner ? ' has-art' : ''}${overBackdrop ? ' over-backdrop' : ''}">
     ${banner
       ? html`<img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="object-position:${positionOf(banner.id)[0]}% ${positionOf(banner.id)[1]}%" alt="" decoding="async" />`
-      : itemImg('char', id, 'wiki-hero-bg')}
+      : heroGlow('char', id)}
     <div class="container wiki-hero-inner">
       ${portrait ? html`<img class="wiki-hero-portrait user-art" src="${portrait.src}" alt="" decoding="async" />` : itemImg('char', id, 'wiki-hero-portrait')}
       <div class="min0 wiki-hero-text">

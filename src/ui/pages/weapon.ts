@@ -1,10 +1,11 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, icon, itemImg, rarity } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, rarity } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { weaponBaseRanks, weaponRankCaps } from '../../domain/loadout';
 import { essenceTag, isMaxEssence, weaponRanksOf, wieldersSection } from './loadout';
+import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { accordion, copyLinkButton, credit, crumbs, external, infoHref, kindNav, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
@@ -36,6 +37,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
       <p class="copy-16">Base ATK, skills and Potential for every weapon${owned ? html`. You have ${have} of ${all.length}` : ''}.</p>
     </div><div class="row">${kindNav('weap', 'info')}</div></div></div>
     <main class="container fade-in">
+      <div class="section-head wiki-sort-head">${searchBox('weap')}${sortBar('weap')}</div>
       ${soon.length
         ? html`<section class="section wiki-type">
             <div class="section-head"><h2 class="heading-20">Unreleased</h2></div>
@@ -51,10 +53,9 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
             </div>
           </section>`
         : ''}
-      <div class="section-head${soon.length ? ' wiki-all-head' : ''} wiki-sort-head">${sortBar('weap')}</div>
       ${groups.map((g) => {
         return html`<section class="section wiki-type">
-          <div class="section-head"><h2 class="heading-20">${g.label || 'All weapons'}</h2><span class="label-13 secondary">${g.items.length}</span></div>
+          <div class="section-head"><h2 class="heading-20">${g.label || 'All weapons'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
           <div class="wiki-grid">
             ${g.items.map(([id, w]) => {
               const mine = owned?.get(id);
@@ -62,7 +63,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
                 ${itemImg('weap', id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${w.name}</span>
-                  <span class="label-12 secondary">${rarity(w.rarity)} · ${w.skills[w.skills.length - 1]?.tag ?? w.type}${mine?.copies && essenceTag(id, weaponRankCaps(w, mine.potential)) ? html` · ${essenceTag(id, weaponRankCaps(w, mine.potential))}` : ''}</span>
+                  <span class="label-12 secondary">${rarity(w.rarity)} · ${w.skills[w.skills.length - 1]?.tag ?? w.type}${mine?.copies && essenceTag(id, w, mine.potential) ? html` · ${essenceTag(id, w, mine.potential)}` : ''}</span>
                 </span>
                 ${ownedTag(mine)}
               </a>`;
@@ -70,6 +71,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
           </div>
         </section>`;
       })}
+      <p class="copy-14 secondary list-search-empty" hidden>No weapons match your search.</p>
       ${credit(f.attribution)}
     </main>`;
 }
@@ -80,7 +82,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
 
 function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
   return html`<section class="wiki-hero weapon">
-    ${itemImg('weap', id, 'wiki-hero-bg')}
+    ${heroGlow('weap', id)}
     <div class="container wiki-hero-inner">
       ${itemImg('weap', id, 'wiki-hero-portrait')}
       <div class="min0 wiki-hero-text">

@@ -29,7 +29,11 @@ const listeners = new Set<() => void>();
 export const subscribe = (fn: () => void): void => void listeners.add(fn);
 const emit = () => listeners.forEach((fn) => fn());
 
-/** What a change touched: Google Drive sync uploads after the player's own changes. */
+/**
+ * What a change touched: Google Drive sync uploads after the player's own
+ * changes. Change listeners hear it before the redraw, so the header already
+ * shows the sync it queued.
+ */
 export type Change = 'history' | 'historyCleared' | 'settings' | store.ImageSlot | 'art' | 'everything';
 const changeListeners = new Set<(c: Change) => void>();
 export const onChange = (fn: (c: Change) => void): void => void changeListeners.add(fn);
@@ -37,8 +41,8 @@ const changed = (c: Change) => changeListeners.forEach((fn) => fn(c));
 
 /** Operator art changed (pages/art.ts): redraw, and (unless sync brought it) let sync upload it. */
 export function artChanged(fromSync = false): void {
-  emit();
   if (!fromSync) changed('art');
+  emit();
 }
 
 /** Newest pull time in a history (ms), 0 if empty. */
@@ -89,12 +93,17 @@ export async function loadSnapshots(): Promise<void> {
 export async function restoreSnapshot(id: string): Promise<{ chars: number; weaps: number; savedCurrent: boolean }> {
   const copy = await store.loadSnapshot(id);
   if (!copy) throw new Error('That copy is no longer in version history.');
+  return restoreCopy(copy);
+}
+
+/** Replaces the pulls with `copy` (from version history here or in Google Drive), saving the current pulls first. */
+export async function restoreCopy(copy: PullHistory): Promise<{ chars: number; weaps: number; savedCurrent: boolean }> {
   const savedCurrent = await snapshot('Before restoring an older copy');
   await store.saveHistory(copy);
   state.history = copy;
   recompute();
-  emit();
   changed('history');
+  emit();
   return { chars: copy.characters.length, weaps: copy.weapons.length, savedCurrent };
 }
 
@@ -121,8 +130,8 @@ export async function importHistory(incoming: PullHistory, reason = 'Before impo
   await store.saveHistory(history);
   state.history = history;
   recompute();
-  emit();
   if (added.char || added.weap) changed('history');
+  emit();
   return added;
 }
 
@@ -143,8 +152,8 @@ export const currentServer = (): Server => state.settings.server ?? guessServer(
 export function updateSettings(patch: Partial<store.Settings>): void {
   state.settings = { ...state.settings, ...patch };
   store.saveSettings(state.settings);
-  emit();
   changed('settings');
+  emit();
 }
 
 export async function setImage(slot: store.ImageSlot, blob: Blob | null): Promise<void> {
@@ -156,8 +165,8 @@ export async function setImage(slot: store.ImageSlot, blob: Blob | null): Promis
     await store.deleteImage(slot);
     delete state.images[slot];
   }
-  emit();
   changed(slot);
+  emit();
 }
 
 export async function loadImages(): Promise<void> {
@@ -174,8 +183,8 @@ export async function clearHistory(reason = 'Before deleting pull history'): Pro
   await store.clearHistory();
   state.history = null;
   recompute();
-  emit();
   changed('historyCleared');
+  emit();
 }
 
 /** Deletes everything this site saved in the browser and resets the page to its empty state. */
@@ -186,6 +195,6 @@ export async function clearEverything(): Promise<void> {
   state.images = {};
   state.settings = store.loadSettings();
   recompute();
-  emit();
   changed('everything');
+  emit();
 }

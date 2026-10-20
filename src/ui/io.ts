@@ -136,7 +136,7 @@ export async function importText(text: string, source: string, mode: ImportMode 
       if (img?.startsWith('data:image/')) await setImage(slot, await dataUrlToBlob(img));
     }
     const art = await restoreArt(b.art);
-    toast(art ? `Backup restored, with ${art} operator ${art === 1 ? 'picture' : 'pictures'}.` : 'Backup restored.');
+    toast(art ? `Export imported, with ${art} operator ${art === 1 ? 'picture' : 'pictures'}.` : 'Export imported.');
     return;
   }
   const incoming = parseHistoryJson(text);

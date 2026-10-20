@@ -245,7 +245,7 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
   const list = bannerCards(kind, banners, opts);
 
   return html`
-    ${pageHeader(k.title, `${fmtInt(s.pulls)} pulls across ${banners.length} banners · ${s.uniqueItems} unique ${k.items}`, kindNav(kind, 'banners'), bannerCrumbs(kind))}
+    ${pageHeader(k.title, `${banners.length} banners · ${s.uniqueItems} unique ${k.items}`, kindNav(kind, 'banners'), bannerCrumbs(kind))}
     <main class="container fade-in">
       ${metrics(
         [

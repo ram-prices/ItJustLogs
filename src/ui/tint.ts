@@ -128,6 +128,45 @@ export function tintSixStrip(): void {
 }
 
 /**
+ * The operator and weapon pages' hero glow (`data-hero-tint`: the item's
+ * icon; `data-hero-tint-skin` for operators, skin left out): the same colour
+ * as its banner card, from the same cache.
+ */
+export function tintHeroes(): void {
+  for (const el of document.querySelectorAll<HTMLElement>('[data-hero-tint]')) {
+    const url = el.dataset.heroTint!;
+    const known = cache.get(url);
+    if (known) {
+      el.style.setProperty('--banner-tint', known);
+      continue;
+    }
+    if (pending.has(url)) continue;
+    pending.add(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let tint = DEFAULT_TINT;
+      try {
+        tint = weaponColour(img, el.hasAttribute('data-hero-tint-skin'));
+      } catch {
+        // not CORS-clean: keep the faint default glow
+      }
+      cache.set(url, tint);
+      pending.delete(url);
+      paintSix(url, tint);
+      for (const e of document.querySelectorAll<HTMLElement>('[data-hero-tint]')) {
+        if (e.dataset.heroTint === url) e.style.setProperty('--banner-tint', tint);
+      }
+    };
+    img.onerror = () => {
+      pending.delete(url);
+      cache.set(url, DEFAULT_TINT);
+    };
+    img.src = url;
+  }
+}
+
+/**
  * Tints each card that has one rate-up from that item's icon
  * (`data-tint-item`): the weapon for Arsenal, the operator (skin left out,
  * `data-tint-skin`) for Headhunting. The icon is loaded off-page, for each

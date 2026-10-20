@@ -72,7 +72,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   import, delete, replace, restore or Drive merge that changes the pulls, the
   previous pulls are saved in IndexedDB (`data` store, `snapshot:<id>` plus a
   `snapshots` index; last 15, identical copies skipped). Settings → Version
-  history lists them with Restore (which saves the current pulls first).
+  history lists them with Restore (which saves the current pulls first). While synced, each copy also goes to Drive as its own
+  appData file (`snapshot:<id>`, list fields in `appProperties`; `syncSnapshots`
+  in ui/sync.ts), the newest 30 from every device kept; Version history
+  lists them too (`meta.driveSnapshots`) and downloads one only to restore it
+  (then signs out, like any restore).
   Delete pull history keeps them; Delete everything clears them. Tokens last an hour and there's no backend to refresh
   them: each visit needs one click (header Sync button / Sync now). The token
   lives in sessionStorage only. Google's script is loaded only when the sync

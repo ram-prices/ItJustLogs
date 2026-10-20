@@ -3,8 +3,8 @@ import { legacyEventLinks } from '../domain/schedule';
 import { RESERVED_PATHS } from '../domain/wiki';
 import type { Kind } from '../domain/types';
 import type { Server } from '../domain/schedule';
-import { clearEverything, clearHistory, currentServer, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
-import type { ThemePref } from '../store';
+import { clearEverything, clearHistory, currentServer, restoreCopy, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
+import { loadTabViews, saveTabView, type ThemePref } from '../store';
 import { installTooltips } from './charts';
 import { installImageFallback, toast } from './common';
 import { LOGO, TAB_ICON, icon, pageHeader } from './components';
@@ -17,15 +17,16 @@ import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpa
 import { installWikiControls, shortLinkMap, statusPage } from './pages/info';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
+import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage, togglePatch } from './pages/stats';
 import { cropAvatar } from './cropper';
-import { installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncPending, syncShown, syncView } from './sync';
+import { downloadDriveSnapshot, installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncPending, syncQueued, syncShown, syncView } from './sync';
 import { whenNear } from './near';
-import { installTint, tintSixStrip, tintWeaponCards } from './tint';
+import { installTint, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
 
 /**
  * App shell and router. Layout follows the Vercel dashboard: a header with
@@ -96,7 +97,8 @@ const root = () => document.getElementById('app')!;
 function syncButton(): Html {
   if (!syncShown()) return html``;
   const { status, lastSynced, error } = syncView();
-  const busy = status === 'syncing';
+  // A change starts a sync a moment later: show Syncing straight away rather than Unsynced first.
+  const busy = status === 'syncing' || (status === 'idle' && syncQueued());
   const pending = syncPending();
   const when = lastSynced ? ` Last synced ${new Date(lastSynced).toLocaleString()}.` : '';
   const title =
@@ -127,6 +129,7 @@ function syncButton(): Html {
 
 function header(route: Route): Html {
   const has = !!state.analysis;
+  const tabViews = loadTabViews();
   const name = state.settings.displayName || 'Endministrator';
   return html`<header class="header"><div class="container">
     <div class="header-top">
@@ -143,8 +146,9 @@ function header(route: Route): Html {
     </div>
     <nav class="tabs" aria-label="Sections">
       ${TABS.map(([page, label]) => {
-        // Without an import, Operators and Arsenal open their info pages (game data, no pulls needed).
-        const info = !has && (page === 'operators' || page === 'arsenal');
+        // Operators and Arsenal open the view the player was last on (banners or the full list);
+        // without an import, always the list (game data, no pulls needed).
+        const info = (page === 'operators' || page === 'arsenal') && (!has || tabViews[page] === 'info');
         const disabled = !has && DATA_PAGES.includes(page) && !info;
         return html`<a class="tab tab-${page}" href="/${page === 'home' ? '' : info ? `${page}/info` : page}" aria-label="${label}" ${raw(route.page === page ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[page] ?? ''}<span>${label}</span></a>`;
       })}
@@ -228,6 +232,8 @@ function draw(): void {
   // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
   const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
   const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}`;
+  // Remember which view of Operators / Arsenal the player is on, for their tab next time.
+  if ((route.page === 'operators' || route.page === 'arsenal') && !route.id && state.analysis) saveTabView(route.page, route.info ? 'info' : 'banners');
   // Banner cards fade in when a page opens, not again on every redraw.
   if (key !== lastKey) {
     resetCardEntrance();
@@ -239,7 +245,10 @@ function draw(): void {
   // later redraws (a setting changed, Drive sync starting and finishing)
   // swap the page in place instead of flashing it.
   root().classList.toggle('settled', key === lastKey && Date.now() - openedAt > SETTLE_MS);
+  // A redraw while the player types a search keeps the box focused.
+  const searching = document.activeElement?.matches('[data-list-search]');
   render(root(), html`${header(route)}${page(route)}${footer()}`);
+  if (searching) refocusListSearch();
   if (key !== lastKey) {
     // /operators/<poolId> opens that banner's section and scrolls to it.
     const target = route.id && !route.info && document.getElementById(`banner-${route.id}`);
@@ -256,9 +265,11 @@ function draw(): void {
     if (route.focus) focusScheduleItem(route.focus, false);
   }
   lastKey = key;
+  applyListSearch();
   markOverflow();
   tintWeaponCards();
   tintSixStrip();
+  tintHeroes();
   const title = route.info ? (route.page === 'arsenal' ? weaponInfoTitle(route.id) : operatorInfoTitle(route.id)) : TABS.find(([p]) => p === route.page)?.[1];
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
@@ -615,6 +626,22 @@ async function onClick(e: MouseEvent): Promise<void> {
       }
       return;
     }
+    case 'restore-drive-snapshot': {
+      // Download it while still signed in, then sign out (so the removal never reaches Drive) and restore.
+      try {
+        const copy = await downloadDriveSnapshot(el.dataset.value!);
+        const signedOut = signOutBeforeLosingPulls();
+        const { chars, weaps, savedCurrent } = await restoreCopy(copy);
+        toast(
+          `Restored ${fmtInt(chars)} operator and ${fmtInt(weaps)} arsenal records from Google Drive.` +
+            (savedCurrent ? ' Your previous pulls were saved to version history.' : '') +
+            (signedOut ? ' This browser was signed out of Google Drive; the copy there is untouched.' : ''),
+        );
+      } catch (err) {
+        toast(`Couldn't restore: ${(err as Error).message}`, 'error');
+      }
+      return;
+    }
     case 'clear-all':
       setConfirmingDelete(el.dataset.value === 'pulls' ? 'pulls' : 'all');
       return draw();
@@ -655,6 +682,7 @@ export function mount(): void {
   installTimelineLabels();
   installCopyMenu();
   installWikiControls();
+  installListSearch();
   installProfile();
   installSync();
   document.addEventListener('click', (e) => void onClick(e));

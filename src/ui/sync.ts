@@ -1,7 +1,8 @@
 import { compareHistories, mergeHistories, missingPulls } from '../domain/parse';
 import * as drive from '../drive';
 import { artChanged, clearHistory, importHistory, onChange, setImage, state, updateSettings } from '../state';
-import { allArtKeys, artBlob, blobToDataUrl, dataUrlToBlob, deleteArt, loadSyncMeta, putArt, saveSyncMeta, type ChangeTimes } from '../store';
+import type { PullHistory } from '../domain/types';
+import { allArtKeys, artBlob, blobToDataUrl, dataUrlToBlob, deleteArt, listSnapshots, loadSnapshot, loadSyncMeta, MAX_DRIVE_SNAPSHOTS, putArt, saveSyncMeta, type ChangeTimes, type SnapshotInfo } from '../store';
 import { forgetLoadedArt } from './pages/art';
 import { toast } from './common';
 import { askSamePlayer } from './dialog';
@@ -175,6 +176,7 @@ async function syncWith(token: string): Promise<void> {
     meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), paused: false };
     save();
     await syncArt(token);
+    await syncSnapshots(token);
     return;
   }
   throw new Error('Another device kept changing the Drive copy. Try Sync now again in a moment.');
@@ -212,6 +214,50 @@ async function syncArt(token: string): Promise<void> {
     forgetLoadedArt();
     artChanged(true);
   }
+}
+
+/**
+ * Version history copies: each one this browser saved goes to Drive as a
+ * file of its own (drive.uploadSnapshot) unless it's there already, and
+ * Drive keeps the newest MAX_DRIVE_SNAPSHOTS from every device. Only their
+ * list is kept here (meta.driveSnapshots, for Settings → Version history);
+ * a copy is downloaded when the player restores it (downloadDriveSnapshot).
+ */
+async function syncSnapshots(token: string): Promise<void> {
+  const remote = await drive.listSnapshotFiles(token);
+  const inDrive = new Set(remote.map((f) => f.name.slice('snapshot:'.length)));
+  for (const s of await listSnapshots()) {
+    if (inDrive.has(s.id)) continue;
+    const h = await loadSnapshot(s.id);
+    if (!h) continue;
+    const props = { at: String(s.at), reason: s.reason, chars: String(s.chars), weaps: String(s.weaps), newest: String(s.newest) };
+    await drive.uploadSnapshot(token, `snapshot:${s.id}`, props, JSON.stringify(h));
+  }
+  const all = (await drive.listSnapshotFiles(token))
+    .map((f) => {
+      const p = f.appProperties ?? {};
+      return { id: f.name.slice('snapshot:'.length), fileId: f.id, at: Number(p.at) || 0, reason: p.reason ?? 'Saved copy', chars: Number(p.chars) || 0, weaps: Number(p.weaps) || 0, newest: Number(p.newest) || 0 };
+    })
+    .sort((a, b) => b.at - a.at);
+  for (const old of all.slice(MAX_DRIVE_SNAPSHOTS)) await drive.deleteFile(token, old.fileId);
+  meta = { ...meta, driveSnapshots: all.slice(0, MAX_DRIVE_SNAPSHOTS) };
+  save();
+}
+
+/** Version history copies in Google Drive (from every device), newest first; empty while signed out. */
+export const driveSnapshots = (): SnapshotInfo[] => (meta.on ? (meta.driveSnapshots ?? []) : []);
+
+/**
+ * Downloads one of Drive's version history copies. Call from a click: it may
+ * open Google's sign-in window if this visit hasn't connected yet.
+ */
+export async function downloadDriveSnapshot(id: string): Promise<PullHistory> {
+  const file = meta.driveSnapshots?.find((s) => s.id === id);
+  if (!file) throw new Error('That copy is no longer in Google Drive.');
+  const token = drive.currentToken() ?? (await drive.requestToken({ email: meta.email }));
+  const h = JSON.parse(await drive.downloadText(token, file.fileId)) as PullHistory;
+  if (!Array.isArray(h?.characters) || !Array.isArray(h?.weapons)) throw new Error("That file in Google Drive isn't a copy of your pulls.");
+  return h;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,9 +312,17 @@ async function runSync(interactive: boolean): Promise<void> {
   }
 }
 
+/** Set while a sync waits to start (changes settle for a moment first); the header shows it as syncing already. */
+let queued = false;
+export const syncQueued = (): boolean => queued;
+
 function schedule(delay = 2000): void {
   clearTimeout(timer);
-  timer = setTimeout(() => void runSync(false), delay);
+  queued = true;
+  timer = setTimeout(() => {
+    queued = false;
+    void runSync(false);
+  }, delay);
 }
 
 /** Sync now (also reconnects after the hour-long sign-in runs out, and resumes after a Cancel). Call from a click. */
@@ -298,6 +352,7 @@ export const syncIsOn = (): boolean => meta.on;
 export function signOut(quiet = false): void {
   drive.revoke();
   clearTimeout(timer);
+  queued = false;
   meta = { on: false, changed: meta.changed };
   save();
   setStatus('off');
@@ -316,6 +371,7 @@ export function installSync(): void {
       // Delete everything also signs this browser out; the Drive copy stays.
       drive.revoke();
       clearTimeout(timer);
+      queued = false;
       meta = loadSyncMeta();
       return setStatus('off');
     }

@@ -19,6 +19,7 @@ const KEYS = {
   bannerDb: 'ijl.bannerDb',
   schedule: 'ijl.schedule',
   sync: 'ijl.sync',
+  tabViews: 'ijl.tabViews',
 } as const;
 
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -94,6 +95,18 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/**
+ * Which view the Operators and Arsenal tabs open: the banners or the full
+ * list ("info"), whichever the player was last on. This browser only (not
+ * synced: it's where they left off, not a setting).
+ */
+export type TabView = 'banners' | 'info';
+export const loadTabViews = (): Partial<Record<'operators' | 'arsenal', TabView>> => readJson(KEYS.tabViews) ?? {};
+export function saveTabView(tab: 'operators' | 'arsenal', view: TabView): void {
+  const all = loadTabViews();
+  if (all[tab] !== view) writeJson(KEYS.tabViews, { ...all, [tab]: view });
+}
+
 export async function loadHistory(): Promise<PullHistory | null> {
   const saved = await idb<PullHistory | undefined>('data', 'readonly', (s) => s.get('history'));
   if (saved) return saved;
@@ -142,6 +155,8 @@ export interface SyncMeta {
   paused?: boolean;
   /** When the latest change not yet in Drive was made (none: everything here is synced). */
   pending?: number;
+  /** Version history copies in Drive (from any device), newest first; `fileId` to download one. */
+  driveSnapshots?: (SnapshotInfo & { fileId: string })[];
   changed: ChangeTimes;
 }
 
@@ -173,6 +188,8 @@ export interface SnapshotInfo {
 
 /** How many copies to keep; the oldest go first. */
 export const MAX_SNAPSHOTS = 15;
+/** How many Google Drive keeps (shared by every device that syncs); the oldest go first. */
+export const MAX_DRIVE_SNAPSHOTS = 30;
 
 export const listSnapshots = (): Promise<SnapshotInfo[]> =>
   idb<SnapshotInfo[] | undefined>('data', 'readonly', (s) => s.get('snapshots')).then((l) => l ?? []).catch(() => []);

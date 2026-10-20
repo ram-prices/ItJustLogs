@@ -2269,10 +2269,10 @@ code {
 }
 /* Two rows until Show all; the toggle hides when everything already fits. */
 .six-section:not(.open) .six-strip {
-  /* the 3px of slack keeps the hover lift and portrait rings from clipping */
-  max-height: calc(2 * var(--six-row) + var(--six-gap) + 6px);
-  padding: 3px;
-  margin: -3px;
+  /* 6px of slack keeps the 2px hover lift plus the 2px rate-up ring from clipping */
+  max-height: calc(2 * var(--six-row) + var(--six-gap) + 12px);
+  padding: 6px;
+  margin: -6px;
   overflow: hidden;
 }
 .six-section.fits .six-toggle {
@@ -2861,15 +2861,23 @@ code {
 .patch-toggle[aria-expanded='true'] .icon {
   transform: rotate(90deg);
 }
+/* An opened patch: its banners sit in a soft panel right under its row,
+   with no line between the two and none around the panel. */
+.patch-row.open td {
+  border-bottom: 0;
+}
 .patch-banners > td {
-  padding: 0 0 10px;
+  height: auto;
+  padding: 0 12px 12px;
+}
+.table tbody tr.patch-banners:hover {
+  background: none;
 }
 .patch-banner-list {
   display: flex;
   flex-direction: column;
-  margin: 0 12px;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-border);
+  background: var(--gray-alpha-100);
   overflow: hidden;
 }
 .patch-banner {
@@ -2980,6 +2988,11 @@ a.patch-banner:hover {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
+  /* Up to 45 copies with Drive's: about 8 rows, then it scrolls. */
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 .version {
   display: flex;
@@ -2992,6 +3005,19 @@ a.patch-banner:hover {
 .version-when {
   font: 600 14px/20px var(--font-sans);
 }
+/* A copy that's also in Google Drive (or only there, from another device). */
+.version-drive {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  color: var(--gray-900);
+  font: 400 12px/16px var(--font-sans);
+  vertical-align: 1px;
+}
+.version-drive .icon {
+  font-size: 15px;
+}
 .versions-empty {
   margin-top: 10px;
 }
@@ -3001,6 +3027,11 @@ a.patch-banner:hover {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
+  /* About 7 rows (52px each); the half row showing below says it scrolls. */
+  max-height: 390px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 .extra {
   display: grid;
@@ -3148,19 +3179,23 @@ a.patch-banner:hover {
   isolation: isolate;
   overflow: hidden;
 }
-.wiki-hero-bg {
+/* The header's ambient glow: the item's main colour, like its banner card (tint.ts tintHeroes). */
+.wiki-hero-glow {
   position: absolute;
-  inset: -20% -10%;
-  width: 120%;
-  height: 140%;
-  object-fit: cover;
-  filter: blur(64px) saturate(1.5);
-  opacity: 0.4;
+  inset: -40% -20% -10%;
+  background: radial-gradient(ellipse 45% 60% at 35% 55%, var(--banner-tint, transparent) 0%, transparent 70%);
+  filter: blur(60px);
+  opacity: 0.5;
   z-index: -2;
   pointer-events: none;
+  transition: --banner-tint 1.2s ease;
 }
-.wiki-hero-bg.missing {
-  display: none;
+@media (max-width: 640px) {
+  /* As on the cards: no blur filter on phones, a wider gradient instead. */
+  .wiki-hero-glow {
+    filter: none;
+    background: radial-gradient(ellipse 70% 70% at 30% 55%, var(--banner-tint, transparent) 0%, transparent 85%);
+  }
 }
 .wiki-hero::after {
   content: '';
@@ -3287,7 +3322,7 @@ a.patch-banner:hover {
 .wiki-hero.over-backdrop::after {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--background-100) 35%, transparent), transparent);
 }
-.wiki-hero.over-backdrop .wiki-hero-bg {
+.wiki-hero.over-backdrop .wiki-hero-glow {
   display: none;
 }
 .wiki-hero.over-backdrop .wiki-hero-art {
@@ -3842,6 +3877,53 @@ a.patch-banner:hover {
 .wiki-sort-head {
   justify-content: flex-end;
 }
+/* Operator and weapon lists: type-to-search (pages/search.ts). The typed text
+   lives in this hidden input; it shows only in big letters (.type-search). */
+.list-search-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+}
+/* The search in big letters in the middle of the screen while it's typed. */
+.type-search {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 900;
+  max-width: calc(100vw - 32px);
+  color: var(--gray-1000);
+  /* No box: a soft shadow keeps the letters readable over the tiles. */
+  text-shadow: 0 2px 24px var(--background-100), 0 0 8px var(--background-100);
+  font: 600 clamp(40px, 9vw, 96px) / 1.1 var(--font-sans);
+  letter-spacing: -2.4px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+}
+.type-search.show {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  transition-duration: 0.1s;
+}
+/* Tiles and sections the search leaves out (their display rules would otherwise win over [hidden]). */
+.wiki-tile[hidden],
+.wiki-type[hidden],
+.list-search-empty[hidden] {
+  display: none;
+}
+.list-search-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+
 /* Weapons list: whether the player's copy has max essence. */
 .essence-max {
   color: var(--green);

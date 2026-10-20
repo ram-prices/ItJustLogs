@@ -87,17 +87,29 @@ export function setMaxEssence(wpnId: string, on: boolean, caps: number[] = []): 
   updateSettings({ maxEssence: on ? [...list, wpnId] : list.length ? list : undefined, weaponRanks: Object.keys(ranks).length ? ranks : undefined });
 }
 
-/** One weapon skill's rank as the player built it (`base`: the ranks to start from if none are set yet). */
+const sameRanks = (a: number[], b: number[]) => a.length === b.length && a.every((r, i) => r === b[i]);
+
+/**
+ * One weapon skill's rank as the player built it (`base`: the ranks without
+ * essence, where it starts if none are set yet). Ranks back at `base` are
+ * forgotten: that's the default.
+ */
 export function setWeaponRank(wpnId: string, i: number, rank: number, base: number[]): void {
   const next = [...(weaponRanksOf(wpnId) ?? base)];
   next[i] = Math.max(1, Math.floor(rank));
-  updateSettings({ weaponRanks: { ...state.settings.weaponRanks, [wpnId]: next } });
+  const all = { ...state.settings.weaponRanks, [wpnId]: next };
+  if (sameRanks(next, base)) delete all[wpnId];
+  updateSettings({ weaponRanks: Object.keys(all).length ? all : undefined });
 }
 
-/** How the player built a weapon: the green essence icon for Maxed Essence, "Ranks 5 · 9 · 4" if they set ranks, else nothing. */
-export const essenceTag = (wpnId: string, caps?: number[]): Html | null => {
-  if (isMaxEssence(wpnId, caps)) return html`<span class="essence-max">${essenceIcon()}</span>`;
+/**
+ * How the player built a weapon: the green essence icon for Maxed Essence,
+ * "Ranks 5 · 9 · 4" if they set ranks, else (no essence, the default) nothing.
+ */
+export const essenceTag = (wpnId: string, w?: WikiWeapon, potential: number | null = null): Html | null => {
+  if (isMaxEssence(wpnId, w ? weaponRankCaps(w, potential) : undefined)) return html`<span class="essence-max">${essenceIcon()}</span>`;
   const r = weaponRanksOf(wpnId);
+  if (r && w && sameRanks(r, weaponBaseRanks(w, potential))) return null;
   return r ? html`<span class="essence-part">Ranks ${r.join(' · ')}</span>` : null;
 };
 
@@ -130,7 +142,7 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
 
   const w = l.weapon ? weps?.weapons[l.weapon] : undefined;
   const wp = l.weapon && ownedWeps?.get(l.weapon)?.copies ? ownedWeps.get(l.weapon)!.potential : null;
-  const tag = l.weapon ? essenceTag(l.weapon, w ? weaponRankCaps(w, wp) : undefined) : null;
+  const tag = l.weapon ? essenceTag(l.weapon, w, wp) : null;
   const weaponTile = slotTile(
     opId,
     'weapon',

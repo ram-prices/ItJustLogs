@@ -17,7 +17,7 @@ import {
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
-import { badge, icon, itemImg, metric, metrics } from '../components';
+import { badge, heroGlow, icon, itemImg, metric, metrics } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
 
 /**
@@ -131,7 +131,7 @@ export function previewPage(
   attribution: WikiPreviewFile['attribution'],
 ): Html {
   return html`<section class="wiki-hero${kind === 'weap' ? ' weapon' : ''}">
-      ${itemImg(kind, id, 'wiki-hero-bg')}
+      ${heroGlow(kind, id)}
       <div class="container wiki-hero-inner">
         ${itemImg(kind, id, 'wiki-hero-portrait')}
         <div class="min0 wiki-hero-text">
