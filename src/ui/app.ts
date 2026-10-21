@@ -18,7 +18,8 @@ import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
 import { installParallax } from './parallax';
 import { syncVideoBackground } from './videoBackground';
 import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
-import { installWikiControls, shortLinkMap, statusPage, wikiFile } from './pages/info';
+import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
+import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
@@ -47,7 +48,8 @@ type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achieveme
 /**
  * The header's tabs. Database (every operator and weapon) and Pulls (the
  * player's banners and Stats) hold several pages, picked with side tabs;
- * their pages keep their own paths (/operators/info, /arsenal, /stats...).
+ * their pages live under /database and /banner (/database/operators,
+ * /banner/arsenal, /banner/stats...).
  */
 type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'achievements' | 'archives' | 'settings';
 const TABS: [Tab, string][] = [
@@ -62,7 +64,9 @@ const TABS: [Tab, string][] = [
 /** Paths that are pages of their own. */
 const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'stats', 'achievements', 'archives', 'settings']);
 /** Where Database and Pulls open first: the operator list, the Headhunting banners. */
-const SECTION_HOME = { database: '/operators/info', pulls: '/operators' } as const;
+const SECTION_HOME = { database: '/database/operators', pulls: '/banner/headhunting' } as const;
+/** The path each section answers to (/database, /banner). */
+const SECTION_PATH = { database: 'database', pulls: 'banner' } as const;
 /** A Pulls page's title (document title). */
 const PULLS_TITLE: Partial<Record<Page, string>> = { operators: 'Headhunting', arsenal: 'Arsenal Issues', stats: 'Stats' };
 
@@ -76,8 +80,10 @@ function tabOf(route: Route): Tab | null {
 interface Route {
   page: Page;
   id?: string;
-  /** /operators/info[/<chr id>], /arsenal/info[/<wpn id>]: info from the wiki data; `id` is the operator or weapon. */
+  /** /database/operators[/<name>], /database/arsenals[/<name>]: info from the wiki data; `id` is the operator or weapon. */
   info?: boolean;
+  /** /database/operators/<name> before the names are loaded: the page shows Loading. */
+  pending?: boolean;
   /** A short link (/si, /lunar-calling): the item's info page once resolved, else why not. */
   short?: string;
   shortState?: 'loading' | 'missing' | 'failed';
@@ -88,12 +94,75 @@ interface Route {
 /** Top-level paths that aren't pages: operator and weapon short links (/si), resolved once the wiki data loads. */
 const isShortLink = (segment: string) => /^[a-z0-9][a-z0-9-]*$/i.test(segment) && !RESERVED_PATHS.has(segment.toLowerCase());
 
-/** Pages are clean paths: / (home), /operators, /arsenal/<poolId>, /operators/info/<chr id>, /arsenal/info/<wpn id>, /banners/<name> (Home at that banner), /event/<id> (that event and its rewards), /stats, /settings. */
+/**
+ * Paths from before /database and /banner (/operators/info/<chr id>,
+ * /arsenal/<poolId>, /stats, /pulls) as today's, so old links, bookmarks and
+ * saved tab views still open. Ids stay ids here; the router swaps them for
+ * names once it can.
+ */
+export function currentPath(path: string): string {
+  const [page = '', a, b] = path.replace(/^\/+|\/+$/g, '').split('/');
+  const p = page.toLowerCase();
+  const tail = (x?: string) => (x ? `/${x}` : '');
+  if ((p === 'operators' || p === 'arsenal') && a?.toLowerCase() === 'info') return `/database/${p === 'operators' ? 'operators' : 'arsenals'}${tail(b)}`;
+  if (p === 'operators' || p === 'arsenal') return `/banner/${p === 'operators' ? 'headhunting' : 'arsenal'}${tail(a)}`;
+  if (p === 'stats') return '/banner/stats';
+  if (p === 'pulls') return '/banner';
+  return path;
+}
+
+/** A Database page's item: its name slug, or (old links, items without one) its id. */
+function itemRoute(kind: Kind, segment: string | undefined): Route {
+  const page: Page = kind === 'char' ? 'operators' : 'arsenal';
+  if (!segment) return { page, info: true };
+  const raw = decodeURIComponent(segment);
+  const slugs = slugsOf(kind, draw);
+  const id = slugs?.bySlug.get(raw.toLowerCase());
+  if (id) return { page, info: true, id };
+  // Ids have an underscore (chr_0003_endminf); a name slug never does.
+  const isId = raw.includes('_');
+  if (!isId && (!slugs || previewsLoading()) && !wikiFile(kind === 'char' ? 'operators.json' : 'weapons.json', draw).failed) return { page, info: true, id: raw, pending: true };
+  return { page, info: true, id: raw };
+}
+
+/** A Pulls banner: its name slug (as Home's /banners/<name> links have it), or its pool id. */
+function bannerRoute(kind: Kind, segment: string | undefined): Route {
+  const page: Page = kind === 'char' ? 'operators' : 'arsenal';
+  if (!segment) return { page };
+  const raw = decodeURIComponent(segment);
+  const pool = bannerSlugs(state.schedule).bySlug.get(raw.toLowerCase()) ?? canonicalPoolId(raw);
+  // The card's own pool id (the export's spelling).
+  const id = state.analysis?.banners.find((b) => canonicalPoolId(b.poolId) === pool)?.poolId ?? pool;
+  return { page, id };
+}
+
+/** Pages are clean paths: / (home), /database/operators[/<name>], /database/arsenals[/<name>], /banner/headhunting[/<banner>], /banner/arsenal[/<banner>], /banner/stats, /banners/<name> (Home at that banner), /event/<id> (that event and its rewards), /settings. */
 function parseRoute(): Route {
-  // /database and /pulls: the page of that section the player was last on.
-  const section = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
-  if (section === 'database' || section === 'pulls') history.replaceState(null, '', loadTabViews()[section] ?? SECTION_HOME[section]);
+  const old = currentPath(location.pathname);
+  if (old !== location.pathname) history.replaceState(null, '', old + location.search + location.hash);
+  // /database and /banner: the page of that section the player was last on.
+  const path = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  for (const section of ['database', 'pulls'] as const)
+    if (path === SECTION_PATH[section]) history.replaceState(null, '', currentPath(loadTabViews()[section] ?? SECTION_HOME[section]));
   const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
+  const top = page.toLowerCase();
+  if (top === 'database' || top === 'banner') {
+    const kind: Kind | null = id === 'operators' || id === 'headhunting' ? 'char' : id === 'arsenals' || id === 'arsenal' ? 'weap' : null;
+    const route =
+      top === 'banner' && id === 'stats'
+        ? ({ page: 'stats' } as Route)
+        : kind && (top === 'database') === (id === 'operators' || id === 'arsenals')
+          ? top === 'database'
+            ? itemRoute(kind, sub)
+            : bannerRoute(kind, sub)
+          : ({ page: 'home' } as Route);
+    // Old ids and odd spellings: show the page's own address (its name).
+    if (kind && route.id && !route.pending) {
+      const own = top === 'database' ? infoHref(kind, route.id) : bannerHref(kind, route.id);
+      if (own !== location.pathname) history.replaceState(null, '', own + location.search + location.hash);
+    }
+    return route;
+  }
   if (page === 'banners' && id) return { page: 'home', focus: `/banners/${id.toLowerCase()}` };
   if (page === 'event' && id) return { page: 'event', id };
   // LEGACY, to be removed with legacyEventLinks: old /events/<name> links go to their /event/<id>.
@@ -180,7 +249,7 @@ function header(route: Route): Html {
     <nav class="tabs" aria-label="Sections">
       ${TABS.map(([tab, label]) => {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
-        const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? (tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
+        const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
         return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span></a>`;
       })}
@@ -227,7 +296,7 @@ function page(route: Route): Html {
       'Page not found',
       route.shortState === 'failed'
         ? html`Couldn't load the operator and weapon list to open <b>/${route.short}</b>. Check your connection and reload.`
-        : html`Nothing lives at <b>/${route.short}</b>. <a href="/">Go home</a>, or browse <a href="/operators/info">operators</a> and <a href="/arsenal/info">weapons</a>.`,
+        : html`Nothing lives at <b>/${route.short}</b>. <a href="/">Go home</a>, or browse <a href="${infoHref('char')}">operators</a> and <a href="${infoHref('weap')}">weapons</a>.`,
     );
   }
   if (route.page === 'home') return homePage(withWikiEnds(state.schedule, wikiFile<EventRewardsFile>('events.json', draw).data), currentServer(), a, draw);
@@ -237,6 +306,7 @@ function page(route: Route): Html {
   if (route.page === 'essences') return essencesPage(draw);
   if (route.page === 'event') return eventPage(route.id, draw);
   // Info pages are game data: they work without an import, and show the player's copies with one.
+  if (route.pending) return route.page === 'arsenal' ? loadingOrFailed('weap', 'Arsenals', false) : loadingOrFailed('char', 'Operators', false);
   if (route.info) return route.page === 'arsenal' ? weaponInfoPage(route.id, a, draw) : operatorInfoPage(route.id, a, draw);
   if (!a) return welcome();
   switch (route.page) {
@@ -303,8 +373,8 @@ function draw(): void {
   const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}`;
   // Remember which page of Database / Pulls the player is on, for their tab next time.
   const section = tabOf(route);
-  if (section === 'database' && !route.id) saveTabView('database', `/${route.page}/info`);
-  if (section === 'pulls' && !route.id && state.analysis) saveTabView('pulls', `/${route.page}`);
+  if (section === 'database' && !route.id) saveTabView('database', infoHref(route.page === 'arsenal' ? 'weap' : 'char'));
+  if (section === 'pulls' && !route.id && state.analysis) saveTabView('pulls', route.page === 'stats' ? '/banner/stats' : bannerHref(route.page === 'arsenal' ? 'weap' : 'char'));
   // Banner cards fade in when a page opens, not again on every redraw.
   if (key !== lastKey) {
     resetCardEntrance();
@@ -323,7 +393,7 @@ function draw(): void {
   restoreTabRows(tabRows);
   if (searching) refocusListSearch();
   if (key !== lastKey) {
-    // /operators/<poolId> opens that banner's section and scrolls to it.
+    // /banner/headhunting/<banner> opens that banner's card and scrolls to it.
     const target = route.id && !route.info && document.getElementById(`banner-${route.id}`);
     if (target) target.scrollIntoView({ block: 'start' });
     else scrollTo({ top: 0 });

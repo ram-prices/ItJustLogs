@@ -1,11 +1,13 @@
 import type { Analysis } from '../../domain/analyze';
 import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type ExtraCopy, type Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
-import { scheduleLinks } from '../../domain/schedule';
+import { canonicalPoolId } from '../../domain/banners';
+import { scheduleLinks, type Schedule } from '../../domain/schedule';
 import { SITE_URL } from '../../domain/share';
 import {
   fmtSkillValue,
   itemShortLinks,
+  itemSlugs,
   parseMarkup,
   shortLinkOf,
   splitPlaceholders,
@@ -14,6 +16,7 @@ import {
   type WikiOperatorFile,
   type WikiPreviewFile,
   type WikiWeaponFile,
+  wikiId,
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
@@ -26,12 +29,71 @@ import { fmtDate, html, raw, type Html } from '../html';
  * ties the page to the player's imported history.
  */
 
-const PATH: Record<Kind, string> = { char: 'operators', weap: 'arsenal' };
+/** Where each kind lives: /database/operators, /banner/headhunting. */
+export const DATABASE_PATH: Record<Kind, string> = { char: 'operators', weap: 'arsenals' };
+export const BANNER_PATH: Record<Kind, string> = { char: 'headhunting', weap: 'arsenal' };
 /** What the banners view of each kind is called (its side tab and title). */
 const BANNERS_LABEL: Record<Kind, string> = { char: 'Headhunting', weap: 'Issues' };
+const WIKI_FILE: Record<Kind, string> = { char: 'operators.json', weap: 'weapons.json' };
 
-/** Link to an item's info page, or the list of all of them. */
-export const infoHref = (kind: Kind, id?: string): string => `/${PATH[kind]}/info${id ? `/${encodeURIComponent(id)}` : ''}`;
+/** Link to an item's info page (/database/operators/chen-qianyu), or the list of all of them. */
+export const infoHref = (kind: Kind, id?: string): string =>
+  `/database/${DATABASE_PATH[kind]}${id ? `/${encodeURIComponent(slugsOf(kind)?.byId.get(kind === 'char' ? wikiId(id) : id) ?? id)}` : ''}`;
+
+/** Link to one of the player's banners (/banner/headhunting/hues-of-passion), or the list of them. */
+export const bannerHref = (kind: Kind, poolId?: string): string =>
+  `/banner/${BANNER_PATH[kind]}${poolId ? `/${encodeURIComponent(bannerSlugs(state.schedule).byPool.get(canonicalPoolId(poolId)) ?? poolId)}` : ''}`;
+
+const slugCache = new Map<Kind, { items: object; pre: object | null; bySlug: Map<string, string>; byId: Map<string, string> }>();
+
+/**
+ * The name slugs of every item of `kind` (wiki data, then unreleased ones from
+ * the previews), once its wiki file is in. With `redraw` it starts loading
+ * the files (redrawing when done); without, it only uses what's loaded, and
+ * links keep the id until then (the router turns those into slugs).
+ */
+export function slugsOf(kind: Kind, redraw?: () => void): { bySlug: Map<string, string>; byId: Map<string, string> } | null {
+  const items = (redraw ? wikiFile<WikiOperatorFile & WikiWeaponFile>(WIKI_FILE[kind], redraw) : files.get(WIKI_FILE[kind]))?.data as
+    | (WikiOperatorFile & WikiWeaponFile)
+    | null
+    | undefined;
+  if (!items) return null;
+  const all = kind === 'char' ? items.operators : items.weapons;
+  const pre = (redraw ? previewsOf(redraw) : (files.get('previews.json')?.data as WikiPreviewFile | undefined)) ?? null;
+  let c = slugCache.get(kind);
+  if (!c || c.items !== all || c.pre !== pre) {
+    const bySlug = itemSlugs({ ...(kind === 'char' ? pre?.operators : pre?.weapons), ...all }, kind);
+    const byId = new Map<string, string>();
+    for (const [slug, id] of bySlug) if (!byId.has(id)) byId.set(id, slug);
+    slugCache.set(kind, (c = { items: all, pre, bySlug, byId }));
+  }
+  return c;
+}
+
+/** Whether the previews are still loading (an unreleased item's slug may be in them). */
+export const previewsLoading = (): boolean => {
+  const f = files.get('previews.json');
+  return !!f && !f.data && !f.failed;
+};
+
+const bannerSlugCache = new WeakMap<Schedule, { bySlug: Map<string, string>; byPool: Map<string, string> }>();
+
+/** Each scheduled banner's name slug (as its /banners/<name> link has it) ↔ its pool id. */
+export function bannerSlugs(s: Schedule): { bySlug: Map<string, string>; byPool: Map<string, string> } {
+  let c = bannerSlugCache.get(s);
+  if (!c) {
+    c = { bySlug: new Map(), byPool: new Map() };
+    for (const [item, path] of scheduleLinks(s)) {
+      const poolId = 'poolId' in item && item.poolId ? canonicalPoolId(item.poolId) : null;
+      if (!poolId || !path.startsWith('/banners/')) continue;
+      const slug = path.slice('/banners/'.length);
+      c.bySlug.set(slug, poolId);
+      c.byPool.set(poolId, slug);
+    }
+    bannerSlugCache.set(s, c);
+  }
+  return c;
+}
 
 // ---------------------------------------------------------------------------
 // Data
@@ -323,7 +385,8 @@ const OUTCOME: Record<string, Html> = {
  * What the player's history says about this item: copies, Potential, where
  * each copy came from. `a` null = no import yet.
  */
-export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined): Html {
+/** The player's copies of an item; `potentials` (what each Potential does) sits beside the list of copies. */
+export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, potentials?: Html): Html {
   const head = html`<div class="section-head"><h2 class="heading-20">Your pulls</h2></div>`;
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
@@ -354,7 +417,6 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
   const via = (x: Acquisition) => (x.reward ? `${x.reward} · ${x.bannerName}` : x.bannerName);
   // Extra copies have no date: they show as "Extra" with their note.
   const when = (x: Acquisition) => html`<span class="wiki-date">${x.extra ? 'Extra' : fmtDate(x.ts)}</span>`;
-  const path = PATH[kind];
 
   return html`<section class="section">
     ${head}
@@ -380,6 +442,7 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
         ? metric({ label: `Reached P${MAX_POTENTIAL}`, value: when(owned.maxed), sub: via(owned.maxed) })
         : metric({ label: 'Latest copy', value: when(latest), sub: via(latest) }),
     ])}
+    <div class="wiki-owned-body${potentials ? ' with-pots' : ''}">
     <div class="card wiki-pulls">
       ${[...owned.acquisitions].reverse().map((x) => {
         const p = x.pull;
@@ -400,7 +463,7 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
             ? 'Free'
             : `${kind === 'weap' ? `Set ${Math.ceil(p.bannerPull / 10)}` : `Pull ${p.bannerPull}`}${p.pity !== null ? ` · pity ${p.pity}` : ''}`;
         const tag = x.reward ? badge('Reward', 'outline') : p?.outcome ? OUTCOME[p.outcome] : p?.bannerPull === null ? badge('Free', 'outline') : '';
-        return html`<a class="wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}" href="/${path}/${encodeURIComponent(x.poolId)}">
+        return html`<a class="wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}" href="${bannerHref(kind, x.poolId)}">
           <span class="num secondary">${fmtDate(x.ts)}</span>
           <span class="ellipsis wiki-em">${x.bannerName}</span>
           <span class="num secondary wiki-pull-at">${at}</span>
@@ -408,6 +471,8 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
           ${copyTag}
         </a>`;
       })}
+    </div>
+    ${potentials ? html`<div class="wiki-owned-pots">${potentials}</div>` : ''}
     </div>
     ${owned.selectors
       ? html`<p class="copy-13 secondary wiki-note">You also earned ${owned.selectors} Selector${owned.selectors > 1 ? 's' : ''} on banners featuring ${name}; any picked for ${name} aren't counted.</p>`
@@ -453,11 +518,11 @@ export function pullsTabs(current: 'char' | 'weap' | 'stats', body: Html): Html 
   return sideTabs(
     'Pulls',
     [
-      [`/${PATH.char}`, BANNERS_LABEL.char, pulled('char')],
-      [`/${PATH.weap}`, 'Arsenal Issues', pulled('weap')],
-      ['/stats', 'Stats', ''],
+      [bannerHref('char'), BANNERS_LABEL.char, pulled('char')],
+      [bannerHref('weap'), 'Arsenal Issues', pulled('weap')],
+      ['/banner/stats', 'Stats', ''],
     ],
-    current === 'stats' ? '/stats' : `/${PATH[current]}`,
+    current === 'stats' ? '/banner/stats' : bannerHref(current),
     body,
   );
 }

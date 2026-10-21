@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import scheduleSnapshot from '../data/schedule.snapshot.json';
 import snapshot from '../data/wiki-share.snapshot.json';
 import { legacyEventLinks, scheduleLinks, type Schedule } from './schedule';
-import { itemShortLinks, nameSlug, operatorShortLinks, RESERVED_PATHS, shortLinkOf } from './wiki';
+import { itemShortLinks, itemSlugs, nameSlug, operatorShortLinks, RESERVED_PATHS, shortLinkOf } from './wiki';
 import {
   DISCORD_CHARS,
   EMBED_BYTES,
@@ -49,7 +49,7 @@ describe('link previews', () => {
     const arcane = operatorPreview('chr_0032_lizhiyan', operators.chr_0032_lizhiyan);
     expect(arcane.description.match(/Jadecrushing Grid/g)).toHaveLength(1);
     const typhoeus = operatorPreview('chr_0034_typhoeus', operators.chr_0034_typhoea);
-    expect(typhoeus.url).toBe('https://itjustlogs.dev/operators/info/chr_0034_typhoeus');
+    expect(typhoeus.url).toBe('https://itjustlogs.dev/database/operators/chr_0034_typhoeus');
     expect(typhoeus.image).toMatch(/chr_0034_typhoea\.webp$/);
   });
 
@@ -105,7 +105,7 @@ describe('Copy to Discord', () => {
     const text = operatorDiscord('chr_0016_laevat', o);
     expect(text.length).toBeLessThanOrEqual(DISCORD_CHARS);
     for (const s of o.skills) expect(text).toContain(s.name);
-    expect(text).toContain('<https://itjustlogs.dev/operators/info/chr_0016_laevat>');
+    expect(text).toContain('<https://itjustlogs.dev/database/operators/chr_0016_laevat>');
   });
 
   it('lists weapon skills with their ranges', () => {
@@ -210,6 +210,18 @@ describe('weapon short links', () => {
     const linked = new Set([...links.values()].map((t) => t.id));
     expect(Object.keys(snapshot.weapons).filter((id) => !linked.has(id))).toEqual([]);
     for (const slug of links.keys()) expect(RESERVED_PATHS.has(slug)).toBe(false);
+  });
+});
+
+describe('Database page names', () => {
+  it('name every operator and weapon in its own list', () => {
+    for (const [kind, items] of [['char', snapshot.operators], ['weap', snapshot.weapons]] as const) {
+      const slugs = itemSlugs(items as Record<string, { name: string }>, kind);
+      const named = new Set(slugs.values());
+      expect(Object.keys(items).filter((id) => !named.has(id))).toEqual([]);
+      for (const slug of slugs.keys()) expect(slug).toMatch(/^[a-z0-9-]+$/);
+    }
+    expect(itemSlugs(snapshot.weapons as Record<string, { name: string }>, 'weap').get('jade-vessel')).toBe('wpn_claym_0018');
   });
 });
 

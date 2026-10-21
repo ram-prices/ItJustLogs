@@ -18,11 +18,31 @@ import {
   type ShareOperator,
   type ShareWeapon,
 } from './src/domain/share.ts';
-import { legacyEventLinks, scheduleLinks, type Schedule } from './src/domain/schedule.ts';
-import { itemShortLinks, WIKI_ALIASES } from './src/domain/wiki.ts';
+import { isScheduleBanner, isWeaponBanner, legacyEventLinks, scheduleLinks, type Schedule } from './src/domain/schedule.ts';
+import { itemShortLinks, itemSlugs, WIKI_ALIASES } from './src/domain/wiki.ts';
 
-/** The app's top-level pages; each gets its own copy of index.html in the build. */
-const PAGES = ['database', 'pulls', 'operators', 'arsenal', 'essences', 'stats', 'achievements', 'archives', 'settings'];
+/**
+ * The app's pages; each gets its own copy of index.html in the build. The old
+ * paths (operators, arsenal, stats, pulls) stay so old links open and the app
+ * moves them to today's.
+ */
+const PAGES = [
+  'database',
+  'database/operators',
+  'database/arsenals',
+  'banner',
+  'banner/headhunting',
+  'banner/arsenal',
+  'banner/stats',
+  'essences',
+  'achievements',
+  'archives',
+  'settings',
+  'pulls',
+  'operators',
+  'arsenal',
+  'stats',
+];
 
 /** Fallback for the banner and event pages when ef-assets can't be reached (the app's own schedule snapshot). */
 const SCHEDULE_SNAPSHOT = 'src/data/schedule.snapshot.json';
@@ -128,15 +148,19 @@ function withPreview(index: string, p: Preview, embed: ComponentEmbed, title: st
 }
 
 /**
- * GitHub Pages only serves files, so clean paths like /operators need a file
+ * GitHub Pages only serves files, so clean paths like /database need a file
  * there: copy index.html into a folder per page. Deeper paths
- * (/operators/<poolId>) fall back to 404.html, which is the same app.
+ * (/banner/headhunting/<poolId>) fall back to 404.html, which is the same app.
  *
  * Operator and weapon info pages get a file each
- * (operators/info/<chr id>.html, which Pages serves at the clean path) with
+ * (database/operators/<name>.html, which Pages serves at the clean path) with
  * that item's link-preview tags and Discord component embed, since Discord
- * and friends read the raw HTML and run no script. A new operator needs a rebuild to get one; until then
+ * and friends read the raw HTML and run no script. The old addresses
+ * (operators/info/<chr id>.html) get the same page, so old links still
+ * unfurl. A new operator needs a rebuild to get one; until then
  * its link still works through 404.html, with the generic preview.
+ * Each scheduled banner's Pulls card (banner/headhunting/<name>.html) gets
+ * its banner's preview too.
  * Each short link (/si, /lunar-calling; see itemShortLinks) gets a copy of its
  * item's page at the site root.
  */
@@ -161,10 +185,26 @@ function pageCopies(): Plugin {
       const ops = Object.entries(wiki.operators);
       // Game ids the wiki files under another id get the same page.
       for (const [game, wikiKey] of Object.entries(WIKI_ALIASES)) if (wiki.operators[wikiKey]) ops.push([game, wiki.operators[wikiKey]]);
-      const pages: { dir: string; id: string; name: string; p: Preview; embed: (p: Preview) => ComponentEmbed; fromWiki?: boolean }[] = [
-        ...ops.map(([id, o]) => ({ dir: 'operators/info', id, name: o.name, p: operatorPreview(id, o), embed: (p: Preview) => operatorEmbed(o, p) })),
-        ...Object.entries(wiki.weapons).map(([id, w]) => ({ dir: 'arsenal/info', id, name: w.name, p: weaponPreview(id, w), embed: (p: Preview) => weaponEmbed(w, p) })),
-      ];
+      // Database pages are named by the item (database/operators/si), else by id; the old id pages point there.
+      const slugOf = (links: Map<string, string>) => {
+        const out = new Map<string, string>();
+        for (const [slug, id] of links) if (!out.has(id)) out.set(id, slug);
+        return out;
+      };
+      const opSlug = slugOf(itemSlugs(wiki.operators, 'char'));
+      const wpnSlug = slugOf(itemSlugs(wiki.weapons, 'weap'));
+      const pages: { dir: string; id: string; name: string; p: Preview; embed: (p: Preview) => ComponentEmbed; fromWiki?: boolean }[] = [];
+      for (const [id, o] of ops) {
+        const slug = opSlug.get(WIKI_ALIASES[id] ?? id) ?? id;
+        const page = { name: o.name, p: operatorPreview(id, o, slug), embed: (p: Preview) => operatorEmbed(o, p) };
+        pages.push({ dir: 'operators/info', id, ...page });
+        if (!WIKI_ALIASES[id]) pages.push({ dir: 'database/operators', id: slug, ...page });
+      }
+      for (const [id, w] of Object.entries(wiki.weapons)) {
+        const slug = wpnSlug.get(id) ?? id;
+        const page = { name: w.name, p: weaponPreview(id, w, slug), embed: (p: Preview) => weaponEmbed(w, p) };
+        pages.push({ dir: 'arsenal/info', id, ...page }, { dir: 'database/arsenals', id: slug, ...page });
+      }
       // Every banner and event in the schedule: /banners/<name>, /event/<id>.
       const links = scheduleLinks(schedule);
       const schedulePages = [...links].map(([item, path]) => {
@@ -172,6 +212,13 @@ function pageCopies(): Plugin {
         return { dir, id, name: item.name, p: schedulePreview(item, path), embed: (p: Preview) => scheduleEmbed(item, p), fromWiki: false };
       });
       pages.push(...schedulePages);
+      // Each banner's Pulls card: banner/headhunting/<name>, with the banner's preview.
+      for (const [item, path] of links) {
+        if (!isScheduleBanner(item) || !item.poolId || !path.startsWith('/banners/')) continue;
+        const dir = `banner/${isWeaponBanner(item.kind) ? 'arsenal' : 'headhunting'}`;
+        const id = path.slice('/banners/'.length);
+        pages.push({ dir, id, name: item.name, p: schedulePreview(item, `/${dir}/${id}`), embed: (p: Preview) => scheduleEmbed(item, p), fromWiki: false });
+      }
       // LEGACY, to be removed with legacyEventLinks: the old /events/<name> pages,
       // same preview (pointing at /event/<id>) so old links still unfurl.
       for (const [e, path] of legacyEventLinks(schedule)) {

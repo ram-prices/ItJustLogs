@@ -4,7 +4,7 @@
   "url": "https://endfield.wiki.gg",
   "license": "CC BY-SA 4.0",
   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-  "fetched": "2026-10-20"
+  "fetched": "2026-10-21"
  },
  "medals": [
   {
@@ -16,7 +16,7 @@
    "cond": "Complete the main mission Prologue - Process: Awakening",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Awaken%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-awaken.webp"
    }
   },
   {
@@ -28,7 +28,7 @@
    "cond": "Summon the fruit of a great technological endeavor",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Core_ex_Machina%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-core-ex-machina.webp"
    }
   },
   {
@@ -40,7 +40,7 @@
    "cond": "Complete the main mission Chapter I Process I: Fort Showdown",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22The_Fist_Misses%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-the-fist-misses.webp"
    }
   },
   {
@@ -52,7 +52,7 @@
    "cond": "Witness an attack in progress",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22The_Refugees_Strike_Back%3F%21%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-the-refugees-strike-back.webp"
    }
   },
   {
@@ -64,7 +64,7 @@
    "cond": "Complete the main mission Chapter I Process III: Cradle of the Ages",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Shards_of_the_Crushed_Star%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-shards-of-the-crushed-star.webp"
    }
   },
   {
@@ -76,7 +76,7 @@
    "cond": "Complete the main mission Undying Cinders",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Rift_Sealing%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-rift-sealing.webp"
    }
   },
   {
@@ -88,7 +88,7 @@
    "cond": "Complete the main mission Intermission: Conference of the Four",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Returning_Signs_of_Ill_Omen%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-returning-signs-of-ill-omen.webp"
    }
   },
   {
@@ -100,7 +100,7 @@
    "cond": "Reach an all-new city",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22First_Visit_to_Wuling%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-first-visit-to-wuling.webp"
    }
   },
   {
@@ -112,7 +112,7 @@
    "cond": "Complete the main mission Chapter Ⅱ Process Ⅲ: No Retreat",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Drowning_in_Water%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-drowning-in-water.webp"
    }
   },
   {
@@ -124,7 +124,7 @@
    "cond": "Part ways with Ardashir at a certain key location",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22The_Final_Lord_I_Served%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-the-final-lord-i-served.webp"
    }
   },
   {
@@ -136,7 +136,7 @@
    "cond": "Complete the main mission Chapter Ⅱ Process Ⅴ: Battle of the Main Pillar",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Conqueror%27s_Fall%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-conqueror-s-fall.webp"
    }
   },
   {
@@ -148,7 +148,7 @@
    "cond": "Complete the main mission Chapter Ⅱ Process Ⅵ: Forged at the Very Beginning",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Gently_Down_the_Stream%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-gently-down-the-stream.webp"
    }
   },
   {
@@ -160,7 +160,7 @@
    "cond": "Complete the main mission Chapter Ⅱ Process Ⅶ: Bravely Breach the Hostile Winds",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Seal_Lifted%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-seal-lifted.webp"
    }
   },
   {
@@ -172,7 +172,7 @@
    "cond": "Bid farewell to an instructor of Tanjian Hall",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Dialog_of_Swords%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-dialog-of-swords.webp"
    }
   },
   {
@@ -184,7 +184,7 @@
    "cond": "Span the chasm with a Xiranite bridge",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Connection_to_the_Past%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-connection-to-the-past.webp"
    }
   },
   {
@@ -196,7 +196,7 @@
    "cond": "Complete the main mission Chapter Ⅱ Process Ⅶ: Warily Returns the Wandering Vigile",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Child_of_Hope%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-child-of-hope.webp"
    }
   },
   {
@@ -208,7 +208,7 @@
    "cond": "Complete the main mission Chapter Ⅱ Process Ⅶ: Homecoming",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Thus_Ends_the_Weeping_Gash%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-thus-ends-the-weeping-gash.webp"
    }
   },
   {
@@ -220,7 +220,7 @@
    "cond": "Complete main mission Chapter Ⅱ Process Ⅷ: Inn the Painting",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Enter_the_Painted_World%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-enter-the-painted-world.webp"
    }
   },
   {
@@ -232,7 +232,7 @@
    "cond": "Complete main mission Chapter Ⅱ Process Ⅷ: Trial Ⅲ - A Path Where There's None",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22See_Through_the_Self%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-see-through-the-self.webp"
    }
   },
   {
@@ -244,7 +244,7 @@
    "cond": "Complete main mission Chapter Ⅱ Process Ⅷ: The Conclusion",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Paint_with_Fresh_Ink%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-paint-with-fresh-ink.webp"
    }
   },
   {
@@ -265,9 +265,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-True_Altruist.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-True_Altruist_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-True_Altruist_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-true-altruist.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-true-altruist-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-true-altruist-reforged-iii.webp"
    }
   },
   {
@@ -279,7 +279,7 @@
    "cond": "Complete the side mission: Lone Wolf",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Lone_Wolf%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-lone-wolf.webp"
    }
   },
   {
@@ -291,7 +291,7 @@
    "cond": "Complete the side mission: Letter from a Messenger",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Letter_From_a_Messenger%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-letter-from-a-messenger.webp"
    }
   },
   {
@@ -303,7 +303,7 @@
    "cond": "Complete the side mission: Love, Scream & The Prototype",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Love%2C_Scream_%26_The_Prototype%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-love-scream-the-prototype.webp"
    }
   },
   {
@@ -315,7 +315,7 @@
    "cond": "Complete the side mission: Let Fire Consume the Ashen Past",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Let_Fire_Consume_the_Ashen_Past%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-let-fire-consume-the-ashen-past.webp"
    }
   },
   {
@@ -327,7 +327,7 @@
    "cond": "Complete the side mission: The Red Knight",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22The_Red_Knight%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-the-red-knight.webp"
    }
   },
   {
@@ -339,7 +339,7 @@
    "cond": "Complete the side mission: A Fistful of Reflections",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Fistful_of_Reflections%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-fistful-of-reflections.webp"
    }
   },
   {
@@ -351,7 +351,7 @@
    "cond": "Complete the side mission: Danse Macabre",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Danse_Macabre%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-danse-macabre.webp"
    }
   },
   {
@@ -363,7 +363,7 @@
    "cond": "Complete the side mission Like a Star Streaking Through the Boundaries",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Like_a_Star_Streaking_Through_the_Boundaries%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-like-a-star-streaking-through-the-boundaries.webp"
    }
   },
   {
@@ -375,7 +375,7 @@
    "cond": "Complete the side mission: A Winter Dream Fogged Deep in the Woods",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Winter_Dream_Fogged_Deep_in_the_Woods%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-winter-dream-fogged-deep-in-the-woods.webp"
    }
   },
   {
@@ -387,7 +387,7 @@
    "cond": "Complete the side mission Illumination of Fate and Endeavor of a Lifetime",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Fate_Beneath_the_Snow%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-fate-beneath-the-snow.webp"
    }
   },
   {
@@ -399,7 +399,7 @@
    "cond": "Complete the side mission Bell of Recollection",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Let_Suiming_Light_the_Way%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-let-suiming-light-the-way.webp"
    }
   },
   {
@@ -411,7 +411,7 @@
    "cond": "Complete side mission A Day to Remember",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Day_to_Remember%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-day-to-remember.webp"
    }
   },
   {
@@ -432,9 +432,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Combined_Arms.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Combined_Arms_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Combined_Arms_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-combined-arms.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-combined-arms-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-combined-arms-reforged-iii.webp"
    }
   },
   {
@@ -455,9 +455,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Arts_and_Flow.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Arts_and_Flow_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Arts_and_Flow_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arts-and-flow.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arts-and-flow-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arts-and-flow-reforged-iii.webp"
    }
   },
   {
@@ -478,9 +478,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Superb_Physicals.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Superb_Physicals_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Superb_Physicals_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-superb-physicals.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-superb-physicals-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-superb-physicals-reforged-iii.webp"
    }
   },
   {
@@ -493,8 +493,8 @@
    "reforge": [],
    "trim": "Complete Crisis Pandemonium: Rhodagn in 120s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Crushed_the_Bony_Fist%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Crushed_the_Bony_Fist%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-crushed-the-bony-fist.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-crushed-the-bony-fist-trimmed.webp"
    }
   },
   {
@@ -507,8 +507,8 @@
    "reforge": [],
    "trim": "Complete Crisis Calamity: Triaggelos in 240s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Broken_Remains_of_Astarron%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Broken_Remains_of_Astarron%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-broken-remains-of-astarron.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-broken-remains-of-astarron-trimmed.webp"
    }
   },
   {
@@ -521,8 +521,8 @@
    "reforge": [],
    "trim": "Complete Crisis Calamity: Marble Aggelomoirai in 240s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Collapse_of_Her_Pale_Image%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Collapse_of_Her_Pale_Image%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-collapse-of-her-pale-image.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-collapse-of-her-pale-image-trimmed.webp"
    }
   },
   {
@@ -543,9 +543,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Master_Interceptor.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Master_Interceptor_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Master_Interceptor_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-master-interceptor.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-master-interceptor-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-master-interceptor-reforged-iii.webp"
    }
   },
   {
@@ -557,7 +557,7 @@
    "cond": "Immobilize the same enemy continuously for 20s during combat",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Ultimate_Immobilizer.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-ultimate-immobilizer.webp"
    }
   },
   {
@@ -569,7 +569,7 @@
    "cond": "Defeat at least 5 enemies with a single damaging hit",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Total_Obliterator.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-total-obliterator.webp"
    }
   },
   {
@@ -590,9 +590,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Smart_Annihilation.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Smart_Annihilation_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Smart_Annihilation_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-smart-annihilation.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-smart-annihilation-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-smart-annihilation-reforged-iii.webp"
    }
   },
   {
@@ -605,8 +605,8 @@
    "reforge": [],
    "trim": "Complete Crisis Calamity: Ruan Yi in 200s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Thus_Withers_the_Branch_of_Fury%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Thus_Withers_the_Branch_of_Fury%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-thus-withers-the-branch-of-fury.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-thus-withers-the-branch-of-fury-trimmed.webp"
    }
   },
   {
@@ -618,7 +618,7 @@
    "cond": "Rescue a teammate trapped by Nimbus Razor 1 time",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22NO_MORE_KIDNAPPING%21%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-no-more-kidnapping.webp"
    }
   },
   {
@@ -630,7 +630,7 @@
    "cond": "Have any operators becoming during battle 10 times",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Entropic_Reduction%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-entropic-reduction.webp"
    }
   },
   {
@@ -643,8 +643,8 @@
    "reforge": [],
    "trim": "Complete Crisis Calamity: Nefarith in 200s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Conqueror%27s_Grief%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Conqueror%27s_Grief%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-conqueror-s-grief.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-conqueror-s-grief-trimmed.webp"
    }
   },
   {
@@ -656,7 +656,7 @@
    "cond": "Defeat the Skydrummer",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Silencing_the_Drum%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-silencing-the-drum.webp"
    }
   },
   {
@@ -668,7 +668,7 @@
    "cond": "Interrupt the Skydrummer's roaring shockwave during combat",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Interceptor_of_Thunder%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-interceptor-of-thunder.webp"
    }
   },
   {
@@ -680,7 +680,7 @@
    "cond": "During battle, defeat an \"Æthillu\" within 2s of its revival",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Unstable_%C3%86thillu%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-unstable-thillu.webp"
    }
   },
   {
@@ -692,7 +692,7 @@
    "cond": "Defeat the Craghowler",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Mega-Beast_Subdued%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-mega-beast-subdued.webp"
    }
   },
   {
@@ -704,7 +704,7 @@
    "cond": "The controlled operator suffers zero DMG and performs at least 5 perfect dodges against the spinning attack of the Armored Manglerbeast",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Gale_Weaver%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-gale-weaver.webp"
    }
   },
   {
@@ -716,7 +716,7 @@
    "cond": "Defeat the Blitzcrash Blightshade",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Blitzcrash%27s_Silent_Passing%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-blitzcrash-s-silent-passing.webp"
    }
   },
   {
@@ -729,8 +729,8 @@
    "reforge": [],
    "trim": "Complete Crisis Calamity: Alleikhreos, Chiliarch in 200s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Torch_Extinguished%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22A_Torch_Extinguished%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-torch-extinguished.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-torch-extinguished-trimmed.webp"
    }
   },
   {
@@ -742,7 +742,7 @@
    "cond": "Defeat the Gloomwald's Rage",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Gloomwald%27s_Silence%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-gloomwald-s-silence.webp"
    }
   },
   {
@@ -754,7 +754,7 @@
    "cond": "Force burrowing Woodcraft Wanderers to resurface",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Completely_Uprooted%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-completely-uprooted.webp"
    }
   },
   {
@@ -766,7 +766,7 @@
    "cond": "Let Si unleash her Painting ATK during the black-and-white state of Inkwashed Realm, and do not let the controlled operator take any DMG from the Painting ATK.",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Art_of_Blanks%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-art-of-blanks.webp"
    }
   },
   {
@@ -779,8 +779,8 @@
    "reforge": [],
    "trim": "Complete \"Crisis Calamity: Si\" in 200s",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Insight_of_Rejuvenation%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Insight_of_Rejuvenation%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-insight-of-rejuvenation.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-insight-of-rejuvenation-trimmed.webp"
    }
   },
   {
@@ -792,7 +792,7 @@
    "cond": "Complete these Protocol Spaces:\n*Manifested Nightmares\n*Blessing of Oros\n*Tacit Maelstrom\n*Mirage of the Tower\n*Gunsmith's Mound\n*Forge Trials Lv.5",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Material_Gathering.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-material-gathering.webp"
    }
   },
   {
@@ -804,7 +804,7 @@
    "cond": "Complete all Protocol Spaces: Advanced Progression",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Advanced_Progression.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-advanced-progression.webp"
    }
   },
   {
@@ -816,7 +816,7 @@
    "cond": "Reach Exploration Level 7 and complete 5 different Severe Energy Alluvium sites",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Alluvium_Dredger.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-alluvium-dredger.webp"
    }
   },
   {
@@ -828,7 +828,7 @@
    "cond": "Complete any 5 Operator Guide stages",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Operator_Guide.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-operator-guide.webp"
    }
   },
   {
@@ -841,8 +841,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Those Forsaken by the Land\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Those_Forsaken_by_the_Land%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Those_Forsaken_by_the_Land%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-those-forsaken-by-the-land.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-those-forsaken-by-the-land-trimmed.webp"
    }
   },
   {
@@ -855,8 +855,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Inorganic Construct\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Inorganic_Construct%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Inorganic_Construct%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-inorganic-construct.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-inorganic-construct-trimmed.webp"
    }
   },
   {
@@ -869,8 +869,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Searing Scars\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Searing_Scars%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Searing_Scars%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-searing-scars.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-searing-scars-trimmed.webp"
    }
   },
   {
@@ -883,8 +883,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Turbidity Manifest\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Turbidity_Manifest%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Turbidity_Manifest%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-turbidity-manifest.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-turbidity-manifest-trimmed.webp"
    }
   },
   {
@@ -897,8 +897,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Contention of Deathly Silences\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Contention_of_Deathly_Silences%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Contention_of_Deathly_Silences%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-contention-of-deathly-silences.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-contention-of-deathly-silences-trimmed.webp"
    }
   },
   {
@@ -911,8 +911,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Howlers of the Crag\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Howlers_of_the_Crag%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Howlers_of_the_Crag%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-howlers-of-the-crag.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-howlers-of-the-crag-trimmed.webp"
    }
   },
   {
@@ -925,8 +925,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Marked by Dark Shadows\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Marked_by_Dark_Shadows%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Marked_by_Dark_Shadows%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-marked-by-dark-shadows.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-marked-by-dark-shadows-trimmed.webp"
    }
   },
   {
@@ -939,8 +939,8 @@
    "reforge": [],
    "trim": "In Umbral Monument, complete all \"Murmurs of the Deep Forest\" stages at Agony mode",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Murmurs_of_the_Deep_Forest%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Murmurs_of_the_Deep_Forest%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-murmurs-of-the-deep-forest.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-murmurs-of-the-deep-forest-trimmed.webp"
    }
   },
   {
@@ -957,8 +957,8 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Valley_Anchorer.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Valley_Anchorer_Reforged_II.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-anchorer.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-anchorer-reforged-ii.webp"
    }
   },
   {
@@ -979,9 +979,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Reunited_Fragments%22.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-%22Reunited_Fragments%22_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-%22Reunited_Fragments%22_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-reunited-fragments.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-reunited-fragments-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-reunited-fragments-reforged-iii.webp"
    }
   },
   {
@@ -1002,9 +1002,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Valley_Crate_Master.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Valley_Crate_Master_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Valley_Crate_Master_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-crate-master.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-crate-master-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-crate-master-reforged-iii.webp"
    }
   },
   {
@@ -1025,9 +1025,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22DELTA_Savior%22.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-%22DELTA_Savior%22_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-%22DELTA_Savior%22_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-delta-savior.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-delta-savior-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-delta-savior-reforged-iii.webp"
    }
   },
   {
@@ -1039,7 +1039,7 @@
    "cond": "In Valley IV, win Athletic Race 4 times",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Shoulder_to_Shoulder_Delivery%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-shoulder-to-shoulder-delivery.webp"
    }
   },
   {
@@ -1056,8 +1056,8 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Valley_Investigator.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Valley_Investigator_Reforged_II.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-investigator.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-investigator-reforged-ii.webp"
    }
   },
   {
@@ -1069,7 +1069,7 @@
    "cond": "Unlock 19 TP Points in Jingyu Valley and Wuling City",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Anchored_to_Wuling_%E2%85%A0.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-anchored-to-wuling.webp"
    }
   },
   {
@@ -1082,8 +1082,8 @@
    "reforge": [],
    "trim": "Gather 81 Aurylenes in Jingyu Valley and Wuling City",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Re-Congregated_Fragments%22_%E2%85%A0.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Re-Congregated_Fragments%22_%E2%85%A0_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments-trimmed.webp"
    }
   },
   {
@@ -1096,8 +1096,8 @@
    "reforge": [],
    "trim": "Open 242 storage crates in Jingyu Valley and Wuling City",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Crate_Master_%E2%85%A0.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Wuling_Crate_Master_%E2%85%A0_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-crate-master.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-crate-master-trimmed.webp"
    }
   },
   {
@@ -1109,7 +1109,7 @@
    "cond": "Gather 2 investigation reports in Jingyu Valley and Wuling City",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Investigator_%E2%85%A0.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-investigator.webp"
    }
   },
   {
@@ -1121,7 +1121,7 @@
    "cond": "Complete 8 pressure plate challenges in Jingyu Valley and Wuling City",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Fowlbeast_Water_Prancer%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-fowlbeast-water-prancer.webp"
    }
   },
   {
@@ -1133,7 +1133,7 @@
    "cond": "Complete 6 glowbug passing challenges in Jingyu Valley and Wuling City",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Swat_the_Lanky_and_Pass_the_Bug%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-swat-the-lanky-and-pass-the-bug.webp"
    }
   },
   {
@@ -1145,7 +1145,7 @@
    "cond": "Eliminate every Blight mass in Qingbo Stockade",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Purger_of_the_Turbid%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-purger-of-the-turbid.webp"
    }
   },
   {
@@ -1157,7 +1157,7 @@
    "cond": "In Qingbo Stockade, Marker Stone, Marker Stone Interiors, and Test Area, unlock 19 TP Points",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Anchored_to_Wuling_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-anchored-to-wuling.webp"
    }
   },
   {
@@ -1169,7 +1169,7 @@
    "cond": "In Qingbo Stockade, Marker Stone, Marker Stone Interiors, and Test Area, gather 59 Aurylenes",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Re-Congregated_Fragments%22_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments.webp"
    }
   },
   {
@@ -1181,7 +1181,7 @@
    "cond": "In Qingbo Stockade, Marker Stone, Marker Stone Interiors, and Test Area, open 121 storage crates",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Crate_Master_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-crate-master.webp"
    }
   },
   {
@@ -1193,7 +1193,7 @@
    "cond": "In Qingbo Stockade, Marker Stone, Marker Stone Interiors, and Test Area, activate 6 sets of pressure plates",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Fowlbeast_Water_Prancer_%E2%85%A1%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-fowlbeast-water-prancer.webp"
    }
   },
   {
@@ -1205,7 +1205,7 @@
    "cond": "In Qingbo Stockade, Marker Stone, Marker Stone Interiors, and Test Area, complete 3 glowbug passing puzzles",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Swat_the_Lanky_and_Pass_the_Bug_%E2%85%A1%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-swat-the-lanky-and-pass-the-bug.webp"
    }
   },
   {
@@ -1217,7 +1217,7 @@
    "cond": "Restore 8 Xiranflow Track Systems in Wuling City",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Track_Sprayer%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-track-sprayer.webp"
    }
   },
   {
@@ -1229,7 +1229,7 @@
    "cond": "Eliminate every Superactive Blight mass in Sword Vault Dale",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Superactive_Blight_Eliminator.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-superactive-blight-eliminator.webp"
    }
   },
   {
@@ -1241,7 +1241,7 @@
    "cond": "In Sword Vault Dale, Yinglung Pass and North Wuling Exclusion Zone, unlock 22 TP Points",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Anchored_to_Wuling_%E2%85%A2.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-anchored-to-wuling.webp"
    }
   },
   {
@@ -1253,7 +1253,7 @@
    "cond": "In Sword Vault Dale, Yinglung Pass and North Wuling Exclusion Zone, gather 59 Aurylenes.",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Re-Congregated_Fragments_%E2%85%A2.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments.webp"
    }
   },
   {
@@ -1265,7 +1265,7 @@
    "cond": "In Sword Vault Dale, Yinglung Pass and North Wuling Exclusion Zone, open 151 crates",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Crate_Master_%E2%85%A2.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-crate-master.webp"
    }
   },
   {
@@ -1277,7 +1277,7 @@
    "cond": "In Yinglung Pass and North Wuling Exclusion Zone, solve 8 Kaleidograph puzzles",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Kaleidographer.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-kaleidographer.webp"
    }
   },
   {
@@ -1289,7 +1289,7 @@
    "cond": "In Yinglung Pass and North Wuling Exclusion Zone, complete aero-salvaging 26 times.",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Aero-Salvager.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-aero-salvager.webp"
    }
   },
   {
@@ -1301,7 +1301,7 @@
    "cond": "In North Wuling Exclusion Zone, completely neutralize 5 rifts",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Rift_Neutralizer.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-rift-neutralizer.webp"
    }
   },
   {
@@ -1313,7 +1313,7 @@
    "cond": "Use Typhoeus's arrows and shatter all runes in the Snowy Forest",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Guidance_From_Amma%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-guidance-from-amma.webp"
    }
   },
   {
@@ -1325,7 +1325,7 @@
    "cond": "In Suiming, open 28 crates",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Suiming_Crate_Master.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-suiming-crate-master.webp"
    }
   },
   {
@@ -1337,7 +1337,7 @@
    "cond": "Kick 18 Originium Slugs into the Suiming Pit",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_Goal_Truly_Slugged%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-goal-truly-slugged.webp"
    }
   },
   {
@@ -1349,7 +1349,7 @@
    "cond": "In Snowy Forest and Si's Painting, unlock 18 TP-Points",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Anchored_to_Wuling_%E2%85%A3.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-anchored-to-wuling.webp"
    }
   },
   {
@@ -1361,7 +1361,7 @@
    "cond": "In Snowy Forest and Si's Painting, gather 41 Aurylenes",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Re-Congregated_Fragments%22_%E2%85%A3.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments.webp"
    }
   },
   {
@@ -1373,7 +1373,7 @@
    "cond": "In Snowy Forest and Si's Painting, open 140 crates",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Outworldly_Crate_Master.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-outworldly-crate-master.webp"
    }
   },
   {
@@ -1385,7 +1385,7 @@
    "cond": "In Si's Painting, solve 11 Stone Lantern puzzles",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Brilliant_Dabs_and_Strokes%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-brilliant-dabs-and-strokes.webp"
    }
   },
   {
@@ -1397,7 +1397,7 @@
    "cond": "In Si's Painting, restore 16 Old Works of Si",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Painting_Mender%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-painting-mender.webp"
    }
   },
   {
@@ -1418,9 +1418,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Operator_Contact.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Operator_Contact_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Operator_Contact_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-operator-contact.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-operator-contact-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-operator-contact-reforged-iii.webp"
    }
   },
   {
@@ -1441,9 +1441,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Skill_Master.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Skill_Master_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Skill_Master_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-skill-master.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-skill-master-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-skill-master-reforged-iii.webp"
    }
   },
   {
@@ -1464,9 +1464,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Potential_Unleashed.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Potential_Unleashed_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Potential_Unleashed_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-potential-unleashed.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-potential-unleashed-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-potential-unleashed-reforged-iii.webp"
    }
   },
   {
@@ -1487,9 +1487,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Arsenal_Collection.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Arsenal_Collection_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Arsenal_Collection_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arsenal-collection.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arsenal-collection-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arsenal-collection-reforged-iii.webp"
    }
   },
   {
@@ -1502,8 +1502,8 @@
    "reforge": [],
    "trim": "Upgrade 1 Weapon to a total skill rank of 25",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Ultimate_Weaponry.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Ultimate_Weaponry_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-ultimate-weaponry.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-ultimate-weaponry-trimmed.webp"
    }
   },
   {
@@ -1515,7 +1515,7 @@
    "cond": "Upgrade all stats of 1 piece of gear to Fully Artificed",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Perfect_Gearing.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-perfect-gearing.webp"
    }
   },
   {
@@ -1536,9 +1536,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Deep_Explorer.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Deep_Explorer_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Deep_Explorer_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-deep-explorer.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-deep-explorer-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-deep-explorer-reforged-iii.webp"
    }
   },
   {
@@ -1559,9 +1559,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Hardened_Veteran.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Hardened_Veteran_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Hardened_Veteran_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-hardened-veteran.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-hardened-veteran-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-hardened-veteran-reforged-iii.webp"
    }
   },
   {
@@ -1573,7 +1573,7 @@
    "cond": "Research every technology in the Basic AIC Plan",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Valley_Factory_Pioneer.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-factory-pioneer.webp"
    }
   },
   {
@@ -1586,8 +1586,8 @@
    "reforge": [],
    "trim": "Raise all Valley IV outposts to the highest level",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Valley_Outpost_Builder.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Valley_Outpost_Builder_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-outpost-builder.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-outpost-builder-trimmed.webp"
    }
   },
   {
@@ -1608,9 +1608,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Valley_Stock_Redistributor.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Valley_Stock_Redistributor_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Valley_Stock_Redistributor_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-stock-redistributor.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-stock-redistributor-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-valley-stock-redistributor-reforged-iii.webp"
    }
   },
   {
@@ -1622,7 +1622,7 @@
    "cond": "Research every technology in the Wuling AIC I",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Factory_Pioneer_%E2%85%A0.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-factory-pioneer.webp"
    }
   },
   {
@@ -1634,7 +1634,7 @@
    "cond": "Earn 2,000,000 Wuling Stock Bills",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Stock_Redistributor.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-stock-redistributor.webp"
    }
   },
   {
@@ -1646,7 +1646,7 @@
    "cond": "Gather resources from Recycling Stations 50 times",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Resource_Recycler.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-resource-recycler.webp"
    }
   },
   {
@@ -1659,8 +1659,8 @@
    "reforge": [],
    "trim": "In 1 single cargo selling action, achieve a cargo selling price that is at least 500% higher than the average holding price",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Steady_Sales.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Steady_Sales_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-steady-sales.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-steady-sales-trimmed.webp"
    }
   },
   {
@@ -1673,8 +1673,8 @@
    "reforge": [],
    "trim": "Pack and deliver 20 Factory Goods packages without taking any damage",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Goods_Delivery.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Goods_Delivery_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-goods-delivery.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-goods-delivery-trimmed.webp"
    }
   },
   {
@@ -1687,8 +1687,8 @@
    "reforge": [],
    "trim": "Complete Ecology Overview Progress of the Wuling Outskirts Monitoring Terminal",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Environment_Monitor.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Environment_Monitor_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-environment-monitor.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-environment-monitor-trimmed.webp"
    }
   },
   {
@@ -1709,9 +1709,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Factory_Simulation.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Factory_Simulation_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Factory_Simulation_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-factory-simulation.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-factory-simulation-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-factory-simulation-reforged-iii.webp"
    }
   },
   {
@@ -1723,7 +1723,7 @@
    "cond": "Research 25 technologies in the Wuling AIC Plan",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Factory_Pioneer_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-factory-pioneer.webp"
    }
   },
   {
@@ -1735,7 +1735,7 @@
    "cond": "Earn 10,000,000 Wuling Stock Bills",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Stock_Redistributor_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-stock-redistributor.webp"
    }
   },
   {
@@ -1748,8 +1748,8 @@
    "reforge": [],
    "trim": "Raise Sky King Flats Construction Site and Cardiac Remediation Station to the highest level",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Outpost_Builder_%E2%85%A0.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Wuling_Outpost_Builder_%E2%85%A0_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-outpost-builder.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-outpost-builder-trimmed.webp"
    }
   },
   {
@@ -1761,7 +1761,7 @@
    "cond": "Research 34 technologies in the Wuling AIC Plan",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Factory_Pioneer_%E2%85%A2.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-factory-pioneer.webp"
    }
   },
   {
@@ -1773,7 +1773,7 @@
    "cond": "Earn 25,000,000 Wuling Stock Bills",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Stock_Redistributor_%E2%85%A2.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-stock-redistributor.webp"
    }
   },
   {
@@ -1786,8 +1786,8 @@
    "reforge": [],
    "trim": "After 1 instance of Data Overflow, complete 1 Trial with a total of 10 Battle Points",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Zenith_of_the_Trials%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Zenith_of_the_Trials%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-zenith-of-the-trials.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-zenith-of-the-trials-trimmed.webp"
    }
   },
   {
@@ -1799,7 +1799,7 @@
    "cond": "Earn 80,000,000 Wuling Stock Bills",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Stock_Redistributor_%E2%85%A3.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-stock-redistributor.webp"
    }
   },
   {
@@ -1811,7 +1811,7 @@
    "cond": "Research 47 technologies in the Wuling AIC Plan",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Factory_Pioneer_%E2%85%A3.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-factory-pioneer.webp"
    }
   },
   {
@@ -1823,7 +1823,7 @@
    "cond": "Earn 100,000,000 Wuling Stock Bills",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Stock_Redistributor_%E2%85%A4.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-stock-redistributor.webp"
    }
   },
   {
@@ -1835,7 +1835,7 @@
    "cond": "Add all Wuling outposts into the support program",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Wuling_Outpost_Builder_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-wuling-outpost-builder.webp"
    }
   },
   {
@@ -1847,7 +1847,7 @@
    "cond": "Manually start and complete 30 simulations",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Factory_Simulation_%E2%85%A1.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-factory-simulation.webp"
    }
   },
   {
@@ -1860,8 +1860,8 @@
    "reforge": [],
    "trim": "In Typhoeus's Archery Range, complete all \"Advanced Training\" and complete \"Daily Exercise 04\" with 3★",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Archer%27s_Epiphany%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Archer%27s_Epiphany%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-archer-s-epiphany.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-archer-s-epiphany-trimmed.webp"
    }
   },
   {
@@ -1874,8 +1874,8 @@
    "reforge": [],
    "trim": "Acquire 40 recipes",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Happy_Gourmand.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-Happy_Gourmand_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-happy-gourmand.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-happy-gourmand-trimmed.webp"
    }
   },
   {
@@ -1887,7 +1887,7 @@
    "cond": "Upgrade the Control Nexus of Dijiang to Level 5",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Nexus_Upgrader.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-nexus-upgrader.webp"
    }
   },
   {
@@ -1908,9 +1908,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Friendly_Giveaway.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Friendly_Giveaway_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Friendly_Giveaway_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-friendly-giveaway.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-friendly-giveaway-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-friendly-giveaway-reforged-iii.webp"
    }
   },
   {
@@ -1931,9 +1931,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Immense_Trust.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Immense_Trust_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Immense_Trust_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-immense-trust.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-immense-trust-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-immense-trust-reforged-iii.webp"
    }
   },
   {
@@ -1954,9 +1954,9 @@
     }
    ],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Can%27t_Do_Without_It.png",
-    "r2": "https://endfield.wiki.gg/images/Medal-Can%27t_Do_Without_It_Reforged_II.png",
-    "r3": "https://endfield.wiki.gg/images/Medal-Can%27t_Do_Without_It_Reforged_III.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-can-t-do-without-it.webp",
+    "r2": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-can-t-do-without-it-reforged-ii.webp",
+    "r3": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-can-t-do-without-it-reforged-iii.webp"
    }
   },
   {
@@ -1968,7 +1968,7 @@
    "cond": "Give 50 production assists to your friends",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Generous_Helper.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-generous-helper.webp"
    }
   },
   {
@@ -1980,7 +1980,7 @@
    "cond": "Receive 100 production assists from your friends",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Assist_Recipient.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-assist-recipient.webp"
    }
   },
   {
@@ -1992,7 +1992,7 @@
    "cond": "Participate in a total of 50 clue exchanges",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-Clue_Exchanger.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-clue-exchanger.webp"
    }
   },
   {
@@ -2005,8 +2005,8 @@
    "reforge": [],
    "trim": "In [Delver of the Cryptic], perfectly complete all \"Cryptic First Revealed\" Protocol Spaces",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22In_the_Cryptics_of_the_Valley%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22In_the_Cryptics_of_the_Valley%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-in-the-cryptics-of-the-valley.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-in-the-cryptics-of-the-valley-trimmed.webp"
    }
   },
   {
@@ -2019,8 +2019,8 @@
    "reforge": [],
    "trim": "In [Delver of the Cryptic], perfectly complete all \"Grotto Survey\" Protocol Spaces",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Delver_of_the_Grottoes%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Delver_of_the_Grottoes%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-delver-of-the-grottoes.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-delver-of-the-grottoes-trimmed.webp"
    }
   },
   {
@@ -2033,8 +2033,8 @@
    "reforge": [],
    "trim": "In [Delver of the Cryptic], complete all \"Artful Realm of Six Cardinals\" Protocol Spaces",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Artful_Realm_of_Six_Cardinals%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Artful_Realm_of_Six_Cardinals%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-artful-realm-of-six-cardinals.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-artful-realm-of-six-cardinals-trimmed.webp"
    }
   },
   {
@@ -2047,8 +2047,8 @@
    "reforge": [],
    "trim": "In [Delver of the Cryptic], complete all \"Fade Beyond the Painting\" Protocol Spaces",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Fade_Beyond_the_Painting%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Fade_Beyond_the_Painting%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-fade-beyond-the-painting.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-fade-beyond-the-painting-trimmed.webp"
    }
   },
   {
@@ -2062,8 +2062,8 @@
    "trim": "Complete \"Bouncy Cleaning Drill\" in 120s",
    "end": "2026/04/19",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Totally_Cleansed_and_Rinsed%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Totally_Cleansed_and_Rinsed%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-totally-cleansed-and-rinsed.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-totally-cleansed-and-rinsed-trimmed.webp"
    }
   },
   {
@@ -2077,8 +2077,8 @@
    "trim": "Complete \"Final Assessment\" in 120s",
    "end": "2026/04/30",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Expert_Survivor%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Expert_Survivor%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-expert-survivor.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-expert-survivor-trimmed.webp"
    }
   },
   {
@@ -2092,8 +2092,8 @@
    "trim": "During AIC Support: Palm-Top Savior, earn 800,000 Fruits of Altruism Certs and submit 20,000 Xiranite Jade Gourds",
    "end": "2026/05/19",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Palm_Top_Deliverer%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Palm_Top_Deliverer%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-palm-top-deliverer.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-palm-top-deliverer-trimmed.webp"
    }
   },
   {
@@ -2106,7 +2106,7 @@
    "reforge": [],
    "end": "2026/07/16",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Re-Ignition%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-ignition.webp"
    }
   },
   {
@@ -2120,8 +2120,8 @@
    "trim": "Complete all [HEAT RAGE! MEGA ARENA!] stages in MAXED Mode, and complete any of the following stages in 180s:\n* &#91;Unholy! Breakers and Buggers! MAXED!&#93;\n* &#91;Tactics! Beat Their Beastmasters! MAXED!&#93;\n* &#91;Chaos! Total Carnage! MAXED!&#93;",
    "end": "2026/08/13",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Nocturnal_Tactics%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Nocturnal_Tactics%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-nocturnal-tactics.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-nocturnal-tactics-trimmed.webp"
    }
   },
   {
@@ -2135,8 +2135,8 @@
    "trim": "In [The Rooted Realm], complete Realm Quests of all phases",
    "end": "2026/09/02",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Explorer_of_the_Realm%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Explorer_of_the_Realm%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-explorer-of-the-realm.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-explorer-of-the-realm-trimmed.webp"
    }
   },
   {
@@ -2150,8 +2150,8 @@
    "trim": "In [Runners' Steeplechase], complete all tracks with 3★",
    "end": "2026/10/15",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Supreme_Runner%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Supreme_Runner%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-supreme-runner.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-supreme-runner-trimmed.webp"
    }
   },
   {
@@ -2165,8 +2165,8 @@
    "trim": "During [AIC Support: Chubby Lung Attacks], earn 800,000 Fruits of Altruism Certs and submit 20,000 Heavy Xiranite Chubby Lungs",
    "end": "2026/10/07",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Chubby_Lung_Explosion%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Chubby_Lung_Explosion%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-chubby-lung-explosion.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-chubby-lung-explosion-trimmed.webp"
    }
   },
   {
@@ -2179,8 +2179,8 @@
    "reforge": [],
    "trim": "In &#91;Arena of Games&#93;, complete 15 Arena Tasks",
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Dataplate_Counter%22.png",
-    "trim": "https://endfield.wiki.gg/images/Medal-%22Dataplate_Counter%22_Trimmed.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-dataplate-counter.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-dataplate-counter-trimmed.webp"
    }
   },
   {
@@ -2193,7 +2193,7 @@
    "secret": "Break all weak surfaces of the Origin Lodespring",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Auditors_Trapped%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-auditors-trapped.webp"
    }
   },
   {
@@ -2206,7 +2206,7 @@
    "secret": "Travel 10000 meters using ziplines, bounce pads, and ropes",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Unconventional_Movement%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-unconventional-movement.webp"
    }
   },
   {
@@ -2219,7 +2219,7 @@
    "secret": "Kick 4 Originium Slugs till they fall",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Battle_of_the_Four_Emperors%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-battle-of-the-four-emperors.webp"
    }
   },
   {
@@ -2232,7 +2232,7 @@
    "secret": "Use the defensive parry to intercept the Axe Armorbeast's ramming assault",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22We_Built_the_Southern_Bastion%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-we-built-the-southern-bastion.webp"
    }
   },
   {
@@ -2245,7 +2245,7 @@
    "secret": "Use a Jump attack from at least 20 meters and hit an enemy",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Protocol_%CE%B5_20.00m%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-protocol-20-00m.webp"
    }
   },
   {
@@ -2258,7 +2258,7 @@
    "secret": "Reach the top of the Qingbo Stockade waterwheel",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Water_Flows_from_the_Sky%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-water-flows-from-the-sky.webp"
    }
   },
   {
@@ -2271,7 +2271,7 @@
    "secret": "While Ruan Yi is Infuriated, keep his Withering Touch active for at least 60s",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Traveler_of_the_Deathly_Realms%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-traveler-of-the-deathly-realms.webp"
    }
   },
   {
@@ -2284,7 +2284,7 @@
    "secret": "Explore the base of Type-C Tianshi Pillar",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Dwelling_Upon_Wilted_Glory%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-dwelling-upon-wilted-glory.webp"
    }
   },
   {
@@ -2297,7 +2297,7 @@
    "secret": "Let Nefarith, \"Conqueror\" hold the place in stasis and lock your controlled operator in mid-air",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Fully_Revealed%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-fully-revealed.webp"
    }
   },
   {
@@ -2310,7 +2310,7 @@
    "secret": "Find Smartie's \"tribute\"",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Beastie%27s_Tribute%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-beastie-s-tribute.webp"
    }
   },
   {
@@ -2323,7 +2323,7 @@
    "secret": "Let the controlled operator slip on banana peels 1 time",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Arms_Race%3F%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-arms-race.webp"
    }
   },
   {
@@ -2336,7 +2336,7 @@
    "secret": "Complete \"Crisis Calamity: Alleikhreos, Chiliarch\" without using Foundite Weapons",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Maker%27s_Domination%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-maker-s-domination.webp"
    }
   },
   {
@@ -2349,7 +2349,7 @@
    "secret": "In North Wuling Exclusion Zone, clear 5 energy alluvium sites",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Blade_Hanging_by_a_Thread%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-blade-hanging-by-a-thread.webp"
    }
   },
   {
@@ -2362,7 +2362,7 @@
    "secret": "Reach the underground cave of Little Grotto, Snowy Forest",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Giant_Ice_Hammer%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-giant-ice-hammer.webp"
    }
   },
   {
@@ -2375,7 +2375,7 @@
    "secret": "Reach the Vantage Islet",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22A_View_of_the_Southern_Peak%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-a-view-of-the-southern-peak.webp"
    }
   },
   {
@@ -2388,7 +2388,7 @@
    "secret": "When fighting Simmer's Purge, Thunder Cloud can unleash Thunderbolts that inflict Stun.",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Involuntary_Karma_Recipient%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-involuntary-karma-recipient.webp"
    }
   },
   {
@@ -2401,7 +2401,7 @@
    "secret": "Find all the minimalist Lung-shaped Ink Spirits",
    "reforge": [],
    "images": {
-    "base": "https://endfield.wiki.gg/images/Medal-%22Most_Dashing_Lung%22.png"
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-most-dashing-lung.webp"
    }
   }
  ]

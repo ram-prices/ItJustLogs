@@ -119,7 +119,7 @@ export const wikiId = (itemId: string): string => WIKI_ALIASES[itemId] ?? itemId
 // ---------------------------------------------------------------------------
 
 /** Top-level paths the app or its files already use; no short link may take one. */
-export const RESERVED_PATHS = new Set(['database', 'pulls', 'operators', 'arsenal', 'stats', 'settings', 'privacy', 'assets', 'icons', 'info', 'home', '404', 'index', 'banners', 'event', 'events']);
+export const RESERVED_PATHS = new Set(['database', 'pulls', 'operators', 'arsenal', 'stats', 'settings', 'privacy', 'assets', 'icons', 'info', 'home', '404', 'index', 'banners', 'banner', 'event', 'events']);
 
 /** "Zhuang Fangyi" → "zhuang-fangyi", "Si" → "si". */
 export const nameSlug = (name: string): string =>
@@ -140,24 +140,33 @@ const SHARED_NAME_SLUGS: Record<string, string[]> = {
 };
 
 /**
- * Short link → operator id, for every operator: its name as a slug (/si,
- * /chen-qianyu). Names shared by several operators only get the links in
- * SHARED_NAME_SLUGS; names that clash with a page (RESERVED_PATHS) get none.
+ * Slug → id for every item of one kind: its name as a slug, the last part of
+ * its Database page (/database/operators/chen-qianyu). Names shared by several
+ * items get none (their page keeps the id), except the operators in
+ * SHARED_NAME_SLUGS.
  */
-export function operatorShortLinks(operators: Record<string, { name: string }>): Map<string, string> {
+export function itemSlugs(items: Record<string, { name: string }>, kind: 'char' | 'weap'): Map<string, string> {
   const byName = new Map<string, string[]>();
-  for (const [id, o] of Object.entries(operators)) {
+  for (const [id, o] of Object.entries(items)) {
     const slug = nameSlug(o.name);
     if (slug) byName.set(slug, [...(byName.get(slug) ?? []), id]);
   }
   const out = new Map<string, string>();
-  for (const [slug, ids] of byName) {
-    if (ids.length === 1 && !RESERVED_PATHS.has(slug)) out.set(slug, ids[0]);
-  }
-  for (const [id, slugs] of Object.entries(SHARED_NAME_SLUGS)) {
-    if (operators[id]) for (const s of slugs) out.set(s, id);
-  }
+  for (const [slug, ids] of byName) if (ids.length === 1) out.set(slug, ids[0]);
+  if (kind === 'char')
+    for (const [id, slugs] of Object.entries(SHARED_NAME_SLUGS)) {
+      if (items[id]) for (const s of slugs) out.set(s, id);
+    }
   return out;
+}
+
+/**
+ * Short link → operator id, for every operator: its name as a slug (/si,
+ * /chen-qianyu), as itemSlugs gives it; names that clash with a page
+ * (RESERVED_PATHS) get none.
+ */
+export function operatorShortLinks(operators: Record<string, { name: string }>): Map<string, string> {
+  return new Map([...itemSlugs(operators, 'char')].filter(([slug]) => !RESERVED_PATHS.has(slug)));
 }
 
 /** What a short link opens. */

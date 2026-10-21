@@ -16,9 +16,9 @@ import {
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
 import { weeklyChart } from '../charts';
-import { TAB_ICON, badge, icon, itemName, metric, metrics, pageHeader } from '../components';
+import { TAB_ICON, badge, icon, iconOf, itemName, metric, metrics, pageHeader } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
-import { credit, external, pullsTabs, wikiFile } from './info';
+import { bannerHref, credit, external, pullsTabs, wikiFile } from './info';
 
 /**
  * Stats: totals, pulls per week, and a per-patch breakdown table. Each patch
@@ -39,11 +39,22 @@ export function togglePatch(key: string): void {
   if (!openPatches.delete(key)) openPatches.add(key);
 }
 
-/** What a set of totals comes to, written out: "1,600 Oroberyl, 5 Basic HH Permits" (Oroberyl and Origeometry have no plural). */
+/** Pull currencies written as their icon and the number in their colour, no name. */
+const CURRENCY: Record<string, string> = { Oroberyl: 'oroberyl', 'Chartered HH Permit': 'chartered', 'Basic HH Permit': 'basic-permit' };
+
+/** An amount of one item: "[icon] 1,600" for those currencies, else "5 Arsenal Tickets" (Oroberyl and Origeometry have no plural). */
+function amount(k: string, n: number): Html {
+  const src = k === 'Oroberyl' ? '/icons/oroberyl.webp' : iconOf('items', k);
+  if (CURRENCY[k] && src)
+    return html`<span class="amt amt-${CURRENCY[k]}" title="${k}" aria-label="${fmtInt(n)} ${k}"><img src="${src}" alt="" />${fmtInt(n)}</span>`;
+  return html`${fmtInt(n)} ${itemName(n !== 1 && /(Permit|Ticket)$/.test(k) ? `${k}s` : k)}`;
+}
+
+/** What a set of totals comes to, written out: "[icon] 1,600, [icon] 5". */
 function itemsText(totals: Record<string, number>): Html {
   const items = Object.entries(totals)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => html`${fmtInt(n)} ${itemName(n !== 1 && /(Permit|Ticket)$/.test(k) ? `${k}s` : k)}`);
+    .map(([k, n]) => amount(k, n));
   return html`${items.flatMap((x, i) => (i ? [', ', x] : [x]))}`;
 }
 const hasItems = (totals: Record<string, number>) => Object.values(totals).some((n) => n > 0);
@@ -260,7 +271,7 @@ function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: Tick
         <span class="patch-banner-when secondary">${b.start ? fmtDate(b.start) : kind}</span>
         <span class="patch-banner-pulls num${s?.paidPulls ? '' : ' tertiary'}">${s?.paidPulls ? `${fmtInt(s.paidPulls)} pulls` : 'No pulls'}</span>`;
       return s?.paidPulls && b.poolId
-        ? html`<a class="patch-banner ${b.kind}" href="/${b.kind === 'weap' ? 'arsenal' : 'operators'}/${b.poolId}" title="${kind}">${inner}</a>`
+        ? html`<a class="patch-banner ${b.kind}" href="${bannerHref(b.kind, b.poolId)}" title="${kind}">${inner}</a>`
         : html`<div class="patch-banner ${b.kind} unpulled" title="${kind}">${inner}</div>`;
     })}
   </div>${inc?.lines.length ? patchIncomeList(inc, tickets, bond, dossiers) : ''}</td></tr>`;

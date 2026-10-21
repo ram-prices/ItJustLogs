@@ -41,8 +41,9 @@ export interface Preview {
   color: string;
 }
 
-export const operatorUrl = (id: string): string => `${SITE_URL}/operators/info/${encodeURIComponent(id)}`;
-export const weaponUrl = (id: string): string => `${SITE_URL}/arsenal/info/${encodeURIComponent(id)}`;
+/** An item's Database page; `slug` is its name slug (itemSlugs), else its id. */
+export const operatorUrl = (slug: string): string => `${SITE_URL}/database/operators/${encodeURIComponent(slug)}`;
+export const weaponUrl = (slug: string): string => `${SITE_URL}/database/arsenals/${encodeURIComponent(slug)}`;
 
 // ---------------------------------------------------------------------------
 // Wiki markup → text
@@ -195,14 +196,14 @@ const element = (e: string): string => (ELEMENT_EMOJI[e] ? `${ELEMENT_EMOJI[e]} 
 // Operators
 // ---------------------------------------------------------------------------
 
-export function operatorPreview(id: string, o: ShareOperator): Preview {
+export function operatorPreview(id: string, o: ShareOperator, slug = id): Preview {
   const facts = [element(o.element), o.weapon, o.faction].filter(Boolean).join(' · ');
   const skills = uniqueSkills(o.skills).map((s) => `${s.type}: ${s.name}`);
   return {
     title: clip(`${o.name} · ${stars(o.rarity)} ${o.class}`, TITLE_BYTES, utf8Bytes),
     description: fitLines([facts, ...(o.tags.length ? [o.tags.join(' · ')] : [])], skills),
     image: `${EF_ASSETS_CDN}/operators/${wikiId(id)}.webp`,
-    url: operatorUrl(id),
+    url: operatorUrl(slug),
     color: ELEMENT_COLOR[o.element] ?? RARITY_COLOR[o.rarity] ?? RARITY_COLOR[6],
   };
 }
@@ -242,7 +243,7 @@ export function operatorSkillDiscord(id: string, o: ShareOperator, skill: ShareO
 
 const baseAtk = (w: ShareWeapon): number | null => w.stats?.baseAtk.at(-1) ?? null;
 
-export function weaponPreview(id: string, w: ShareWeapon): Preview {
+export function weaponPreview(id: string, w: ShareWeapon, slug = id): Preview {
   const atk = baseAtk(w);
   const head = `${stars(w.rarity)} ${w.type}${atk != null ? ` · Base ATK ${atk}` : ''}`;
   const skills = w.skills.map((s) => (s.text ? `${s.name}: ${wikiText(s.text, s.values, false)}` : s.name));
@@ -252,7 +253,7 @@ export function weaponPreview(id: string, w: ShareWeapon): Preview {
     title: clip(`${w.name} · ${stars(w.rarity)} ${w.type}`, TITLE_BYTES, utf8Bytes),
     description: clip(lines.filter(Boolean).join('\n'), PREVIEW_BYTES, utf8Bytes),
     image: `${EF_ASSETS_CDN}/arsenals/${id}.webp`,
-    url: weaponUrl(id),
+    url: weaponUrl(slug),
     color: RARITY_COLOR[w.rarity] ?? RARITY_COLOR[6],
   };
 }

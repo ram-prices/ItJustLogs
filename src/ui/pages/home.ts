@@ -23,7 +23,7 @@ import { toast } from '../common';
 import { backgroundSource, heat, icon, issueArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
-import { wikiFile } from './info';
+import { bannerHref, wikiFile } from './info';
 import { eventTags } from './event';
 
 /**
@@ -60,7 +60,7 @@ function summaryFor(b: ScheduleBanner, a: Analysis | null): BannerSummary | null
   return a.banners.find((s) => canonicalPoolId(s.poolId) === b.poolId) ?? null;
 }
 
-const pagePath = (b: ScheduleBanner) => `/${isWeaponBanner(b.kind) ? 'arsenal' : 'operators'}/${b.poolId}`;
+const pagePath = (b: ScheduleBanner) => bannerHref(isWeaponBanner(b.kind) ? 'weap' : 'char', b.poolId!);
 
 function rateUpLine(b: ScheduleBanner): Html {
   if (!b.rateUps.length) return html``;
@@ -338,7 +338,7 @@ export function scrollTimelineToNow(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Copy link, Copy image: right-click, or long-press on touch screens
+// Copy link, Copy (or on phones Share) banner card: right-click, or long-press on touch screens
 // ---------------------------------------------------------------------------
 
 let menu: HTMLElement | null = null;
@@ -371,7 +371,7 @@ export async function copyText(text: string): Promise<boolean> {
 
 /**
  * The menu for a copyable element: "Copy link" for `data-link`, and
- * "Copy image" for banner cards (`data-card-image`, the picture's name).
+ * "Copy banner card" ("Share banner card" on phones) for banner cards (`data-card-image`, the picture's name).
  * Opened by a long-press (`touch`), it starts drawing the card's picture
  * straight away: phones only allow copying or sharing during the tap, and the
  * picture has to be ready by then.
@@ -403,12 +403,15 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
   const card = el.closest<HTMLElement>('[data-card-image]');
   if (card) {
     const prepared: PreparedImage | undefined = touch ? prepareCardImage(card) : undefined;
-    const btn = item('image', 'Copy image', async () => {
+    // Phones share the card; elsewhere it's copied.
+    const what = touch ? 'Share banner card' : 'Copy banner card';
+    const btn = item(touch ? 'share' : 'image', what, async () => {
       try {
-        const { done, why } = await copyCardImage(card, card.dataset.cardImage!, prepared);
+        const { done, why } = await copyCardImage(card, card.dataset.cardImage!, prepared, touch);
         if (done === 'shown') return; // the picture's dialog says what to do
+        if (done === 'shared') return;
         toast(
-          done === 'copied' ? 'Image copied.' : done === 'shared' ? 'Shared.' : `Saved to your downloads: this browser didn't allow copying it (${why}).`,
+          done === 'copied' ? 'Banner card copied.' : `Saved to your downloads: this browser didn't allow copying it (${why}).`,
           done === 'saved' ? 'error' : 'info',
         );
       } catch {
@@ -419,13 +422,13 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
     if (prepared) {
       const label = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = label.replace('Copy image', 'Preparing image…');
+      btn.innerHTML = label.replace(what, 'Preparing…');
       prepared.promise.then(
         () => {
           btn.disabled = false;
           btn.innerHTML = label;
         },
-        () => (btn.innerHTML = label.replace('Copy image', "Can't make the image")),
+        () => (btn.innerHTML = label.replace(what, "Can't make the picture")),
       );
     }
   }
@@ -438,7 +441,7 @@ function openMenu(x: number, y: number, el: HTMLElement, touch = false): void {
   first?.focus();
 }
 
-/** Things with a menu: Home's banners and events (Copy link) and every banner card (Copy image). */
+/** Things with a menu: Home's banners and events (Copy link) and every banner card (Copy or Share banner card). */
 const copyable = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-link], [data-card-image]') : null);
 
 export function installCopyMenu(): void {

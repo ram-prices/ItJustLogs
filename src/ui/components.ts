@@ -91,7 +91,7 @@ export function iconOf(kind: IconKind, name: string): string | null {
 export function itemName(name: string): Html {
   if (/^oroberyls?$/i.test(name)) return html`<span class="oroberyl"><img class="oroberyl-icon" src="/icons/oroberyl.webp" alt="" />${name}</span>`;
   const src = iconOf('items', name);
-  return src ? html`<span class="item-name"><img class="item-icon" src="${src}" alt="" loading="lazy" decoding="async" />${name}</span>` : html`${name}`;
+  return src ? html`<span class="item-label"><img class="item-icon" src="${src}" alt="" loading="lazy" decoding="async" />${name}</span>` : html`${name}`;
 }
 
 /** An element, class or weapon type with its game icon. */
@@ -138,6 +138,13 @@ export function heroGlow(kind: Kind, itemId: string): Html {
 }
 
 export const RARITY_COLOR: Record<number, string> = { 6: 'var(--r6)', 5: 'var(--r5)', 4: 'var(--r4)', 3: 'var(--r3)' };
+/**
+ * A Database list tile's picture with its rarity on it, as the game shows it:
+ * a band of the rarity's colour along the bottom, glowing up behind the art.
+ */
+export const tileArt = (kind: Kind, id: string, r: number): Html =>
+  html`<span class="wiki-tile-art r${r}" role="img" aria-label="${r}★" title="${r}★">${itemImg(kind, id, 'wiki-tile-portrait')}</span>`;
+
 export const rarity = (r: number): Html =>
   html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}★</span>`;
 

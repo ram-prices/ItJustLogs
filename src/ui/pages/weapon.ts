@@ -1,16 +1,16 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, heroGlow, icon, itemImg, rarity, trait } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, tileArt, trait } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { weaponBaseRanks, weaponRankCaps } from '../../domain/loadout';
 import { essenceTag, isMaxEssence, weaponRanksOf, wieldersSection } from './loadout';
 import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
-import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
+import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
- * Weapon info pages (/arsenal/info and /arsenal/info/<wpn id>): base ATK,
+ * Weapon info pages (/database/arsenals and /database/arsenals/<name>): base ATK,
  * skills with their values at each rank, Potential and tuning costs from the
  * wiki data, plus the player's copies. CC BY-SA 4.0: every page credits
  * endfield.wiki.gg.
@@ -51,10 +51,10 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
             ${g.items.map(({ id, w, name, rarity: r, type }) => {
               const mine = owned?.get(id);
               return html`<a class="wiki-tile card${owned && (!w || !mine?.copies) ? ' unowned' : ''}" href="${weaponInfoHref(id)}">
-                ${itemImg('weap', id, 'wiki-tile-portrait')}
+                ${tileArt('weap', id, r)}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${name}</span>
-                  <span class="label-12 secondary">${rarity(r)} · ${w ? (w.skills[w.skills.length - 1]?.tag ?? w.type) : (type ?? 'Weapon')}${w && mine?.copies && essenceTag(id, w, mine.potential) ? html` · ${essenceTag(id, w, mine.potential)}` : ''}</span>
+                  <span class="label-12 secondary">${w ? (w.skills[w.skills.length - 1]?.tag ?? w.type) : (type ?? 'Weapon')}${w && mine?.copies && essenceTag(id, w, mine.potential) ? html` · ${essenceTag(id, w, mine.potential)}` : ''}</span>
                 </span>
                 ${w ? ownedTag(mine) : badge('Unreleased', 'amber')}
               </a>`;
@@ -72,7 +72,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
 // One weapon
 // ---------------------------------------------------------------------------
 
-function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
+function hero(id: string, w: WikiWeapon): Html {
   return html`<section class="wiki-hero weapon">
     ${heroGlow('weap', id)}
     <div class="container wiki-hero-inner">
@@ -85,7 +85,6 @@ function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
           <span class="wiki-fact"><span class="wiki-fact-label">Type</span>${trait('weapon-types', w.type)}</span>
           ${w.stats?.baseAtk.at(-1) != null ? html`<span class="wiki-fact"><span class="wiki-fact-label">Base ATK</span><span class="num">${w.stats.baseAtk.at(-1)}</span></span>` : ''}
           ${w.source ? html`<span class="wiki-fact"><span class="wiki-fact-label">Source</span>${w.source}</span>` : ''}
-          ${owned?.copies ? html`<span class="wiki-fact"><span class="wiki-fact-label">Potential</span><span class="wiki-fact-pot">${potentialLevel(owned)}${pips(owned.potential)}</span></span>` : ''}
         </div>
         ${w.skills.length ? html`<div class="wiki-tags">${w.skills.map((s) => badge(s.tag ?? s.name, 'outline'))}</div>` : ''}
       </div>
@@ -177,19 +176,15 @@ function skillsSection(id: string, w: WikiWeapon, owned: Owned | undefined): Htm
   </section>`;
 }
 
-function potentialSection(w: WikiWeapon, owned: Owned | undefined, imported: boolean): Html {
-  if (!w.potential) return html``;
-  const copies = owned?.copies ?? 0;
-  const p = owned?.potential ?? -1;
+const potentialText = (w: WikiWeapon): Html =>
+  html`<div class="card card-body"><p class="copy-14 wiki-text">${rich(w.potential ?? '')} Each duplicate raises Potential by one, to P${MAX_POTENTIAL}.</p></div>`;
+
+/** What Potential does, as a section of its own when the player has no copy (else it's in Your pulls). */
+function potentialSection(w: WikiWeapon, owned: Owned | undefined): Html {
+  if (!w.potential || owned?.copies) return html``;
   return html`<section class="section">
-    <div class="section-head">
-      <h2 class="heading-20">Potential</h2>
-      ${imported ? html`<span class="label-13 secondary">${!copies ? 'Not owned yet' : p >= MAX_POTENTIAL ? 'Yours is maxed' : `Yours: P${p} of P${MAX_POTENTIAL}`}</span>` : ''}
-    </div>
-    <div class="card card-body wiki-weapon-pot">
-      ${pips(p)}
-      <p class="copy-14 wiki-text">${rich(w.potential)} Each duplicate raises Potential by one, to P${MAX_POTENTIAL}.</p>
-    </div>
+    <div class="section-head"><h2 class="heading-20">Potential</h2></div>
+    ${potentialText(w)}
   </section>`;
 }
 
@@ -220,12 +215,12 @@ function aboutSection(w: WikiWeapon): Html {
 
 function detailPage(id: string, w: WikiWeapon, attribution: WikiAttribution, a: Analysis | null, redraw: () => void): Html {
   const owned = ownedOf(a, 'weap')?.get(id);
-  return html`${hero(id, w, owned)}
+  return html`${hero(id, w)}
     <main class="container fade-in wiki-page">
-      ${ownedSection('weap', w.name, a, owned)}
+      ${ownedSection('weap', w.name, a, owned, w.potential ? potentialText(w) : undefined)}
       ${wieldersSection(id, redraw)}
       <div class="wiki-cols">
-        <div class="wiki-col">${statsSection(w)}${potentialSection(w, owned, !!a)}</div>
+        <div class="wiki-col">${statsSection(w)}${potentialSection(w, owned)}</div>
         <div class="wiki-col">${skillsSection(id, w, owned)}${tuningSection(w)}</div>
       </div>
       ${aboutSection(w)}
@@ -247,7 +242,7 @@ function weaponPreview(id: string, p: PreviewWeapon, attribution: WikiPreviewFil
   return previewPage('weap', id, p, [['Type', p.type]], [], about, attribution);
 }
 
-/** /arsenal/info[/<wpn id>]; `redraw` runs once the data has loaded. */
+/** /database/arsenals[/<name>]; `redraw` runs once the data has loaded. */
 export function weaponInfoPage(id: string | undefined, a: Analysis | null, redraw: () => void): Html {
   const f = wikiFile<WikiWeaponFile>('weapons.json', redraw);
   file = f.data;

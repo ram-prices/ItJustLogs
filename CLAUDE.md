@@ -12,10 +12,13 @@ and daily at 06:17 UTC (so pages made from ef-assets data stay current)
 `itjustlogs.dev` (the old `ram-prices.github.io/ItJustLogs` redirects there).
 Served from the domain root, so `base: '/'` (absolute asset paths). Clean
 paths need files on Pages: the `pageCopies` plugin in `vite.config.ts` copies
-`index.html` into `operators/`, `arsenal/`, `stats/`, `settings/` and to
-`404.html` (the fallback for `/operators/<poolId>`). Add new top-level pages
-to its `PAGES` list. It also writes `operators/info/<chr id>.html` and
-`arsenal/info/<wpn id>.html` (Pages serves them at the clean path) for every
+`index.html` into `database/operators/`, `banner/headhunting/`, `settings/`...
+and to `404.html` (the fallback for `/banner/headhunting/<poolId>`). Add new
+pages to its `PAGES` list. It also writes `database/operators/<name>.html` and
+`database/arsenals/<name>.html` (Pages serves them at the clean path; the
+name is `itemSlugs` in `domain/wiki.ts`, the id when a name is shared) and
+the same page at the old `operators/info/<chr id>.html` and
+`arsenal/info/<wpn id>.html` for every
 item in the ef-assets wiki data, each with that item's Discord component
 embed (`<script id="discord:component-embed">`, max 3,000 bytes: header with
 portrait, every skill fitted, wiki credit link) and Open Graph tags as its
@@ -195,14 +198,20 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     `ui/components.ts` (`public/icons/oroberyl.webp`, `--oroberyl`).
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
-    `/operators`, `/operators/<poolId>`, `/arsenal[/<poolId>]`, `/stats`,
-    `/settings`) with `history.pushState` for in-page links, rewrites
-    old `#/...` links, and holds the delegated `data-action` click handlers.
+    `/database/operators[/<name>]`, `/database/arsenals[/<name>]`,
+    `/banner/headhunting[/<banner>]`, `/banner/arsenal[/<banner>]`,
+    `/banner/stats`, `/settings`) with `history.pushState` for in-page links,
+    and holds the delegated `data-action` click handlers. URLs use English
+    names: items by `itemSlugs`, banners by the name `scheduleLinks` gives
+    them (`bannerSlugs`), else the id; links are built by `infoHref` /
+    `bannerHref` in `pages/info.ts`, and the router swaps ids for names. Old
+    paths (`/operators/info/<chr id>`, `/arsenal/<poolId>`, `/stats`, `/pulls`,
+    `#/...`) are moved to today's (`currentPath`), and their folders are
+    still built, so old links keep working.
     Header tabs: Home, Database, Pulls, Essences, Achievements, Archive,
-    Settings. Database (`/operators/info`, `/arsenal/info`) and Pulls
-    (`/operators`, `/arsenal`, `/stats`) are sections whose pages keep their
-    own paths, picked with side tabs (`databaseTabs` / `pullsTabs` in
-    `pages/info.ts`); `/database` and `/pulls` open the page last used there.
+    Settings. Database (`/database/...`) and Pulls (`/banner/...`) are
+    sections picked with side tabs (`databaseTabs` / `pullsTabs` in
+    `pages/info.ts`); `/database` and `/banner` open the page last used there.
     Home is widgets (`ui/pages/homeWidgets.ts`, settings `home`: type, width
     4/6/8/12 of a 12-column grid, own settings; unset = the schedule as
     before): the schedule's four sections, Pity, 6★ history, Latest pulls,
@@ -235,8 +244,8 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     with your pity and rate-up status, events now, coming up, and a
     version/banner/event timeline; works without an import; anything with
     `data-link` or `data-card-image` gets a right-click / long-press menu
-    (`installCopyMenu`: Copy link, Copy image via `ui/cardImage.ts`); `kind.ts` = operators/arsenal: every banner as a fixed-height card
-    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/operators/<poolId>` opens one), `operator.ts` / `weapon.ts` = `/operators/info[/<chr id>]` / `/arsenal/info[/<wpn id>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`); shared pieces in
+    (`installCopyMenu`: Copy link, Copy banner card, or Share banner card on phones, via `ui/cardImage.ts`); `kind.ts` = operators/arsenal: every banner as a fixed-height card
+    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/banner/headhunting/<banner>` opens one), `operator.ts` / `weapon.ts` = `/database/operators[/<name>]` / `/database/arsenals[/<name>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
   - Escape every user/game string: use the `html` tagged template from
@@ -247,10 +256,12 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   `domain/collections.ts`): the game's Medal Album and Intel Archives
   (Findings' Manuscripts, E-Files and Peculiars, then Audio Records, Nexus
   Files and Intel Gathering), one category tab at a time; work without an
-  import. The reader only reads Findings. Data is a wiki snapshot made by
-  `scripts/wiki-collections.mjs` into `src/data/medals.snapshot.json` and
-  `findings.snapshot.json` (lazy-loaded chunks; pictures hotlink
-  endfield.wiki.gg for now, to move to ef-assets with the script). The
+  import. The reader only reads Findings. Data is ef-assets `wiki/medals.json`
+  and `wiki/findings.json` (its `scripts/wiki-collections.mjs`, weekly) with
+  pictures from its `collections/` (`scripts/collection-pictures.py`), copied
+  into `src/data/medals.snapshot.json` and `findings.snapshot.json`
+  (lazy-loaded chunks) by our `scripts/wiki-collections.mjs`; no picture
+  loads from the wiki. The
   player's progress is settings (`medals`: date, Reforging tier, Trimmed;
   `findings`: ids), so it syncs and exports. "Read from video or
   screenshots" (`ui/medalReader.ts`) reads the Medal Album in the browser:

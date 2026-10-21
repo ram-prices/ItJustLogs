@@ -9,12 +9,12 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, heroGlow, icon, itemImg, rarity, trait } from '../components';
+import { badge, heroGlow, icon, itemImg, tileArt, trait } from '../components';
 import { html, type Html } from '../html';
-import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
+import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
- * Operator info pages (/operators/info and /operators/info/<chr id>): class,
+ * Operator info pages (/database/operators and /database/operators/<name>): class,
  * element, stats, skills and talents from the community wiki's data, which
  * ef-assets snapshots, plus what the player's pulls say (copies, Potential).
  * Works without an import. The data is CC BY-SA 4.0, so every page credits
@@ -61,10 +61,10 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
             ${g.items.map((r) => {
               const mine = owned?.get(r.id);
               return html`<a class="wiki-tile card${owned && (r.soon || !mine?.copies) ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}">
-                ${itemImg('char', r.id, 'wiki-tile-portrait')}
+                ${tileArt('char', r.id, r.rarity)}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${r.name}</span>
-                  <span class="label-12 secondary">${rarity(r.rarity)}${r.class ? html` · ${trait('classes', r.class)}` : ''}${r.element ? html` · ${trait('elements', r.element)}` : ''}</span>
+                  <span class="label-12 secondary">${[r.class && trait('classes', r.class), r.element && trait('elements', r.element)].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}</span>
                 </span>
                 ${r.soon ? badge('Unreleased', 'amber') : ownedTag(mine)}
               </a>`;
@@ -87,7 +87,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
  * soft glow of their portrait), with the player's character picture in place
  * of the portrait when they picked one (pages/art.ts).
  */
-function hero(id: string, o: WikiOperator, owned: Owned | undefined, redraw: () => void, overBackdrop = false): Html {
+function hero(id: string, o: WikiOperator, redraw: () => void, overBackdrop = false): Html {
   const banner = currentArt(id, 'banner', redraw);
   const portrait = currentArt(id, 'portrait', redraw);
   return html`<section class="wiki-hero${banner ? ' has-art' : ''}${overBackdrop ? ' over-backdrop' : ''}">
@@ -105,7 +105,6 @@ function hero(id: string, o: WikiOperator, owned: Owned | undefined, redraw: () 
           <span class="wiki-fact"><span class="wiki-fact-label">Element</span><span class="wk wk-${o.element.toLowerCase().replace(/\W/g, '')}">${trait('elements', o.element)}</span></span>
           <span class="wiki-fact"><span class="wiki-fact-label">Weapon</span>${trait('weapon-types', o.weapon)}</span>
           ${o.faction ? html`<span class="wiki-fact"><span class="wiki-fact-label">Faction</span>${o.faction}</span>` : ''}
-          ${owned?.copies ? html`<span class="wiki-fact"><span class="wiki-fact-label">Potential</span><span class="wiki-fact-pot">${potentialLevel(owned)}${pips(owned.potential)}</span></span>` : ''}
         </div>
         ${o.tags.length ? html`<div class="wiki-tags">${o.tags.map((t) => badge(t, 'outline'))}</div>` : ''}
       </div>
@@ -283,14 +282,9 @@ function skillsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> 
 }
 
 /** Potentials, with the ones the player's copies unlock marked. */
-function potentialsSection(o: WikiOperator, owned: Owned | undefined, imported: boolean): Html {
-  if (!o.potentials.length) return html``;
+function potentialsList(o: WikiOperator, owned: Owned | undefined, imported: boolean): Html {
   const have = owned?.potential ?? -1;
-  return html`<section class="section">
-    <div class="section-head">
-      <h2 class="heading-20">Potentials</h2>
-    </div>
-    <div class="card wiki-accs wiki-pots">
+  return html`<div class="card wiki-accs wiki-pots">
       ${o.potentials.map((p) => {
         const on = p.rank <= have;
         return html`<div class="${imported ? (on ? 'on' : 'off') : ''}">${accordion(
@@ -299,7 +293,15 @@ function potentialsSection(o: WikiOperator, owned: Owned | undefined, imported: 
           html`<p class="copy-14 secondary wiki-text">${rich(p.description)}</p>`,
         )}</div>`;
       })}
-    </div>
+    </div>`;
+}
+
+/** Potentials as a section of their own, when the player has no copy (else they're in Your pulls). */
+function potentialsSection(o: WikiOperator, owned: Owned | undefined, imported: boolean): Html {
+  if (!o.potentials.length) return html``;
+  return html`<section class="section">
+    <div class="section-head"><h2 class="heading-20">Potentials</h2></div>
+    ${potentialsList(o, owned, imported)}
   </section>`;
 }
 
@@ -405,21 +407,26 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
   const bonuses = bonusesFor(id, o, a, redraw);
   const backdrop = currentArt(id, 'background', redraw);
   return html`${backdrop ? html`<img class="op-backdrop" src="${backdrop.src}" alt="" decoding="async" />` : ''}
-    ${hero(id, o, owned, redraw, !!backdrop)}
+    ${hero(id, o, redraw, !!backdrop)}
     <main class="container fade-in wiki-page${backdrop ? ' has-backdrop' : ''}">
-      ${ownedSection('char', o.name, a, owned)}
+      ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined)}
       <div class="wiki-cols even">
         <div class="wiki-col">${statsSection(o, bonuses, owned?.copies ? owned.potential : null)}</div>
         <div class="wiki-col">${loadoutSection(id, a, redraw)}</div>
       </div>
-      <div class="wiki-cols even">
-        <div class="wiki-col">${skillsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
-        <div class="wiki-col">${potentialsSection(o, owned, !!a)}</div>
-      </div>
-      <div class="wiki-cols even">
-        <div class="wiki-col">${talentsSection(o)}</div>
-        <div class="wiki-col">${baseSkillsSection(o)}</div>
-      </div>
+      ${owned?.copies
+        ? html`<div class="wiki-cols even">
+            <div class="wiki-col">${skillsSection(id, o, bonuses, owned.potential)}</div>
+            <div class="wiki-col">${talentsSection(o)}${baseSkillsSection(o)}</div>
+          </div>`
+        : html`<div class="wiki-cols even">
+              <div class="wiki-col">${skillsSection(id, o, bonuses, null)}</div>
+              <div class="wiki-col">${potentialsSection(o, owned, !!a)}</div>
+            </div>
+            <div class="wiki-cols even">
+              <div class="wiki-col">${talentsSection(o)}</div>
+              <div class="wiki-col">${baseSkillsSection(o)}</div>
+            </div>`}
       ${gallerySection(id, redraw)}
       ${profileSection(o)}
       ${credit(attribution, o.page)}
@@ -441,7 +448,7 @@ function operatorPreview(id: string, p: PreviewOperator, attribution: WikiPrevie
   return previewPage('char', id, p, [['Class', p.class], ['Element', element], ['Weapon', p.weapon]], p.tags, about, attribution);
 }
 
-/** /operators/info[/<chr id>]; `redraw` runs once the data has loaded. */
+/** /database/operators[/<name>]; `redraw` runs once the data has loaded. */
 export function operatorInfoPage(id: string | undefined, a: Analysis | null, redraw: () => void): Html {
   const f = wikiFile<WikiOperatorFile>('operators.json', redraw);
   file = f.data;

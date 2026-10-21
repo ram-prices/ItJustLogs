@@ -1,5 +1,5 @@
 /**
- * Banner cards as pictures: right-click or long-press a card → "Copy image".
+ * Banner cards as pictures: right-click or long-press a card → "Copy banner card" ("Share banner card" on phones).
  * The card is drawn as it looks on screen (html-to-image, loaded only when
  * used) at twice the screen's resolution, on the page's background so its
  * translucent panels look the same as on the site.
@@ -13,7 +13,7 @@
  *
  * Phones only allow the clipboard and the share sheet during the tap itself,
  * and drawing the card takes a moment: so the long-press menu starts drawing
- * it as it opens (`prepareCardImage`) and only offers Copy image once it's
+ * it as it opens (`prepareCardImage`) and only offers it once it's
  * ready, so the tap never waits. When it ends up shown or saved, `why` says
  * what the browser refused.
  */
@@ -63,11 +63,36 @@ export function prepareCardImage(el: HTMLElement): PreparedImage {
   return prepared;
 }
 
-export async function copyCardImage(el: HTMLElement, name: string, prepared: PreparedImage = prepareCardImage(el)): Promise<CardImageResult> {
-  // The clipboard only works during the tap: hand it the picture now, ready
-  // or still being drawn (Safari accepts a promise of it).
+/**
+ * Copies the card's picture, else shares it, else saves or shows it. With
+ * `share` (phones) the share sheet comes first and the clipboard second.
+ */
+export async function copyCardImage(el: HTMLElement, name: string, prepared: PreparedImage = prepareCardImage(el), share = false): Promise<CardImageResult> {
   const refused: string[] = [];
   const reason = (what: string, e: unknown) => refused.push(`${what}: ${(e as Error)?.name ?? 'Error'}${(e as Error)?.message ? ` (${(e as Error).message})` : ''}`);
+  const fileName = `${name.replace(/[^\w\- ]+/g, '').trim() || 'banner'}.png`;
+  // Both need the tap: no waiting before them when the picture is ready.
+  const shareIt = async (): Promise<CardImageResult | null> => {
+    const file = new File([prepared.blob ?? (await prepared.promise)], fileName, { type: 'image/png' });
+    if (!navigator.canShare?.({ files: [file] })) {
+      refused.push('share: files not supported');
+      return null;
+    }
+    try {
+      await navigator.share({ files: [file] });
+      return { done: 'shared' };
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return { done: 'shared' }; // closed the share sheet
+      reason('share', e);
+      return null;
+    }
+  };
+  if (share) {
+    const r = await shareIt();
+    if (r) return r;
+  }
+  // The clipboard only works during the tap: hand it the picture now, ready
+  // or still being drawn (Safari accepts a promise of it).
   try {
     if (!navigator.clipboard?.write) throw new Error('no clipboard.write');
     if (typeof ClipboardItem === 'undefined') throw new Error('no ClipboardItem');
@@ -77,16 +102,11 @@ export async function copyCardImage(el: HTMLElement, name: string, prepared: Pre
   } catch (e) {
     reason('clipboard', e); // fall back to sharing or saving it
   }
-  const file = new File([prepared.blob ?? (await prepared.promise)], `${name.replace(/[^\w\- ]+/g, '').trim() || 'banner'}.png`, { type: 'image/png' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file] });
-      return { done: 'shared' };
-    } catch (e) {
-      if ((e as Error).name === 'AbortError') return { done: 'shared' }; // closed the share sheet
-      reason('share', e);
-    }
-  } else refused.push('share: files not supported');
+  if (!share) {
+    const r = await shareIt();
+    if (r) return r;
+  }
+  const file = new File([prepared.blob ?? (await prepared.promise)], fileName, { type: 'image/png' });
   const url = URL.createObjectURL(file);
   const save = () => Object.assign(document.createElement('a'), { href: url, download: file.name }).click();
   if (matchMedia('(pointer: coarse)').matches) {
