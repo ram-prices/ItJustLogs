@@ -379,20 +379,41 @@ export function copyPmf(b: BannerSummary, copy: number): Float64Array | null {
 /** How a win rate or drop rate compares to what the odds predict. */
 export type LuckTier = 'very-lucky' | 'lucky' | 'average' | 'unlucky' | 'very-unlucky';
 
+/** P(at least `k` successes in `n` tries at chance `p`), summed in log space so thousands of pulls stay exact. */
+function tailAtLeast(k: number, n: number, p: number): number {
+  if (k <= 0) return 1;
+  if (k > n) return 0;
+  const lp = Math.log(p);
+  const lq = Math.log(1 - p);
+  // log C(n, i) built up step by step from i = 0.
+  let logC = 0;
+  let sum = 0;
+  for (let i = 0; i <= n; i++) {
+    if (i > 0) logC += Math.log((n - i + 1) / i);
+    if (i >= k) sum += Math.exp(logC + i * lp + (n - i) * lq);
+  }
+  return Math.min(1, sum);
+}
+
 /**
- * Lucky or not over `tries` (flips or paid pulls): it takes both a clear gap
- * from the expected rate (15% of it, 35% for "very") and enough tries for
- * that gap to stand out from chance (one standard deviation, two for
- * "very"). Anything less is Average: 6 of 22 25/75s (27%) is just Average.
+ * Lucky or not over `tries` (flips or paid pulls), as a percentile: how
+ * many players with as many tries would have done better. Lucky is beating
+ * 70% of them (Very lucky, 90%), Unlucky doing worse than 70% (Very, 90%);
+ * a result also has to be at least 10% off the expected rate (25% for Very),
+ * so a huge number of tries doesn't make a hair's difference count. 6 of 22
+ * 25/75s (27%) is Average; 8 of 22 (36%) is Lucky.
  */
 export function luckTier(actual: number, expected: number, tries: number): LuckTier {
   if (!expected || expected >= 1 || !tries) return 'average';
+  const k = Math.round(actual * tries);
   const ratio = actual / expected;
-  const z = (actual - expected) / Math.sqrt((expected * (1 - expected)) / tries);
-  if (ratio >= 1.35 && z >= 2) return 'very-lucky';
-  if (ratio >= 1.15 && z >= 1) return 'lucky';
-  if (ratio <= 0.65 && z <= -2) return 'very-unlucky';
-  if (ratio <= 0.85 && z <= -1) return 'unlucky';
+  // Share of players who'd do at least this well, and at most this well.
+  const better = tailAtLeast(k, tries, expected);
+  const worse = 1 - tailAtLeast(k + 1, tries, expected);
+  if (ratio >= 1.25 && better <= 0.1) return 'very-lucky';
+  if (ratio >= 1.1 && better <= 0.3) return 'lucky';
+  if (ratio <= 0.75 && worse <= 0.1) return 'very-unlucky';
+  if (ratio <= 0.9 && worse <= 0.3) return 'unlucky';
   return 'average';
 }
 

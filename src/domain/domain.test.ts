@@ -527,13 +527,16 @@ describe('all banners catalog', () => {
 });
 
 describe('luck tiers', () => {
-  it('needs a clear gap and enough tries', async () => {
+  it('rates by how many players with as many tries would do better or worse', async () => {
     const { luckTier } = await import('./analyze');
     expect(luckTier(6 / 22, 0.25, 22)).toBe('average'); // 27% of 25/75s: about what's expected
-    expect(luckTier(6 / 10, 0.5, 10)).toBe('average'); // 60% of ten 50/50s: too few to say
-    expect(luckTier(14 / 20, 0.5, 20)).toBe('lucky');
-    expect(luckTier(32 / 40, 0.5, 40)).toBe('very-lucky');
+    expect(luckTier(8 / 22, 0.25, 22)).toBe('lucky');
+    expect(luckTier(9 / 22, 0.25, 22)).toBe('very-lucky');
+    expect(luckTier(3 / 22, 0.25, 22)).toBe('unlucky');
     expect(luckTier(2 / 30, 0.25, 30)).toBe('very-unlucky');
-    expect(luckTier(0.55, 0.5, 1000)).toBe('average'); // clearly above chance, but only 10% better
+    expect(luckTier(6 / 10, 0.5, 10)).toBe('average'); // 60% of ten 50/50s: too few to say
+    expect(luckTier(12 / 20, 0.5, 20)).toBe('lucky');
+    expect(luckTier(14 / 20, 0.5, 20)).toBe('very-lucky');
+    expect(luckTier(0.53, 0.5, 1000)).toBe('average'); // many tries, but only 6% better
   });
 });

@@ -1532,7 +1532,7 @@ select.input {
   --pin-ring: #fff;
   --pin-fill: #161616;
 }
-/* A 6★ that came from the rate-up guarantee: a blue ring and a blue pull number. */
+/* A 6★ that came from the rate-up guarantee: a blue ring, arrow and pull number. */
 .ruler-pin.guaranteed,
 :root[data-theme='light'] .ruler-pin.guaranteed {
   --pin-ring: var(--blue);
@@ -1540,6 +1540,9 @@ select.input {
 .ruler-pin.guaranteed .ruler-pin-label {
   color: var(--blue);
   font-weight: 600;
+}
+.ruler-pin.guaranteed .ruler-pin-point {
+  background: var(--blue);
 }
 .ruler-portrait {
   width: 26px;
