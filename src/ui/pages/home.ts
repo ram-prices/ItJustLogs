@@ -22,7 +22,7 @@ import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
 import { backgroundSource, heat, icon, issueArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
+import { hourglass, rateUpChip, rateUpIcon, rateUpIdsOf, rateUpOwned, rateUpPotential } from './kind';
 import { bannerHref, wikiFile } from './info';
 import { eventTags } from './event';
 
@@ -64,7 +64,8 @@ const pagePath = (b: ScheduleBanner) => bannerHref(isWeaponBanner(b.kind) ? 'wea
 
 function rateUpLine(b: ScheduleBanner): Html {
   if (!b.rateUps.length) return html``;
-  return html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${b.rateUps.join(', ')}</span></span>`;
+  const kind = isWeaponBanner(b.kind) ? 'weap' : 'char';
+  return html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${b.rateUps.join(', ')}</span>${rateUpPotential(kind, rateUpIdsOf(kind, b.poolId, b.rateUps), b.poolId)}</span>`;
 }
 
 /** An icon per event type ("Sign-In Event", "Challenge Event", ...). */

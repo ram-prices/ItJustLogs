@@ -5,11 +5,11 @@ import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import type { HomeWidget } from '../../store';
 import { bannerArtUrl } from '../../domain/banners';
-import { badge, heroGlow, icon, itemImg, metric, metrics, trait } from '../components';
+import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars } from '../components';
 import { fmtDate, fmtInt, html, raw, render, type Html } from '../html';
 import { artOf, openArtManager } from './art';
 import { archiveProgress } from './collections';
-import { infoHref, wikiFile } from './info';
+import { infoHref, potentialStar, wikiFile } from './info';
 import { loadoutStrip, weaponDetail } from './loadout';
 import { cardStats } from './operator';
 import { sixStrip } from './kind';
@@ -456,7 +456,7 @@ function toolbar(w: HomeWidget, def: WidgetDef): Html {
 // ---------------------------------------------------------------------------
 
 const heading = (text: string, aside?: Html | string) =>
-  html`<div class="section-head"><h2 class="heading-20">${text}</h2>${aside ? html`<span class="label-13 secondary">${aside}</span>` : ''}</div>`;
+  html`<div class="section-head"><h2 class="heading-20">${withStars(text)}</h2>${aside ? html`<span class="label-13 secondary">${typeof aside === 'string' ? withStars(aside) : aside}</span>` : ''}</div>`;
 
 function pityWidget(a: Analysis): Html | null {
   const latest = (kind: Kind, category: string) => a.banners.find((b) => b.kind === kind && b.category === category && b.isLatest);
@@ -545,8 +545,8 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
   const mine = c.a ? ownedItems(c.a, 'char', extrasOf(state.settings)).get(w.op) : undefined;
   const facts = w.facts ?? ['potential', 'first'];
   const chips: Html[] = [];
-  // Potential sits beside the name.
-  const potential = facts.includes('potential') && mine?.copies ? badge(`P${Math.max(mine.potential, 0)}`, 'purple') : '';
+  // Their Potential now sits beside the name, as the game's star.
+  const potential = facts.includes('potential') && mine?.copies ? potentialStar(mine.potential, 'pot-star char-card-pot') : '';
   if (facts.includes('first') && mine?.acquisitions[0]) chips.push(html`<span class="char-fact">Since <b>${fmtDate(mine.acquisitions[0].ts)}</b></span>`);
   if (facts.includes('spent') && c.a) {
     const spent = c.a.banners.filter((b) => b.kind === 'char' && b.info?.rateUpIds.includes(w.op!)).reduce((n, b) => n + b.paidPulls, 0);
@@ -595,7 +595,7 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
               <span class="char-card-names min0">
                 ${w.title ? html`<span class="label-12 secondary char-card-title">${w.title}</span>` : ''}
                 <span class="heading-20 char-card-name">${name}${potential ? html` ${potential}` : ''}</span>
-                ${o ? html`<span class="label-12 secondary">${'★'.repeat(o.rarity)}${o.class ? html` · ${trait('classes', o.class)}` : ''}${o.element ? html` · ${trait('elements', o.element)}` : ''}</span>` : ''}
+                ${o ? html`<span class="label-12 secondary">${stars(o.rarity)}${o.class ? html` · ${trait('classes', o.class)}` : ''}${o.element ? html` · ${trait('elements', o.element)}` : ''}</span>` : ''}
               </span>
             </span>`
           : ''}

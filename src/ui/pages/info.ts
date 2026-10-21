@@ -20,7 +20,7 @@ import {
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
-import { badge, heroGlow, icon, itemImg, metric, metrics } from '../components';
+import { badge, heroGlow, icon, iconOf, itemImg, metric, metrics, stars } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
 
 /**
@@ -197,7 +197,7 @@ export function previewPage(
         ${itemImg(kind, id, 'wiki-hero-portrait')}
         <div class="min0 wiki-hero-text">
           ${crumbs(kind, p.name)}
-          <div class="wiki-stars" style="color:var(--r${p.rarity})" aria-label="${p.rarity} star">${'★'.repeat(p.rarity)}</div>
+          <div class="wiki-stars" style="color:var(--r${p.rarity})" aria-label="${p.rarity} star">${stars(p.rarity)}</div>
           <h1 class="heading-32">${p.name} ${badge('Unreleased', 'amber')}</h1>
           <div class="wiki-facts">
             ${facts.filter(([, v]) => v).map(([label, v]) => html`<span class="wiki-fact"><span class="wiki-fact-label">${label}</span>${v}</span>`)}
@@ -365,6 +365,18 @@ export function installWikiControls(): void {
 }
 
 /** One pip per Potential level (each duplicate), P0 to P5. */
+/**
+ * The player's current Potential as the game draws it: the star, a stroke per
+ * Potential (white) and the next one in yellow; the diamond pips until the
+ * icons are in. Hard to read on its own, so only beside the level written
+ * out ("P3", as in Your pulls) or as decoration (Home's Character card).
+ */
+export function potentialStar(potential: number, cls = 'pot-star'): Html {
+  const level = `P${Math.max(potential, 0)}`;
+  const src = iconOf('potential', `Potential ${Math.max(potential, 0)}`);
+  return src ? html`<img class="${cls}" src="${src}" alt="${level}" title="Your Potential: ${level}" />` : pips(potential);
+}
+
 export function pips(potential: number): Html {
   return html`<span class="wiki-pips" role="img" aria-label="P${Math.max(potential, 0)} of P${MAX_POTENTIAL}">
     ${Array.from({ length: MAX_POTENTIAL }, (_, i) => html`<i class="${i < potential ? 'on' : ''}"></i>`)}
@@ -429,7 +441,7 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
       metric({
         label: 'Potential',
         value: html`${level}${isMax ? html` <small>Max</small>` : ''}`,
-        aside: pips(owned.potential),
+        aside: potentialStar(owned.potential),
         // Spare copies stay low-key: a count and when the latest one turned up.
         sub: isMax
           ? lastSpare

@@ -16,7 +16,7 @@ import {
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
 import { weeklyChart } from '../charts';
-import { TAB_ICON, badge, icon, iconOf, itemName, metric, metrics, pageHeader } from '../components';
+import { TAB_ICON, badge, colorOf, icon, iconOf, itemName, metric, metrics, pageHeader, withStars } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { bannerHref, credit, external, pullsTabs, wikiFile } from './info';
 
@@ -40,13 +40,24 @@ export function togglePatch(key: string): void {
 }
 
 /** Pull currencies written as their icon and the number in their colour, no name. */
-const CURRENCY: Record<string, string> = { Oroberyl: 'oroberyl', 'Chartered HH Permit': 'chartered', 'Basic HH Permit': 'basic-permit' };
+const CURRENCY: Record<string, string> = {
+  Oroberyl: 'oroberyl',
+  Origeometry: 'origeometry',
+  'Chartered HH Permit': 'chartered',
+  'Basic HH Permit': 'basic-permit',
+  'Arsenal Ticket': 'arsenal-ticket',
+};
 
-/** An amount of one item: "[icon] 1,600" for those currencies, else "5 Arsenal Tickets" (Oroberyl and Origeometry have no plural). */
+/**
+ * An amount of one item: "[icon] 1,600" for those currencies and for banner
+ * HH Permits (in the permit's own colour), else "5 Arsenal Tickets"
+ * (Oroberyl and Origeometry have no plural).
+ */
 function amount(k: string, n: number): Html {
   const src = k === 'Oroberyl' ? '/icons/oroberyl.webp' : iconOf('items', k);
-  if (CURRENCY[k] && src)
-    return html`<span class="amt amt-${CURRENCY[k]}" title="${k}" aria-label="${fmtInt(n)} ${k}"><img src="${src}" alt="" />${fmtInt(n)}</span>`;
+  const own = !CURRENCY[k] && colorOf(k);
+  if (src && (CURRENCY[k] || own))
+    return html`<span class="amt${CURRENCY[k] ? ` amt-${CURRENCY[k]}` : ''}" ${own ? html`style="--amt:${own}"` : ''} title="${k}" aria-label="${fmtInt(n)} ${k}"><img src="${src}" alt="" />${fmtInt(n)}</span>`;
   return html`${fmtInt(n)} ${itemName(n !== 1 && /(Permit|Ticket)$/.test(k) ? `${k}s` : k)}`;
 }
 
@@ -229,16 +240,16 @@ function patchIncomeList(inc: PatchIncome, tickets: Tickets, bond: number, dossi
           'Your Headhunting pulls',
           tickets.other
             ? bullets([
-                tickets.patch > 0 && `Patch banners: ${fmtInt(tickets.patch)} Arsenal Tickets`,
-                `Basic Headhunting and other banners: ${fmtInt(tickets.other)} Arsenal Tickets`,
+                tickets.patch > 0 && html`Patch banners: ${amount('Arsenal Ticket', tickets.patch)}`,
+                html`Basic Headhunting and other banners: ${amount('Arsenal Ticket', tickets.other)}`,
               ])
-            : `${fmtInt(tickets.patch)} Arsenal Tickets back`,
+            : html`${amount('Arsenal Ticket', tickets.patch)} back`,
           0,
           back,
         )
       : ''}
     <div class="patch-income-row patch-income-total">
-      <span>${inc.basic ? `Plus ${plural(Math.round(inc.basic), 'Basic HH Permit')}` : 'In all'}</span><span class="num">${fmtPulls(Math.round((inc.headhunting + (bondLine ? bondPermits : 0) + dossierPulls) * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
+      <span>${inc.basic ? html`Plus ${amount('Basic HH Permit', Math.round(inc.basic))}` : 'In all'}</span><span class="num">${fmtPulls(Math.round((inc.headhunting + (bondLine ? bondPermits : 0) + dossierPulls) * 10) / 10)}</span><span class="num">${fmtPulls(Math.round((inc.arsenal + back) * 10) / 10)}</span>
     </div>
   </div>`;
 }
@@ -466,7 +477,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
           <div class="legend">
             <span><i style="background:var(--op)"></i>Operators</span>
             <span><i style="background:var(--ars)"></i>Arsenal</span>
-            <span><i class="round" style="background:var(--r6)"></i>Week with a 6★</span>
+            <span><i class="round" style="background:var(--r6)"></i>${withStars('Week with a 6★')}</span>
           </div>
         </div>
         <div class="card-body">${weeklyChart(weeks)}</div>

@@ -1,6 +1,7 @@
 import type { TimelineBucket } from '../domain/patches';
 import { cumulative } from '../domain/pity';
 import { escape, fmtInt, html, raw, type Html } from './html';
+import { STAR_SVG } from './components';
 
 /**
  * Charts are plain SVG strings. Hover targets carry a `data-tip` attribute
@@ -17,7 +18,7 @@ function niceStep(max: number, target = 4): number {
 
 /** Tooltip HTML helpers (values are escaped); used with a `data-tip` attribute. */
 export const tipRow = (label: string, value: string, color?: string) =>
-  `<div class="t-row"><span>${color ? `<i style="background:${color}"></i>` : ''}${escape(label)}</span><b>${escape(value)}</b></div>`;
+  `<div class="t-row"><span>${color ? `<i style="background:${color}"></i>` : ''}${escape(label).replaceAll('★', STAR_SVG)}</span><b>${escape(value)}</b></div>`;
 /** A line of plain text in a tooltip, under the title. */
 export const tipNote = (text: string) => `<div class="t-note">${escape(text)}</div>`;
 export const tip = (title: string, rows: string[]) =>

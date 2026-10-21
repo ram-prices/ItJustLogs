@@ -1,13 +1,16 @@
 import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPull, type Analysis, type BannerSummary, type LuckTier } from '../../domain/analyze';
-import { bannerArtUrl, itemIconUrl } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, itemIconUrl, lookupBanner } from '../../domain/banners';
 import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
 import type { Schedule, Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
-import { badge, heat, icon, issueArt, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
+import { badge, heat, icon, issueArt, withStars, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
-import { infoHref, pullsTabs } from './info';
+import { infoHref, ownedOf, pullsTabs } from './info';
+import { state } from '../../state';
+import { MAX_COPIES } from '../../domain/owned';
+import { wikiId } from '../../domain/wiki';
 
 /** Operators / Arsenal: list of banners, and a page per banner with its pull history. */
 
@@ -33,7 +36,8 @@ const bannersOf = (kind: Kind, a: Analysis) =>
     .sort((x, y) => Number(y.category === 'basic') - Number(x.category === 'basic') || y.lastTs - x.lastTs);
 
 /** The rate-up mark: stacked chevrons in a circle. */
-export const rateUpIcon = (): Html => html`<span class="rateup-icon">${icon('stat_2')}</span>`;
+/** The circled rate-up chevrons; `got`: the player has it, so a check instead. */
+export const rateUpIcon = (got = false): Html => html`<span class="rateup-icon${got ? ' got' : ''}">${icon(got ? 'check' : 'stat_2')}</span>`;
 
 /** Banner key art; weapon banners without art fall back to the rate-up weapon icon. */
 /** Reward icons: a star in a circle for Tokens, a crate for Selectors (pick-one boxes), a gift for free rate-up copies. */
@@ -81,6 +85,38 @@ function art(b: BannerSummary): Html {
 /** Rate-up copies you own on a banner: pulled plus rate-up rewards (Tokens, Joint Selectors, Arsenal copies). */
 export const rateUpOwned = (b: BannerSummary): number => b.rateUpCopies + (b.rewards?.copies ?? 0);
 
+/**
+ * The player's Potential with a banner's rate-up ("P2"), when the banner has
+ * one rate-up and they own a copy of it, from any banner or reward.
+ */
+/**
+ * A banner's rate-up ids when its data only has names (a banner announced
+ * before its pool id is known): ids from banners.json by pool id, else the
+ * player's own pulls of those names.
+ */
+export function rateUpIdsOf(kind: Kind, poolId: string | null, names: string[]): string[] {
+  const known = poolId ? lookupBanner(state.db, poolId)?.rateUpIds : undefined;
+  if (known?.length) return known;
+  const byName = new Map<string, string>();
+  for (const b of state.analysis?.banners ?? []) if (b.kind === kind) for (const p of b.pulls) if (p.itemId) byName.set(p.name.trim().toLowerCase(), p.itemId);
+  return names.map((n) => byName.get(n.trim().toLowerCase())).filter((id): id is string => !!id);
+}
+
+export function rateUpPotential(kind: Kind, rateUpIds: string[], poolId?: string | null): Html {
+  // One character can be listed under both its ids (chr_0034_typhoeus, chr_0034_typhoea).
+  const ids = [...new Set(rateUpIds.map(wikiId))];
+  if (ids.length !== 1) return html``;
+  const owned = ownedOf(state.analysis, kind)?.get(ids[0]);
+  if (!owned?.copies) return html``;
+  // Where this banner's copies took them (its last copy); a banner that gave
+  // none (a rerun of someone they have, one not pulled on yet) shows where they are now.
+  const pool = poolId && canonicalPoolId(poolId);
+  const last = pool ? owned.acquisitions.filter((x) => !x.extra && canonicalPoolId(x.poolId) === pool).at(-1) : undefined;
+  const copy = last?.copy ?? owned.copies;
+  const level = copyLabel(copy);
+  return html`<span class="rateup-pot${copy >= MAX_COPIES ? ' max' : ''}" title="${last ? 'Potential after this banner' : 'Your Potential now'}: ${level}">${level}</span>`;
+}
+
 export function rateUpChip(b: BannerSummary): Html {
   if (!b.info) return html``;
   const names = b.category === 'joint' && b.info.rateUpIds.length > 1 ? `${b.info.rateUpIds.length} rate-ups` : b.info.rateUpNames.join(', ');
@@ -96,7 +132,7 @@ export function rateUpChip(b: BannerSummary): Html {
   const breakdown = fromRewards ? ` (${pulled} pulled + ${fromRewards} from ${rewardWord})` : '';
   const label = `Rate-up: ${names}${got ? ` · obtained ×${total}${breakdown}` : ' · not obtained yet'}`;
   return html`<span class="banner-rateup${got ? ' got' : ''}" title="${label}" aria-label="${label}">
-    ${rateUpIcon()}<span class="ellipsis">${names}</span>${got ? html`${icon('check')}${total > 1 ? html`<span class="rateup-count">×${total}</span>` : ''}` : ''}
+    ${rateUpIcon(got)}<span class="ellipsis">${names}</span>${rateUpPotential(b.kind, b.info.rateUpIds, b.poolId)}${total > 1 ? html`<span class="rateup-count">×${total}</span>` : ''}
   </span>`;
 }
 
@@ -112,15 +148,65 @@ export function toggleSixStrip(kind: Kind): boolean {
   return true;
 }
 
+/** An operator's Token from a banner: when it came, and the banner pull that earned it. */
+interface TokenEntry {
+  id: string;
+  name: string;
+  ts: number;
+  seq: number;
+  bannerName: string;
+  /** The banner's pull count when it came (null if that pull isn't in the history). */
+  at: number | null;
+  estimated: boolean;
+  /** Which copy it was (1 = the first). */
+  copy: number;
+}
+
+/** The Potential a copy brought: P0 for the first, up to P5; spare copies past that as +1, +2... */
+const copyLabel = (copy: number): string => (copy > MAX_COPIES ? `+${copy - MAX_COPIES}` : `P${copy - 1}`);
+
+/** Each pulled copy's number (which copy of that operator or weapon it was), by pull. */
+function copiesByPull(a: Analysis, kind: Kind): Map<AnalyzedPull, number> {
+  const out = new Map<AnalyzedPull, number>();
+  for (const o of ownedOf(a, kind)?.values() ?? []) for (const x of o.acquisitions) if (x.pull && !x.reward) out.set(x.pull, x.copy);
+  return out;
+}
+
+/**
+ * Every Token the player got: from the export's reward records, else worked
+ * out from the pull count (estimated, older banners), as Potential counts them.
+ */
+function tokensOf(a: Analysis, kind: Kind): TokenEntry[] {
+  const out: TokenEntry[] = [];
+  const names = new Map(a.sixStars.map((x) => [wikiId(x.itemId), x.name]));
+  for (const [id, o] of ownedOf(a, kind) ?? []) {
+    for (const x of o.acquisitions) {
+      if (!x.reward || x.extra) continue;
+      // A listed Token comes with the pull that earned it: the banner's last pull up to it.
+      const b = x.pull ? null : a.banners.find((y) => canonicalPoolId(y.poolId) === canonicalPoolId(x.poolId));
+      const before = b?.pulls.filter((p) => p.ts < x.ts || (p.ts === x.ts && p.seq <= x.seq)).at(-1);
+      out.push({ id, name: names.get(wikiId(id)) ?? (kind === 'char' ? 'Operator' : 'Weapon'), ts: x.ts, seq: x.seq, bannerName: x.bannerName, at: (x.pull ?? before)?.bannerPull ?? null, estimated: !!x.estimated, copy: x.copy });
+    }
+  }
+  return out;
+}
+
 /**
  * Every 6★ for this kind, newest first: portrait with its pity underneath,
  * rate-ups outlined. Weapons that dropped in the same set of ten share one
- * box (as their pins share one oval on the banner's ruler). Two rows until
- * opened.
+ * box (as their pins share one oval on the banner's ruler). Operators'
+ * Tokens are listed among them, with the banner pull that earned them. Two
+ * rows until opened.
  */
 export function sixStrip(kind: Kind, a: Analysis): Html {
-  const sixes = a.sixStars.filter((x) => x.kind === kind).sort((x, y) => y.ts - x.ts);
+  // Newest first; pulls from one ten-pull share a time, so their order breaks the tie.
+  const sixes = a.sixStars.filter((x) => x.kind === kind).sort((x, y) => y.ts - x.ts || y.seq - x.seq);
   if (!sixes.length) return html``;
+  const tokens = tokensOf(a, kind);
+  const rewards = !tokens.length ? '' : kind === 'char' ? ` · ${tokens.length} Token${tokens.length > 1 ? 's' : ''}` : ` · ${tokens.length} rate-up cop${tokens.length > 1 ? 'ies' : 'y'}`;
+  const copies = copiesByPull(a, kind);
+  // Its Potential in the portrait's corner.
+  const pot = (copy: number | undefined) => (copy ? html`<span class="six-pot">${copyLabel(copy)}</span>` : '');
   // Weapons from one set of ten (same banner, same set) together.
   const setKey = (x: AnalyzedPull) => (x.kind === 'weap' && x.bannerPull != null ? `${x.poolId}:${setOf(x.bannerPull)}` : null);
   const groups: AnalyzedPull[][] = [];
@@ -133,14 +219,24 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
   const open = sixOpen.has(kind);
   return html`<div class="section six-section${open ? ' open' : ''}" data-kind="${kind}">
     <div class="section-head">
-      <h2 class="heading-20">6★ history</h2>
+      <h2 class="heading-20">${withStars('6★ history')}</h2>
       <div class="row">
-        <span class="label-13 secondary">${sixes.length} total · newest first</span>
+        <span class="label-13 secondary">${sixes.length} total${rewards} · newest first</span>
         <button class="btn tertiary sm six-toggle" data-action="six-strip" aria-expanded="${String(open)}">${open ? 'Show less' : 'Show all'}</button>
       </div>
     </div>
     <div class="six-strip">
-      ${groups.map((g) => {
+      ${[...groups.map((g) => ({ ts: g[0].ts, seq: g[0].seq, g, t: null as TokenEntry | null })), ...tokens.map((t) => ({ ts: t.ts, seq: t.seq, g: null, t }))]
+        .sort((x, y) => y.ts - x.ts || y.seq - x.seq)
+        .map(({ g, t }) => {
+        if (t) {
+          // Arsenal counts in sets of ten.
+          const n = t.at == null ? null : kind === 'weap' ? setOf(t.at) : t.at;
+          const at = n != null ? `at ${kind === 'weap' ? 'set' : 'pull'} ${n}${t.estimated ? ' (estimated)' : ''}` : 'pull not in your history';
+          const name = kind === 'char' ? `${t.name}'s Token` : `${t.name} (rate-up copy)`;
+          return html`<a class="six-item token" href="${infoHref(kind, t.id)}" title="${name} · ${t.bannerName} · ${t.ts ? fmtDate(t.ts, true) : ''} · ${at}"><span class="six-art">${itemImg(kind, t.id, 'six-portrait')}${pot(t.copy)}</span><span class="six-pity">${kind === 'char' ? TOKEN_GLYPH : icon('redeem')}${n ?? '–'}</span></a>`;
+        }
+        g = g!;
         const p = g[0];
         const pity = html`<span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
         // Rate-ups are outlined in their banner card's colour: the art's for
@@ -157,7 +253,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         const cls = `six-item${up ? ' rateup' : ''}`;
         const title = (x: AnalyzedPull) => `${x.name} · ${x.bannerName} · ${fmtDate(x.ts, true)}`;
         // Portraits open that operator's or weapon's info page.
-        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title(p)}" ${tintAttrs}>${itemImg(p.kind, p.itemId, 'six-portrait')}${pity}</a>`;
+        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title(p)}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}</span>${pity}</a>`;
         // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
         const step = 100 / g.length;
         const blend = Math.min(10, step / 3);
@@ -168,7 +264,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
           })
           .join(', ');
         return html`<div class="${cls} shared" title="${g.map(title).join('\n')}" ${tintAttrs}>
-          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}</a>`)}</span></span>
+          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}</a>`)}</span></span>
           ${pity}
         </div>`;
       })}
@@ -211,7 +307,7 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
       ${img}
       <div class="banner-art-text">
         <div class="banner-name ellipsis">${c.name}</div>
-        ${c.rateUpNames.length ? html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${c.rateUpNames.join(', ')}</span></span>` : ''}
+        ${c.rateUpNames.length ? html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${c.rateUpNames.join(', ')}</span>${rateUpPotential(c.kind, c.rateUpIds.length ? c.rateUpIds : rateUpIdsOf(c.kind, c.poolId, c.rateUpNames), c.poolId)}</span>` : ''}
       </div>
     </div>
     <div class="unpulled-body">
@@ -388,7 +484,7 @@ function pityStat(b: BannerSummary, ended: boolean): Html {
     const six = b.pulls.find((p) => p.rarity === 6 && p.pity !== null);
     const n = six ? six.pity! : b.pity.value;
     const say = six ? `First 6★ on pull ${n} of ${b.pity.max}; the banner has ended` : `${n} of ${b.pity.max}: a 6★ is certain by pull ${b.pity.max}, and the banner ends at the first one`;
-    return html`<span class="glance-stat" style="color:${color}" title="${say}" aria-label="6★ pity: ${say}">${hourglass(six ? 1 : n / b.pity.max)}<b>${n}</b><i>/${b.pity.max} or first 6★</i></span>`;
+    return html`<span class="glance-stat" style="color:${color}" title="${say}" aria-label="6★ pity: ${say}">${hourglass(six ? 1 : n / b.pity.max)}<b>${n}</b><i>/${b.pity.max} or first ${withStars('6★')}</i></span>`;
   }
   const say = b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${unit}${ended ? ' (banner ended)' : ''}`;
   return html`<span class="glance-stat" style="color:${color}" title="6★ pity: ${say}" aria-label="6★ pity ${say}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>`;
@@ -650,7 +746,7 @@ function bannerBody(b: BannerSummary): Html {
             ['5', '5★'],
             ['4', '4★'],
           ] as [Rarity, string][]
-        ).map(([v, label]) => html`<button type="button" data-action="filter" data-value="${v}" aria-pressed="${String(f.has(v))}">${label}</button>`)}
+        ).map(([v, label]) => html`<button type="button" data-action="filter" data-value="${v}" aria-pressed="${String(f.has(v))}" aria-label="${label}">${withStars(label)}</button>`)}
       </div>
     </div>
     <div class="banner-scroll">${shown.length ? pullTable(b, shown) : html`<div class="table-empty">No pulls match this filter.</div>`}</div>`;

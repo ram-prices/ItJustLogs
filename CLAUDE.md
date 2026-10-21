@@ -196,6 +196,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     real screen (a flat `rotate` fixes headless Firefox only).
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
     `ui/components.ts` (`public/icons/oroberyl.webp`, `--oroberyl`).
+  - Rarity is drawn with the game's emblem, not a ★ glyph: `STAR_SVG`,
+    `stars(n)` and `withStars(text)` in `ui/components.ts` (endfield.wiki.gg
+    Star.svg, in the text's colour). Keep "★" only in attributes and
+    `<option>` text. Potential is written "P3"; the game's Potential star
+    (`potentialStar`) only beside that text or as decoration.
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
     `/database/operators[/<name>]`, `/database/arsenals[/<name>]`,

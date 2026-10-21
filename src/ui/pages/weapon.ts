@@ -1,7 +1,7 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, heroGlow, icon, itemImg, tileArt, trait } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, stars, tileArt, trait, withStars } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { weaponBaseRanks, weaponRankCaps } from '../../domain/loadout';
 import { essenceTag, isMaxEssence, weaponRanksOf, wieldersSection } from './loadout';
@@ -46,7 +46,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
       html`<div class="section-head wiki-sort-head">${searchBox('weap')}${sortBar('weap')}</div>
       ${groups.map((g) => {
         return html`<section class="section wiki-type">
-          <div class="section-head"><h2 class="heading-20">${g.label || 'All weapons'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
+          <div class="section-head"><h2 class="heading-20">${g.label ? withStars(g.label) : 'All weapons'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
           <div class="wiki-grid">
             ${g.items.map(({ id, w, name, rarity: r, type }) => {
               const mine = owned?.get(id);
@@ -79,7 +79,7 @@ function hero(id: string, w: WikiWeapon): Html {
       ${itemImg('weap', id, 'wiki-hero-portrait')}
       <div class="min0 wiki-hero-text">
         ${crumbs('weap', w.name)}
-        <div class="wiki-stars" style="color:var(--r${w.rarity})" aria-label="${w.rarity} star">${'★'.repeat(w.rarity)}</div>
+        <div class="wiki-stars" style="color:var(--r${w.rarity})" aria-label="${w.rarity} star">${stars(w.rarity)}</div>
         <h1 class="heading-32">${w.name}</h1>
         <div class="wiki-facts">
           <span class="wiki-fact"><span class="wiki-fact-label">Type</span>${trait('weapon-types', w.type)}</span>

@@ -9,7 +9,7 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, heroGlow, icon, itemImg, tileArt, trait } from '../components';
+import { badge, heroGlow, icon, itemImg, stars, tileArt, trait, withStars } from '../components';
 import { html, type Html } from '../html';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
@@ -56,7 +56,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
       html`<div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
       ${groups.map(
         (g) => html`<section class="section wiki-type">
-          <div class="section-head"><h2 class="heading-20">${g.label || 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
+          <div class="section-head"><h2 class="heading-20">${g.label ? withStars(g.label) : 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
           <div class="wiki-grid">
             ${g.items.map((r) => {
               const mine = owned?.get(r.id);
@@ -98,7 +98,7 @@ function hero(id: string, o: WikiOperator, redraw: () => void, overBackdrop = fa
       ${portrait ? html`<img class="wiki-hero-portrait user-art" src="${portrait.src}" alt="" decoding="async" />` : itemImg('char', id, 'wiki-hero-portrait')}
       <div class="min0 wiki-hero-text">
         ${crumbs('char', o.name)}
-        <div class="wiki-stars" style="color:var(--r${o.rarity})" aria-label="${o.rarity} star">${'★'.repeat(o.rarity)}</div>
+        <div class="wiki-stars" style="color:var(--r${o.rarity})" aria-label="${o.rarity} star">${stars(o.rarity)}</div>
         <h1 class="heading-32">${o.name}</h1>
         <div class="wiki-facts">
           <span class="wiki-fact"><span class="wiki-fact-label">Class</span>${trait('classes', o.class)}</span>

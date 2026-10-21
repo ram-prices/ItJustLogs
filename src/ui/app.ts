@@ -440,6 +440,18 @@ function measureCard(card: HTMLElement): void {
   card.classList.toggle('fits', !!list && list.scrollHeight <= list.clientHeight + 1);
 }
 
+/** Whether an open card's list would fit without scrolling if it were closed. */
+function fitsClosed(card: HTMLElement): boolean {
+  const list = card.querySelector<HTMLElement>('.banner-scroll');
+  card.style.transition = 'none';
+  card.classList.replace('expanded', 'fits');
+  const fits = !!list && list.scrollHeight <= list.clientHeight + 1;
+  card.classList.replace('fits', 'expanded');
+  void card.offsetHeight;
+  card.style.transition = '';
+  return fits;
+}
+
 /** Cards whose list fits without scrolling don't need the Expand button. */
 function markOverflow(): void {
   for (const card of document.querySelectorAll<HTMLElement>('.banner')) {
@@ -474,25 +486,30 @@ function toggleCard(card: HTMLElement): void {
   const from = card.offsetHeight;
   card.style.transition = 'none';
   card.classList.toggle('expanded', opening);
-  card.style.height = 'auto';
+  // Its height in the new state: full when open, the fixed height when closed.
+  card.style.height = '';
   const to = card.offsetHeight;
   card.style.height = `${from}px`;
   void card.offsetHeight; // reflow so the transition starts from `from`
   card.style.transition = '';
   card.style.height = `${to}px`;
-  card.addEventListener(
-    'transitionend',
-    () => {
-      card.style.height = '';
-      if (!opening) {
-        card.querySelector('.banner-scroll')?.scrollTo({ top: 0 });
-        // Expanded cards aren't measured (markOverflow), so a filter changed
-        // while open left Expand stale: measure again now it's collapsed.
-        markOverflow();
-      }
-    },
-    { once: true },
-  );
+  // The card's own height, not the button's icon turning (which ends first);
+  // a card whose height doesn't change gets no transition, so a timer backs it up.
+  let finished = false;
+  const done = (e?: TransitionEvent) => {
+    if (finished || (e && (e.target !== card || e.propertyName !== 'height'))) return;
+    finished = true;
+    card.removeEventListener('transitionend', done);
+    card.style.height = '';
+    if (!opening) {
+      card.querySelector('.banner-scroll')?.scrollTo({ top: 0 });
+      // Expanded cards aren't measured (markOverflow), so a filter changed
+      // while open left Expand stale: measure again now it's collapsed.
+      markOverflow();
+    }
+  };
+  card.addEventListener('transitionend', done);
+  setTimeout(done, 600);
   if (!opening && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
@@ -757,6 +774,8 @@ async function onClick(e: MouseEvent): Promise<void> {
         host.classList.add('no-anim');
         render(host, body);
         markOverflow();
+        // An open card whose list now fits at its closed height has nothing to Collapse: close it.
+        if (card.classList.contains('expanded') && fitsClosed(card)) toggleCard(card);
       }
       return;
     }

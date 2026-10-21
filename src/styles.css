@@ -52,6 +52,8 @@
   --oroberyl: #ff7350; /* the Oroberyl crystal's red */
   --chartered: #e2d957; /* the Chartered HH Permit's yellow */
   --basic-permit: #4a9be0; /* the Basic HH Permit's blue */
+  --origeometry: #e8b13a; /* the Origeometry crystal's gold */
+  --arsenal-ticket: #8fb0dc; /* the Arsenal Ticket's silver-blue */
   --red-bg: rgba(229, 72, 77, 0.16);
   --muted: #5c5c5c;
   --r6: #ff7a3d;
@@ -110,6 +112,8 @@
   --oroberyl: #d2381f;
   --chartered: #9a8a07;
   --basic-permit: #2a72b8;
+  --origeometry: #a06d05;
+  --arsenal-ticket: #4a6a96;
   --red-bg: rgba(229, 72, 77, 0.1);
   --muted: #a8a8a8;
   --r6: #e85d1e;
@@ -871,9 +875,21 @@ main {
 }
 .rateup-icon .icon {
   font-size: 0.85em;
-  /* The chevrons sit 3.5% low in the glyph's box (measured): centre them in the circle. */
-  translate: 0 -0.035em;
   font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
+}
+/* The chevrons sit 3.5% low in the glyph's box (measured): centre them in the circle. The check is centred already. */
+.rateup-icon:not(.got) .icon {
+  translate: 0 -0.035em;
+}
+/* Current Potential as the game's star (info.ts potentialStar), e.g. beside a metric. */
+.pot-star {
+  width: 28px;
+  height: 26px;
+}
+.char-card-pot {
+  display: inline-block;
+  vertical-align: -5px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
 }
 .rarity-filter .filter-up .icon {
   font-size: 17px;
@@ -1248,14 +1264,28 @@ select.input {
   font-size: 17px;
   color: rgba(255, 255, 255, 0.75);
 }
-.banner-rateup > .ellipsis + .icon {
-  font-size: 16px;
+/* Once you have it, the circle holds a check, in green. */
+.banner-rateup .rateup-icon.got {
   color: #4cc38a;
-  font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
 }
 .rateup-count {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
+}
+/* The player's Potential with the rate-up (kind.ts rateUpPotential). */
+.rateup-pot {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  font: 600 11px/1 var(--font-sans);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: none;
+}
+.rateup-pot.max {
+  color: var(--r5);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--r5) 60%, transparent);
 }
 
 /* Glance row under the art: just pulls and pity, plus the pity bar. */
@@ -2463,7 +2493,39 @@ code {
 .six-item.rateup .six-portrait {
   box-shadow: 0 0 0 2px var(--six-tint, var(--r6));
 }
-.six-item:hover .six-portrait {
+/* A Token (kind.ts sixStrip): not a pull, so a dashed outline, and the banner pull that earned it. */
+.six-item.token .six-portrait {
+  outline: 2px dashed var(--gray-alpha-500);
+  outline-offset: 2px;
+}
+.six-item.token .six-pity .token-glyph {
+  width: 12px;
+  height: 12px;
+  color: var(--r6);
+}
+.six-item.token .six-pity .icon {
+  font-size: 14px;
+  color: var(--r6);
+}
+/* The portrait and its Potential in the lower left corner (kind.ts sixStrip). */
+.six-art {
+  position: relative;
+  display: block;
+  line-height: 0;
+  transition: transform 0.15s var(--ease);
+}
+.six-pot {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font: 600 10px/1 var(--font-sans);
+  pointer-events: none;
+}
+.six-item:hover .six-art {
   transform: translateY(-2px);
 }
 /* Weapons from one set of ten: one box around them all, like their oval on the
@@ -2492,7 +2554,7 @@ code {
   background: none;
   box-shadow: none;
 }
-.six-item.shared:hover .six-portrait {
+.six-item.shared:hover .six-art {
   transform: none;
 }
 .six-item.shared:hover .six-heads {
@@ -3023,6 +3085,11 @@ a.sched-next:hover {
 .amt {
   white-space: nowrap;
   font-weight: 600;
+  /* Banner HH Permits bring their own colour (--amt, made for dark pages). */
+  color: var(--amt);
+}
+:root[data-theme='light'] .amt[style] {
+  color: color-mix(in srgb, var(--amt) 60%, #000);
 }
 .amt img {
   display: inline-block;
@@ -3040,6 +3107,12 @@ a.sched-next:hover {
 }
 .amt-basic-permit {
   color: var(--basic-permit);
+}
+.amt-origeometry {
+  color: var(--origeometry);
+}
+.amt-arsenal-ticket {
+  color: var(--arsenal-ticket);
 }
 /* An item, element, class or weapon type with its game icon (components.ts itemName, trait). */
 .item-label,
@@ -3615,9 +3688,31 @@ a.patch-banner:hover {
 .wiki-hero-text {
   flex: 1;
 }
+/* The game's rarity emblem (components.ts STAR_SVG), sized and coloured like the text it replaces ★ in. */
+.rarity-star {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  fill: currentColor;
+}
+.rarity-star .t1 {
+  fill: color-mix(in srgb, currentColor 84%, #000);
+}
+.rarity-star .t2 {
+  fill: color-mix(in srgb, currentColor 70%, #000);
+}
+/* On Home they're white, as in the game, not the grey of the text around them. */
+.home .rarity-star {
+  color: #fff;
+}
+:root[data-theme='light'] .home .rarity-star {
+  color: var(--gray-1000);
+}
 .wiki-stars {
-  font-size: 14px;
-  letter-spacing: 2px;
+  display: flex;
+  gap: 2px;
+  font-size: 16px;
   line-height: 18px;
 }
 .wiki-facts {

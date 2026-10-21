@@ -49,11 +49,20 @@ export interface MetricOpts {
   valueColor?: string;
 }
 
+/**
+ * The game's rarity emblem (endfield.wiki.gg's Star.svg) for the ★ of a
+ * rarity: drawn in the text's colour, its three tones as shades of it.
+ */
+export const STAR_SVG = '<svg class="rarity-star" viewBox="0 0 24 24" aria-hidden="true"><path class="t1" d="m5.845 17.424 6.369-3.667L9.605 9.25.87 14.28zm17.249.69-6.37-3.678-2.608 4.519 8.736 5.043zM20.417 0 15.2 2.686v7.07h5.217z"/><path class="t2" d="m8.298 16.03 3.765-2.174-2.609-4.518-1.957 1.13s2.051 4.325.8 5.562m12.343.668-3.765-2.174-2.61 4.518 1.959 1.13s2.72-3.939 4.416-3.474m-.224-9.202S15.49 7.266 15.2 5.41v4.348h5.217z"/><path d="m13.922 9.77-.136-6.147L9.42 6.145l.008 6.622c.29 2.125-1.28 3.35-1.28 3.35l4.519-2.61c1.53-1.238 1.256-3.737 1.256-3.737m3.887 3.639 5.391 2.957v-5.044l-5.74-3.304c-2.141-.655-2.26-2.783-2.26-2.783v5.217c.15 2.103 2.609 2.957 2.609 2.957m-5.4 1.547-5.257 3.191 4.368 2.522 5.731-3.318c1.695-1.314 3.54-.567 3.54-.567l-4.518-2.608c-1.839-.707-3.865.78-3.865.78"/></svg>';
+export const stars = (n: number): Html => raw(STAR_SVG.repeat(n));
+/** Text with each ★ drawn as the game's rarity emblem ("6★ history"). */
+export const withStars = (text: string): Html => html`${text.split('★').map((part, i) => html`${i ? raw(STAR_SVG) : ''}${part}`)}`;
+
 export function metric(o: MetricOpts): Html {
   return html`<div class="metric">
-    <div class="metric-label"><span>${o.label}</span>${o.aside ?? ''}</div>
+    <div class="metric-label"><span>${withStars(o.label)}</span>${o.aside ?? ''}</div>
     <div class="metric-value" ${o.valueColor ? raw(`style="color:${o.valueColor}"`) : ''}>${o.value}</div>
-    ${o.sub ? html`<div class="metric-sub">${o.sub}</div>` : ''}
+    ${o.sub ? html`<div class="metric-sub">${typeof o.sub === 'string' ? withStars(o.sub) : o.sub}</div>` : ''}
     ${o.progress !== undefined
       ? html`<div class="progress"><i style="width:${Math.max(0, Math.min(1, o.progress)) * 100}%;${o.progressColor ? `background:${o.progressColor}` : ''}"></i></div>`
       : ''}
@@ -66,8 +75,9 @@ export function metric(o: MetricOpts): Html {
  * name → file. Loaded once at start (app.ts); until it arrives, or for a name
  * it lacks, names show without an icon.
  */
-export type IconKind = 'items' | 'elements' | 'classes' | 'weapon-types';
-let icons: Partial<Record<IconKind, Record<string, string>>> | null = null;
+export type IconKind = 'items' | 'elements' | 'classes' | 'weapon-types' | 'potential';
+/** ef-assets icons/index.json: kind → name → file, plus `colors`, each banner HH Permit's main colour. */
+let icons: Partial<Record<IconKind | 'colors', Record<string, string>>> | null = null;
 export function loadIcons(redraw: () => void): void {
   const url = `${EF_ASSETS}/icons/index.json`;
   fetch(url)
@@ -85,6 +95,12 @@ export function iconOf(kind: IconKind, name: string): string | null {
   const files = icons?.[kind];
   const file = files?.[name] ?? files?.[name.replace(/s$/, '')];
   return file ? `${EF_ASSETS}/icons/${file}` : null;
+}
+
+/** A banner HH Permit's main colour (from its icon), if ef-assets has one. */
+export function colorOf(name: string): string | null {
+  const colors = icons?.colors;
+  return colors?.[name] ?? colors?.[name.replace(/s$/, '')] ?? null;
 }
 
 /** An item's name with its game icon; Oroberyl also in its colour: "[icon] Oroberyl". */
@@ -146,7 +162,7 @@ export const tileArt = (kind: Kind, id: string, r: number): Html =>
   html`<span class="wiki-tile-art r${r}" role="img" aria-label="${r}★" title="${r}★">${itemImg(kind, id, 'wiki-tile-portrait')}</span>`;
 
 export const rarity = (r: number): Html =>
-  html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}★</span>`;
+  html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}${stars(1)}</span>`;
 
 /** Status colour for a pity-like value: calm until it gets close to the cap. */
 export function heat(value: number, max: number): string {
@@ -158,7 +174,7 @@ export function toggleGroup(name: string, options: [string, string][], current: 
   return html`<div class="toggle" role="group">
     ${options.map(
       ([value, label]) =>
-        html`<button type="button" data-action="${name}" data-value="${value}" aria-pressed="${String(value === current)}">${label}</button>`,
+        html`<button type="button" data-action="${name}" data-value="${value}" aria-pressed="${String(value === current)}">${withStars(label)}</button>`,
     )}
   </div>`;
 }
