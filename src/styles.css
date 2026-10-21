@@ -3128,6 +3128,17 @@ a.sched-next:hover {
   vertical-align: -0.32em;
   object-fit: contain;
 }
+.trait-mask {
+  background: currentColor;
+  mask: var(--icon) center / contain no-repeat;
+}
+/* In wiki text ("[icon] Cryo DMG"): a little smaller, sitting on the line. */
+.wk > .trait-icon {
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: 2px;
+  vertical-align: -0.22em;
+}
 .oroberyl-icon {
   display: inline-block;
   width: 1.25em;

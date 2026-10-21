@@ -111,9 +111,20 @@ export function itemName(name: string): Html {
 }
 
 /** An element, class or weapon type with its game icon. */
+/**
+ * An element's icon in the element's own colour (the wk-* text colours):
+ * the icons are white glyphs, drawn as a mask. Nothing until icons load.
+ */
+export function elementIcon(name: string): Html {
+  const src = iconOf('elements', name);
+  return src ? html`<span class="trait-icon trait-mask wk-${name.toLowerCase().replace(/\W/g, '')}" style="--icon:url('${src}')" aria-hidden="true"></span>` : html``;
+}
+
 export function trait(kind: Exclude<IconKind, 'items'>, name: string): Html {
   const src = iconOf(kind, name);
-  return src ? html`<span class="trait"><img class="trait-icon" src="${src}" alt="" loading="lazy" decoding="async" />${name}</span>` : html`${name}`;
+  if (!src) return html`${name}`;
+  if (kind === 'elements') return html`<span class="trait">${elementIcon(name)}${name}</span>`;
+  return html`<span class="trait"><img class="trait-icon" src="${src}" alt="" loading="lazy" decoding="async" />${name}</span>`;
 }
 
 /**

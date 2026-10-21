@@ -20,7 +20,7 @@ import {
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
-import { badge, heroGlow, icon, iconOf, itemImg, metric, metrics, stars } from '../components';
+import { badge, elementIcon, heroGlow, icon, iconOf, itemImg, metric, metrics, stars } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
 
 /**
@@ -251,13 +251,35 @@ function filled(text: string, values: number[][] | undefined, rank: number): Htm
 }
 
 /** Wiki markup → escaped HTML (bold, highlights, line breaks). */
+/** Marks in wiki text that are one element's: its DMG ("Cryo DMG"), its Infliction, its reaction. */
+const MARK_ELEMENT: Record<string, string> = { phys: 'Physical', elec: 'Electric', heat: 'Heat', cryo: 'Cryo', nature: 'Nature' };
+const REACTION_ELEMENT: [RegExp, string][] = [
+  [/^(Heat|Cryo|Nature|Electric|Physical)\b/, ''],
+  [/Combustion/, 'Heat'],
+  [/Electrification/, 'Electric'],
+  [/Solidification/, 'Cryo'],
+  [/Corrosion/, 'Nature'],
+];
+function elementOf(cls: string, text: string): string | null {
+  if (MARK_ELEMENT[cls]) return MARK_ELEMENT[cls];
+  if (cls !== 'key') return null;
+  for (const [re, el] of REACTION_ELEMENT) {
+    const m = text.match(re);
+    if (m) return el || m[1];
+  }
+  return null;
+}
+
 export function rich(s: string, values?: number[][], rank = 1): Html {
   return html`${parseMarkup(s).map((seg) => {
     switch (seg.kind) {
       case 'bold':
         return html`<b>${filled(seg.text, values, rank)}</b>`;
-      case 'mark':
-        return html`<span class="wk wk-${seg.cls.replace(/\W/g, '')}">${filled(seg.text, values, rank)}</span>`;
+      case 'mark': {
+        // An element's DMG, Infliction or reaction gets that element's icon.
+        const el = elementOf(seg.cls, seg.text);
+        return html`<span class="wk wk-${seg.cls.replace(/\W/g, '')}">${el ? elementIcon(el) : ''}${filled(seg.text, values, rank)}</span>`;
+      }
       case 'break':
         return html`<br />`;
       default:
