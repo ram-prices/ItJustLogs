@@ -2,7 +2,7 @@ import { ALL_STATS, STAT_ALIASES, byFit, fitOf, parseEssenceKey, type EssenceSta
 import type { WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import { toast } from '../common';
-import { icon, itemImg, pageHeader, rarity, toggleGroup } from '../components';
+import { icon, itemImg, pageHeader, rarityArt, toggleGroup } from '../components';
 import { html, type Html } from '../html';
 import { credit, infoHref, ownedOf, wikiFile } from './info';
 import { searchBox } from './search';
@@ -126,8 +126,8 @@ export function essencesPage(redraw: () => void): Html {
             const more = full.length - show.length;
             return html`<div class="card essence-weapon" data-search-item>
               <a class="essence-weapon-head" href="${infoHref('weap', id)}">
-                ${itemImg('weap', id, 'essence-weapon-icon')}
-                <span class="min0"><span class="essence-weapon-name">${w.name}</span><span class="label-12 secondary">${rarity(w.rarity)} · ${w.type}</span></span>
+                ${rarityArt(itemImg('weap', id, 'essence-weapon-icon'), w.rarity)}
+                <span class="min0"><span class="essence-weapon-name">${w.name}</span><span class="label-12 secondary">${w.type}</span></span>
               </a>
               <div class="essence-wants label-12 secondary">Wants ${statChips(wants.map((s) => [s, 0] as EssenceStat), wants)}</div>
               <div class="essence-best">

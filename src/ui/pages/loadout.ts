@@ -3,7 +3,7 @@ import { gearIconUrl } from '../../domain/banners';
 import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, weaponBaseRanks, weaponRankCaps, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { badge, essenceIcon, icon, itemImg, rarity } from '../components';
+import { badge, essenceIcon, icon, itemImg, rarityArt, tileArt } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
 
@@ -153,9 +153,9 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
     'Weapon',
     l.weapon
       ? {
-          img: itemImg('weap', l.weapon),
+          img: w ? rarityArt(itemImg('weap', l.weapon), w.rarity) : itemImg('weap', l.weapon),
           name: w?.name ?? l.weapon,
-          sub: html`${w ? rarity(w.rarity) : ''}${ownedWeps?.get(l.weapon)?.copies ? html` · P${ownedWeps.get(l.weapon)!.potential}` : ''}${tag ? html` · ${tag}` : ''}`,
+          sub: html`${[ownedWeps?.get(l.weapon)?.copies ? `P${ownedWeps.get(l.weapon)!.potential}` : '', tag ?? ''].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}`,
           href: infoHref('weap', l.weapon),
         }
       : null,
@@ -163,7 +163,7 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
   const gearTiles = GEAR_SLOTS.map(({ slot, label }) => {
     const id = l[slot];
     const g = id ? gear?.gear.items[id] : undefined;
-    return slotTile(opId, slot, label, id ? { img: gearImg(id), name: g?.name ?? id, sub: g?.set ?? (g ? `Lv ${g.level}` : ''), extra: g ? artificePicker(opId, slot, l, g) : undefined } : null);
+    return slotTile(opId, slot, label, id ? { img: g ? rarityArt(gearImg(id), g.rarity) : gearImg(id), name: g?.name ?? id, sub: g?.set ?? (g ? `Lv ${g.level}` : ''), extra: g ? artificePicker(opId, slot, l, g) : undefined } : null);
   });
 
   // Set effects that are on (3 pieces of one set).
@@ -202,12 +202,15 @@ export function wieldersSection(weaponId: string, redraw: () => void): Html {
   return html`<section class="section">
     <div class="section-head"><h2 class="heading-20">Equipped on</h2><span class="label-13 secondary">From your loadouts</span></div>
     <div class="wiki-grid">
-      ${ids.map(
-        (id) => html`<a class="wiki-tile card" href="${infoHref('char', id)}">
-          ${itemImg('char', id, 'wiki-tile-portrait')}
-          <span class="wiki-tile-text min0"><span class="wiki-tile-name ellipsis">${ops?.operators[id]?.name ?? id}</span></span>
-        </a>`,
-      )}
+      ${ids.map((id) => {
+        const o = ops?.operators[id];
+        // Each opens that operator's page, marked with the link icon the loadout slots use.
+        return html`<a class="wiki-tile card wielder" href="${infoHref('char', id)}" title="${o?.name ?? id} info">
+          ${o ? tileArt('char', id, o.rarity) : itemImg('char', id, 'wiki-tile-portrait')}
+          <span class="wiki-tile-text min0"><span class="wiki-tile-name ellipsis">${o?.name ?? id}</span></span>
+          <span class="wielder-link" aria-hidden="true">${icon('link')}</span>
+        </a>`;
+      })}
     </div>
   </section>`;
 }
@@ -240,7 +243,7 @@ function weaponOptions(o: WikiOperator, weps: WikiWeaponFile, a: Analysis | null
         name: w.name,
         img: itemImg('weap', id),
         rarity: w.rarity,
-        meta: html`${rarity(w.rarity)}${tag ? ` · ${tag}` : ''}${mine?.copies ? html` · <span class="wiki-em">P${mine.potential}</span>` : owned ? html` · <span class="tertiary">Not owned</span>` : ''}`,
+        meta: html`${[tag, mine?.copies ? html`<span class="wiki-em">P${mine.potential}</span>` : owned ? html`<span class="tertiary">Not owned</span>` : ''].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}`,
         search: `${w.name} ${tag ?? ''}`.toLowerCase(),
         first: !!mine?.copies,
       };
@@ -255,7 +258,7 @@ function gearOptions(type: string, gear: WikiGearFile): Option[] {
       name: g.name,
       img: gearImg(id),
       rarity: g.rarity,
-      meta: html`${rarity(g.rarity)}${g.level ? ` · Lv ${g.level}` : ''}${g.set ? ` · ${g.set}` : ''}<br /><span class="tertiary">${statLine(g)}</span>`,
+      meta: html`${[g.level ? `Lv ${g.level}` : '', g.set ?? ''].filter(Boolean).join(' · ')}<br /><span class="tertiary">${statLine(g)}</span>`,
       search: `${g.name} ${g.set ?? ''} ${g.stats.map((s) => s.stat).join(' ')}`.toLowerCase(),
       first: false,
     }));
@@ -277,7 +280,7 @@ function pick(title: string, options: Option[], current: string | undefined): Pr
       <div class="picker-list" role="listbox" aria-label="${title}">
         ${options.map(
           (o) => html`<button type="button" class="picker-option${o.id === current ? ' current' : ''}" role="option" aria-selected="${String(o.id === current)}" data-pick="${o.id}" data-search="${o.search}">
-            ${o.img}
+            ${o.rarity ? rarityArt(o.img, o.rarity) : o.img}
             <span class="min0"><span class="picker-name ellipsis">${o.name}</span><span class="picker-meta">${o.meta}</span></span>
             ${o.id === current ? icon('check') : ''}
           </button>`,
@@ -474,10 +477,10 @@ export function weaponDetail(opId: string, a: Analysis | null, redraw: () => voi
   const ranks = w ? (weaponRanksFor(id, w, p) ?? weaponRankCaps(w, p)) : undefined;
   const tag = essenceTag(id, w, p);
   return html`<span class="card-weapon">
-      ${itemImg('weap', id, 'card-weapon-img')}
+      ${w ? rarityArt(itemImg('weap', id, 'card-weapon-img'), w.rarity) : itemImg('weap', id, 'card-weapon-img')}
       <span class="min0">
         <span class="card-weapon-name">${w?.name ?? id}</span>
-        <span class="label-12 secondary">${w ? rarity(w.rarity) : ''}${p != null ? ` · P${p}` : ''}${atk ? ` · ATK ${atk}` : ''}${tag ? html` · ${tag}` : ''}</span>
+        <span class="label-12 secondary">${[p != null ? `P${p}` : '', atk ? `ATK ${atk}` : '', tag ?? ''].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}</span>
       </span>
     </span>
     ${w?.skills.length

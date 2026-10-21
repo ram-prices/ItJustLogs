@@ -5255,6 +5255,19 @@ select option {
 .loadout-link .icon {
   font-size: 16px;
 }
+.wielder-link {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--gray-900);
+}
+.wielder-link .icon {
+  font-size: 16px;
+}
+.wielder:hover .wielder-link,
 .loadout-link:hover {
   background: var(--gray-alpha-200);
   color: var(--gray-1000);
@@ -5536,40 +5549,53 @@ select option {
 }
 /* Its rarity on the picture (components.ts tileArt): a band of the rarity's
    colour along the bottom, glowing up behind the art. */
-.wiki-tile-art {
+.rarity-art {
   position: relative;
   flex: none;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
+  display: inline-block;
+  line-height: 0;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background:
     linear-gradient(to top, color-mix(in srgb, var(--rc, var(--gray-500)) 38%, transparent), transparent 75%),
     var(--gray-100);
 }
-.wiki-tile-art::after {
+.rarity-art::after {
   content: '';
   position: absolute;
   inset: auto 0 0;
   height: 3px;
   background: var(--rc, var(--gray-500));
 }
-.wiki-tile-art.r6 {
+.rarity-art.r6 {
   --rc: var(--r6);
 }
-.wiki-tile-art.r5 {
+.rarity-art.r5 {
   --rc: var(--r5);
 }
-.wiki-tile-art.r4 {
+.rarity-art.r4 {
   --rc: var(--r4);
 }
-.wiki-tile-art.r3 {
+.rarity-art.r3 {
   --rc: var(--r3);
 }
-.wiki-tile-art .wiki-tile-portrait {
+.rarity-art.r2 {
+  --rc: var(--gray-700);
+}
+.rarity-art.r1 {
+  --rc: var(--gray-600);
+}
+.rarity-art > img {
   display: block;
+  margin: 0;
   border-radius: 0;
   background: none;
+  box-shadow: none;
+}
+.wiki-tile-art {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
 }
 .wiki-tile-text {
   display: flex;

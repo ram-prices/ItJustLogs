@@ -155,11 +155,15 @@ export function heroGlow(kind: Kind, itemId: string): Html {
 
 export const RARITY_COLOR: Record<number, string> = { 6: 'var(--r6)', 5: 'var(--r5)', 4: 'var(--r4)', 3: 'var(--r3)' };
 /**
- * A Database list tile's picture with its rarity on it, as the game shows it:
- * a band of the rarity's colour along the bottom, glowing up behind the art.
+ * A picture with its rarity on it, as the game shows it: a band of the
+ * rarity's colour along the bottom, glowing up behind the art. Used wherever
+ * an operator, weapon or gear piece is listed, instead of writing "6★".
  */
-export const tileArt = (kind: Kind, id: string, r: number): Html =>
-  html`<span class="wiki-tile-art r${r}" role="img" aria-label="${r}★" title="${r}★">${itemImg(kind, id, 'wiki-tile-portrait')}</span>`;
+export const rarityArt = (img: Html, r: number, cls = ''): Html =>
+  html`<span class="rarity-art r${r}${cls ? ` ${cls}` : ''}" role="img" aria-label="${r}★" title="${r}★">${img}</span>`;
+
+/** A Database list tile's picture with its rarity on it. */
+export const tileArt = (kind: Kind, id: string, r: number): Html => rarityArt(itemImg(kind, id, 'wiki-tile-portrait'), r, 'wiki-tile-art');
 
 export const rarity = (r: number): Html =>
   html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}${stars(1)}</span>`;
