@@ -1,12 +1,10 @@
 import type { Analysis, BannerSummary } from '../../domain/analyze';
 import { bannerArtUrl, canonicalPoolId } from '../../domain/banners';
 import type { EventRewards, EventRewardsFile } from '../../domain/eventRewards';
-import { claimDaysLeft } from '../../domain/income';
 import {
   KIND_LABEL,
   SERVER_LABEL,
   endOrGuess,
-  hasDailyRewards,
   isWeaponBanner,
   packLanes,
   scheduleLinks,
@@ -22,10 +20,11 @@ import { tip, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
-import { backgroundSource, badge, heat, icon, issueArt } from '../components';
+import { backgroundSource, heat, icon, issueArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpOwned } from './kind';
 import { wikiFile } from './info';
+import { eventTags } from './event';
 
 /**
  * Home: the banner and event schedule. What's open now (with your pity on
@@ -158,34 +157,6 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
     </div>
     <div class="sched-next-when">${rowWhen(start, timeOn(b.end, server), now)}</div>
   </div>`;
-}
-
-/**
- * An event row's tags: Limited or Permanent (the wiki's page says whether it
- * stays playable), Limited-Time Rewards for a permanent one whose rewards
- * still end, Daily Rewards (with how long there's left to start them and
- * still get them all), and Unique when it hands out portraits, frames,
- * stickers, operators and the like.
- */
-function eventTags(e: ScheduleEvent, r: EventRewards | undefined, now: number, server: Server, schedule: Schedule): Html {
-  const tags: Html[] = [r?.permanent ? badge('Permanent', 'green') : badge('Limited', 'amber')];
-  if (r?.permanent && r.limitedRewards) tags.push(badge('Limited-Time Rewards', 'amber'));
-  if (hasDailyRewards(e, schedule)) {
-    const start = timeOn(e.start, server);
-    const end = timeOn(e.end, server);
-    const days = r?.days;
-    let when = '';
-    if (days && start != null && now < start) when = `${days} days`;
-    else if (days && end != null) {
-      const left = claimDaysLeft(now, end, server);
-      // Days to start in and still claim every one: today counts.
-      const spare = left - days;
-      when = spare > 0 ? `start within ${spare + 1} days` : spare === 0 ? 'start today' : `${left} ${left === 1 ? 'day' : 'days'} left`;
-    }
-    tags.push(html`${badge('Daily Rewards', 'blue')}${when ? html`<span class="evt-tag-note">${when}</span>` : ''}`);
-  }
-  if (r?.unique?.length) tags.push(html`<span title="${r.unique.join(', ')}">${badge('Unique', 'purple')}</span>`);
-  return html`<div class="sched-next-tags">${tags}</div>`;
 }
 
 function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule, r?: EventRewards): Html {

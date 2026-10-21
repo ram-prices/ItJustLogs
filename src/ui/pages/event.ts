@@ -1,5 +1,6 @@
 import { fmtPulls, pullsOf, withWikiEnds, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
-import { SERVER_LABEL, timeOn, type Server, type ScheduleEvent } from '../../domain/schedule';
+import { claimDaysLeft } from '../../domain/income';
+import { hasDailyRewards, SERVER_LABEL, timeOn, type Schedule, type Server, type ScheduleEvent } from '../../domain/schedule';
 import { currentServer, state } from '../../state';
 import { badge, icon, itemName } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
@@ -17,6 +18,40 @@ import { credit, external, wikiFile } from './info';
 
 export const eventOf = (id: string | undefined, file?: EventRewardsFile | null): ScheduleEvent | undefined =>
   id === undefined ? undefined : withWikiEnds(state.schedule, file).events?.find((e) => String(e.id) === id);
+
+/**
+ * An event's tags (Home's rows and its own page): Limited or Permanent (the
+ * wiki's page says whether it stays playable), Limited-Time Rewards for a
+ * permanent one whose rewards still end, Daily Rewards (with how long there's
+ * left to start them and still get them all), and Unique when it hands out
+ * portraits, frames, stickers, operators and the like (`items`: named after
+ * it, else on hover).
+ */
+export function eventTags(e: ScheduleEvent, r: EventRewards | undefined, now: number, server: Server, schedule: Schedule, items = false): Html {
+  const tags: Html[] = [r?.permanent ? badge('Permanent', 'green') : badge('Limited', 'amber')];
+  if (r?.permanent && r.limitedRewards) tags.push(badge('Limited-Time Rewards', 'amber'));
+  if (hasDailyRewards(e, schedule)) {
+    const start = timeOn(e.start, server);
+    const end = timeOn(e.end, server);
+    const days = r?.days;
+    let when = '';
+    if (days && start != null && now < start) when = `${days} days`;
+    else if (days && end != null) {
+      const left = claimDaysLeft(now, end, server);
+      // Days to start in and still claim every one: today counts.
+      const spare = left - days;
+      when = spare > 0 ? `start within ${spare + 1} days` : spare === 0 ? 'start today' : `${left} ${left === 1 ? 'day' : 'days'} left`;
+    }
+    tags.push(html`${badge('Daily Rewards', 'blue')}${when ? html`<span class="evt-tag-note">${when}</span>` : ''}`);
+  }
+  if (r?.unique?.length)
+    tags.push(
+      items
+        ? html`${badge('Unique', 'purple')}<span class="evt-tag-note">${r.unique.join(', ')}</span>`
+        : html`<span title="${r.unique.join(', ')}">${badge('Unique', 'purple')}</span>`,
+    );
+  return html`<div class="sched-next-tags">${tags}</div>`;
+}
 
 /** The event's phases with their dates on the player's server: each until the next starts, the last until the event ends. */
 function phases(r: EventRewards, e: ScheduleEvent, server: Server): Html {
@@ -60,7 +95,7 @@ function summary(r: EventRewards): Html {
     parts.push(html`<div class="metric"><div class="metric-label"><span>Basic HH Permit</span></div><div class="metric-value num">${fmtInt(p.basicPermits)}</div><div class="metric-sub">Basic Headhunting only</div></div>`);
   if (p.arsenalTickets) parts.push(html`<div class="metric"><div class="metric-label"><span>Arsenal Tickets</span></div><div class="metric-value num">${fmtInt(p.arsenalTickets)}</div></div>`);
   return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">${p.pulls ? `${atLeast}${fmtPulls(p.pulls)} Headhunting ${p.pulls === 1 ? 'pull' : 'pulls'}` : 'Rewards'}</h2>${r.partial ? badge('Partial', 'amber') : ''}</div>
+    <div class="section-head"><h2 class="heading-20">${p.oroberyl ? 'Total Oroberyls' : 'Pulls'}</h2>${r.partial ? badge('Partial', 'amber') : ''}</div>
     ${r.partial ? html`<p class="copy-14 secondary event-partial">The wiki lists some of this event's rewards without amounts, so these totals are what's known so far.</p>` : ''}
     ${parts.length ? html`<div class="metrics event-metrics">${parts}</div>` : ''}
   </section>`;
@@ -71,7 +106,7 @@ function allItems(r: EventRewards): Html {
   const items: Reward[] = [...named].map((n) => [n, r.totals[n] ?? null]);
   items.sort((a, b) => (b[1] ?? -1) - (a[1] ?? -1));
   return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">Everything in all</h2><span class="label-13 secondary">${items.length} items</span></div>
+    <div class="section-head"><h2 class="heading-20">Rewards</h2><span class="label-13 secondary">${items.length} items</span></div>
     <div class="card"><div class="card-body">${rewardChips(items)}</div></div>
   </section>`;
 }
@@ -114,6 +149,7 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
             <span class="wiki-fact"><span class="wiki-fact-label">When (${SERVER_LABEL[server]})</span>${when}</span>
             ${e.version ? html`<span class="wiki-fact"><span class="wiki-fact-label">Version</span>${e.version}</span>` : ''}
           </div>
+          ${eventTags(e, r, Date.now(), server, state.schedule, true)}
         </div>
       </div>
     </section>
