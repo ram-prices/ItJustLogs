@@ -4064,6 +4064,17 @@ a.patch-banner:hover {
 .wiki-variant:first-of-type {
   margin-top: 0;
 }
+/* Arcane's skill sets (operator.ts skillsSection): why one is active; the other dimmed. */
+.wiki-variant-why {
+  margin-left: 8px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--gray-900);
+}
+.wiki-inactive {
+  opacity: 0.55;
+}
 .wiki-skills {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

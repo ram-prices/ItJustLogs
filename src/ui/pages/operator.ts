@@ -136,6 +136,20 @@ const STAT_ROWS: [keyof NonNullable<WikiOperator['stats']>, string][] = [
  * Potential and loadout add; values show totals (Breakdown splits them), and
  * stats without a base value (DEF, DMG bonuses...) get rows of their own.
  */
+/**
+ * An attribute's total at Lv 90 (else the highest level listed) with what
+ * talents, Potential and the loadout add, as the whole number the game shows:
+ * Strength 91.855 is 91. 0 if the wiki has no such attribute.
+ */
+function attributeTotal(o: WikiOperator, bonuses: Map<string, Bonus> | null, label: string | null): number {
+  const s = o.stats;
+  if (!s || !label) return 0;
+  let at = s.levels.findIndex((l) => l.level === 90);
+  if (at < 0) at = s.levels.length - 1;
+  const k = STAT_ROWS.find(([, l]) => l === label)?.[0];
+  return k && Array.isArray(s[k]) ? Math.floor(statTotal((s[k] as number[])[at], bonuses?.get(label))) : 0;
+}
+
 function statsSection(o: WikiOperator, bonuses: Map<string, Bonus> | null, potential: number | null): Html {
   const s = o.stats;
   if (!s) return html``;
@@ -153,10 +167,7 @@ function statsSection(o: WikiOperator, bonuses: Map<string, Bonus> | null, poten
   const def = bonuses?.get('DEF');
   // ATK and HP grow with the attributes' totals (atkTotal, hpTotal), as the
   // whole numbers the game shows: Strength 91.855 gives 91 × 5 HP, not 459.
-  const totalOf = (label: string | null) => {
-    const k = STAT_ROWS.find(([, l]) => l === label)?.[0];
-    return k && Array.isArray(s[k]) ? Math.floor(statTotal((s[k] as number[])[at], bonuses?.get(label!))) : 0;
-  };
+  const totalOf = (label: string | null) => attributeTotal(o, bonuses, label);
   const opAtk = s.atk?.[at] ?? 0;
   const opHp = s.hp?.[at] ?? 0;
   const hp = hpTotal(opHp, bonuses?.get('HP'), totalOf('Strength'));
@@ -266,18 +277,39 @@ function skillRow(key: string, sliderKey: string, s: WikiSkill, mods: Map<string
   );
 }
 
+/**
+ * Arcane's two skill sets ("Array Arcana: INT" / "Array Arcana: WILL"): the
+ * INT set is active while Intellect ≥ Will (her talent Tactical Planning).
+ * Null for operators without them.
+ */
+function attributeVariant(o: WikiOperator, bonuses: Map<string, Bonus> | null): { int: number; will: number; active: 'INT' | 'WILL' } | null {
+  if (!o.skills.some((s) => /: (INT|WILL)$/.test(s.variant ?? ''))) return null;
+  const int = attributeTotal(o, bonuses, 'Intellect');
+  const will = attributeTotal(o, bonuses, 'Will');
+  return int || will ? { int, will, active: int >= will ? 'INT' : 'WILL' } : null;
+}
+
 function skillsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> | null, potential: number | null): Html {
   if (!o.skills.length) return html``;
   const mods = potentialSkillMods(o, potential);
   const touched = mods.size > 0 || o.skills.some((s) => skillDmgBonus(s, bonuses));
+  const arcana = attributeVariant(o, bonuses);
+  // The game's "Intellect (N) ≥ Will (N)" lines, with her numbers in.
+  const withTotals = (s: WikiSkill): WikiSkill =>
+    arcana ? { ...s, description: s.description.replace(/Intellect \(⟦num\|N⟧\)/g, `Intellect (⟦num|${arcana.int}⟧)`).replace(/Will \(⟦num\|N⟧\)/g, `Will (⟦num|${arcana.will}⟧)`) } : s;
   return html`<section class="section">
     <div class="section-head"><h2 class="heading-20">Skills</h2>${touched ? html`<span class="row label-13 secondary">${splitToggle()}</span>` : ''}</div>
-    ${skillSets(o.skills).map(
-      (set, si) => html`${set.variant ? html`<h3 class="wiki-skill-type wiki-variant">${set.variant}</h3>` : ''}
-        <div class="card wiki-accs">${set.skills.map((s, i) =>
-          skillRow(`skill-${si}-${i}`, `${id}:${si}:${i}`, s, mods.get(`${s.type}:${s.name}`), skillDmgBonus(s, bonuses)),
-        )}</div>`,
-    )}
+    ${skillSets(o.skills).map((set, si) => {
+      const kind = set.variant?.match(/: (INT|WILL)$/)?.[1];
+      const on = arcana && kind ? kind === arcana.active : null;
+      const why = arcana ? (arcana.active === 'INT' ? `Intellect ${arcana.int} ≥ Will ${arcana.will}` : `Will ${arcana.will} > Intellect ${arcana.int}`) : '';
+      return html`${set.variant
+          ? html`<h3 class="wiki-skill-type wiki-variant">${set.variant}${on ? html` ${badge('Active', 'green')}<span class="wiki-variant-why">${why}</span>` : ''}</h3>`
+          : ''}
+        <div class="card wiki-accs${on === false ? ' wiki-inactive' : ''}">${set.skills.map((s, i) =>
+          skillRow(`skill-${si}-${i}`, `${id}:${si}:${i}`, withTotals(s), mods.get(`${s.type}:${s.name}`), skillDmgBonus(s, bonuses)),
+        )}</div>`;
+    })}
   </section>`;
 }
 
@@ -483,10 +515,7 @@ export function cardStats(id: string, a: Analysis | null, redraw: () => void, ma
   let at = s.levels.findIndex((l) => l.level === 90);
   if (at < 0) at = s.levels.length - 1;
   const bonuses = bonusesFor(id, o, a, redraw);
-  const totalOf = (label: string | null) => {
-    const k = STAT_ROWS.find(([, l]) => l === label)?.[0];
-    return k && Array.isArray(s[k]) ? Math.floor(statTotal((s[k] as number[])[at], bonuses.get(label!))) : 0;
-  };
+  const totalOf = (label: string | null) => attributeTotal(o, bonuses, label);
   const fmt = (n: number) => Math.round(n).toLocaleString();
   const out: [string, string][] = [];
   if (s.hp) out.push(['HP', fmt(hpTotal(s.hp[at], bonuses.get('HP'), totalOf('Strength')).total)]);

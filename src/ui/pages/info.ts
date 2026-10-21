@@ -276,9 +276,10 @@ export function rich(s: string, values?: number[][], rank = 1): Html {
       case 'bold':
         return html`<b>${filled(seg.text, values, rank)}</b>`;
       case 'mark': {
-        // An element's DMG, Infliction or reaction gets that element's icon.
+        // An element's DMG, Infliction, Amp or reaction gets that element's icon and colour.
         const el = elementOf(seg.cls, seg.text);
-        return html`<span class="wk wk-${seg.cls.replace(/\W/g, '')}">${el ? elementIcon(el) : ''}${filled(seg.text, values, rank)}</span>`;
+        const cls = el ? el.toLowerCase() : seg.cls.replace(/\W/g, '');
+        return html`<span class="wk wk-${cls}">${el ? elementIcon(el) : ''}${filled(seg.text, values, rank)}</span>`;
       }
       case 'break':
         return html`<br />`;
