@@ -2457,6 +2457,38 @@ code {
 .six-item:hover .six-portrait {
   transform: translateY(-2px);
 }
+/* Weapons from one set of ten: one box around them all, like their oval on the
+   ruler. Its outline (--ring, kind.ts sixStrip) is the rate-up's colour around
+   the rate-up and the usual outline around the others. */
+.six-item.shared {
+  width: auto;
+}
+.six-heads {
+  display: flex;
+  padding: 2px;
+  margin: -2px;
+  border-radius: 12px;
+  background: var(--ring, var(--gray-alpha-400));
+  transition: transform 0.15s var(--ease);
+}
+.six-heads-in {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--gray-100);
+}
+.six-heads .six-portrait,
+.six-item.shared.rateup .six-portrait {
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.six-item.shared:hover .six-portrait {
+  transform: none;
+}
+.six-item.shared:hover .six-heads {
+  transform: translateY(-2px);
+}
 .six-pity {
   display: inline-flex;
   align-items: center;

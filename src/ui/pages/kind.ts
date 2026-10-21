@@ -114,11 +114,21 @@ export function toggleSixStrip(kind: Kind): boolean {
 
 /**
  * Every 6★ for this kind, newest first: portrait with its pity underneath,
- * rate-ups outlined. Two rows until opened.
+ * rate-ups outlined. Weapons that dropped in the same set of ten share one
+ * box (as their pins share one oval on the banner's ruler). Two rows until
+ * opened.
  */
 export function sixStrip(kind: Kind, a: Analysis): Html {
   const sixes = a.sixStars.filter((x) => x.kind === kind).sort((x, y) => y.ts - x.ts);
   if (!sixes.length) return html``;
+  // Weapons from one set of ten (same banner, same set) together.
+  const setKey = (x: AnalyzedPull) => (x.kind === 'weap' && x.bannerPull != null ? `${x.poolId}:${setOf(x.bannerPull)}` : null);
+  const groups: AnalyzedPull[][] = [];
+  for (const x of sixes) {
+    const last = groups[groups.length - 1];
+    if (last && setKey(x) !== null && setKey(x) === setKey(last[0])) last.push(x);
+    else groups.push([x]);
+  }
   const max = kind === 'char' ? 80 : WEAPON_PITY_SETS;
   const open = sixOpen.has(kind);
   return html`<div class="section six-section${open ? ' open' : ''}" data-kind="${kind}">
@@ -130,25 +140,38 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
       </div>
     </div>
     <div class="six-strip">
-      ${sixes.map(
-        (p) => {
-          const inner = html`${itemImg(p.kind, p.itemId, 'six-portrait')}
-            <span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
-          const cls = `six-item${p.isRateUp ? ' rateup' : ''}`;
-          const title = `${p.name} · ${p.bannerName} · ${fmtDate(p.ts, true)}`;
-          // Rate-ups are outlined in their banner card's colour: the art's for
-          // Headhunting, the weapon's own for Arsenal (as the cards glow).
-          // Chartered banners (one rate-up) glow in the operator's colour; Joint ones in their art's.
-          const byOperator = p.kind === 'char' && p.poolId.startsWith('special_');
-          const tintUrl = p.isRateUp ? (p.kind === 'weap' ? itemIconUrl('weap', p.itemId) : byOperator ? itemIconUrl('char', p.itemId) : bannerArtUrl(p.poolId)) : null;
-          const known = tintUrl ? sixTintFor(tintUrl) : null;
-          const tintAttrs = tintUrl
-            ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"${known ? ` style="--six-tint:${known}"` : ''}`)
-            : '';
-          // Portraits open that operator's or weapon's info page.
-          return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title}" ${tintAttrs}>${inner}</a>`;
-        },
-      )}
+      ${groups.map((g) => {
+        const p = g[0];
+        const pity = html`<span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
+        // Rate-ups are outlined in their banner card's colour: the art's for
+        // Headhunting, the weapon's own for Arsenal (as the cards glow).
+        // Chartered banners (one rate-up) glow in the operator's colour; Joint ones in their art's.
+        // A shared box takes its rate-up's.
+        const up = g.find((x) => x.isRateUp);
+        const byOperator = p.kind === 'char' && p.poolId.startsWith('special_');
+        const tintUrl = up ? (up.kind === 'weap' ? itemIconUrl('weap', up.itemId) : byOperator ? itemIconUrl('char', up.itemId) : bannerArtUrl(up.poolId)) : null;
+        const known = tintUrl ? sixTintFor(tintUrl) : null;
+        const tintAttrs = tintUrl
+          ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"${known ? ` style="--six-tint:${known}"` : ''}`)
+          : '';
+        const cls = `six-item${up ? ' rateup' : ''}`;
+        const title = (x: AnalyzedPull) => `${x.name} · ${x.bannerName} · ${fmtDate(x.ts, true)}`;
+        // Portraits open that operator's or weapon's info page.
+        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title(p)}" ${tintAttrs}>${itemImg(p.kind, p.itemId, 'six-portrait')}${pity}</a>`;
+        // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
+        const step = 100 / g.length;
+        const blend = Math.min(10, step / 3);
+        const ring = g
+          .map((x, i) => {
+            const c = x.isRateUp ? 'var(--six-tint, var(--r6))' : 'var(--gray-alpha-400)';
+            return `${c} ${(i ? i * step + blend : 0).toFixed(1)}%, ${c} ${(i < g.length - 1 ? (i + 1) * step - blend : 100).toFixed(1)}%`;
+          })
+          .join(', ');
+        return html`<div class="${cls} shared" title="${g.map(title).join('\n')}" ${tintAttrs}>
+          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}</a>`)}</span></span>
+          ${pity}
+        </div>`;
+      })}
     </div>
   </div>`;
 }
