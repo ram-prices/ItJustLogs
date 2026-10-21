@@ -113,17 +113,17 @@ export function toggleSixStrip(kind: Kind): boolean {
 }
 
 /**
- * Every 6★ for this kind, newest first: portrait with its pity underneath.
- * Arsenal shows only the rate-up weapons. Two rows until opened.
+ * Every 6★ for this kind, newest first: portrait with its pity underneath,
+ * rate-ups outlined. Two rows until opened.
  */
 export function sixStrip(kind: Kind, a: Analysis): Html {
-  const sixes = a.sixStars.filter((x) => x.kind === kind && (kind === 'char' || x.isRateUp)).sort((x, y) => y.ts - x.ts);
+  const sixes = a.sixStars.filter((x) => x.kind === kind).sort((x, y) => y.ts - x.ts);
   if (!sixes.length) return html``;
   const max = kind === 'char' ? 80 : WEAPON_PITY_SETS;
   const open = sixOpen.has(kind);
   return html`<div class="section six-section${open ? ' open' : ''}" data-kind="${kind}">
     <div class="section-head">
-      <h2 class="heading-20">${kind === 'char' ? '6★ history' : 'Rate-up 6★ history'}</h2>
+      <h2 class="heading-20">6★ history</h2>
       <div class="row">
         <span class="label-13 secondary">${sixes.length} total · newest first</span>
         <button class="btn tertiary sm six-toggle" data-action="six-strip" aria-expanded="${String(open)}">${open ? 'Show less' : 'Show all'}</button>
@@ -239,10 +239,10 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
   const banners = bannersOf(kind, a);
   const sixes = a.sixStars.filter((x) => x.kind === kind && x.pity !== null);
   const avgPity = sixes.length ? sixes.reduce((n, x) => n + x.pity!, 0) / sixes.length : 0;
-  const rateTier = luckTier(s.rate, s.expectedRate);
+  const rateTier = luckTier(s.rate, s.expectedRate, s.pulls);
   const flips = s.won + s.lost;
   const winRate = flips ? s.won / flips : 0;
-  const flipTier = luckTier(winRate, s.expectedWinRate);
+  const flipTier = luckTier(winRate, s.expectedWinRate, flips);
   const list = bannerCards(kind, banners, opts);
 
   return html`

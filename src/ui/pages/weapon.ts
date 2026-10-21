@@ -1,7 +1,7 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, heroGlow, icon, itemImg, rarity } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, rarity, trait } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { weaponBaseRanks, weaponRankCaps } from '../../domain/loadout';
 import { essenceTag, isMaxEssence, weaponRanksOf, wieldersSection } from './loadout';
@@ -82,7 +82,7 @@ function hero(id: string, w: WikiWeapon, owned: Owned | undefined): Html {
         <div class="wiki-stars" style="color:var(--r${w.rarity})" aria-label="${w.rarity} star">${'★'.repeat(w.rarity)}</div>
         <h1 class="heading-32">${w.name}</h1>
         <div class="wiki-facts">
-          <span class="wiki-fact"><span class="wiki-fact-label">Type</span>${w.type}</span>
+          <span class="wiki-fact"><span class="wiki-fact-label">Type</span>${trait('weapon-types', w.type)}</span>
           ${w.stats?.baseAtk.at(-1) != null ? html`<span class="wiki-fact"><span class="wiki-fact-label">Base ATK</span><span class="num">${w.stats.baseAtk.at(-1)}</span></span>` : ''}
           ${w.source ? html`<span class="wiki-fact"><span class="wiki-fact-label">Source</span>${w.source}</span>` : ''}
           ${owned?.copies ? html`<span class="wiki-fact"><span class="wiki-fact-label">Potential</span><span class="wiki-fact-pot">${potentialLevel(owned)}${pips(owned.potential)}</span></span>` : ''}

@@ -525,3 +525,15 @@ describe('all banners catalog', () => {
     expect(unpulledBanners('weap', [], db, schedule, 'americas', now).map((b) => b.poolId)).toEqual(['weponbox_1_1_1']);
   });
 });
+
+describe('luck tiers', () => {
+  it('needs a clear gap and enough tries', async () => {
+    const { luckTier } = await import('./analyze');
+    expect(luckTier(6 / 22, 0.25, 22)).toBe('average'); // 27% of 25/75s: about what's expected
+    expect(luckTier(6 / 10, 0.5, 10)).toBe('average'); // 60% of ten 50/50s: too few to say
+    expect(luckTier(14 / 20, 0.5, 20)).toBe('lucky');
+    expect(luckTier(32 / 40, 0.5, 40)).toBe('very-lucky');
+    expect(luckTier(2 / 30, 0.25, 30)).toBe('very-unlucky');
+    expect(luckTier(0.55, 0.5, 1000)).toBe('average'); // clearly above chance, but only 10% better
+  });
+});

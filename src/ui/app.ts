@@ -8,7 +8,7 @@ import { clearEverything, clearHistory, currentServer, restoreCopy, restoreSnaps
 import { deleteAvatarEdit, loadAvatarEdit, loadAvatarHistory, loadImage, loadTabViews, saveAvatarEdit, saveAvatarHistory, saveTabView, type AvatarBox, type AvatarEdit, type ThemePref } from '../store';
 import { installTooltips } from './charts';
 import { installImageFallback, toast } from './common';
-import { LOGO, TAB_ICON, avatar, icon, pageHeader } from './components';
+import { LOGO, TAB_ICON, avatar, icon, loadIcons, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
 import { fmtInt, html, raw, render, type Html } from './html';
 import { askSamePlayer } from './dialog';
@@ -869,6 +869,7 @@ export function mount(): void {
   installImageFallback();
   installTint();
   installCardGlow();
+  loadIcons(draw);
   installParallax();
   installSlideshows();
   installTooltips();

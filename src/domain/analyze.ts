@@ -379,13 +379,21 @@ export function copyPmf(b: BannerSummary, copy: number): Float64Array | null {
 /** How a win rate or drop rate compares to what the odds predict. */
 export type LuckTier = 'very-lucky' | 'lucky' | 'average' | 'unlucky' | 'very-unlucky';
 
-export function luckTier(actual: number, expected: number): LuckTier {
-  const r = expected ? actual / expected : 1;
-  if (r >= 1.25) return 'very-lucky';
-  if (r > 1.05) return 'lucky';
-  if (r >= 0.9) return 'average';
-  if (r >= 0.7) return 'unlucky';
-  return 'very-unlucky';
+/**
+ * Lucky or not over `tries` (flips or paid pulls): it takes both a clear gap
+ * from the expected rate (15% of it, 35% for "very") and enough tries for
+ * that gap to stand out from chance (one standard deviation, two for
+ * "very"). Anything less is Average: 6 of 22 25/75s (27%) is just Average.
+ */
+export function luckTier(actual: number, expected: number, tries: number): LuckTier {
+  if (!expected || expected >= 1 || !tries) return 'average';
+  const ratio = actual / expected;
+  const z = (actual - expected) / Math.sqrt((expected * (1 - expected)) / tries);
+  if (ratio >= 1.35 && z >= 2) return 'very-lucky';
+  if (ratio >= 1.15 && z >= 1) return 'lucky';
+  if (ratio <= 0.65 && z <= -2) return 'very-unlucky';
+  if (ratio <= 0.85 && z <= -1) return 'unlucky';
+  return 'average';
 }
 
 export const LUCK_LABEL: Record<LuckTier, string> = {

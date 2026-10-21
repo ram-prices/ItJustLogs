@@ -9,7 +9,7 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, heroGlow, icon, itemImg, rarity } from '../components';
+import { badge, heroGlow, icon, itemImg, rarity, trait } from '../components';
 import { html, type Html } from '../html';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, pips, potentialLevel, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
@@ -64,7 +64,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
                 ${itemImg('char', r.id, 'wiki-tile-portrait')}
                 <span class="wiki-tile-text min0">
                   <span class="wiki-tile-name ellipsis">${r.name}</span>
-                  <span class="label-12 secondary">${rarity(r.rarity)} · ${[r.class, r.element].filter(Boolean).join(' · ')}</span>
+                  <span class="label-12 secondary">${rarity(r.rarity)}${r.class ? html` · ${trait('classes', r.class)}` : ''}${r.element ? html` · ${trait('elements', r.element)}` : ''}</span>
                 </span>
                 ${r.soon ? badge('Unreleased', 'amber') : ownedTag(mine)}
               </a>`;
@@ -101,9 +101,9 @@ function hero(id: string, o: WikiOperator, owned: Owned | undefined, redraw: () 
         <div class="wiki-stars" style="color:var(--r${o.rarity})" aria-label="${o.rarity} star">${'★'.repeat(o.rarity)}</div>
         <h1 class="heading-32">${o.name}</h1>
         <div class="wiki-facts">
-          <span class="wiki-fact"><span class="wiki-fact-label">Class</span>${o.class}</span>
-          <span class="wiki-fact"><span class="wiki-fact-label">Element</span><span class="wk wk-${o.element.toLowerCase().replace(/\W/g, '')}">${o.element}</span></span>
-          <span class="wiki-fact"><span class="wiki-fact-label">Weapon</span>${o.weapon}</span>
+          <span class="wiki-fact"><span class="wiki-fact-label">Class</span>${trait('classes', o.class)}</span>
+          <span class="wiki-fact"><span class="wiki-fact-label">Element</span><span class="wk wk-${o.element.toLowerCase().replace(/\W/g, '')}">${trait('elements', o.element)}</span></span>
+          <span class="wiki-fact"><span class="wiki-fact-label">Weapon</span>${trait('weapon-types', o.weapon)}</span>
           ${o.faction ? html`<span class="wiki-fact"><span class="wiki-fact-label">Faction</span>${o.faction}</span>` : ''}
           ${owned?.copies ? html`<span class="wiki-fact"><span class="wiki-fact-label">Potential</span><span class="wiki-fact-pot">${potentialLevel(owned)}${pips(owned.potential)}</span></span>` : ''}
         </div>

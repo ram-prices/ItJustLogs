@@ -1,4 +1,4 @@
-import { issueLayerUrls, itemIconUrl } from '../domain/banners';
+import { cdnFallback, EF_ASSETS, issueLayerUrls, itemIconUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { html, raw, type Html } from './html';
 import { tintFor } from './tint';
@@ -60,9 +60,45 @@ export function metric(o: MetricOpts): Html {
   </div>`;
 }
 
-/** An item's name; Oroberyl gets its game icon and colour: "[icon] Oroberyl". */
-export const itemName = (name: string): Html =>
-  /^oroberyls?$/i.test(name) ? html`<span class="oroberyl"><img class="oroberyl-icon" src="/icons/oroberyl.webp" alt="" />${name}</span>` : html`${name}`;
+/**
+ * The game's icons for items, elements, classes and weapon types: ef-assets
+ * icons/index.json (its scripts/item-icons.py, from endfield.wiki.gg), kind →
+ * name → file. Loaded once at start (app.ts); until it arrives, or for a name
+ * it lacks, names show without an icon.
+ */
+export type IconKind = 'items' | 'elements' | 'classes' | 'weapon-types';
+let icons: Partial<Record<IconKind, Record<string, string>>> | null = null;
+export function loadIcons(redraw: () => void): void {
+  const url = `${EF_ASSETS}/icons/index.json`;
+  fetch(url)
+    .then((r) => (r.ok ? r : fetch(cdnFallback(url)!)))
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!data) return;
+      icons = data;
+      redraw();
+    })
+    .catch(() => {});
+}
+/** A name's icon URL, if ef-assets has one (a plural "...Permits" finds "...Permit"). */
+export function iconOf(kind: IconKind, name: string): string | null {
+  const files = icons?.[kind];
+  const file = files?.[name] ?? files?.[name.replace(/s$/, '')];
+  return file ? `${EF_ASSETS}/icons/${file}` : null;
+}
+
+/** An item's name with its game icon; Oroberyl also in its colour: "[icon] Oroberyl". */
+export function itemName(name: string): Html {
+  if (/^oroberyls?$/i.test(name)) return html`<span class="oroberyl"><img class="oroberyl-icon" src="/icons/oroberyl.webp" alt="" />${name}</span>`;
+  const src = iconOf('items', name);
+  return src ? html`<span class="item-name"><img class="item-icon" src="${src}" alt="" loading="lazy" decoding="async" />${name}</span>` : html`${name}`;
+}
+
+/** An element, class or weapon type with its game icon. */
+export function trait(kind: Exclude<IconKind, 'items'>, name: string): Html {
+  const src = iconOf(kind, name);
+  return src ? html`<span class="trait"><img class="trait-icon" src="${src}" alt="" loading="lazy" decoding="async" />${name}</span>` : html`${name}`;
+}
 
 /**
  * The player's profile picture in its circle (`lg`: Settings' bigger one).

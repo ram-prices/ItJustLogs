@@ -5,7 +5,7 @@ import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import type { HomeWidget } from '../../store';
 import { bannerArtUrl } from '../../domain/banners';
-import { badge, heroGlow, icon, itemImg, metric, metrics } from '../components';
+import { badge, heroGlow, icon, itemImg, metric, metrics, trait } from '../components';
 import { fmtDate, fmtInt, html, raw, render, type Html } from '../html';
 import { artOf, openArtManager } from './art';
 import { archiveProgress } from './collections';
@@ -595,7 +595,7 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
               <span class="char-card-names min0">
                 ${w.title ? html`<span class="label-12 secondary char-card-title">${w.title}</span>` : ''}
                 <span class="heading-20 char-card-name">${name}${potential ? html` ${potential}` : ''}</span>
-                ${o ? html`<span class="label-12 secondary">${'★'.repeat(o.rarity)} · ${[o.class, o.element].filter(Boolean).join(' · ')}</span>` : ''}
+                ${o ? html`<span class="label-12 secondary">${'★'.repeat(o.rarity)}${o.class ? html` · ${trait('classes', o.class)}` : ''}${o.element ? html` · ${trait('elements', o.element)}` : ''}</span>` : ''}
               </span>
             </span>`
           : ''}
