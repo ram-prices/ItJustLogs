@@ -882,10 +882,11 @@ async function onClick(e: MouseEvent): Promise<void> {
       break;
     }
     case 'extra-ids': {
-      // One copy of each listed item (the page leaves out ones already there).
+      // `data-copies` (else one) of each listed item (the page leaves out ones already there).
       const ids = (el.dataset.value ?? '').split(',').filter(Boolean);
-      addExtras(ids.map((id) => ({ id, copies: 1, note: el.dataset.note ?? '' })));
-      if (ids.length) toast(`Added ${ids.length} ${el.dataset.note ?? ''} ${ids.length === 1 ? 'copy' : 'copies'}.`);
+      const copies = Number(el.dataset.copies) || 1;
+      addExtras(ids.map((id) => ({ id, copies, note: el.dataset.note ?? '' })));
+      if (ids.length) toast(copies > 1 ? `Added ${ids.length} ${el.dataset.note ?? ''}, ${copies} copies each.` : `Added ${ids.length} ${el.dataset.note ?? ''} ${ids.length === 1 ? 'copy' : 'copies'}.`);
       break;
     }
     case 'extra-remove':

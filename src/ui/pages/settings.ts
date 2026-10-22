@@ -1,10 +1,10 @@
-import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator, MAX_COPIES, PROTOCOL_PASS, type ExtraCopy } from '../../domain/owned';
+import { endministratorOf, EXTRA_PRESETS, extraKind, extrasOf, isEndministrator, MAX_COPIES, PROTOCOL_PASS, THREE_STAR_WEAPONS, type ExtraCopy } from '../../domain/owned';
 import { SERVER_LABEL } from '../../domain/schedule';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
 import { loadAvatarHistory, MAX_DRIVE_SNAPSHOTS, MAX_SNAPSHOTS, type AvatarBox } from '../../store';
 import { EXPORTER_SOURCE } from '../guide';
-import { avatar, badge, icon, itemImg, pageHeader, toggleGroup } from '../components';
+import { avatar, badge, icon, itemImg, pageHeader, toggleGroup, withStars } from '../components';
 import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { driveConfigured } from '../../drive';
@@ -113,6 +113,9 @@ function extrasCard(redraw: () => void): Html {
   // Every weapon the wiki lists as a Protocol Pass reward, so new ones join by themselves.
   const pass = weps ? Object.keys(weps.weapons).filter((id) => /protocol pass/i.test(weps.weapons[id].source ?? '')) : [];
   const passMissing = pass.filter((id) => !has({ id, copies: 1, note: PROTOCOL_PASS }));
+  // Every 3★ weapon, maxed: likewise from the wiki, so new ones join by themselves.
+  const threes = weps ? Object.keys(weps.weapons).filter((id) => weps.weapons[id].rarity === 3) : [];
+  const threesMissing = threes.filter((id) => !has({ id, copies: MAX_COPIES, note: THREE_STAR_WEAPONS }));
   const options = (items: [string, { name: string; rarity: number }][]) =>
     items
       .sort(([, p], [, q]) => q.rarity - p.rarity || p.name.localeCompare(q.name))
@@ -159,6 +162,9 @@ function extrasCard(redraw: () => void): Html {
         ${EXTRA_PRESETS.map((p) => html`<button class="btn tertiary sm" data-action="extra-preset" data-value="${p.key}" ${p.extras.every(has) ? 'disabled' : ''}>${p.label}</button>`)}
         ${pass.length
           ? html`<button class="btn tertiary sm" data-action="extra-ids" data-value="${passMissing.join(',')}" data-note="${PROTOCOL_PASS}" ${passMissing.length ? '' : 'disabled'} title="One copy each of every Protocol Pass weapon you don't have listed yet">Protocol Pass weapons (${pass.length}, 1 copy each)</button>`
+          : ''}
+        ${threes.length
+          ? html`<button class="btn tertiary sm" data-action="extra-ids" data-value="${threesMissing.join(',')}" data-note="${THREE_STAR_WEAPONS}" data-copies="${MAX_COPIES}" ${threesMissing.length ? '' : 'disabled'} title="Every 3★ weapon at max Potential, except ones you have listed already">${withStars(`All 3★ weapons, maxed (${threes.length})`)}</button>`
           : ''}
       </div>
     </div>

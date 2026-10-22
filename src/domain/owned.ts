@@ -57,10 +57,17 @@ export const EXTRA_PRESETS: { key: string; label: string; extras: ExtraCopy[] }[
       { id: 'wpn_funnel_0013', copies: 1, note: 'Awakening Sign-In' },
     ],
   },
+  {
+    key: 'tribute',
+    label: 'Tribute of Companionship Sign-In (Farsight)',
+    extras: [{ id: 'wpn_sword_0026', copies: 1, note: 'Tribute of Companionship' }],
+  },
 ];
 
 /** The note on Protocol Pass weapons (Settings → Extra copies' quick add, built from the wiki's sources). */
 export const PROTOCOL_PASS = 'Protocol Pass';
+/** The note on the 3★ weapons (quick add: every one the wiki lists, maxed). */
+export const THREE_STAR_WEAPONS = '3★ weapons';
 
 export const extraKind = (id: string): Kind => (id.startsWith('wpn_') ? 'weap' : 'char');
 
