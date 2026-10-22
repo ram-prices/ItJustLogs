@@ -213,6 +213,18 @@ function lazy<T>(load: () => Promise<T>): { mod: T | null; get(): T | null } {
 const essences = lazy(() => import('./pages/essences'));
 const story = lazy(() => import('./pages/story'));
 
+/** A Story mission opened at one of its lines (/story/<mission>#l-3-12, from the search): scroll there once it's drawn, and mark it. */
+let lineShown = '';
+function scrollToLine(): void {
+  const target = location.pathname + location.hash;
+  if (!location.hash.startsWith('#l-') || lineShown === target) return;
+  const el = document.getElementById(location.hash.slice(1));
+  if (!el) return;
+  lineShown = target;
+  el.classList.add('story-found');
+  el.scrollIntoView({ block: 'center' });
+}
+
 const loadingPage = (title: string): Html => html`${pageHeader(title, 'Loading…')}<main class="container"></main>`;
 
 // ---------------------------------------------------------------------------
@@ -439,6 +451,10 @@ function draw(): void {
   }
   lastKey = key;
   applyListSearch();
+  if (route.page === 'story') {
+    story.mod?.refreshStoryHits();
+    scrollToLine();
+  }
   markOverflow();
   tintWeaponCards();
   tintSixStrip();

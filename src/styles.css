@@ -6761,18 +6761,43 @@ a.six-item {
   font-size: 18px;
   color: var(--gray-700);
 }
-.story-unlisted {
-  margin-top: 12px;
+/* Lines found by the Story search (pages/story.ts showHits). */
+.story-hits:not(:empty) {
+  margin: 16px 0 32px;
 }
-.story-unlisted > summary {
-  cursor: pointer;
-  padding: 6px 0;
-  color: var(--gray-900);
+.story-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 16px;
+  color: inherit;
+  text-decoration: none;
 }
-.story-unlisted > summary::marker {
-  color: var(--gray-700);
+.story-hit + .story-hit {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
 }
-.story-unlisted[open] > summary {
+.story-hit:hover {
+  background: var(--gray-alpha-100);
+}
+.story-hit mark,
+.story-found mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--amber) 35%, transparent);
+  color: inherit;
+}
+/* The line a search result opened. */
+.story-found {
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+/* Searched (pages/search.ts) but not shown: the mission's chapter or section. */
+.story-row-where {
+  display: none;
+}
+/* A search field you can see (pages/search.ts searchField). */
+.list-search-field {
+  max-width: 420px;
   margin-bottom: 8px;
 }
 .story-summary {

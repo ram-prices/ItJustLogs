@@ -299,7 +299,12 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   game's own summary, lines with speaker (operator portraits via `actor`),
   and the replies offered; where a reply falls in the scene isn't in the
   dump, so they're listed after the scene. Lines without English text are
-  left out. Works without an import; loaded on first use (`lazy`).
+  left out. Works without an import; loaded on first use (`lazy`). The
+  list's search field (`searchField` in pages/search.ts, visible so phones
+  can use it) filters missions by name and chapter, and from 3 letters lists
+  matching lines from ef-assets `story/search.json` (loaded on the first such
+  search); a result opens `/story/<mission>#l-<scene>-<line>`, scrolled to and
+  marking that line (`scrollToLine` in app.ts).
 - Essences tab (`ui/pages/essences.ts`, `domain/essences.ts`): the player's
   essences (settings `essences`: kind key → count) against every weapon's
   skill stats; only perfect fits (all of a weapon's stats) are suggested, by

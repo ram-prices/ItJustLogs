@@ -1,4 +1,5 @@
 import type { Kind } from '../../domain/types';
+import { icon } from '../components';
 import { html, type Html } from '../html';
 
 /**
@@ -17,13 +18,21 @@ import { html, type Html } from '../html';
 const queries: Record<string, string> = {};
 
 /** Lowercase, without accents, so "lifeng" finds "Lifeng" and "eclair" finds "Éclair". */
-const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+export const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const LABEL: Record<string, string> = { char: 'Search operators', weap: 'Search weapons' };
 
 /** The hidden input that holds a list's search (typing on the page goes into it); `key` keeps each list's own. */
 export function searchBox(key: Kind | string, label = LABEL[key] ?? 'Search'): Html {
   return html`<input class="list-search-input" type="search" data-list-search="${key}" value="${queries[key] ?? ''}" aria-label="${label}: start typing" autocomplete="off" spellcheck="false" tabindex="-1" />`;
+}
+
+/**
+ * A search field you can see and tap (phones have no keyboard to type
+ * anywhere with), filtering the same way; typing anywhere still lands in it.
+ */
+export function searchField(key: string, placeholder: string): Html {
+  return html`<label class="picker-search list-search-field">${icon('search')}<input type="search" data-list-search="${key}" data-shown value="${queries[key] ?? ''}" placeholder="${placeholder}" aria-label="${placeholder}" autocomplete="off" spellcheck="false" /></label>`;
 }
 
 /** Shows only the tiles matching the search, hides sections left empty, and updates their counts. */
@@ -95,7 +104,8 @@ export function installListSearch(): void {
     if (!key) return;
     queries[key] = el.value;
     applyListSearch();
-    showTyped(el.value);
+    // A field you can see shows the text already.
+    if (!el.hasAttribute('data-shown')) showTyped(el.value);
   });
   document.addEventListener('keydown', (e) => {
     const input = document.querySelector<HTMLInputElement>('[data-list-search]');

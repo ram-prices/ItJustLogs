@@ -67,6 +67,12 @@ export interface StoryMission {
   scenes: StoryScene[];
 }
 
+/** story/search.json: every line as plain text ("Who: text"), by mission, then scene. */
+export type StorySearch = Record<string, string[][]>;
+
+/** A line's place on its mission's page (the id of its row: scene and line, from 0). */
+export const lineAnchor = (scene: number, line: number): string => `l-${scene}-${line}`;
+
 /** Every mission in reading order: the index's groups and sections as listed. */
 export const storyOrder = (ix: StoryIndex): string[] => ix.groups.flatMap((g) => g.sections.flatMap((s) => s.missions));
 
