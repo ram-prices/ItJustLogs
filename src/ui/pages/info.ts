@@ -109,9 +109,10 @@ const files = new Map<string, Loaded<unknown> & { loading: boolean; waiting: Set
  * The wiki file if it's loaded; starts loading it if not, and redraws (with
  * every `redraw` asked for while it loaded) when it's in.
  */
-export function wikiFile<T>(file: string, redraw: () => void): Loaded<T> {
-  let f = files.get(file);
-  if (!f) files.set(file, (f = { data: null, failed: false, loading: false, waiting: new Set() }));
+export function wikiFile<T>(file: string, redraw: () => void, dir = 'wiki'): Loaded<T> {
+  const key = dir === 'wiki' ? file : `${dir}/${file}`;
+  let f = files.get(key);
+  if (!f) files.set(key, (f = { data: null, failed: false, loading: false, waiting: new Set() }));
   if (!f.data) f.waiting.add(redraw);
   if (!f.data && !f.loading) {
     const entry = f;
@@ -123,7 +124,7 @@ export function wikiFile<T>(file: string, redraw: () => void): Loaded<T> {
       entry.waiting.clear();
       fns.forEach((fn) => fn());
     };
-    loadWikiFile<T>(file).then(
+    loadWikiFile<T>(file, dir).then(
       (d) => {
         entry.data = d;
         done();

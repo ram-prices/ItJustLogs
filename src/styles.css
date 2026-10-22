@@ -6721,3 +6721,123 @@ a.six-item {
     animation: none;
   }
 }
+
+/* ---------- Story (ui/pages/story.ts) ------------------------------------ */
+.story-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.story-crumbs a {
+  color: inherit;
+  text-decoration: none;
+}
+.story-crumbs .icon {
+  font-size: 16px;
+}
+.story-list {
+  overflow: hidden;
+}
+.story-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+.story-row + .story-row {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.story-row:hover {
+  background: var(--gray-alpha-100);
+}
+.story-row-name {
+  flex: 1;
+  font-weight: 500;
+}
+.story-row .icon {
+  font-size: 18px;
+  color: var(--gray-700);
+}
+.story-unlisted {
+  margin-top: 12px;
+}
+.story-unlisted > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--gray-900);
+}
+.story-unlisted > summary::marker {
+  color: var(--gray-700);
+}
+.story-unlisted[open] > summary {
+  margin-bottom: 8px;
+}
+.story-summary {
+  margin: 0 0 10px;
+}
+.story-lines {
+  padding: 6px 0;
+}
+.story-line {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+}
+.story-face {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gray-100);
+  box-shadow: var(--shadow-border);
+}
+.story-face-none {
+  display: grid;
+  place-items: center;
+  font: 600 14px/1 var(--font-sans);
+  color: var(--gray-900);
+}
+.story-who {
+  font: 600 13px/18px var(--font-sans);
+}
+.story-text {
+  white-space: pre-line;
+}
+.story-narr {
+  margin: 0;
+  padding: 8px 16px 8px 64px;
+  font-style: italic;
+  white-space: pre-line;
+}
+.story-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px 0;
+}
+.story-option {
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-border);
+}
+.story-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.story-nav-link {
+  max-width: 48%;
+  white-space: normal;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .story-narr {
+    padding-left: 16px;
+  }
+}

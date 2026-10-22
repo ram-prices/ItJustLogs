@@ -1,5 +1,5 @@
 import type { Analysis, BannerSummary } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, cdnUrl } from '../../domain/banners';
 import type { EventRewards, EventRewardsFile } from '../../domain/eventRewards';
 import {
   KIND_LABEL,
@@ -52,7 +52,7 @@ function span(ms: number): string {
 }
 
 /** ef-assets' 1024px art when the pool is known, else the announcement cover. */
-const artOf = (b: ScheduleBanner): string | null => (b.poolId && bannerArtUrl(b.poolId)) || b.art;
+const artOf = (b: ScheduleBanner): string | null => (b.poolId && bannerArtUrl(b.poolId)) || (b.art ? cdnUrl(b.art) : null);
 
 /** Your banner card for a schedule entry, if you've pulled on it. */
 function summaryFor(b: ScheduleBanner, a: Analysis | null): BannerSummary | null {
@@ -106,7 +106,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
   return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-link="${linkOf(b)}" data-card-image="${b.name}">
     <div class="banner-art">
-      ${src ? ((b.poolId && src === bannerArtUrl(b.poolId) ? issueArt(b.poolId, src) : null) ?? html`<img src="${src}" alt="" loading="lazy" decoding="async" />`) : ''}
+      ${src ? ((b.poolId && src === bannerArtUrl(b.poolId) ? issueArt(b.poolId, src) : null) ?? html`<img src="${src}" alt="" loading="lazy" decoding="async" data-fallback />`) : ''}
       <div class="banner-art-text">
         <span class="sched-kind">${KIND_LABEL[b.kind]}</span>
         <div class="banner-name ellipsis">${b.name}</div>
@@ -164,7 +164,7 @@ function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Sched
   // Each event opens its own page (rewards and dates): pages/event.ts.
   return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
     ${e.art
-      ? html`<div class="sched-thumb evt-art"><img src="${e.art}" alt="" loading="lazy" decoding="async" /><span class="evt-art-type" title="${e.type}">${icon(eventIcon(e))}</span></div>`
+      ? html`<div class="sched-thumb evt-art"><img src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback /><span class="evt-art-type" title="${e.type}">${icon(eventIcon(e))}</span></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>

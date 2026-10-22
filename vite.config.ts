@@ -37,6 +37,7 @@ const PAGES = [
   'essences',
   'achievements',
   'archives',
+  'story',
   'settings',
   'pulls',
   'operators',

@@ -1,5 +1,5 @@
 import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPull, type Analysis, type BannerSummary, type LuckTier } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId, itemIconUrl, lookupBanner } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, cdnUrl, itemIconUrl, lookupBanner } from '../../domain/banners';
 import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
@@ -288,7 +288,7 @@ export interface ListOptions {
 function unpulledCard(c: CatalogBanner, i = 0): Html {
   const weaponId = c.rateUpIds.find((id) => id.startsWith('wpn_'));
   const weapon = weaponId ? itemIconUrl('weap', weaponId) : '';
-  const url = c.art ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
+  const url = (c.art ? cdnUrl(c.art) : null) ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
   // Coloured like a pulled card: from its one rate-up when it has one (see
   // tintWeaponCards), else from the art.
   const operators = c.rateUpIds.filter((id) => id.startsWith('chr_'));

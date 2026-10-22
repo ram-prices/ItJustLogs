@@ -352,22 +352,23 @@ async function refreshFile<T>(file: string, key: string): Promise<T | null> {
  */
 const wikiFiles = new Map<string, Promise<unknown>>();
 
-export function loadWikiFile<T>(file: string): Promise<T> {
-  let p = wikiFiles.get(file) as Promise<T> | undefined;
+export function loadWikiFile<T>(file: string, dir = 'wiki'): Promise<T> {
+  const key = `${dir}/${file}`;
+  let p = wikiFiles.get(key) as Promise<T> | undefined;
   if (!p) {
     p = (async () => {
       for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
         try {
-          const res = await fetch(`${base}/wiki/${file}`, { signal: AbortSignal.timeout(10000) });
+          const res = await fetch(`${base}/${key}`, { signal: AbortSignal.timeout(10000) });
           if (res.ok) return (await res.json()) as T;
         } catch {
           /* try the next mirror */
         }
       }
-      wikiFiles.delete(file);
-      throw new Error(`Couldn't load ${file}`);
+      wikiFiles.delete(key);
+      throw new Error(`Couldn't load ${key}`);
     })();
-    wikiFiles.set(file, p);
+    wikiFiles.set(key, p);
   }
   return p;
 }

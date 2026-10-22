@@ -1,4 +1,4 @@
-import { cdnFallback } from '../domain/banners';
+import { mirrorUrl } from '../domain/banners';
 
 export function installImageFallback(): void {
   document.addEventListener(
@@ -6,7 +6,7 @@ export function installImageFallback(): void {
     (e) => {
       const img = e.target;
       if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-fallback')) return;
-      const next = !img.dataset.retried && cdnFallback(img.src);
+      const next = !img.dataset.retried && mirrorUrl(img.src);
       if (next) {
         img.dataset.retried = '1';
         img.src = next;

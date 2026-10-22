@@ -288,6 +288,18 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   (`domain/medalTier.ts`: dark/silver/gold = base/Reforged II/III,
   holographic = Trimmed) from a square of its picture beside the title,
   rules pinned by `medalTier.test.ts` with real samples.
+- Story tab (`ui/pages/story.ts`, types in `domain/story.ts`; `/story`,
+  `/story/<mission name slug>`): every mission's dialogue from the game's own
+  text, read from ef-assets `story/` (`scripts/story.mjs` there, weekly: the
+  EndfieldData community dump at git.escartem.moe, a datamine of the game's
+  tables; the text is Gryphline's, credited as such, not CC BY-SA).
+  `index.json` groups missions as the wiki's Mission/Main and Mission/Side
+  pages order them; sections the wiki doesn't index yet are `unlisted`
+  (folded away: maybe unreleased). Each mission file has its scenes with the
+  game's own summary, lines with speaker (operator portraits via `actor`),
+  and the replies offered; where a reply falls in the scene isn't in the
+  dump, so they're listed after the scene. Lines without English text are
+  left out. Works without an import; loaded on first use (`lazy`).
 - Essences tab (`ui/pages/essences.ts`, `domain/essences.ts`): the player's
   essences (settings `essences`: kind key → count) against every weapon's
   skill stats; only perfect fits (all of a weapon's stats) are suggested, by
@@ -332,6 +344,15 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   (`domain/wiki.ts` has the types and the text markup). It's CC BY-SA 4.0:
   any page showing it must credit "endfield.wiki.gg, CC BY-SA 4.0". Too big
   for localStorage, so it's fetched on demand (`loadWikiFile` in store.ts).
+- ef-assets pictures (portraits, gear, banner art and layers, item icons,
+  schedule art via `cdnUrl`, backgrounds) load from jsDelivr
+  (`EF_ASSETS_CDN`: browsers keep them a week; a changed file reaches the CDN
+  within 12 hours, or purge `https://purge.jsdelivr.net/gh/ram-prices/ef-assets@main/<path>`),
+  data files (`schedule.json`, `banners.json`, `wiki/*`, `icons/index.json`)
+  from raw.githubusercontent (`EF_ASSETS`, fresh within minutes). A failed
+  load tries the other mirror once (`mirrorUrl`, `data-fallback` images).
+  The screen readers, the cropper and the Essences page are loaded on first
+  use (`lazy` in app.ts, dynamic imports), so every visit downloads less.
 - Banner names/rate-ups come from `ram-prices/ef-assets/banners.json`
   (snapshot in `src/data/` for offline/tests, refreshed at runtime). Fix bad
   banner data there, not with special cases here.

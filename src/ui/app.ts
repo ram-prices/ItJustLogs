@@ -26,14 +26,11 @@ import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './p
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
 import { achievementsPage, archivesPage, collectionAction, collectionChange, readFindingsFrom, readMedalsFrom } from './pages/collections';
-import { essenceAction, essencesPage } from './pages/essences';
 import { eventOf, eventPage } from './pages/event';
-import { readEssenceFiles, readEssences } from './essenceReader';
 import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { forgetSavedAvatars, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage, togglePatch } from './pages/stats';
-import { cropAvatar } from './cropper';
 import { downloadDriveSnapshot, installSync, onSyncStatus, signIn, signOut, syncIsOn, syncNeedsClick, syncNow, syncPending, syncQueued, syncShown, syncView } from './sync';
 import { whenNear } from './near';
 import { installTint, tintAmbients, tintHeroes, tintSixStrip, tintWeaponCards } from './tint';
@@ -44,14 +41,14 @@ import { installTint, tintAmbients, tintHeroes, tintSixStrip, tintWeaponCards } 
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achievements' | 'archives' | 'settings' | 'event';
+type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achievements' | 'archives' | 'story' | 'settings' | 'event';
 /**
  * The header's tabs. Database (every operator and weapon) and Pulls (the
  * player's banners and Stats) hold several pages, picked with side tabs;
  * their pages live under /database and /banner (/database/operators,
  * /banner/arsenal, /banner/stats...).
  */
-type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'achievements' | 'archives' | 'settings';
+type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'achievements' | 'archives' | 'story' | 'settings';
 const TABS: [Tab, string][] = [
   ['home', 'Home'],
   ['database', 'Database'],
@@ -59,10 +56,11 @@ const TABS: [Tab, string][] = [
   ['essences', 'Essences'],
   ['achievements', 'Achievements'],
   ['archives', 'Archive'],
+  ['story', 'Story'],
   ['settings', 'Settings'],
 ];
 /** Paths that are pages of their own. */
-const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'stats', 'achievements', 'archives', 'settings']);
+const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'stats', 'achievements', 'archives', 'story', 'settings']);
 /** Where Database and Pulls open first: the operator list, the Headhunting banners. */
 const SECTION_HOME = { database: '/database/operators', pulls: '/banner/headhunting' } as const;
 /** The path each section answers to (/database, /banner). */
@@ -187,6 +185,36 @@ function parseRoute(): Route {
 
 const root = () => document.getElementById('app')!;
 
+/**
+ * Code a page needs only once it's opened, as its own chunk: `get` starts
+ * loading it (redrawing when it's in) and gives it once loaded; `mod` only
+ * looks. Keeps the Essences page and the readers out of what every visit loads.
+ */
+function lazy<T>(load: () => Promise<T>): { mod: T | null; get(): T | null } {
+  let loading = false;
+  const l = {
+    mod: null as T | null,
+    get(): T | null {
+      if (!l.mod && !loading) {
+        loading = true;
+        load().then(
+          (m) => {
+            l.mod = m;
+            draw();
+          },
+          () => (loading = false),
+        );
+      }
+      return l.mod;
+    },
+  };
+  return l;
+}
+const essences = lazy(() => import('./pages/essences'));
+const story = lazy(() => import('./pages/story'));
+
+const loadingPage = (title: string): Html => html`${pageHeader(title, 'Loading…')}<main class="container"></main>`;
+
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
@@ -303,7 +331,9 @@ function page(route: Route): Html {
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);
-  if (route.page === 'essences') return essencesPage(draw);
+  if (route.page === 'essences') return essences.get()?.essencesPage(draw) ?? loadingPage('Essences');
+  // The game's story text: no import needed.
+  if (route.page === 'story') return story.get()?.storyPage(route.id, draw) ?? loadingPage('Story');
   if (route.page === 'event') return eventPage(route.id, draw);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.pending) return route.page === 'arsenal' ? loadingOrFailed('weap', 'Arsenals', false) : loadingOrFailed('char', 'Operators', false);
@@ -422,7 +452,9 @@ function draw(): void {
       : operatorInfoTitle(route.id)
     : route.page === 'event'
       ? eventOf(route.id)?.name
-      : (PULLS_TITLE[route.page] ?? TABS.find(([t]) => t === route.page)?.[1]);
+      : route.page === 'story'
+        ? (story.mod?.storyTitle(route.id) ?? 'Story')
+        : (PULLS_TITLE[route.page] ?? TABS.find(([t]) => t === route.page)?.[1]);
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
 
@@ -609,7 +641,7 @@ function mediaToReader(files: File[]): boolean {
   const page = parseRoute().page;
   if (page === 'achievements') void readMedalsFrom(media);
   else if (page === 'archives') void readFindingsFrom(media);
-  else if (page === 'essences') void readEssenceFiles(media);
+  else if (page === 'essences') void import('./essenceReader').then((m) => m.readEssenceFiles(media));
   else toast('To read medals, findings or essences from a recording or screenshots, open Achievements, Archive or Essences and paste or drop them there.', 'error');
   return true;
 }
@@ -653,6 +685,7 @@ async function editAvatar(): Promise<void> {
     const edit = await loadAvatarEdit();
     const source = edit?.source ?? (await loadImage('avatar'));
     if (!source) return;
+    const { cropAvatar } = await import('./cropper');
     const done = await cropAvatar(source, !!state.settings.avatarPop, edit, state.settings.displayName);
     if (done) await saveAvatar(done);
   } catch {
@@ -669,6 +702,7 @@ function installProfile(): void {
     if (!file) return;
     try {
       // The player frames it first (cropper.ts); Cancel keeps the old picture.
+      const { cropAvatar } = await import('./cropper');
       const done = await cropAvatar(file, !!state.settings.avatarPop, undefined, state.settings.displayName);
       if (done) await saveAvatar(done);
     } catch {
@@ -743,8 +777,8 @@ async function onClick(e: MouseEvent): Promise<void> {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
   // Achievements and Archive handle their own buttons.
-  if (collectionAction(el.dataset.action ?? '', el) || essenceAction(el.dataset.action ?? '', el)) return draw();
-  if (el.dataset.action === 'essence-read') return readEssences();
+  if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el)) return draw();
+  if (el.dataset.action === 'essence-read') return void import('./essenceReader').then((m) => m.readEssences());
   switch (el.dataset.action) {
     case 'import':
       return document.getElementById('fileInput')!.click();

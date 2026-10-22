@@ -88,17 +88,17 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
   if (!itemId) return '';
   // ef-assets stores Typhoeus' portrait under the game's other id for him.
   const id = itemId === 'chr_0034_typhoeus' ? 'chr_0034_typhoea' : itemId;
-  return `${EF_ASSETS}/${kind === 'char' ? 'operators' : 'arsenals'}/${id}.webp`;
+  return `${EF_ASSETS_CDN}/${kind === 'char' ? 'operators' : 'arsenals'}/${id}.webp`;
 }
 
 /** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
-export const gearIconUrl = (gearId: string): string => `${EF_ASSETS}/gear/${gearId}.webp`;
+export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
 
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
   // Constant Issues have ef-assets art (rebuilt from the weapon render); other constant pools don't.
   if (id.includes('constant') && !id.startsWith('weaponbox_constant_')) return null;
-  return `${EF_ASSETS}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
+  return `${EF_ASSETS_CDN}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
 }
 
 /**
@@ -109,11 +109,22 @@ export function bannerArtUrl(poolId: string): string | null {
 export function issueLayerUrls(poolId: string): { back: string; weapon: string; front: string } | null {
   const id = canonicalPoolId(poolId);
   if (!id.startsWith('weponbox_') && !id.startsWith('weaponbox_constant_')) return null;
-  const at = `${EF_ASSETS}/banners/layers/`;
+  const at = `${EF_ASSETS_CDN}/banners/layers/`;
   return { back: `${at}issue-back.webp`, weapon: `${at}${id}.webp`, front: `${at}issue-front.webp` };
 }
 
-/** raw.githubusercontent → jsDelivr, used once when an asset fails to load. */
-export function cdnFallback(url: string): string | null {
-  return url.startsWith(EF_ASSETS) ? EF_ASSETS_CDN + url.slice(EF_ASSETS.length) : null;
+/**
+ * Pictures come from jsDelivr (browsers keep them a week; raw.githubusercontent
+ * lets them keep a file for five minutes, so every visit re-asked for every
+ * portrait), data files from raw.githubusercontent (fresh within minutes).
+ * A changed picture reaches jsDelivr within 12 hours, a new one at once:
+ * until the CDN has it, the load fails and the other mirror is tried.
+ */
+export function mirrorUrl(url: string): string | null {
+  if (url.startsWith(EF_ASSETS)) return EF_ASSETS_CDN + url.slice(EF_ASSETS.length);
+  if (url.startsWith(EF_ASSETS_CDN)) return EF_ASSETS + url.slice(EF_ASSETS_CDN.length);
+  return null;
 }
+
+/** A picture URL the schedule gives (raw.githubusercontent) as its jsDelivr one. */
+export const cdnUrl = (url: string): string => (url.startsWith(EF_ASSETS) ? EF_ASSETS_CDN + url.slice(EF_ASSETS.length) : url);

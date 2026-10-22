@@ -3,8 +3,6 @@ import { state, updateSettings } from '../../state';
 import { icon, pageHeader, toggleGroup } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { credit } from './info';
-import { readFindingFiles, readFindings } from '../findingReader';
-import { readMedalFiles, readMedals } from '../medalReader';
 import { searchBox } from './search';
 
 /**
@@ -56,6 +54,7 @@ function findingData(redraw: () => void): FindingFile | null {
 /** Reads medals from pasted or dropped files (app.ts), loading the medal list first if needed. */
 export async function readMedalsFrom(files: File[]): Promise<void> {
   const data = medalFile ?? ((await import('../../data/medals.snapshot.json')).default as unknown as MedalFile);
+  const { readMedalFiles } = await import('../medalReader');
   await readMedalFiles(files, data.medals);
 }
 
@@ -74,6 +73,7 @@ export function archiveProgress(redraw: () => void): { medals: [number, number] 
 /** Reads findings from pasted or dropped files (app.ts), loading the list first if needed. */
 export async function readFindingsFrom(files: File[]): Promise<void> {
   const data = findingFile ?? ((await import('../../data/findings.snapshot.json')).default as unknown as FindingFile);
+  const { readFindingFiles } = await import('../findingReader');
   await readFindingFiles(files, data.findings.filter((f) => FINDING_CATEGORIES.includes(f.category)));
 }
 
@@ -109,12 +109,17 @@ export function collectionAction(action: string, el: HTMLElement): boolean {
     case 'finding-tab':
       tab[action === 'medal-tab' ? 'medals' : 'findings'] = id;
       return true;
-    case 'medal-read':
-      if (medalFile) readMedals(medalFile.medals);
+    case 'medal-read': {
+      // The reader (Tesseract and its rules) loads on the first click.
+      const file = medalFile;
+      if (file) void import('../medalReader').then((m) => m.readMedals(file.medals));
       return true;
-    case 'finding-read':
-      if (findingFile) readFindings(findingFile.findings.filter((f) => FINDING_CATEGORIES.includes(f.category)));
+    }
+    case 'finding-read': {
+      const file = findingFile;
+      if (file) void import('../findingReader').then((m) => m.readFindings(file.findings.filter((f) => FINDING_CATEGORIES.includes(f.category))));
       return true;
+    }
     case 'medal-toggle':
       setMedal(id, medalsOwned()[id] ? null : {});
       return true;

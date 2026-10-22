@@ -1,4 +1,4 @@
-import { cdnFallback, EF_ASSETS, issueLayerUrls, itemIconUrl } from '../domain/banners';
+import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, mirrorUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { html, raw, type Html } from './html';
 import { tintFor } from './tint';
@@ -81,7 +81,7 @@ let icons: Partial<Record<IconKind | 'colors', Record<string, string>>> | null =
 export function loadIcons(redraw: () => void): void {
   const url = `${EF_ASSETS}/icons/index.json`;
   fetch(url)
-    .then((r) => (r.ok ? r : fetch(cdnFallback(url)!)))
+    .then((r) => (r.ok ? r : fetch(mirrorUrl(url)!)))
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
       if (!data) return;
@@ -94,7 +94,7 @@ export function loadIcons(redraw: () => void): void {
 export function iconOf(kind: IconKind, name: string): string | null {
   const files = icons?.[kind];
   const file = files?.[name] ?? files?.[name.replace(/s$/, '')];
-  return file ? `${EF_ASSETS}/icons/${file}` : null;
+  return file ? `${EF_ASSETS_CDN}/icons/${file}` : null;
 }
 
 /** A banner HH Permit's main colour (from its icon), if ef-assets has one. */
@@ -219,6 +219,7 @@ export const TAB_ICON: Record<string, Html> = {
   home: raw('<span class="tab-icon icon filled" aria-hidden="true">home</span>'),
   database: raw('<span class="tab-icon icon filled" aria-hidden="true">menu_book</span>'),
   pulls: raw('<span class="tab-icon icon filled" aria-hidden="true">inventory_2</span>'),
+  story: raw('<span class="tab-icon icon filled" aria-hidden="true">auto_stories</span>'),
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
   essences: raw(`<svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${ESSENCE_PATH}"/></svg>`),
   achievements: raw('<span class="tab-icon icon filled" aria-hidden="true">military_tech</span>'),
