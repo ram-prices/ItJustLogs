@@ -4,7 +4,7 @@ import { endministratorOf, extrasOf } from '../../domain/owned';
 import { state } from '../../state';
 import { icon, itemImg, pageHeader } from '../components';
 import { html, render, type Html } from '../html';
-import { external, rich, wikiFile } from './info';
+import { rich, wikiFile } from './info';
 import { fold, searchField } from './search';
 
 /**
@@ -44,7 +44,7 @@ const crumbs = (where?: string): Html =>
 
 const credit = (ix: StoryIndex): Html => html`<p class="wiki-credit copy-13">
   ${icon('menu_book')}
-  <span>${ix.attribution.note}. Text from the ${external(ix.attribution.url, 'EndfieldData')} community dump (${external(ix.attribution.dumper, 'EndfieldDataDumper')}), snapshot of ${ix.attribution.fetched}.</span>
+  <span>${ix.attribution.note}.</span>
 </p>`;
 
 function listPage(ix: StoryIndex): Html {
