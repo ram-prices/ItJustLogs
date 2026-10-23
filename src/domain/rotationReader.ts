@@ -1,0 +1,734 @@
+/**
+ * Reading a rotation from a gameplay video (controller layout), with image
+ * checks only: no text recognition, no AI. ui/rotationReader.ts plays the
+ * video and cuts three areas out of each frame (scaled to READ_HEIGHT tall:
+ * the game sizes its HUD to the screen's height); this file measures them
+ * and turns the measurements into presses. Measured on a 2560×1600 Crisis
+ * Calamity recording (rotationReader.test.ts pins it):
+ * - SP bar (bottom centre, 3 segments of 100): a battle skill drops it, a
+ *   Final Strike adds 10–20, a Finisher more.
+ * - Skill diamond (bottom right): each operator's Ultimate dot is filled
+ *   when it's charged. An ultimate hides the HUD for its cut-in; whose it
+ *   was is the dot that was full before and empty after.
+ * - Holding LB opens the skill wheel; the button pressed in it stays lit a
+ *   frame longer than the others as the wheel closes: who used the battle
+ *   skill (a guess the player can change).
+ * - A combo shows its operator's art in a side banner (top left). Banners
+ *   are grouped by their art: each group is one operator, for the player
+ *   to name (colours alone told look-alike art apart wrongly).
+ * - The stopwatch (top left) ticks once a second: when it stops is the
+ *   fight's end, and a stretch where it stood still a pause (a phase
+ *   change; ultimates don't stop it). Its digits are read with text
+ *   recognition at a few ticks only (readings passed in).
+ */
+
+export const READ_HEIGHT = 1080;
+
+/** The HUD slots, as the skill diamond and the portraits lay them out. */
+export const SLOTS = ['Top', 'Left', 'Right', 'Bottom'] as const;
+export type Slot = 0 | 1 | 2 | 3;
+
+/** RGBA pixels of an area, as a canvas gives them. */
+export interface Px {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+export interface Area {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The game draws at 2560×1600 here; at READ_HEIGHT everything is this much smaller. */
+const S = READ_HEIGHT / 1600;
+const RIGHT = { w: 312, h: 280, y: 776 };
+const CENTRE = { w: 300, h: 32, y: 980 };
+const BANNER = { x: 0, y: 220, w: 340, h: 155 };
+const PORTRAITS = { x: 0, y: 776, w: 420, h: 304 };
+/** The stopwatch's digits (its icon left out). */
+const CLOCK = { x: 214, y: 30, w: 88, h: 40 };
+/** The boss's name, above its HP bar. */
+const ENEMY = { w: 400, h: 36, y: 18 };
+
+/** Where to cut the areas from a frame `width` wide and READ_HEIGHT tall: the diamond sits right, the SP bar centred, the rest left. */
+export function areas(width: number): { right: Area; centre: Area; banner: Area; portraits: Area; clock: Area; enemy: Area } {
+  return {
+    right: { x: width - RIGHT.w, y: RIGHT.y, w: RIGHT.w, h: RIGHT.h },
+    centre: { x: Math.round(width / 2) - CENTRE.w / 2, y: CENTRE.y, w: CENTRE.w, h: CENTRE.h },
+    banner: BANNER,
+    portraits: PORTRAITS,
+    clock: CLOCK,
+    enemy: { x: Math.round(width / 2) - ENEMY.w / 2, y: ENEMY.y, w: ENEMY.w, h: ENEMY.h },
+  };
+}
+
+// Points measured at 2560×1600, moved into each area.
+const rp = (x: number, y: number) => [Math.round((x - 2560) * S + RIGHT.w), Math.round(y * S - RIGHT.y)] as const;
+const cp = (x: number, y: number) => [Math.round((x - 1280) * S + CENTRE.w / 2), Math.round(y * S - CENTRE.y)] as const;
+const SEGMENTS = [
+  [cp(1072, 0)[0], cp(1198, 0)[0]],
+  [cp(1216, 0)[0], cp(1344, 0)[0]],
+  [cp(1360, 0)[0], cp(1494, 0)[0]],
+];
+const SP_Y = cp(0, 1468)[1];
+const HP_Y = cp(0, 1490)[1];
+const HP_X = [cp(1080, 0)[0], cp(1480, 0)[0]];
+/** Each slot's Ultimate dot. */
+const DOTS = [rp(2368, 1255), rp(2228, 1390), rp(2510, 1390), rp(2368, 1530)];
+/** Each slot's icon while the skill wheel is open. */
+const WHEEL = [rp(2273, 1250), rp(2173, 1342), rp(2373, 1342), rp(2273, 1438)];
+/** The banner's top and bottom edges. */
+const BANNER_EDGES = [Math.round(345 * S) - BANNER.y, Math.round(541 * S) - BANNER.y];
+/** Each slot's portrait centre in the portraits area (to show it in the review). */
+export const FACES = [
+  [305, 1255],
+  [200, 1365],
+  [410, 1370],
+  [310, 1470],
+].map(([x, y]) => [Math.round(x * S) - PORTRAITS.x, Math.round(y * S) - PORTRAITS.y] as const);
+
+const at = (p: Px, x: number, y: number) => (y * p.width + x) * 4;
+
+/** What a frame shows. */
+export interface Sample {
+  /** Seconds into the video. */
+  t: number;
+  /** SP, 0–300. */
+  sp: number;
+  /** How much of the HP bar is lit: the HUD is up (it hides for ultimates' cut-ins). */
+  hud: number;
+  /** How clearly a side banner's edges show (a combo). */
+  banner: number;
+  /** Each slot's Ultimate dot: how much of it is filled with colour. */
+  ready: number[];
+  /** Each slot's icon in the skill wheel: how much of it is white. */
+  wheel: number[];
+  /** While a banner shows: its art, 24×9 RGB means. */
+  art?: number[];
+  /** The stopwatch: how many of its yellow-green pixels each column has (it changes when it ticks). */
+  clock?: number[];
+}
+
+/** SP from the bar: how far each segment is lit from its left (white or yellow). */
+function spOf(c: Px): number {
+  let sp = 0;
+  for (const [a, b] of SEGMENTS) {
+    let n = 0;
+    for (let x = a; x < b; x++) {
+      // The dimmest of three rows, brightest channel.
+      let v = 255;
+      for (let y = SP_Y - 1; y <= SP_Y + 1; y++) {
+        const i = at(c, x, y);
+        v = Math.min(v, Math.max(c.data[i], c.data[i + 1], c.data[i + 2]));
+      }
+      if (v > 180) n++;
+      else break;
+    }
+    sp += (100 * n) / (b - a);
+  }
+  return sp;
+}
+
+function hudOf(c: Px): number {
+  let lit = 0;
+  let n = 0;
+  for (let y = HP_Y - 1; y <= HP_Y + 1; y++)
+    for (let x = HP_X[0]; x < HP_X[1]; x++, n++) {
+      const i = at(c, x, y);
+      if (c.data[i + 2] > 170 && c.data[i + 1] > 140 && c.data[i] < 130) lit++;
+    }
+  return lit / n;
+}
+
+/** The share of columns with a sharp step at the banner's top edge, and at its bottom: the smaller. */
+function bannerOf(l: Px): number {
+  const grey = (x: number, y: number) => {
+    const i = at(l, x, y);
+    return (l.data[i] + l.data[i + 1] + l.data[i + 2]) / 3;
+  };
+  let edges = 1;
+  for (const r of BANNER_EDGES) {
+    let best = 0;
+    for (let y = r - 2; y <= r; y++) {
+      let n = 0;
+      for (let x = 10; x < 330; x++) if (Math.abs(grey(x, y + 1) - grey(x, y)) > 22) n++;
+      best = Math.max(best, n / 320);
+    }
+    edges = Math.min(edges, best);
+  }
+  return edges;
+}
+
+function share(p: Px, cx: number, cy: number, half: number, test: (r: number, g: number, b: number) => boolean): number {
+  let hit = 0;
+  let n = 0;
+  for (let y = cy - half; y <= cy + half; y++)
+    for (let x = cx - half; x <= cx + half; x++, n++) {
+      const i = at(p, x, y);
+      if (test(p.data[i], p.data[i + 1], p.data[i + 2])) hit++;
+    }
+  return hit / n;
+}
+
+/** The stopwatch's yellow-green. */
+const timerGreen = (r: number, g: number, b: number) => g > 150 && r > 110 && b < 110 && g - b > 80;
+
+/** The stopwatch's yellow-green pixels per column. */
+export function clockProfile(c: Px): number[] {
+  const out: number[] = [];
+  for (let x = 0; x < c.width; x++) {
+    let n = 0;
+    for (let y = 0; y < c.height; y++) {
+      const i = at(c, x, y);
+      if (timerGreen(c.data[i], c.data[i + 1], c.data[i + 2])) n++;
+    }
+    out.push(n);
+  }
+  return out;
+}
+
+/** The stopwatch's digits as black on white, `scale` times bigger with a white margin, for text recognition. */
+export function clockInk(c: Px, scale = 3, margin = 24): Px {
+  const w = c.width * scale + 2 * margin;
+  const h = c.height * scale + 2 * margin;
+  const data = new Uint8ClampedArray(w * h * 4).fill(255);
+  for (let y = 0; y < c.height * scale; y++)
+    for (let x = 0; x < c.width * scale; x++) {
+      const i = at(c, Math.floor(x / scale), Math.floor(y / scale));
+      if (timerGreen(c.data[i], c.data[i + 1], c.data[i + 2])) data.set([0, 0, 0, 255], ((y + margin) * w + x + margin) * 4);
+    }
+  return { data, width: w, height: h };
+}
+
+/** White text (the boss's name) as black on white, for text recognition. */
+export function whiteInk(c: Px, scale = 2): Px {
+  const w = c.width * scale;
+  const h = c.height * scale;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = at(c, Math.floor(x / scale), Math.floor(y / scale));
+      const v = Math.min(c.data[i], c.data[i + 1], c.data[i + 2]) > 190 ? 0 : 255;
+      data.set([v, v, v, 255], (y * w + x) * 4);
+    }
+  return { data, width: w, height: h };
+}
+
+const colourful = (r: number, g: number, b: number) => Math.max(r, g, b) - Math.min(r, g, b) > 80 && Math.max(r, g, b) > 140;
+const white = (r: number, g: number, b: number) => Math.min(r, g, b) > 200;
+
+/** Measures one frame from its areas. */
+export function measure(t: number, right: Px, centre: Px, banner: Px, clock?: Px): Sample {
+  const s: Sample = {
+    t,
+    sp: spOf(centre),
+    hud: hudOf(centre),
+    banner: bannerOf(banner),
+    ready: DOTS.map(([x, y]) => share(right, x, y, 3, colourful)),
+    wheel: WHEEL.map(([x, y]) => share(right, x, y, 19, white)),
+  };
+  if (s.banner > 0.3) s.art = artOf(banner);
+  if (clock) s.clock = clockProfile(clock);
+  return s;
+}
+
+/** A banner's art as 24×9 cells of mean colour (between its edges). */
+export function artOf(l: Px): number[] {
+  const [y0, y1] = BANNER_EDGES;
+  const out: number[] = [];
+  for (let cy = 0; cy < 9; cy++)
+    for (let cx = 0; cx < 24; cx++) {
+      const sum = [0, 0, 0];
+      let n = 0;
+      const ya = y0 + 2 + Math.floor(((y1 - y0 - 4) * cy) / 9);
+      const yb = y0 + 2 + Math.floor(((y1 - y0 - 4) * (cy + 1)) / 9);
+      const xa = 20 + Math.floor((317 * cx) / 24);
+      const xb = 20 + Math.floor((317 * (cx + 1)) / 24);
+      for (let y = ya; y < yb; y += 2)
+        for (let x = xa; x < xb; x += 2, n++) {
+          const i = at(l, x, y);
+          sum[0] += l.data[i];
+          sum[1] += l.data[i + 1];
+          sum[2] += l.data[i + 2];
+        }
+      out.push(sum[0] / n, sum[1] / n, sum[2] / n);
+    }
+  return out;
+}
+
+export type Read = 'battle' | 'combo' | 'ultimate' | 'strike' | 'finisher';
+export const READ_NAME: Record<Read, string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher' };
+
+/** A press read from the video (or a Final Strike / Finisher between them). */
+export interface Step {
+  /** Seconds into the video. */
+  t: number;
+  input: Read;
+  /** Whose: a HUD slot, or null when it can't be told. */
+  slot: Slot | null;
+  /** The slot is a guess. */
+  unsure?: boolean;
+  /** Battle skills: SP came back right after it (some operators' battle skills return SP): a hint at whose it was. */
+  spBack?: boolean;
+  /** Combos: which banner art it showed (one per operator). */
+  group?: number;
+}
+
+export interface Reading {
+  steps: Step[];
+  /** When the fight's HUD first and last shows (seconds into the video); null if it never does. */
+  start: number | null;
+  end: number | null;
+  /** Each combo group's banner art (24×9 RGB cells), by group. */
+  arts: number[][];
+  /** From the stopwatch, when its digits were read: when it stopped (seconds into the video), what it showed then (the fight's length, seconds), and the stretches it stood still (seconds into the video). */
+  clock?: { end: number; seconds: number; pauses: [number, number][] };
+}
+
+/** What the stopwatch showed at a tick (text recognition's words, "01:05"). */
+export interface ClockReading {
+  t: number;
+  text: string;
+}
+
+const ON = 0.5;
+/** HUD hidden at least this long: a cut-in (shorter is a flicker). */
+const CUT_IN = 0.25;
+/** HUD back for less than this between two hidden stretches: the same cut-in. */
+const REJOIN = 0.4;
+const DROP = 12;
+const GAIN = 8;
+const FINISHER = 40;
+/** SP coming back from a battle skill: a step within this long after it. */
+const SP_BACK = 0.8;
+/** How much SP coming back counts. */
+const SP_BACK_GAIN = 10;
+/** Two Final Strikes are at least this far apart (a basic attack chain takes longer). */
+const CHAIN = 1.2;
+/** A step smaller than this share of the usual Final Strike's is SP from something else. */
+const REFUND = 0.6;
+/** The stopwatch is read this long after a tick (seconds). */
+const SETTLE = 0.5;
+/** The stopwatch standing still at least this long is a pause (a phase change; less is a tick found a frame off). */
+const PAUSE = 1;
+
+/** When the HUD shows: per sample, and the hidden stretches ([first, past last] sample), a short flicker of HUD inside one joined to it. */
+function shown(samples: Sample[]): { on: boolean[]; gaps: [number, number][] } {
+  const n = samples.length;
+  const t = samples.map((s) => s.t);
+  const on = samples.map((s) => s.hud > ON);
+  // Hidden stretches, a short flicker of HUD inside one joined to it.
+  const gaps: [number, number][] = [];
+  for (let i = 0; i < n; ) {
+    if (on[i]) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < n && !on[j]) j++;
+    const last = gaps[gaps.length - 1];
+    if (last && last[1] < n && t[i] - t[last[1]] < REJOIN) last[1] = j;
+    else gaps.push([i, j]);
+    i = j;
+  }
+  for (const [i, j] of gaps) for (let k = i; k < j; k++) on[k] = false;
+  return { on, gaps };
+}
+
+/**
+ * Turns a video's samples (in time order) into steps. `clock`: the stopwatch's digits at the ticks clockAnchors
+ * asked for, read by text recognition.
+ */
+export function readRotation(samples: Sample[], clock: ClockReading[] = []): Reading {
+  const n = samples.length;
+  const t = samples.map((s) => s.t);
+  const { on, gaps } = shown(samples);
+  const first = on.indexOf(true);
+  if (first < 0) return { steps: [], start: null, end: null, arts: [] };
+  const steps: Step[] = [];
+
+  // Ultimates: a cut-in with the HUD up on both sides, and a dot full before it and empty after.
+  const gapEnds: number[] = [];
+  for (const [i, j] of gaps) {
+    if (j >= n) continue;
+    gapEnds.push(t[j]);
+    if (i === 0 || t[j] - t[i] < CUT_IN) continue;
+    // Before: the last moments the dots could be seen (the skill wheel hides them; an ultimate needs one full dot).
+    const seen: number[] = [];
+    for (let k = i - 1; k >= 0 && t[k] >= t[i] - 3; k--) if (on[k] && Math.max(...samples[k].ready) > ON) seen.push(k);
+    const before = seen.filter((k) => t[k] >= t[seen[0]] - 0.3);
+    const after: number[] = [];
+    for (let k = j; k < n && t[k] < t[j] + 1.5; k++) if (on[k]) after.push(k);
+    if (!before.length || !after.length) continue;
+    for (let slot = 0; slot < 4; slot++) {
+      const full = before.filter((k) => samples[k].ready[slot] > ON).length / before.length;
+      const later = Math.max(...after.map((k) => samples[k].ready[slot]));
+      if (full > 0.5 && later < 0.3) steps.push({ t: t[i], input: 'ultimate', slot: slot as Slot });
+    }
+  }
+
+  // SP: a drop is a battle skill, a step up a Final Strike (or a Finisher). Not a Final Strike: SP coming back from
+  // a battle skill (a step 0.4 s after it), a second step sooner than a basic attack chain takes, or a small step
+  // (another source of SP: under REFUND of the usual Final Strike's).
+  let lastDrop = -Infinity;
+  let lastGain = -Infinity;
+  const gains: { step: Step; gain: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    if (!on[i]) continue;
+    let hi = -1;
+    let lo = Infinity;
+    // The last 0.12 s, and at least the frame before (frames seen far apart when the video plays fast).
+    for (let k = i - 1; k >= 0 && (t[k] > t[i] - 0.12 || (hi < 0 && t[k] > t[i] - 0.3)); k--)
+      if (on[k]) {
+        hi = Math.max(hi, samples[k].sp);
+        lo = Math.min(lo, samples[k].sp);
+      }
+    if (hi < 0) continue;
+    const sp = samples[i].sp;
+    if (hi - sp >= DROP && t[i] - lastDrop > 0.3) {
+      lastDrop = t[i];
+      steps.push({ t: t[i], input: 'battle', ...casterOf(samples, i), ...(spBack(samples, on, i) ? { spBack: true } : {}) });
+    } else if (sp - lo >= GAIN && t[i] - lastGain > CHAIN && t[i] - lastDrop > SP_BACK && !gapEnds.some((e) => t[i] - e >= 0 && t[i] - e < 0.6) && holds(samples, on, i)) {
+      lastGain = t[i];
+      gains.push({ step: { t: t[i], input: sp - lo >= FINISHER ? 'finisher' : 'strike', slot: null }, gain: sp - lo });
+    }
+  }
+  const usual = median(gains.filter((g) => g.step.input === 'strike').map((g) => g.gain));
+  steps.push(...gains.filter((g) => g.step.input === 'finisher' || g.gain >= usual * REFUND).map((g) => g.step));
+
+  const combo = combos(samples, on);
+  steps.push(...combo.steps);
+  let end = n - 1;
+  while (!on[end]) end--;
+  const reading: Reading = { steps: steps.sort((a, b) => a.t - b.t), start: t[first], end: t[end], arts: combo.arts };
+  const c = clockOf(samples, on, gaps, clock);
+  if (c) reading.clock = c;
+  return reading;
+}
+
+/** How much the stopwatch's digits differ between two samples. */
+const changed = (a: Sample, b: Sample) => a.clock!.reduce((d, v, x) => d + Math.abs(v - (b.clock![x] ?? 0)), 0);
+
+/** The sample nearest time x (samples in time order). */
+function nearest(samples: Sample[], x: number): number {
+  let lo = 0;
+  let hi = samples.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (samples[mid].t < x) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo > 0 && Math.abs(samples[lo - 1].t - x) < Math.abs(samples[lo].t - x) ? lo - 1 : lo;
+}
+
+interface Stretch {
+  /** The stopwatch's ticks: every beat of its second while the HUD shows (times into the video). */
+  ticks: number[];
+  /** How much its digits changed at each tick. */
+  change: number[];
+}
+
+/**
+ * The stopwatch's ticks in each stretch the HUD shows. Its digits change once a second; effects behind them change
+ * them too, and a change can spread over a few frames. So the ticks are found as a beat: the phase where the changes
+ * line up once a second best, every beat of it a tick.
+ */
+function stretches(samples: Sample[], on: boolean[]): Stretch[] {
+  const t = samples.map((s) => s.t);
+  const lit = (k: number) => (samples[k].clock ?? []).reduce((a, b) => a + b, 0) > 20;
+  // The HUD's stretches, from 0.5 s after it comes back.
+  const spans: [number, number][] = [];
+  for (let k = 0; k < samples.length; ) {
+    if (!on[k]) {
+      k++;
+      continue;
+    }
+    let j = k;
+    while (j < samples.length && on[j]) j++;
+    if (t[j - 1] - t[k] > 1.5) spans.push([t[k] + (k ? 0.5 : 0), t[j - 1]]);
+    k = j;
+  }
+  // How much the digits changed across a moment.
+  const change = (x: number) => {
+    const a = nearest(samples, x - 0.08);
+    const b = nearest(samples, x + 0.12);
+    return on[a] && on[b] && lit(a) && lit(b) ? changed(samples[a], samples[b]) : 0;
+  };
+  return spans.flatMap(([from, to]) => {
+    const score = Array.from({ length: 50 }, (_, i) => {
+      let sum = 0;
+      for (let x = Math.ceil(from - i / 50) + i / 50; x <= to; x++) sum += Math.min(60, change(x));
+      return sum;
+    });
+    // Every phase whose window holds the change scores alike: the middle of them, where the window's middle is.
+    const top = score.indexOf(Math.max(...score));
+    let lo = 0;
+    let hi = 0;
+    while (lo < 24 && score[(top - lo - 1 + 50) % 50] >= score[top] * 0.95) lo++;
+    while (hi < 24 && score[(top + hi + 1) % 50] >= score[top] * 0.95) hi++;
+    const phase = ((((top + (hi - lo) / 2) / 50 + 0.02) % 1) + 1) % 1;
+    const ticks: number[] = [];
+    for (let x = Math.ceil(from - phase) + phase; x <= to; x++) ticks.push(x);
+    const changes = ticks.map(change);
+    // A stretch where the digits never clearly change on the beat says nothing.
+    return changes.filter((c) => c > 25).length >= 2 ? [{ ticks, change: changes }] : [];
+  });
+}
+
+/**
+ * When to read the stopwatch's digits (seconds into the video): half a second after the second, middle and last
+ * tick of each stretch, when they hold still (at a tick a frame may still show the second before), and the last
+ * moment the HUD shows (what it stopped at).
+ */
+export function clockAnchors(samples: Sample[]): number[] {
+  const { on } = shown(samples);
+  const out = stretches(samples, on).flatMap(({ ticks: x }) => [...new Set([x[Math.min(1, x.length - 1)], x[Math.floor(x.length / 2)], x[x.length - 2] ?? x[0]])].map((v) => v + SETTLE));
+  const last = on.lastIndexOf(true);
+  if (last >= 0) out.push(samples[last].t);
+  return out;
+}
+
+/** The boss's name from a few readings of it: the one read most often (stray marks dropped), if any. */
+export function enemyName(texts: string[]): string | undefined {
+  const names = texts
+    .map((x) => x.replace(/\s*\.\s+/g, ', ').replace(/[^A-Za-z ,'\-]/g, ' ').replace(/\s+/g, ' ').replace(/^[ ,'-]+|[ ,'-]+$/g, '').replace(/\b[a-z]\b ?/g, '').trim())
+    .filter((x) => /[A-Za-z]{3}/.test(x));
+  const count = new Map<string, number>();
+  for (const x of names) count.set(x, (count.get(x) ?? 0) + 1);
+  return [...count].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0]?.[0];
+}
+
+/** "01:05" as seconds, or null. */
+function clockSeconds(text: string): number | null {
+  const m = /(\d{1,2})\s*[:.;]?\s*(\d{2})(?!\d)/.exec(text.replace(/[oO]/g, '0'));
+  return m && Number(m[2]) < 60 ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], readings: ClockReading[]): Reading['clock'] {
+  const runs = stretches(samples, on);
+  if (!runs.length || !readings.length) return undefined;
+  // Each stretch's time at its first tick, by vote of its readings (each tick is one more second).
+  const zero = runs.map(({ ticks: r }) => {
+    const votes = new Map<number, number>();
+    for (const x of readings) {
+      const g = clockSeconds(x.text);
+      if (g === null || x.t < r[0] || x.t > r[r.length - 1] + 2 * SETTLE) continue;
+      const g0 = g - Math.round(x.t - SETTLE - r[0]);
+      // A clean "00:00" counts twice: a misread usually loses its colon or a digit.
+      votes.set(g0, (votes.get(g0) ?? 0) + (/^\d\d:\d\d$/.test(x.text.trim()) ? 2 : 1));
+    }
+    return [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  });
+  const t = samples.map((s) => s.t);
+  const pauses: [number, number][] = [];
+  let prev = -1;
+  runs.forEach(({ ticks: r }, k) => {
+    if (zero[k] === null) return;
+    if (prev >= 0) {
+      const p = runs[prev].ticks;
+      const a = p[p.length - 1];
+      const ga = zero[prev]! + Math.round(a - p[0]);
+      // Time that went by between the two ticks, less what the stopwatch counted: it stood still. Ultimates' cut-ins
+      // don't stop it, and a tick found a frame off is no pause.
+      const still = r[0] - a - (zero[k]! - ga);
+      if (still >= PAUSE) {
+        // From where the HUD went away for longest between the two ticks.
+        const hidden = gaps.filter(([i, j]) => t[i] > a && t[i] < r[0] && j < t.length).sort(([i1, j1], [i2, j2]) => t[j2] - t[i2] - (t[j1] - t[i1]))[0];
+        const from = hidden ? t[hidden[0]] : a;
+        pauses.push([from, from + still]);
+      }
+    }
+    prev = k;
+  });
+  if (prev < 0) return undefined;
+  const last = runs[prev].ticks;
+  const g = (x: number) => zero[prev]! + Math.round(x - last[0]);
+  // Where it stopped: the tick at what it shows at the last moment the HUD does, else the last tick it changed at.
+  const final = readings
+    .filter((x) => x.t > last[last.length - 1])
+    .map((x) => clockSeconds(x.text))
+    .find((v): v is number => v !== null && v >= g(last[0]) && v <= g(last[last.length - 1]));
+  if (final !== undefined) return { end: last[0] + (final - zero[prev]!), seconds: final, pauses };
+  const moved = last.filter((_, i) => runs[prev].change[i] > 25);
+  const end = moved[moved.length - 1];
+  return { end, seconds: g(end), pauses };
+}
+
+/**
+ * SP coming back after the battle skill whose drop is sample i: SP_BACK_GAIN more at SP_BACK after it than just after
+ * the drop, and still there (the bar's own refill is about 6 a second; a flicker doesn't stay). Later rises can be
+ * the controlled operator's Final Strike.
+ */
+function spBack(samples: Sample[], on: boolean[], i: number): boolean {
+  const t = samples[i].t;
+  let low = samples[i].sp;
+  let end = -1;
+  let high = -1;
+  for (let k = i + 1; k < samples.length && samples[k].t <= t + SP_BACK; k++) {
+    if (!on[k]) continue;
+    if (samples[k].t <= t + 0.15) low = Math.min(low, samples[k].sp);
+    else {
+      high = Math.max(high, samples[k].sp);
+      end = samples[k].sp;
+    }
+  }
+  return end - low >= SP_BACK_GAIN && high - end < 5;
+}
+
+/** An SP step that stays (the bar refilling at the end of a fight keeps climbing). */
+function holds(samples: Sample[], on: boolean[], i: number): boolean {
+  const t = samples[i].t;
+  let max = -1;
+  for (let k = i + 1; k < samples.length && samples[k].t < t + 0.35; k++) if (on[k] && samples[k].t > t + 0.15) max = Math.max(max, samples[k].sp);
+  return max >= 0 && max - samples[i].sp < 5;
+}
+
+const wheelOpen = (s: Sample) => s.wheel.filter((w) => w > 0.08).length >= 3;
+
+/**
+ * Who used the battle skill whose SP drop is sample i: the button pressed in
+ * the skill wheel. It flashes white, or it stays lit after the others dim
+ * (they dim when SP falls below their cost, or as the wheel closes). No
+ * wheel seen (not the controller layout): unknown.
+ */
+function casterOf(samples: Sample[], i: number): { slot: Slot | null; unsure?: boolean } {
+  const t = samples[i].t;
+  const open: Sample[] = [];
+  for (let k = i - 1; k >= 0 && samples[k].t >= t - 0.8; k--) if (wheelOpen(samples[k])) open.push(samples[k]);
+  if (!open.length) return { slot: null };
+  const base = [0, 1, 2, 3].map((s) => median(open.filter((x) => x.t < t - 0.03).map((x) => x.wheel[s])));
+  // The flash shows on the frame SP drops, or one or two after it.
+  for (let k = i; k >= 0 && samples[k].t >= t - 0.04; k--) {
+    const flash = samples[k].wheel.findIndex((w, s) => w > base[s] + 0.25);
+    if (flash >= 0) return { slot: flash as Slot };
+  }
+  for (let k = i + 1; k < samples.length && samples[k].t <= t + 0.12; k++) {
+    const flash = samples[k].wheel.findIndex((w, s) => w > base[s] + 0.25);
+    if (flash >= 0) return { slot: flash as Slot };
+  }
+  let lit: number[] = [];
+  for (let k = i; k < samples.length && samples[k].t <= t + 0.25; k++) {
+    const now = [0, 1, 2, 3].filter((s) => samples[k].wheel[s] > 0.02);
+    if (now.length === 1) return { slot: now[0] as Slot, unsure: true };
+    if (!now.length) break;
+    lit = now;
+  }
+  return { slot: null, unsure: lit.length > 0 };
+}
+
+function median(xs: number[]): number {
+  if (!xs.length) return 0;
+  const s = xs.slice().sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+function corr(a: number[], b: number[]): number {
+  const n = a.length;
+  const ma = a.reduce((x, y) => x + y, 0) / n;
+  const mb = b.reduce((x, y) => x + y, 0) / n;
+  let ab = 0;
+  let aa = 0;
+  let bb = 0;
+  for (let i = 0; i < n; i++) {
+    ab += (a[i] - ma) * (b[i] - mb);
+    aa += (a[i] - ma) ** 2;
+    bb += (b[i] - mb) ** 2;
+  }
+  return ab / Math.sqrt(aa * bb + 1e-9);
+}
+
+/** Same art: banners of one operator. */
+const SAME_ART = 0.85;
+/** Between two frames' art below this, and still below it a few frames on: a new banner. */
+const JUMP = 0.5;
+/** Steady art this long (seconds) before a jump counts as a new banner. */
+const STEADY = 0.15;
+
+
+/**
+ * Combos: banner stretches (a gap under 0.6 s is the same banner), cut where the art jumps (a new banner slides in
+ * over the last one; the art itself only pans), grouped by art: each group one operator.
+ */
+function combos(samples: Sample[], on: boolean[]): { steps: Step[]; arts: number[][] } {
+  const n = samples.length;
+  const t = samples.map((s) => s.t);
+  const runs: [number, number][] = [];
+  for (let i = 0; i < n; ) {
+    if (!(on[i] && samples[i].banner > ON)) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < n && on[j] && samples[j].banner > ON) j++;
+    const last = runs[runs.length - 1];
+    if (last && t[i] - t[last[1] - 1] <= 0.6) last[1] = j;
+    else runs.push([i, j]);
+    i = j;
+  }
+  // Each banner: from where it starts, its frames' art. A jump that stays (not one flash), once the art has held
+  // steady, starts a new banner (a banner's own first frames, sliding in, are unsteady).
+  const banners: { from: number; arts: Sample[] }[] = [];
+  for (const [i, j] of runs) {
+    if (t[j - 1] - t[i] < 0.15) continue;
+    const arts = samples.slice(i, j).filter((s) => s.art);
+    if (!arts.length) continue;
+    const parts = [{ from: t[i], arts: [arts[0]] }];
+    let steadySince = -1;
+    let settled = false;
+    for (let k = 1; k < arts.length; k++) {
+      const step = corr(arts[k - 1].art!, arts[k].art!);
+      const after = arts[Math.min(k + 3, arts.length - 1)];
+      if (step < JUMP && corr(arts[k - 1].art!, after.art!) < JUMP && settled) {
+        parts.push({ from: arts[k].t, arts: [] });
+        steadySince = -1;
+        settled = false;
+      } else if (step >= 0.75) {
+        if (steadySince < 0) steadySince = arts[k - 1].t;
+        settled ||= arts[k].t - steadySince >= STEADY;
+      } else steadySince = -1;
+      parts[parts.length - 1].arts.push(arts[k]);
+    }
+    // A banner starting part-way that doesn't stay is the last one sliding out.
+    for (let k = parts.length - 1; k > 0; k--)
+      if (parts[k].arts[parts[k].arts.length - 1].t - parts[k].from < 0.3) parts[k - 1].arts.push(...parts.splice(k, 1)[0].arts);
+    banners.push(...parts);
+  }
+  // A banner's art: its frames at the same moment of its animation (it slides in, then pans), cell by cell.
+  const artOf = (b: (typeof banners)[number]) => {
+    const at = (from: number, to: number) => b.arts.filter((x) => x.t >= b.from + from && x.t <= b.from + to);
+    const p = [at(0.35, 0.75), at(0.2, 9), b.arts].find((x) => x.length)!;
+    return p[0].art!.map((_, c) => median(p.map((x) => x.art![c])));
+  };
+  // How alike two banners are: their frames at the same moments of the animation, as alike as they get with one
+  // started a little earlier (a banner's start is seen a frame or two late).
+  const alike = (a: (typeof banners)[number], b: (typeof banners)[number]) => {
+    let best = -1;
+    for (let shift = -0.3; shift <= 0.3; shift += 0.05) {
+      const pairs: number[] = [];
+      for (const x of a.arts) {
+        const tau = x.t - a.from;
+        if (tau < 0.1 || tau > 1) continue;
+        const y = b.arts.reduce((m, z) => (Math.abs(z.t - b.from - tau - shift) < Math.abs(m.t - b.from - tau - shift) ? z : m));
+        if (Math.abs(y.t - b.from - tau - shift) <= 0.05) pairs.push(corr(x.art!, y.art!));
+      }
+      if (pairs.length >= 3) best = Math.max(best, median(pairs));
+    }
+    return best;
+  };
+  // Groups: banners alike are one operator's (a banner cut short is compared on what it showed).
+  const parent = banners.map((_, i) => i);
+  const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i])));
+  for (let i = 0; i < banners.length; i++)
+    for (let j = 0; j < i; j++) if (root(i) !== root(j) && Math.max(alike(banners[i], banners[j]), alike(banners[j], banners[i])) >= SAME_ART) parent[root(i)] = root(j);
+  // Groups numbered in order of first appearance.
+  const order: number[] = [];
+  banners.forEach((_, i) => {
+    if (!order.includes(root(i))) order.push(root(i));
+  });
+  return {
+    steps: banners.map((b, i) => ({ t: b.from, input: 'combo', slot: null, group: order.indexOf(root(i)) })),
+    arts: order.map((i) => artOf(banners[i])),
+  };
+}

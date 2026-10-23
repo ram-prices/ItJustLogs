@@ -532,7 +532,7 @@ export function ownedTag(owned: Owned | undefined): Html {
  * A section's views as side tabs (a row on phones), like Essences': links,
  * with a count where there is one. `body` is the view itself.
  */
-function sideTabs(label: string, views: [href: string, name: string, count: string][], current: string, body: Html): Html {
+export function sideTabs(label: string, views: [href: string, name: string, count: string][], current: string, body: Html): Html {
   return html`<div class="collection-layout">
     <nav class="collection-tabs" aria-label="${label}">
       ${views.map(

@@ -50,9 +50,9 @@ permanent missions it released (main story by the notes' "available up to",
 others by the wiki's version pages or their region), what its permanent
 modes hand out anew (Echoes of War seasons, Monumental Etching, Delver of the
 Cryptic...: its notes' Event & Gameplay Updates, else the wiki) and its new
-outposts, a rough estimate for
-the storage crates in the areas it added (wiki crate counts times an average
-Oroberyl per crate, badged Estimate), the Origeometry its areas' Aurylene
+outposts, the storage crates in the areas it added (each area's chests as
+the game's tables list them; an area missing there: wiki crate count times an
+average Oroberyl per crate, badged Estimate), the Origeometry its areas' Aurylene
 unlocks (each region's TP Point table; Partial past the table's end on the
 wiki), and hand-kept community-guide amounts with sources (version preview
 livestream, version survey, Combat Drills), the Crafting
@@ -75,7 +75,10 @@ duplicate 5★/6★ operators gave (25 per Chartered HH Permit). The breakdown
 lists pull currencies only, credits only the wiki, and the table ends with a
 total (patch banners only, to today). No
 third-party spreadsheet is used: the owner wants our own estimate. From
-ef-assets `wiki/income.json` (`scripts/income.mjs` there), plus the Arsenal
+ef-assets `wiki/income.json` (`scripts/income.mjs` there; then
+`scripts/game-income.mjs` puts in the game's own amounts from the
+EndfieldData dump: daily, weekly, pass tracks, missions, area chests,
+Valley's Aberrants chests by zone), plus the Arsenal
 Tickets Headhunting gives back; marked on the bars, listed by source when a
 patch is opened. Headhunting counts limited pulls (Basic HH Permits are
 listed apart, as community pull counts do). The current patch is projected
@@ -213,7 +216,7 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     paths (`/operators/info/<chr id>`, `/arsenal/<poolId>`, `/stats`, `/pulls`,
     `#/...`) are moved to today's (`currentPath`), and their folders are
     still built, so old links keep working.
-    Header tabs: Home, Database, Pulls, Essences, Achievements, Archive,
+    Header tabs: Home, Database, Pulls, Essences, AIC, Rotations, Achievements, Archive, Story,
     Settings. Database (`/database/...`) and Pulls (`/banner/...`) are
     sections picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/banner` open the page last used there.
@@ -289,7 +292,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   holographic = Trimmed) from a square of its picture beside the title,
   rules pinned by `medalTier.test.ts` with real samples.
 - Story tab (`ui/pages/story.ts`, types in `domain/story.ts`; `/story`,
-  `/story/<mission name slug>`): every mission's dialogue from the game's own
+  `/story/<slug>`: numbered as the list shows it, main story
+  chapter-act-position (Rally and Unite `1-1-3`, the prologue act 0), side
+  missions `s-<section>-<n>`, events `e-<n>`, outposts `o-<n>`, other
+  missions `m-<n>`; old name links redirect, `storySlugs`; event pages list
+  their own missions from index.json `activities`): every mission's dialogue from the game's own
   text, read from ef-assets `story/` (`scripts/story.mjs` there, weekly: the
   EndfieldData community dump at git.escartem.moe, a datamine of the game's
   tables; the text is Gryphline's, credited as such, not CC BY-SA).
@@ -297,14 +304,89 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   pages order them; sections the wiki doesn't index yet are `unlisted`
   (folded away: maybe unreleased). Each mission file has its scenes with the
   game's own summary, lines with speaker (operator portraits via `actor`),
-  and the replies offered; where a reply falls in the scene isn't in the
-  dump, so they're listed after the scene. Lines without English text are
+  and the replies offered. Scenes with a dialogue tree in the owner's bundle
+  export also have `flow` (ef-assets `scripts/dialog-order.mjs` →
+  `dialog/order.json`, read by story.mjs): lines in play order, each choice
+  where it comes with the lines every reply leads to, returns to the choice,
+  conversations that end, conditional splits named by their condition (quest
+  state 3 = the current objective, mission state 3 = done; `StoryFlow`,
+  rendered by `flow()` in pages/story.ts: replies under the Endministrator,
+  branches in columns, lines that only sometimes play kept in place);
+  without one, the replies are listed after the scene. Lines without English text are
   left out. Works without an import; loaded on first use (`lazy`). The
   list's search field (`searchField` in pages/search.ts, visible so phones
   can use it) filters missions by name and chapter, and from 3 letters lists
   matching lines from ef-assets `story/search.json` (loaded on the first such
   search); a result opens `/story/<mission>#l-<scene>-<line>`, scrolled to and
   marking that line (`scrollToLine` in app.ts).
+- AIC tab (`/aic`, `ui/pages/aic.ts`, `domain/aic.ts`): the AIC planner,
+  from ef-assets `aic/planner.json` (`scripts/aic.mjs` there, weekly, from the
+  EndfieldData dump: recipes with their facility mode, rigs/pumps/extractor as
+  recipes, facilities' power and Protocol Capacity, items' phase and which
+  depots hold them, Thermal Bank fuels, each area's Protocol Capacity by
+  Regional Development level, Regional Transfer). Calculator: one place, no
+  limits. Multi-site: the areas the player picks, each within its Protocol
+  Capacity and ore nodes (blank = no limit); depot items are shared across a
+  region's sites, other items (most fluids) stay at their site; each region's
+  power is the PAC's 200 plus Thermal Banks; a region builds only recipes of
+  modes it allows (Valley IV: "normal" only); Valley IV can send depot items
+  to Wuling by Regional Transfer. A mixed-integer program solved by HiGHS
+  (`highs` on npm, a devDependency for tests; loaded from jsDelivr in
+  `ui/aicWorker.ts`, a Web Worker), a few seconds then the best found with
+  its gap ("Search longer" gives it 30 s). What no site can make is listed as
+  brought in from outside. Settings `aic` hold the page state.
+- Rotations tab (`/rotations`, `ui/pages/rotations.ts`): a team DPS simulator
+  that teaches button order. Four operators in team position order (position
+  01 matters: e.g. Si's ultimate cuts its combo cooldown), each from their
+  loadout and copies ("My loadouts") or with weapon and gear the sim picks
+  ("Optimal gear", `domain/sim/gearSearch.ts`: Maxed Essence, top Artifice,
+  chosen by fights); styles Advanced (swaps, animation cancels) / Standard (one
+  operator controlled, no cancels: `Rules`, World `swaps`/`cancels`; 0.5 s between presses) / Basic
+  (one operator; combos as they come, ultimates when charged, battle skills in a fixed cycle:
+  `searchCycle`, `Policy.cycle`); old saved names map by `styleOf`; goal a fight length, or a dummy HP to defeat fastest (within its own limit, 300 s unless set;
+  `Team.hp`, `scoreOf` in rotation.ts). The picker lists the Endministrator once (two appearances, one
+  operator) and greys out teammates. Every run is saved in IndexedDB (`sims`, last 100, `saveSim` in
+  store.ts) under the request, so a team shows its last result at once (Run again redoes it);
+  History lists every run of the same characters (any order or loadouts) to open again. Optimal gear
+  gives each gacha-only weapon (an Arsenal Issue rate-up, `weponbox_` pools) to one operator at most. A
+  collapsed "How it works" sits under the header.
+  Searches run on several threads (setting `cores`, "Threads": all but one unless set): `ui/simWorker.ts`
+  opens a pool of fight workers (`ui/simPool.ts`, `ui/simJudge.ts`, data via `ui/simData.ts`); search,
+  beam and gear search hand batches to a `Runner` (rotation.ts; `localRunner` on one thread) and take
+  results in order, so the rotation is the same on any number of threads. Beam ways cross threads as
+  their presses (`WayRef`, replayed by `replayWay`); teams as their `TeamSpec`. Fights the training dummy with the game's own skill
+  and buff logic: `domain/sim/engine.ts` interprets the EndfieldData skill and
+  buff files (ef-assets `combat/`: `ops/<id>.json`, `weapons/`, `gear.json`,
+  `settings.json`, `index.json`, made by its `scripts/combat-bundle.mjs`);
+  `build.ts` equips; `rotation.ts` searches (priority list, then a beam search
+  over presses using `World.clone()`); `team.ts` is the page's side. Runs in
+  `ui/simWorker.ts`. Damage formula from the endfield.wiki.gg Damage page
+  (credit it). Checked against a community calculation for Arcane, Last Rite,
+  Si and Xaihi only (`CHECKED`); others show "Not checked yet". Assumptions the
+  data doesn't give are marked in the code (1 s swap cooldown, Si's combo
+  stack count, swapping out of Liino's stance and cutting it with her
+  ultimate; End Stance is never pressed; Liino's beats reach every teammate). Teammates the AI controls
+  don't basic attack (`guardAttacks` off: the owner sees them mostly stand around), so only the controlled
+  operator's Final Strikes give SP and trigger combos. Ultimate Energy blocks (RefrainObtainUsp) last only
+  while their buff or skill does and let their tags through (Last Rite's own skills, Arcane's array); a
+  DoOnceAction runs once per cast.
+  The enemy is the training dummy (`DUMMY` in team.ts) unless a request sets `enemy`: `ALLEIKHREOS`
+  (Crisis Calamity boss) is defined from EnemyAttributeTemplateTable and its wiki page (Resistance 20,
+  Stagger 320 / 11 s, Finisher ×1.75 via `Enemy.finisherMul`), picked with Enemy (`ENEMIES`, setting `enemy`). The
+  timeline has an Enemy lane with its Staggered stretches (`World.staggers`). Cooldowns run through ultimate cut-ins
+  (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
+  Simulator and Transcript (`/rotations/transcript`): a read video's team, enemy (`enemySeen`) and presses, not
+  editable but food (setting `videoFood`); its history lists recordings only. `replaySim` runs to the video stopwatch's stop, attacks nothing in its pauses and shows its time (`ReplayClock`); after a pause (a phase change) SP is refilled to 200, as the owner's video shows; it basic-attacks only while
+  the sim has fewer Final Strikes than the video by then.
+  Uptime (setting `uptime`, %; `World.uptime`): the share of the fight the enemy can be hit, the rest a
+  stretch at the end of every 10 s with no presses or basic attacks (100% unless set). The owner's gameplay
+  videos only confirm game mechanics (energy, combo triggers, cooldowns), never a target for the sim's pace or
+  DPS. Food (member `food`, `FOODS` in team.ts, from the game's
+  UseItemTable and BuffData: Jakub's Legacy ATK +27%) buffs one operator the whole fight. `replaySim` (team.ts) plays a gameplay video's read
+  steps in the sim for its timeline and DPS (worker message `replay`; combos and ultimates the video shows are allowed:
+  `strictCombos`/`strictUltimates` off). The page keeps the last reading (`simVideo` in IndexedDB) to play again, and
+  each replay goes in History as a Recording. Scratch tests `src/domain/sim/dbg*.test.ts` and `dbgTeam.ts`
+  read a local ef-assets clone: never commit them.
 - Essences tab (`ui/pages/essences.ts`, `domain/essences.ts`): the player's
   essences (settings `essences`: kind key → count) against every weapon's
   skill stats; only perfect fits (all of a weapon's stats) are suggested, by

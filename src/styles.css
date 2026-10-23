@@ -699,6 +699,37 @@ main {
   color: var(--gray-1000);
   background: var(--gray-alpha-200);
 }
+/* Rotations: how it works. */
+.sim-how > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.sim-how > summary::-webkit-details-marker {
+  display: none;
+}
+.sim-how > summary::after {
+  content: ' +';
+  color: var(--gray-900);
+}
+.sim-how[open] > summary::after {
+  content: ' −';
+}
+.sim-how dl {
+  display: grid;
+  gap: 12px;
+  padding-top: 0;
+}
+.sim-how dd {
+  margin: 2px 0 0;
+}
+/* The Rotations tab's work-in-progress mark. */
+.tab-wip {
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 6px;
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: 0;
+}
 .badge.lg {
   height: 24px;
   padding: 0 10px;
@@ -4791,6 +4822,55 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
 .reader-status {
   text-align: right;
 }
+.sim-video {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sim-video-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gameplay-preview video {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  border-radius: var(--radius-md);
+  background: #000;
+}
+.gameplay-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-bottom: 12px;
+}
+.gameplay-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gameplay-slot img {
+  border-radius: 50%;
+  background: var(--gray-alpha-200);
+}
+.gameplay-slot .gameplay-art {
+  border-radius: var(--radius-sm);
+}
+.gameplay-select {
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+}
+.sim-steps.gameplay-steps {
+  max-height: none;
+  columns: 2 240px;
+}
+.sim-steps.gameplay-steps li {
+  padding: 2px 0;
+  break-inside: avoid;
+}
 .reader-notyet {
   padding-top: 12px;
 }
@@ -6725,13 +6805,23 @@ a.six-item {
 /* ---------- Story (ui/pages/story.ts) ------------------------------------ */
 .story-crumbs {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
+  gap: 2px 4px;
   margin-bottom: 6px;
 }
 .story-crumbs a {
   color: inherit;
   text-decoration: none;
+}
+.story-crumbs a:hover {
+  color: var(--gray-1000);
+  text-decoration: underline;
+}
+/* A breadcrumb's link to a list section lands below the sticky header. */
+.story-section,
+.section[id^='s-'] {
+  scroll-margin-top: 128px;
 }
 .story-crumbs .icon {
   font-size: 16px;
@@ -6790,6 +6880,32 @@ a.six-item {
 .story-found {
   background: color-mix(in srgb, var(--amber) 14%, transparent);
   box-shadow: inset 3px 0 0 var(--amber);
+}
+/* A process's summary and lore (pages/story.ts recap), folded under its heading. */
+.story-recap {
+  margin: -4px 0 10px;
+}
+.story-recap > summary {
+  cursor: pointer;
+  width: fit-content;
+  padding: 4px 0;
+  color: var(--gray-900);
+}
+.story-recap > summary:hover {
+  color: var(--gray-1000);
+}
+.story-recap-body {
+  max-width: 760px;
+  padding: 4px 0 8px;
+}
+.story-recap-body h4 {
+  margin: 12px 0 4px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+.story-recap-body p {
+  margin: 0 0 10px;
+  line-height: 1.6;
 }
 /* Searched (pages/search.ts) but not shown: the mission's chapter or section. */
 .story-row-where {
@@ -6850,6 +6966,82 @@ a.six-item {
   border-radius: 999px;
   box-shadow: var(--shadow-border);
 }
+/* A section of the mission list: room before the next one's title. */
+.story-section + .story-section {
+  margin-top: 20px;
+}
+/* Choices in play order (a scene's flow): the Endministrator's line with its options, or a column per reply. */
+.story-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 4px;
+}
+.story-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 4px 16px 10px 64px;
+}
+.story-column {
+  min-width: 0;
+}
+/* Branching replies under the Endministrator's name, as their plain replies are. */
+.story-reply-body {
+  flex: 1;
+}
+.story-reply-body > .story-columns {
+  padding: 2px 0 0;
+}
+.story-reply-body .story-column-head {
+  padding-top: 4px;
+}
+/* Unnamed ways: side by side, "or" between. */
+.story-alts {
+  display: flex;
+  gap: 12px;
+  padding: 6px 16px 10px 64px;
+}
+.story-alts > .story-column {
+  flex: 1;
+}
+.story-or {
+  align-self: center;
+}
+.story-column-head {
+  padding: 4px 0 6px;
+}
+/* Lines that only play when a condition holds: in place, with a bar down the side and the condition above. */
+.story-when {
+  margin: 4px 0;
+  box-shadow: inset 2px 0 0 var(--gray-alpha-400);
+}
+.story-when-head {
+  padding: 4px 16px 0 64px;
+}
+.story-thread {
+  box-shadow: inset 2px 0 0 var(--gray-alpha-400);
+}
+.story-thread .story-line,
+.story-thread .story-narr {
+  padding-left: 14px;
+  padding-right: 4px;
+}
+.story-thread .story-narr {
+  padding-left: 14px;
+}
+.story-thread .story-columns,
+.story-thread .story-alts,
+.story-thread .story-when-head,
+.story-thread .story-back {
+  padding-left: 14px;
+  padding-right: 4px;
+}
+.story-back {
+  margin: 0;
+  padding: 2px 16px 6px 64px;
+}
 .story-nav {
   display: flex;
   justify-content: space-between;
@@ -6862,7 +7054,465 @@ a.six-item {
   text-align: center;
 }
 @media (max-width: 640px) {
-  .story-narr {
+  .story-narr,
+  .story-columns,
+  .story-alts,
+  .story-when-head,
+  .story-back {
     padding-left: 16px;
   }
+  .story-alts {
+    flex-direction: column;
+  }
+  .story-or {
+    align-self: flex-start;
+  }
+}
+
+/* ---------- AIC planner (pages/aic.ts) ----------------------------------- */
+.aic-panes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.aic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aic-target {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.aic-item {
+  flex: 1;
+}
+.aic-rate {
+  width: 96px;
+}
+.aic-region {
+  width: 140px;
+}
+.aic-num {
+  width: 72px;
+  height: 32px;
+  text-align: right;
+}
+.aic-level {
+  width: 76px;
+  height: 32px;
+}
+.aic-options,
+.aic-fuels,
+.aic-region-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+.aic-region-head {
+  justify-content: space-between;
+}
+.aic-check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.aic-sites td {
+  height: 44px;
+}
+.aic-sites tr.off td {
+  color: var(--gray-900);
+}
+.aic-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.2s var(--ease);
+}
+.aic-results.stale {
+  opacity: 0.6;
+}
+.aic-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  align-items: flex-end;
+}
+.aic-summary > div:not(.aic-proof) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aic-summary b {
+  font: 600 24px/32px var(--font-sans);
+  letter-spacing: -0.96px;
+}
+.aic-proof {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+.aic-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aic-section h3 {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.aic-steps td {
+  height: 44px;
+}
+.aic-recipe {
+  white-space: normal !important;
+  min-width: 280px;
+}
+.aic-flow {
+  white-space: nowrap;
+}
+.aic-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aic-credit {
+  margin-top: 24px;
+}
+@media (max-width: 640px) {
+  .aic-target {
+    flex-wrap: wrap;
+  }
+  .aic-item {
+    flex-basis: 100%;
+  }
+  .aic-proof {
+    margin-left: 0;
+  }
+  /* Each step on two lines: facility and count, then what it makes. */
+  .aic-steps thead {
+    display: none;
+  }
+  .aic-steps tr {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'name busy count' 'recipe recipe recipe';
+    gap: 2px 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ring);
+  }
+  .aic-steps td {
+    height: auto;
+    padding: 0;
+    border: 0;
+  }
+  .aic-steps td:nth-child(1) {
+    grid-area: name;
+  }
+  .aic-steps td:nth-child(2) {
+    grid-area: count;
+  }
+  .aic-steps td:nth-child(4) {
+    grid-area: busy;
+  }
+  .aic-steps .aic-recipe {
+    grid-area: recipe;
+    min-width: 0;
+    color: var(--gray-900);
+  }
+}
+
+/* ---------- Rotations (pages/rotations.ts) ------------------------------- */
+.sim-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sim-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sim-team {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.sim-member {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-border);
+  min-width: 0;
+}
+.sim-member-head,
+.sim-op,
+.sim-weapon {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.sim-member-head {
+  justify-content: space-between;
+}
+.sim-move {
+  display: inline-flex;
+  gap: 2px;
+}
+.sim-op select {
+  flex: 1;
+  min-width: 0;
+}
+.sim-p {
+  width: 64px;
+  height: 32px;
+}
+.sim-food {
+  height: 32px;
+  max-width: 160px;
+}
+.sim-portrait {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--gray-alpha-100);
+}
+.sim-portrait.sm {
+  width: 28px;
+  height: 28px;
+}
+.sim-weapon-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex: none;
+}
+.sim-weapon > span {
+  flex: 1;
+}
+.sim-gear {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sim-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-start;
+}
+.sim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-num {
+  width: 96px;
+  height: 32px;
+}
+.sim-cores {
+  width: 112px;
+  height: 32px;
+}
+.sim-hp {
+  width: 140px;
+  height: 32px;
+}
+.sim-run {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.sim-error {
+  color: var(--red);
+}
+.sim-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.2s var(--ease);
+}
+.sim-results.stale {
+  opacity: 0.6;
+}
+.sim-history {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow: auto;
+}
+.sim-past {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.sim-past:hover {
+  background: var(--gray-alpha-100);
+}
+.sim-past.on {
+  background: var(--gray-alpha-200);
+}
+@media (max-width: 640px) {
+  .sim-past {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sim-past > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+.sim-share {
+  display: grid;
+  grid-template-columns: 28px minmax(80px, 160px) 1fr 56px;
+  gap: 12px;
+  align-items: center;
+}
+.sim-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--gray-alpha-200);
+  overflow: hidden;
+}
+.sim-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--gray-1000);
+}
+.sim-order {
+  margin: 0;
+  padding-left: 20px;
+}
+.sim-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-lane {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.sim-lane-track {
+  position: relative;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+}
+.sim-axis .sim-lane-track {
+  height: 16px;
+  background: none;
+}
+.sim-axis .sim-lane-track > span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+/* Who's controlled: a band under that operator's presses. */
+.sim-control {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--gray-alpha-300);
+  border-radius: var(--radius-sm);
+}
+.sim-press {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  font: 600 11px/18px var(--font-sans);
+  font-style: normal;
+  text-align: center;
+  color: var(--background-100);
+  background: var(--gray-900);
+}
+.sim-press.combo {
+  background: var(--op);
+}
+.sim-press.ultimate {
+  background: var(--amber);
+}
+.sim-strike {
+  position: absolute;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--gray-700);
+}
+/* The enemy Staggered: a band in its lane. */
+.sim-stagger {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--red) 35%, transparent);
+  border-radius: var(--radius-sm);
+}
+.sim-strike.finisher {
+  top: 7px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--red);
+}
+.sim-steps {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  max-height: 320px;
+  overflow: auto;
+  columns: 3 220px;
+}
+.sim-steps .num {
+  display: inline-block;
+  width: 48px;
+}
+@media (max-width: 640px) {
+  .sim-team {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sim-share {
+    grid-template-columns: 28px minmax(60px, 120px) 1fr 52px;
+  }
+  .sim-lane {
+    grid-template-columns: 64px 1fr;
+  }
+}
+.sim-pots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.sim-pots label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.sim-card > .toggle,
+.sim-field > .toggle {
+  align-self: flex-start;
 }

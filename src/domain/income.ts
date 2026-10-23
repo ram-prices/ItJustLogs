@@ -11,8 +11,9 @@
  * missions it released (Main, Side and Exploration Missions), what its
  * permanent modes hand out anew (Echoes of War seasons, Monumental Etching,
  * Delver of the Cryptic...; official notes, else the wiki) and the outposts
- * it added, a rough estimate for the storage crates in the areas it added
- * (their count times an average Oroberyl per crate), the Origeometry their
+ * it added, the storage crates in the areas it added (what each area's
+ * chests hold in the game's own tables; else, for an area missing there, the
+ * wiki's crate count times an average Oroberyl per crate), the Origeometry their
  * Aurylene unlocks at TP Points, and hand-kept amounts from community guides
  * (version preview livestream, version survey, Combat Drills). Plus the Crafting Manual's gathering milestones (by the version
  * that added the item's area or enemy), one-time progression at launch
@@ -61,6 +62,8 @@ export interface IncomeFile {
   monthly?: { url: string; price: string | null; days: number; onPurchase: Record<string, number>; daily: Record<string, number> };
   /** What each version's official Version Update Notes hand out in the mail, by version name. */
   compensation?: { source: string; versions: Record<string, { url: string; rows: { label: string; rewards: Record<string, number> }[] }> };
+  /** Which parts hold the game's own amounts (ef-assets scripts/game-income.mjs, from the EndfieldData dump). */
+  game?: { source: string; note: string; exact: string[] };
   /** Permanent missions with pull currency rewards, by the version that released them. */
   quests?: { source: string; caps: Record<string, string>; versions: Record<string, Quest[]> };
   /** The areas each version added, with their crate counts, and a rough Oroberyl per crate. */
@@ -136,8 +139,12 @@ export interface ModeReward {
 export interface Area {
   area: string;
   url: string;
+  /** The wiki's crate count. */
   crates: number;
   aurylene: number;
+  /** The game's chests here that hold pull currency, and what they hold in all. */
+  chests?: number;
+  rewards?: Record<string, number>;
 }
 
 export interface Quest {
@@ -271,7 +278,7 @@ export interface IncomeLine {
   modes?: ModeReward[];
   /** Outposts: each outpost counted. */
   outposts?: { outpost: string; url: string; rewards: Record<string, number> }[];
-  /** A rough figure, not the game's own amounts (crates: count × average per crate). */
+  /** A rough figure, not the game's own amounts (crates the game's tables don't list: count × average per crate). */
   estimate?: boolean;
   /** Hand-kept from community guides: what they say and where. */
   extra?: Extra;
@@ -486,11 +493,17 @@ export function patchIncome(
       }
       const credit = income.shops?.credit;
       if (credit && days) lines.push({ source: 'creditStore', count: days, totals: plus({}, credit.perDay, days), url: credit.url, estimate: true });
+      // Each area's chests as the game lists them; an area missing there: its crates × the average per crate.
       const ex = income.exploration;
-      const areas = (ex?.versions[w.version] ?? []).filter((a) => a.crates > 0);
-      const crates = areas.reduce((n, a) => n + a.crates, 0);
-      if (ex && crates)
-        lines.push({ source: 'crates', count: crates, totals: { Oroberyl: Math.round(crates * ex.perCrate) }, areas, estimate: true });
+      const areas = (ex?.versions[w.version] ?? []).filter((a) => a.rewards || a.crates > 0);
+      if (ex && areas.length) {
+        const rough = areas.filter((a) => !a.rewards);
+        const totals = areas.reduce((t, a) => plus(t, a.rewards ?? {}), {} as Record<string, number>);
+        const crates = rough.reduce((n, a) => n + a.crates, 0);
+        if (crates) plus(totals, { Oroberyl: Math.round(crates * ex.perCrate) });
+        const count = areas.reduce((n, a) => n + (a.rewards ? (a.chests ?? 0) : a.crates), 0);
+        lines.push({ source: 'crates', count, totals, areas, estimate: rough.length > 0 });
+      }
       const aur = income.exploration?.aurylene?.versions[w.version];
       if (aur && (Object.keys(aur.rewards).length || aur.partial))
         lines.push({ source: 'aurylene', count: 1, totals: { ...aur.rewards }, url: income.exploration!.aurylene!.url, partial: !!aur.partial, note: aur.partial });

@@ -126,6 +126,10 @@ export interface Settings {
   essences?: Record<string, number>;
   /** When they were last read from the game. */
   essencesRead?: number;
+  /** The AIC planner's items, sites and options (ui/pages/aic.ts). */
+  aic?: import('./domain/aic').AicSettings;
+  /** The Rotations page's team and options (ui/pages/rotations.ts). */
+  sim?: import('./domain/sim/team').SimSettings;
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;
   /** What each operator has equipped (weapon and gear), by operator id. */
@@ -292,6 +296,32 @@ export async function saveSnapshot(info: SnapshotInfo, history: PullHistory): Pr
   });
   return keep;
 }
+
+/** A Rotations result, saved under the request that made it (team, builds, style, search, goal); this browser only. */
+export interface SavedSim<R = unknown> {
+  key: string;
+  /** When it was found (ms). */
+  at: number;
+  result: R;
+  names: string[];
+  ids: string[];
+}
+/** How many Rotations results to keep (each run, for a team's history); the oldest go first. */
+const MAX_SIMS = 100;
+
+export const listSims = <R>(): Promise<SavedSim<R>[]> =>
+  idb<SavedSim<R>[] | undefined>('data', 'readonly', (s) => s.get('sims')).then((l) => l ?? []).catch(() => []);
+
+/** Saves a result after the others (the newest for a request is the one shown) and trims to MAX_SIMS. */
+export async function saveSim<R>(entry: SavedSim<R>): Promise<void> {
+  const list = await listSims<R>();
+  list.push(entry);
+  await idb('data', 'readwrite', (s) => s.put(list.slice(-MAX_SIMS), 'sims'));
+}
+
+/** The last gameplay video's reading (Rotations), so it can be played again without reading the video again. */
+export const loadSimVideo = <V>(): Promise<V | undefined> => idb<V | undefined>('data', 'readonly', (s) => s.get('simVideo')).catch(() => undefined);
+export const saveSimVideo = (v: unknown): Promise<void> => idb<unknown>('data', 'readwrite', (s) => s.put(v, 'simVideo')).then(() => undefined, () => undefined);
 
 /** Removes only the saved pull history; settings and images stay. */
 export async function clearHistory(): Promise<void> {

@@ -96,7 +96,10 @@ const income: IncomeFile = {
     mix: {},
     perCrate: 40,
     sources: [],
-    versions: { Second: [{ area: 'New Area', url: '', crates: 25, aurylene: 10 }] },
+    versions: {
+      Launch: [{ area: 'Old Area', url: '', crates: 10, aurylene: 0, chests: 12, rewards: { Oroberyl: 300 } }],
+      Second: [{ area: 'New Area', url: '', crates: 25, aurylene: 10 }],
+    },
     outposts: { Second: [{ outpost: 'New Outpost', url: '', rewards: { Oroberyl: 320 } }] },
     aurylene: { url: '', versions: { Launch: { rewards: { Origeometry: 4 } }, Second: { rewards: { Origeometry: 2 }, partial: "Wuling's table ends at 190" } } },
   },
@@ -157,11 +160,12 @@ describe('free income per patch', () => {
     expect(by(launch).pass.name).toBe('One');
     expect(launch.partial).toBe(true);
     // 22×200 + 4×500 + 500 + 600 Oroberyl + 4 Origeometry from quests (300) = 7,800, plus 4 Origeometry from
-    // Aurylene (300) and the survey (300) = 8,400 → 16.8 pulls.
+    // Aurylene (300), the survey (300) and the old area's 12 chests as the game lists them (300) = 8,700 → 17.4 pulls.
     // No livestream at launch. 400 + 990 tickets → 1,390 / 1,980 Issues × 10.
     expect(by(launch).quests.count).toBe(1);
     expect(by(launch).livestream).toBeUndefined();
-    expect(launch.headhunting).toBeCloseTo((7800 + 300 + 300) / 500);
+    expect(by(launch).crates).toMatchObject({ count: 12, totals: { Oroberyl: 300 }, estimate: false });
+    expect(launch.headhunting).toBeCloseTo((7800 + 300 + 300 + 300) / 500);
     expect(launch.arsenal).toBeCloseTo((1390 / 1980) * 10);
 
     // Second: an event missing from the wiki file still counts (as partial); so does one not started yet.

@@ -41,26 +41,28 @@ import { installTint, tintAmbients, tintHeroes, tintSixStrip, tintWeaponCards } 
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'stats' | 'achievements' | 'archives' | 'story' | 'settings' | 'event';
+type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'aic' | 'rotations' | 'stats' | 'achievements' | 'archives' | 'story' | 'settings' | 'event';
 /**
  * The header's tabs. Database (every operator and weapon) and Pulls (the
  * player's banners and Stats) hold several pages, picked with side tabs;
  * their pages live under /database and /banner (/database/operators,
  * /banner/arsenal, /banner/stats...).
  */
-type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'achievements' | 'archives' | 'story' | 'settings';
+type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'aic' | 'rotations' | 'achievements' | 'archives' | 'story' | 'settings';
 const TABS: [Tab, string][] = [
   ['home', 'Home'],
   ['database', 'Database'],
   ['pulls', 'Pulls'],
   ['essences', 'Essences'],
+  ['aic', 'AIC'],
+  ['rotations', 'Rotations'],
   ['achievements', 'Achievements'],
   ['archives', 'Archive'],
   ['story', 'Story'],
   ['settings', 'Settings'],
 ];
 /** Paths that are pages of their own. */
-const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'stats', 'achievements', 'archives', 'story', 'settings']);
+const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'aic', 'rotations', 'stats', 'achievements', 'archives', 'story', 'settings']);
 /** Where Database and Pulls open first: the operator list, the Headhunting banners. */
 const SECTION_HOME = { database: '/database/operators', pulls: '/banner/headhunting' } as const;
 /** The path each section answers to (/database, /banner). */
@@ -212,17 +214,22 @@ function lazy<T>(load: () => Promise<T>): { mod: T | null; get(): T | null } {
 }
 const essences = lazy(() => import('./pages/essences'));
 const story = lazy(() => import('./pages/story'));
+const aic = lazy(() => import('./pages/aic'));
+const rotations = lazy(() => import('./pages/rotations'));
 
-/** A Story mission opened at one of its lines (/story/<mission>#l-3-12, from the search): scroll there once it's drawn, and mark it. */
+/** A Story mission opened at one of its lines (/story/<mission>#l-3-12, from the search): scroll there once it's drawn, and mark it; or the list at a section (/story#s-…). */
 let lineShown = '';
 function scrollToLine(): void {
   const target = location.pathname + location.hash;
-  if (!location.hash.startsWith('#l-') || lineShown === target) return;
+  // Lines (#l-…, marked) and the list's sections (#s-…, from a mission's breadcrumb).
+  if (!/^#[ls]-/.test(location.hash) || lineShown === target) return;
   const el = document.getElementById(location.hash.slice(1));
   if (!el) return;
   lineShown = target;
-  el.classList.add('story-found');
-  el.scrollIntoView({ block: 'center' });
+  if (location.hash.startsWith('#l-')) {
+    el.classList.add('story-found');
+    el.scrollIntoView({ block: 'center' });
+  } else el.scrollIntoView({ block: 'start' });
 }
 
 const loadingPage = (title: string): Html => html`${pageHeader(title, 'Loading…')}<main class="container"></main>`;
@@ -291,7 +298,7 @@ function header(route: Route): Html {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
         const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
-        return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span></a>`;
+        return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span>${tab === 'rotations' ? html`<span class="badge amber tab-wip">WIP</span>` : ''}</a>`;
       })}
     </nav>
   </div></header>`;
@@ -344,6 +351,10 @@ function page(route: Route): Html {
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);
   if (route.page === 'essences') return essences.get()?.essencesPage(draw) ?? loadingPage('Essences');
+  // The AIC planner: no import needed.
+  if (route.page === 'aic') return aic.get()?.aicPage(draw) ?? loadingPage('AIC planner');
+  // Rotations: game data and the player's loadouts; no import needed.
+  if (route.page === 'rotations') return rotations.get()?.rotationsPage(draw, route.id) ?? loadingPage('Rotations');
   // The game's story text: no import needed.
   if (route.page === 'story') return story.get()?.storyPage(route.id, draw) ?? loadingPage('Story');
   if (route.page === 'event') return eventPage(route.id, draw);
@@ -730,6 +741,10 @@ function installProfile(): void {
     const el = e.target as HTMLInputElement;
     // Achievements: a medal's date, Reforging tier or Trimming.
     if (collectionChange(el)) return;
+    // AIC planner: its targets, sites and options.
+    if (aic.mod?.aicChange(el)) return;
+    // Rotations: the team and fight options.
+    if (rotations.mod?.simChange(el)) return;
     if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
     // Extra copies (Settings): edit one entry's copies or note.
     const editExtra = (i: number, patch: Partial<ExtraCopy>) =>
@@ -793,7 +808,7 @@ async function onClick(e: MouseEvent): Promise<void> {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
   // Achievements and Archive handle their own buttons.
-  if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el)) return draw();
+  if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el) || aic.mod?.aicAction(el.dataset.action ?? '', el) || rotations.mod?.simAction(el.dataset.action ?? '', el)) return draw();
   if (el.dataset.action === 'essence-read') return void import('./essenceReader').then((m) => m.readEssences());
   switch (el.dataset.action) {
     case 'import':

@@ -6,6 +6,7 @@ import { currentServer, state } from '../../state';
 import { badge, icon, itemName } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { credit, external, wikiFile } from './info';
+import { storySlugs, type StoryIndex } from '../../domain/story';
 
 /**
  * /event/<id>: one event, with its rewards written out (ef-assets
@@ -129,6 +130,26 @@ function breakdown(r: EventRewards): Html {
   )}`;
 }
 
+/** The event's own story missions (the Story tab's pages), when the game's tables name them. */
+function storySection(name: string, redraw: () => void): Html {
+  const ix = wikiFile<StoryIndex>('index.json', redraw, 'story').data;
+  const ids = ix?.activities?.[name]?.filter((id) => ix.missions[id]);
+  if (!ix || !ids?.length) return html``;
+  const slugs = storySlugs(ix).byId;
+  return html`<section class="section">
+    <div class="section-head"><h2 class="heading-20">Story</h2><span class="label-13 secondary">${ids.length} mission${ids.length === 1 ? '' : 's'}</span></div>
+    <div class="card story-list">
+      ${ids.map(
+        (id) => html`<a class="story-row" href="/story/${slugs.get(id)}">
+          <span class="story-row-name ellipsis">${ix.missions[id].name}</span>
+          <span class="label-12 secondary num">${ix.missions[id].lines} lines</span>
+          ${icon('chevron_right')}
+        </a>`,
+      )}
+    </div>
+  </section>`;
+}
+
 export function eventPage(id: string | undefined, redraw: () => void): Html {
   const file = wikiFile<EventRewardsFile>('events.json', redraw);
   const e = eventOf(id, file.data);
@@ -157,6 +178,7 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
     <main class="container fade-in">
       ${e.details ? html`<p class="copy-16 event-details">${e.details.replace(/\[|\]/g, '')}</p>` : ''}
       ${r ? phases(r, e, server) : ''}
+      ${storySection(e.name, redraw)}
       ${r
         ? r.groups.length
           ? html`${summary(r)}${allItems(r)}${breakdown(r)}

@@ -26,6 +26,7 @@ export interface FrameText {
 }
 interface TesseractWorker {
   recognize(img: HTMLCanvasElement): Promise<{ data: FrameText }>;
+  setParameters(p: Record<string, string>): Promise<unknown>;
   terminate(): Promise<void>;
 }
 declare global {
@@ -43,6 +44,22 @@ function loadTesseract(): Promise<NonNullable<Window['Tesseract']>> {
     s.onerror = () => reject(new Error("Couldn't load the text reader. Check your connection."));
     document.head.append(s);
   });
+}
+
+/**
+ * Reads a few small pictures' text (`chars`: the only characters to expect), loading the text reader for it.
+ * Throws if it can't be loaded.
+ */
+export async function recognize(pictures: HTMLCanvasElement[], chars?: string): Promise<string[]> {
+  const worker = await (await loadTesseract()).createWorker('eng');
+  try {
+    if (chars) await worker.setParameters({ tessedit_char_whitelist: chars });
+    const out: string[] = [];
+    for (const p of pictures) out.push((await worker.recognize(p)).data.lines.map((l) => l.text.trim()).join(' '));
+    return out;
+  } finally {
+    await worker.terminate();
+  }
 }
 
 /**
