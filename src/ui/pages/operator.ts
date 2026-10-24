@@ -38,7 +38,7 @@ const FS_COLUMNS: [key: string, label: string, value: (c: Chain, name: string) =
   ['hits', 'Hits', (c) => c.hits],
   ['seconds', 'Chain (s)', (c) => c.seconds],
   ['sp', 'Final Strike SP', (c) => c.sp],
-  ['rate', 'SP per second', (c) => spRate(c)],
+  ['rate', 'SP/s per chain', (c) => spRate(c)],
 ];
 let fsSort: { key: string; desc: boolean } = { key: 'rate', desc: true };
 
@@ -249,7 +249,7 @@ function statsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> |
         ${chain
           ? html`<div class="minor"><dt>Basic attack chain</dt><dd class="num">${chain.hits} hits · ${chain.seconds.toFixed(2)} s</dd></div>
               <div class="minor"><dt>Final Strike SP</dt><dd class="num">${Math.round(chain.sp)}</dd></div>
-              <div class="minor"><dt>SP per second</dt><dd class="num">${spRate(chain).toFixed(2)}</dd></div>`
+              <div class="minor"><dt>SP/s per chain</dt><dd class="num">${spRate(chain).toFixed(2)}</dd></div>`
           : ''}
         ${def ? html`<div class="minor loadout-only"><dt>DEF</dt><dd class="num"><span class="attr-note">${defReduction(def.flat).toFixed(1)}% less DMG taken</span>${loadoutOnly(def)}</dd></div>` : ''}
         ${treatment ? html`<div class="minor"><dt>Treatment received</dt><dd class="num" title="0.1% per point of Will">+${Math.round(treatment * 10) / 10}%</dd></div>` : ''}
