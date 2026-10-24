@@ -3722,6 +3722,9 @@ a.patch-banner:hover {
 :root[data-theme='light'] .wk-stagger { color: #8c6a1c; }
 :root[data-theme='light'] .wk-heal { color: #557a0d; }
 :root[data-theme='light'] .wk-accent { color: #8a7d00; }
+/* The Final Strike's SP (operator pages): the number the sim measured. */
+.wk-sp { color: #fff200; font-weight: 600; }
+:root[data-theme='light'] .wk-sp { color: #8a7d00; }
 .wiki-em {
   color: var(--gray-1000);
 }

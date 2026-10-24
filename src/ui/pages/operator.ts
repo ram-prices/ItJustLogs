@@ -358,9 +358,15 @@ function skillsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> 
   const mods = potentialSkillMods(o, potential);
   const touched = mods.size > 0 || o.skills.some((s) => skillDmgBonus(s, bonuses));
   const arcana = attributeVariant(o, bonuses);
-  // The game's "Intellect (N) ≥ Will (N)" lines, with her numbers in.
-  const withTotals = (s: WikiSkill): WikiSkill =>
-    arcana ? { ...s, description: s.description.replace(/Intellect \(⟦num\|N⟧\)/g, `Intellect (⟦num|${arcana.int}⟧)`).replace(/Will \(⟦num\|N⟧\)/g, `Will (⟦num|${arcana.will}⟧)`) } : s;
+  const chain = CHAINS[id];
+  // The game's "Intellect (N) ≥ Will (N)" lines, with her numbers in; the Final Strike's SP (as the sim measured
+  // it) after its Stagger.
+  const withTotals = (s: WikiSkill): WikiSkill => {
+    let d = s.description;
+    if (arcana) d = d.replace(/Intellect \(⟦num\|N⟧\)/g, `Intellect (⟦num|${arcana.int}⟧)`).replace(/Will \(⟦num\|N⟧\)/g, `Will (⟦num|${arcana.will}⟧)`);
+    if (chain && s.type === 'Basic Attack') d = d.replace(/(Final Strike⟧ also deals ⟦stagger\|\d+⟧ Stagger)/, `$1 and recovers ⟦sp|${chain.sp} SP⟧`);
+    return d === s.description ? s : { ...s, description: d };
+  };
   return html`<section class="section">
     <div class="section-head"><h2 class="heading-20">Skills</h2>${touched ? html`<span class="row label-13 secondary">${splitToggle()}</span>` : ''}</div>
     ${skillSets(o.skills).map((set, si) => {
