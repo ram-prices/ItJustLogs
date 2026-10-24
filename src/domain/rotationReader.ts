@@ -1,31 +1,29 @@
 /**
- * Reading a rotation from a gameplay video (controller layout), with image
- * checks only: no text recognition, no AI. ui/rotationReader.ts plays the
- * video and cuts three areas out of each frame (scaled to READ_HEIGHT tall:
- * the game sizes its HUD to the screen's height); this file measures them
- * and turns the measurements into presses. Measured on a 2560×1600 Crisis
- * Calamity recording (rotationReader.test.ts pins it):
+ * Reading a rotation from a gameplay video, with image checks only: no AI.
+ * ui/rotationReader.ts plays the video and cuts a few areas out of each frame
+ * (scaled to READ_HEIGHT tall: the game sizes its HUD to the screen's
+ * height); this file measures them and turns the measurements into presses.
+ * Two HUDs: the controller one (a 2560×1600 Crisis Calamity recording) and
+ * the phone one (a 1560×720 recording), pinned by rotationReader.test.ts:
  * - SP bar (bottom centre, 3 segments of 100): a battle skill drops it, a
- *   Final Strike adds 10–20, a Finisher more.
- * - Skill diamond (bottom right): each operator's Ultimate dot is filled
- *   when it's charged. An ultimate hides the HUD for its cut-in; whose it
- *   was is the dot that was full before and empty after.
- * - Holding LB opens the skill wheel; the button pressed in it stays lit a
- *   frame longer than the others as the wheel closes: who used the battle
- *   skill (a guess the player can change).
+ *   Final Strike adds 10–25, a Finisher more.
+ * - An ultimate hides the HUD for its cut-in. Controller: whose it was is
+ *   the Ultimate dot (skill diamond, bottom right) full before and empty
+ *   after. Phone: the skill button lit up just before it.
+ * - Who used a battle skill: the button pressed. Controller: in the skill
+ *   wheel (hold LB) it flashes, or stays lit a frame longer as the wheel
+ *   closes. Phone: the operator's skill button (bottom right) lights up.
  * - A combo shows its operator's art in a side banner (top left). Banners
  *   are grouped by their art: each group is one operator, for the player
  *   to name (colours alone told look-alike art apart wrongly).
- * - The stopwatch (top left) ticks once a second: when it stops is the
- *   fight's end, and a stretch where it stood still a pause (a phase
- *   change; ultimates don't stop it). Its digits are read with text
- *   recognition at a few ticks only (readings passed in).
+ * - The stopwatch ticks once a second (up, or down in timed stages): when
+ *   it stops is the fight's end, and a stretch where it stood still a
+ *   pause (a phase change; ultimates don't stop it). Its digits are read
+ *   with text recognition at a few ticks only (readings passed in).
  */
 
 export const READ_HEIGHT = 1080;
 
-/** The HUD slots, as the skill diamond and the portraits lay them out. */
-export const SLOTS = ['Top', 'Left', 'Right', 'Bottom'] as const;
 export type Slot = 0 | 1 | 2 | 3;
 
 /** RGBA pixels of an area, as a canvas gives them. */
@@ -40,54 +38,150 @@ export interface Area {
   w: number;
   h: number;
 }
+type Point = readonly [number, number];
+type Test = (r: number, g: number, b: number) => boolean;
 
-/** The game draws at 2560×1600 here; at READ_HEIGHT everything is this much smaller. */
-const S = READ_HEIGHT / 1600;
-const RIGHT = { w: 312, h: 280, y: 776 };
-const CENTRE = { w: 300, h: 32, y: 980 };
-const BANNER = { x: 0, y: 220, w: 340, h: 155 };
-const PORTRAITS = { x: 0, y: 776, w: 420, h: 304 };
-/** The stopwatch's digits (its icon left out). */
-const CLOCK = { x: 214, y: 30, w: 88, h: 40 };
-/** The boss's name, above its HP bar. */
-const ENEMY = { w: 400, h: 36, y: 18 };
-
-/** Where to cut the areas from a frame `width` wide and READ_HEIGHT tall: the diamond sits right, the SP bar centred, the rest left. */
-export function areas(width: number): { right: Area; centre: Area; banner: Area; portraits: Area; clock: Area; enemy: Area } {
-  return {
-    right: { x: width - RIGHT.w, y: RIGHT.y, w: RIGHT.w, h: RIGHT.h },
-    centre: { x: Math.round(width / 2) - CENTRE.w / 2, y: CENTRE.y, w: CENTRE.w, h: CENTRE.h },
-    banner: BANNER,
-    portraits: PORTRAITS,
-    clock: CLOCK,
-    enemy: { x: Math.round(width / 2) - ENEMY.w / 2, y: ENEMY.y, w: ENEMY.w, h: ENEMY.h },
-  };
+/** A HUD: where its parts are at READ_HEIGHT, and how they look. */
+export interface Layout {
+  name: 'controller' | 'mobile';
+  /** The four operators' places on the HUD, as the review names them. */
+  slots: readonly string[];
+  /** Bottom right (anchored to the right edge): the skill buttons. */
+  right: { w: number; h: number; y: number };
+  /** Bottom centre: the SP bar over the HP bar. */
+  centre: { w: number; h: number; y: number };
+  /** Top left: where a combo's banner shows. */
+  banner: Area;
+  /** The stopwatch's digits: from the left edge (x) or the centre (dx). */
+  clock: { x?: number; dx?: number; y: number; w: number; h: number };
+  /** The boss's name, centred. */
+  enemy?: { w: number; h: number; y: number };
+  /** Where each slot's picture is for the review: in `area`, a square `size` wide around these points. */
+  faces: { area: 'portraits' | 'right'; at: Point[]; above: number; size: number };
+  portraits?: Area;
+  segments: number[][];
+  spY: number;
+  hpY: number;
+  hpX: number[];
+  /** Each slot's Ultimate dot in the right area (controller only). */
+  dots: Point[];
+  /** Where each slot's press shows in the right area, and how far around it to look. */
+  presses: Point[];
+  pressHalf: number;
+  pressTest: Test;
+  /** A banner's edges show at least this clearly (the phone's, smaller and see-through, less so). */
+  bannerOn: number;
+  bannerEdges: number[];
+  /** The stopwatch's ink. */
+  ink: Test;
 }
 
-// Points measured at 2560×1600, moved into each area.
-const rp = (x: number, y: number) => [Math.round((x - 2560) * S + RIGHT.w), Math.round(y * S - RIGHT.y)] as const;
-const cp = (x: number, y: number) => [Math.round((x - 1280) * S + CENTRE.w / 2), Math.round(y * S - CENTRE.y)] as const;
-const SEGMENTS = [
-  [cp(1072, 0)[0], cp(1198, 0)[0]],
-  [cp(1216, 0)[0], cp(1344, 0)[0]],
-  [cp(1360, 0)[0], cp(1494, 0)[0]],
-];
-const SP_Y = cp(0, 1468)[1];
-const HP_Y = cp(0, 1490)[1];
-const HP_X = [cp(1080, 0)[0], cp(1480, 0)[0]];
-/** Each slot's Ultimate dot. */
-const DOTS = [rp(2368, 1255), rp(2228, 1390), rp(2510, 1390), rp(2368, 1530)];
-/** Each slot's icon while the skill wheel is open. */
-const WHEEL = [rp(2273, 1250), rp(2173, 1342), rp(2373, 1342), rp(2273, 1438)];
-/** The banner's top and bottom edges. */
-const BANNER_EDGES = [Math.round(345 * S) - BANNER.y, Math.round(541 * S) - BANNER.y];
-/** Each slot's portrait centre in the portraits area (to show it in the review). */
-export const FACES = [
-  [305, 1255],
-  [200, 1365],
-  [410, 1370],
-  [310, 1470],
-].map(([x, y]) => [Math.round(x * S) - PORTRAITS.x, Math.round(y * S) - PORTRAITS.y] as const);
+const timerGreen: Test = (r, g, b) => g > 150 && r > 110 && b < 110 && g - b > 80;
+const white: Test = (r, g, b) => Math.min(r, g, b) > 200;
+const light: Test = (r, g, b) => Math.min(r, g, b) > 150 && Math.max(r, g, b) - Math.min(r, g, b) < 40;
+
+/** The controller HUD, measured at 2560×1600. */
+export const CONTROLLER: Layout = (() => {
+  const S = READ_HEIGHT / 1600;
+  const right = { w: 312, h: 280, y: 776 };
+  const centre = { w: 300, h: 32, y: 980 };
+  const banner = { x: 0, y: 220, w: 340, h: 155 };
+  const portraits = { x: 0, y: 776, w: 420, h: 304 };
+  const rp = (x: number, y: number) => [Math.round((x - 2560) * S + right.w), Math.round(y * S - right.y)] as const;
+  const cp = (x: number, y: number) => [Math.round((x - 1280) * S + centre.w / 2), Math.round(y * S - centre.y)] as const;
+  return {
+    name: 'controller',
+    slots: ['Top', 'Left', 'Right', 'Bottom'],
+    right,
+    centre,
+    banner,
+    clock: { x: 214, y: 30, w: 88, h: 40 },
+    enemy: { w: 400, h: 36, y: 18 },
+    portraits,
+    faces: {
+      area: 'portraits',
+      at: [
+        [305, 1255],
+        [200, 1365],
+        [410, 1370],
+        [310, 1470],
+      ].map(([x, y]) => [Math.round(x * S) - portraits.x, Math.round(y * S) - portraits.y] as const),
+      above: 20,
+      size: 64,
+    },
+    segments: [
+      [cp(1072, 0)[0], cp(1198, 0)[0]],
+      [cp(1216, 0)[0], cp(1344, 0)[0]],
+      [cp(1360, 0)[0], cp(1494, 0)[0]],
+    ],
+    spY: cp(0, 1468)[1],
+    hpY: cp(0, 1490)[1],
+    hpX: [cp(1080, 0)[0], cp(1480, 0)[0]],
+    dots: [rp(2368, 1255), rp(2228, 1390), rp(2510, 1390), rp(2368, 1530)],
+    // Each slot's icon while the skill wheel is open.
+    presses: [rp(2273, 1250), rp(2173, 1342), rp(2373, 1342), rp(2273, 1438)],
+    pressHalf: 19,
+    pressTest: white,
+    bannerOn: 0.5,
+    bannerEdges: [Math.round(345 * S) - banner.y, Math.round(541 * S) - banner.y],
+    ink: timerGreen,
+  };
+})();
+
+/** The phone HUD, measured at 1560×720: everything about 1.4 times the controller HUD's size, laid out apart. */
+export const MOBILE: Layout = (() => {
+  const S = READ_HEIGHT / 720;
+  const right = { w: 720, h: 460, y: 540 };
+  const centre = { w: 420, h: 40, y: 940 };
+  // Its left part: the banner is see-through further right, over the stage's objectives.
+  const banner = { x: 0, y: 290, w: 420, h: 220 };
+  const rp = (x: number, y: number) => [Math.round((x - 1560) * S + right.w), Math.round(y * S - right.y)] as const;
+  const cp = (x: number, y: number) => [Math.round((x - 780) * S + centre.w / 2), Math.round(y * S - centre.y)] as const;
+  // The four skill buttons, upper right to lower left.
+  const buttons = [rp(1282, 412), rp(1182, 432), rp(1128, 520), rp(1142, 625)];
+  return {
+    name: 'mobile',
+    slots: ['Upper right', 'Upper', 'Middle', 'Lower'],
+    right,
+    centre,
+    banner,
+    clock: { dx: -48, y: 172, w: 140, h: 60 },
+    faces: { area: 'right', at: buttons, above: 48, size: 96 },
+    segments: [
+      [cp(648, 0)[0], cp(729, 0)[0]],
+      [cp(741, 0)[0], cp(822, 0)[0]],
+      [cp(829, 0)[0], cp(912, 0)[0]],
+    ],
+    spY: cp(0, 637)[1],
+    hpY: cp(0, 651)[1],
+    hpX: [cp(655, 0)[0], cp(905, 0)[0]],
+    dots: [],
+    presses: buttons,
+    pressHalf: 32,
+    pressTest: light,
+    bannerOn: 0.3,
+    bannerEdges: [Math.round(206 * S) - banner.y, Math.round(329 * S) - banner.y],
+    ink: white,
+  };
+})();
+
+export const LAYOUTS = { controller: CONTROLLER, mobile: MOBILE };
+
+/** The controller HUD's slot names (the review's default). */
+export const SLOTS = CONTROLLER.slots;
+
+/** Where to cut the areas from a frame `width` wide and READ_HEIGHT tall. */
+export function areas(width: number, layout: Layout = CONTROLLER): { right: Area; centre: Area; banner: Area; portraits: Area; clock: Area; enemy?: Area } {
+  const { right, centre, clock, enemy } = layout;
+  return {
+    right: { x: width - right.w, y: right.y, w: right.w, h: right.h },
+    centre: { x: Math.round(width / 2) - centre.w / 2, y: centre.y, w: centre.w, h: centre.h },
+    banner: layout.banner,
+    portraits: layout.portraits ?? { x: width - right.w, y: right.y, w: right.w, h: right.h },
+    clock: { x: clock.x ?? Math.round(width / 2) + clock.dx!, y: clock.y, w: clock.w, h: clock.h },
+    enemy: enemy && { x: Math.round(width / 2) - enemy.w / 2, y: enemy.y, w: enemy.w, h: enemy.h },
+  };
+}
 
 const at = (p: Px, x: number, y: number) => (y * p.width + x) * 4;
 
@@ -101,25 +195,25 @@ export interface Sample {
   hud: number;
   /** How clearly a side banner's edges show (a combo). */
   banner: number;
-  /** Each slot's Ultimate dot: how much of it is filled with colour. */
+  /** Each slot's Ultimate dot: how much of it is filled with colour (controller). */
   ready: number[];
-  /** Each slot's icon in the skill wheel: how much of it is white. */
+  /** Each slot's press: how much of its icon in the skill wheel is white (controller), or of its skill button is lit (phone). */
   wheel: number[];
   /** While a banner shows: its art, 24×9 RGB means. */
   art?: number[];
-  /** The stopwatch: how many of its yellow-green pixels each column has (it changes when it ticks). */
+  /** The stopwatch: how many of its ink pixels each column has (it changes when it ticks). */
   clock?: number[];
 }
 
 /** SP from the bar: how far each segment is lit from its left (white or yellow). */
-function spOf(c: Px): number {
+function spOf(c: Px, l: Layout): number {
   let sp = 0;
-  for (const [a, b] of SEGMENTS) {
+  for (const [a, b] of l.segments) {
     let n = 0;
     for (let x = a; x < b; x++) {
       // The dimmest of three rows, brightest channel.
       let v = 255;
-      for (let y = SP_Y - 1; y <= SP_Y + 1; y++) {
+      for (let y = l.spY - 1; y <= l.spY + 1; y++) {
         const i = at(c, x, y);
         v = Math.min(v, Math.max(c.data[i], c.data[i + 1], c.data[i + 2]));
       }
@@ -131,37 +225,40 @@ function spOf(c: Px): number {
   return sp;
 }
 
-function hudOf(c: Px): number {
+function hudOf(c: Px, l: Layout): number {
   let lit = 0;
   let n = 0;
-  for (let y = HP_Y - 1; y <= HP_Y + 1; y++)
-    for (let x = HP_X[0]; x < HP_X[1]; x++, n++) {
+  for (let y = l.hpY - 1; y <= l.hpY + 1; y++)
+    for (let x = l.hpX[0]; x < l.hpX[1]; x++, n++) {
       const i = at(c, x, y);
       if (c.data[i + 2] > 170 && c.data[i + 1] > 140 && c.data[i] < 130) lit++;
     }
   return lit / n;
 }
 
+/** The HP bar's lit share in a centre area cut for `layout` (which HUD a video has: ui picks by it). */
+export const hudIn = (centre: Px, layout: Layout) => hudOf(centre, layout);
+
 /** The share of columns with a sharp step at the banner's top edge, and at its bottom: the smaller. */
-function bannerOf(l: Px): number {
+function bannerOf(p: Px, l: Layout): number {
   const grey = (x: number, y: number) => {
-    const i = at(l, x, y);
-    return (l.data[i] + l.data[i + 1] + l.data[i + 2]) / 3;
+    const i = at(p, x, y);
+    return (p.data[i] + p.data[i + 1] + p.data[i + 2]) / 3;
   };
   let edges = 1;
-  for (const r of BANNER_EDGES) {
+  for (const r of l.bannerEdges) {
     let best = 0;
     for (let y = r - 2; y <= r; y++) {
       let n = 0;
-      for (let x = 10; x < 330; x++) if (Math.abs(grey(x, y + 1) - grey(x, y)) > 22) n++;
-      best = Math.max(best, n / 320);
+      for (let x = 10; x < p.width - 10; x++) if (Math.abs(grey(x, y + 1) - grey(x, y)) > 22) n++;
+      best = Math.max(best, n / (p.width - 20));
     }
     edges = Math.min(edges, best);
   }
   return edges;
 }
 
-function share(p: Px, cx: number, cy: number, half: number, test: (r: number, g: number, b: number) => boolean): number {
+function share(p: Px, cx: number, cy: number, half: number, test: Test): number {
   let hit = 0;
   let n = 0;
   for (let y = cy - half; y <= cy + half; y++)
@@ -172,17 +269,14 @@ function share(p: Px, cx: number, cy: number, half: number, test: (r: number, g:
   return hit / n;
 }
 
-/** The stopwatch's yellow-green. */
-const timerGreen = (r: number, g: number, b: number) => g > 150 && r > 110 && b < 110 && g - b > 80;
-
-/** The stopwatch's yellow-green pixels per column. */
-export function clockProfile(c: Px): number[] {
+/** The stopwatch's ink pixels per column. */
+export function clockProfile(c: Px, layout: Layout = CONTROLLER): number[] {
   const out: number[] = [];
   for (let x = 0; x < c.width; x++) {
     let n = 0;
     for (let y = 0; y < c.height; y++) {
       const i = at(c, x, y);
-      if (timerGreen(c.data[i], c.data[i + 1], c.data[i + 2])) n++;
+      if (layout.ink(c.data[i], c.data[i + 1], c.data[i + 2])) n++;
     }
     out.push(n);
   }
@@ -190,14 +284,14 @@ export function clockProfile(c: Px): number[] {
 }
 
 /** The stopwatch's digits as black on white, `scale` times bigger with a white margin, for text recognition. */
-export function clockInk(c: Px, scale = 3, margin = 24): Px {
+export function clockInk(c: Px, layout: Layout = CONTROLLER, scale = 3, margin = 24): Px {
   const w = c.width * scale + 2 * margin;
   const h = c.height * scale + 2 * margin;
   const data = new Uint8ClampedArray(w * h * 4).fill(255);
   for (let y = 0; y < c.height * scale; y++)
     for (let x = 0; x < c.width * scale; x++) {
       const i = at(c, Math.floor(x / scale), Math.floor(y / scale));
-      if (timerGreen(c.data[i], c.data[i + 1], c.data[i + 2])) data.set([0, 0, 0, 255], ((y + margin) * w + x + margin) * 4);
+      if (layout.ink(c.data[i], c.data[i + 1], c.data[i + 2])) data.set([0, 0, 0, 255], ((y + margin) * w + x + margin) * 4);
     }
   return { data, width: w, height: h };
 }
@@ -216,27 +310,27 @@ export function whiteInk(c: Px, scale = 2): Px {
   return { data, width: w, height: h };
 }
 
-const colourful = (r: number, g: number, b: number) => Math.max(r, g, b) - Math.min(r, g, b) > 80 && Math.max(r, g, b) > 140;
-const white = (r: number, g: number, b: number) => Math.min(r, g, b) > 200;
+const colourful: Test = (r, g, b) => Math.max(r, g, b) - Math.min(r, g, b) > 80 && Math.max(r, g, b) > 140;
 
-/** Measures one frame from its areas. */
-export function measure(t: number, right: Px, centre: Px, banner: Px, clock?: Px): Sample {
+/** Measures one frame from its areas, cut for `layout`. */
+export function measure(t: number, right: Px, centre: Px, banner: Px, clock?: Px, layout: Layout = CONTROLLER): Sample {
   const s: Sample = {
     t,
-    sp: spOf(centre),
-    hud: hudOf(centre),
-    banner: bannerOf(banner),
-    ready: DOTS.map(([x, y]) => share(right, x, y, 3, colourful)),
-    wheel: WHEEL.map(([x, y]) => share(right, x, y, 19, white)),
+    sp: spOf(centre, layout),
+    hud: hudOf(centre, layout),
+    banner: bannerOf(banner, layout),
+    ready: layout.dots.length ? layout.dots.map(([x, y]) => share(right, x, y, 3, colourful)) : [0, 0, 0, 0],
+    wheel: layout.presses.map(([x, y]) => share(right, x, y, layout.pressHalf, layout.pressTest)),
   };
-  if (s.banner > 0.3) s.art = artOf(banner);
-  if (clock) s.clock = clockProfile(clock);
+  if (s.banner > 0.3) s.art = artOf(banner, layout);
+  if (clock) s.clock = clockProfile(clock, layout);
   return s;
 }
 
 /** A banner's art as 24×9 cells of mean colour (between its edges). */
-export function artOf(l: Px): number[] {
-  const [y0, y1] = BANNER_EDGES;
+export function artOf(p: Px, layout: Layout = CONTROLLER): number[] {
+  const [y0, y1] = layout.bannerEdges;
+  const span = p.width - 23;
   const out: number[] = [];
   for (let cy = 0; cy < 9; cy++)
     for (let cx = 0; cx < 24; cx++) {
@@ -244,14 +338,14 @@ export function artOf(l: Px): number[] {
       let n = 0;
       const ya = y0 + 2 + Math.floor(((y1 - y0 - 4) * cy) / 9);
       const yb = y0 + 2 + Math.floor(((y1 - y0 - 4) * (cy + 1)) / 9);
-      const xa = 20 + Math.floor((317 * cx) / 24);
-      const xb = 20 + Math.floor((317 * (cx + 1)) / 24);
+      const xa = 20 + Math.floor((span * cx) / 24);
+      const xb = 20 + Math.floor((span * (cx + 1)) / 24);
       for (let y = ya; y < yb; y += 2)
         for (let x = xa; x < xb; x += 2, n++) {
-          const i = at(l, x, y);
-          sum[0] += l.data[i];
-          sum[1] += l.data[i + 1];
-          sum[2] += l.data[i + 2];
+          const i = at(p, x, y);
+          sum[0] += p.data[i];
+          sum[1] += p.data[i + 1];
+          sum[2] += p.data[i + 2];
         }
       out.push(sum[0] / n, sum[1] / n, sum[2] / n);
     }
@@ -311,6 +405,8 @@ const CHAIN = 1.2;
 const REFUND = 0.6;
 /** The stopwatch is read this long after a tick (seconds). */
 const SETTLE = 0.5;
+/** A phone skill button lighting up by this much more than before: pressed. */
+const PRESSED = 0.25;
 /** The stopwatch standing still at least this long is a pause (a phase change; less is a tick found a frame off). */
 const PAUSE = 1;
 
@@ -339,9 +435,10 @@ function shown(samples: Sample[]): { on: boolean[]; gaps: [number, number][] } {
 
 /**
  * Turns a video's samples (in time order) into steps. `clock`: the stopwatch's digits at the ticks clockAnchors
- * asked for, read by text recognition.
+ * asked for, read by text recognition. `layout`: the HUD they were measured with.
  */
-export function readRotation(samples: Sample[], clock: ClockReading[] = []): Reading {
+export function readRotation(samples: Sample[], clock: ClockReading[] = [], layout: Layout = CONTROLLER): Reading {
+  const phone = layout.name === 'mobile';
   const n = samples.length;
   const t = samples.map((s) => s.t);
   const { on, gaps } = shown(samples);
@@ -349,12 +446,18 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = []): Rea
   if (first < 0) return { steps: [], start: null, end: null, arts: [] };
   const steps: Step[] = [];
 
-  // Ultimates: a cut-in with the HUD up on both sides, and a dot full before it and empty after.
+  // Ultimates: a cut-in with the HUD up on both sides, and a dot full before it and empty after (controller), or a
+  // skill button lit up just before it (phone).
   const gapEnds: number[] = [];
   for (const [i, j] of gaps) {
     if (j >= n) continue;
     gapEnds.push(t[j]);
     if (i === 0 || t[j] - t[i] < CUT_IN) continue;
+    if (phone) {
+      const lit = pressed(samples, t[i] - 0.6, t[i] - 0.01);
+      if (lit) steps.push({ t: t[i], input: 'ultimate', slot: lit.slot });
+      continue;
+    }
     // Before: the last moments the dots could be seen (the skill wheel hides them; an ultimate needs one full dot).
     const seen: number[] = [];
     for (let k = i - 1; k >= 0 && t[k] >= t[i] - 3; k--) if (on[k] && Math.max(...samples[k].ready) > ON) seen.push(k);
@@ -369,6 +472,8 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = []): Rea
     }
   }
 
+  let lastOn = n - 1;
+  while (!on[lastOn]) lastOn--;
   // SP: a drop is a battle skill, a step up a Final Strike (or a Finisher). Not a Final Strike: SP coming back from
   // a battle skill (a step 0.4 s after it), a second step sooner than a basic attack chain takes, or a small step
   // (another source of SP: under REFUND of the usual Final Strike's).
@@ -387,29 +492,34 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = []): Rea
       }
     if (hi < 0) continue;
     const sp = samples[i].sp;
-    if (hi - sp >= DROP && t[i] - lastDrop > 0.3) {
+    // Not a battle skill: the bar emptied as the fight ends (the HUD goes for good just after).
+    const ends = (sp < 5 && hi - sp > 150) || t[i] > t[lastOn] - 0.5;
+    if (hi - sp >= DROP && !ends && t[i] - lastDrop > 0.3 && staysDown(samples, on, i, hi)) {
       lastDrop = t[i];
-      steps.push({ t: t[i], input: 'battle', ...casterOf(samples, i), ...(spBack(samples, on, i) ? { spBack: true } : {}) });
-    } else if (sp - lo >= GAIN && t[i] - lastGain > CHAIN && t[i] - lastDrop > SP_BACK && !gapEnds.some((e) => t[i] - e >= 0 && t[i] - e < 0.6) && holds(samples, on, i)) {
+      const caster = phone ? buttonOf(samples, t[i]) : casterOf(samples, i);
+      steps.push({ t: t[i], input: 'battle', ...caster, ...(spBack(samples, on, i) ? { spBack: true } : {}) });
+    } else if (sp - lo >= GAIN && sp - level(samples, on, i) >= GAIN && t[i] - lastGain > CHAIN && t[i] - lastDrop > SP_BACK && !gapEnds.some((e) => t[i] - e >= 0 && t[i] - e < 0.6) && holds(samples, on, i)) {
       lastGain = t[i];
-      gains.push({ step: { t: t[i], input: sp - lo >= FINISHER ? 'finisher' : 'strike', slot: null }, gain: sp - lo });
+      // How much it rose: from just before, or from the level before if the bar blinked in between.
+      const gain = Math.min(sp - lo, sp - level(samples, on, i));
+      gains.push({ step: { t: t[i], input: gain >= FINISHER ? 'finisher' : 'strike', slot: null }, gain });
     }
   }
   const usual = median(gains.filter((g) => g.step.input === 'strike').map((g) => g.gain));
   steps.push(...gains.filter((g) => g.step.input === 'finisher' || g.gain >= usual * REFUND).map((g) => g.step));
 
-  const combo = combos(samples, on);
+  const combo = combos(samples, on, layout.bannerOn);
   steps.push(...combo.steps);
   let end = n - 1;
   while (!on[end]) end--;
   const reading: Reading = { steps: steps.sort((a, b) => a.t - b.t), start: t[first], end: t[end], arts: combo.arts };
-  const c = clockOf(samples, on, gaps, clock);
+  const c = clockOf(samples, on, gaps, clock, t[first]);
   if (c) reading.clock = c;
   return reading;
 }
 
-/** How much the stopwatch's digits differ between two samples. */
-const changed = (a: Sample, b: Sample) => a.clock!.reduce((d, v, x) => d + Math.abs(v - (b.clock![x] ?? 0)), 0);
+/** How much the stopwatch's digits differ between two samples (a pixel or two per column is the video's noise). */
+const changed = (a: Sample, b: Sample) => a.clock!.reduce((d, v, x) => d + Math.max(0, Math.abs(v - (b.clock![x] ?? 0)) - 2), 0);
 
 /** The sample nearest time x (samples in time order). */
 function nearest(samples: Sample[], x: number): number {
@@ -506,16 +616,24 @@ function clockSeconds(text: string): number | null {
   return m && Number(m[2]) < 60 ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
-function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], readings: ClockReading[]): Reading['clock'] {
+function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], readings: ClockReading[], start: number): Reading['clock'] {
   const runs = stretches(samples, on);
   if (!runs.length || !readings.length) return undefined;
-  // Each stretch's time at its first tick, by vote of its readings (each tick is one more second).
+  const within = (x: ClockReading, r: number[]) => x.t >= r[0] && x.t <= r[r.length - 1] + 2 * SETTLE;
+  // Up, or down (a timed stage): which way its readings go within a stretch.
+  let down = 0;
+  for (const { ticks: r } of runs) {
+    const read = readings.filter((x) => within(x, r)).map((x) => ({ t: x.t, g: clockSeconds(x.text) })).filter((x) => x.g !== null);
+    if (read.length >= 2) down += Math.sign(read[0].g! - read[read.length - 1].g!);
+  }
+  const dir = down > 0 ? -1 : 1;
+  // Each stretch's time at its first tick, by vote of its readings (each tick is one more second, or one less).
   const zero = runs.map(({ ticks: r }) => {
     const votes = new Map<number, number>();
     for (const x of readings) {
       const g = clockSeconds(x.text);
-      if (g === null || x.t < r[0] || x.t > r[r.length - 1] + 2 * SETTLE) continue;
-      const g0 = g - Math.round(x.t - SETTLE - r[0]);
+      if (g === null || !within(x, r)) continue;
+      const g0 = g - dir * Math.round(x.t - SETTLE - r[0]);
       // A clean "00:00" counts twice: a misread usually loses its colon or a digit.
       votes.set(g0, (votes.get(g0) ?? 0) + (/^\d\d:\d\d$/.test(x.text.trim()) ? 2 : 1));
     }
@@ -524,15 +642,17 @@ function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], rea
   const t = samples.map((s) => s.t);
   const pauses: [number, number][] = [];
   let prev = -1;
+  let first = -1;
   runs.forEach(({ ticks: r }, k) => {
     if (zero[k] === null) return;
+    if (first < 0) first = k;
     if (prev >= 0) {
       const p = runs[prev].ticks;
       const a = p[p.length - 1];
-      const ga = zero[prev]! + Math.round(a - p[0]);
+      const ga = zero[prev]! + dir * Math.round(a - p[0]);
       // Time that went by between the two ticks, less what the stopwatch counted: it stood still. Ultimates' cut-ins
       // don't stop it, and a tick found a frame off is no pause.
-      const still = r[0] - a - (zero[k]! - ga);
+      const still = r[0] - a - dir * (zero[k]! - ga);
       if (still >= PAUSE) {
         // From where the HUD went away for longest between the two ticks.
         const hidden = gaps.filter(([i, j]) => t[i] > a && t[i] < r[0] && j < t.length).sort(([i1, j1], [i2, j2]) => t[j2] - t[i2] - (t[j1] - t[i1]))[0];
@@ -544,16 +664,20 @@ function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], rea
   });
   if (prev < 0) return undefined;
   const last = runs[prev].ticks;
-  const g = (x: number) => zero[prev]! + Math.round(x - last[0]);
+  const g = (x: number) => zero[prev]! + dir * Math.round(x - last[0]);
+  // The fight's length: how far it moved from what it showed when the HUD first did.
+  const atStart = zero[first]! - dir * Math.round(runs[first].ticks[0] - start);
+  const length = (v: number) => dir * (v - atStart);
   // Where it stopped: the tick at what it shows at the last moment the HUD does, else the last tick it changed at.
+  const [lo, hi] = [g(last[0]), g(last[last.length - 1])].sort((x, y) => x - y);
   const final = readings
     .filter((x) => x.t > last[last.length - 1])
     .map((x) => clockSeconds(x.text))
-    .find((v): v is number => v !== null && v >= g(last[0]) && v <= g(last[last.length - 1]));
-  if (final !== undefined) return { end: last[0] + (final - zero[prev]!), seconds: final, pauses };
+    .find((v): v is number => v !== null && v >= lo && v <= hi);
+  if (final !== undefined) return { end: last[0] + dir * (final - zero[prev]!), seconds: length(final), pauses };
   const moved = last.filter((_, i) => runs[prev].change[i] > 25);
   const end = moved[moved.length - 1];
-  return { end, seconds: g(end), pauses };
+  return { end, seconds: length(g(end)), pauses };
 }
 
 /**
@@ -577,6 +701,34 @@ function spBack(samples: Sample[], on: boolean[], i: number): boolean {
   return end - low >= SP_BACK_GAIN && high - end < 5;
 }
 
+/** SP over the half second before sample i (its middle value: a frame the bar blinks doesn't count). */
+function level(samples: Sample[], on: boolean[], i: number): number {
+  const t = samples[i].t;
+  const sp: number[] = [];
+  for (let k = i - 1; k >= 0 && samples[k].t >= t - 0.6; k--) if (on[k] && samples[k].t < t - 0.05) sp.push(samples[k].sp);
+  return sp.length ? median(sp) : -Infinity;
+}
+
+/**
+ * An SP drop that stays: on the next frames, and most of the next moment (the bar can blink empty for a frame, or
+ * back full for a frame or two after a real drop).
+ */
+function staysDown(samples: Sample[], on: boolean[], i: number, before: number): boolean {
+  const t = samples[i].t;
+  const dip = samples[i].sp;
+  let up = 0;
+  let n = 0;
+  for (let k = i + 1; k < samples.length && samples[k].t <= t + 0.4; k++) {
+    if (!on[k]) continue;
+    if (samples[k].t < t + 0.1 && samples[k].sp > dip + DROP) return false;
+    if (samples[k].t >= t + 0.1) {
+      n++;
+      if (samples[k].sp > before - DROP / 2) up++;
+    }
+  }
+  return up * 2 < n || n === 0;
+}
+
 /** An SP step that stays (the bar refilling at the end of a fight keeps climbing). */
 function holds(samples: Sample[], on: boolean[], i: number): boolean {
   const t = samples[i].t;
@@ -593,6 +745,32 @@ const wheelOpen = (s: Sample) => s.wheel.filter((w) => w > 0.08).length >= 3;
  * (they dim when SP falls below their cost, or as the wheel closes). No
  * wheel seen (not the controller layout): unknown.
  */
+/**
+ * The phone's skill button that lit up between from and to (seconds into the video): of those whose lit share rose
+ * PRESSED above their own before, the one that lit up last (a press flashes as it happens; a button can also glow a
+ * while). `others`: how many more rose.
+ */
+function pressed(samples: Sample[], from: number, to: number): { slot: Slot; others: number } | null {
+  const before = samples.filter((x) => x.t >= from - 0.9 && x.t < from - 0.05 && x.hud > ON);
+  const during = samples.filter((x) => x.t >= from && x.t <= to);
+  if (!during.length) return null;
+  const lit = [0, 1, 2, 3].flatMap((k) => {
+    const base = median(before.map((x) => x.wheel[k]));
+    const first = during.find((x) => x.wheel[k] - base >= PRESSED);
+    return first ? [{ slot: k as Slot, at: first.t }] : [];
+  });
+  if (!lit.length) return null;
+  const last = lit.reduce((a, b) => (b.at > a.at ? b : a));
+  return { slot: last.slot, others: lit.length - 1 };
+}
+
+/** Who used the battle skill whose SP drops at t, on the phone: the skill button that lit up as it was pressed. */
+function buttonOf(samples: Sample[], t: number): { slot: Slot | null; unsure?: boolean } {
+  const lit = pressed(samples, t - 0.35, t + 0.12);
+  if (!lit) return { slot: null };
+  return lit.others ? { slot: lit.slot, unsure: true } : { slot: lit.slot };
+}
+
 function casterOf(samples: Sample[], i: number): { slot: Slot | null; unsure?: boolean } {
   const t = samples[i].t;
   const open: Sample[] = [];
@@ -640,28 +818,28 @@ function corr(a: number[], b: number[]): number {
 }
 
 /** Same art: banners of one operator. */
-const SAME_ART = 0.85;
+const SAME_ART = 0.8;
 /** Between two frames' art below this, and still below it a few frames on: a new banner. */
 const JUMP = 0.5;
 /** Steady art this long (seconds) before a jump counts as a new banner. */
-const STEADY = 0.15;
+const STEADY = 0.1;
 
 
 /**
  * Combos: banner stretches (a gap under 0.6 s is the same banner), cut where the art jumps (a new banner slides in
  * over the last one; the art itself only pans), grouped by art: each group one operator.
  */
-function combos(samples: Sample[], on: boolean[]): { steps: Step[]; arts: number[][] } {
+function combos(samples: Sample[], on: boolean[], bannerOn: number): { steps: Step[]; arts: number[][] } {
   const n = samples.length;
   const t = samples.map((s) => s.t);
   const runs: [number, number][] = [];
   for (let i = 0; i < n; ) {
-    if (!(on[i] && samples[i].banner > ON)) {
+    if (!(on[i] && samples[i].banner > bannerOn)) {
       i++;
       continue;
     }
     let j = i;
-    while (j < n && on[j] && samples[j].banner > ON) j++;
+    while (j < n && on[j] && samples[j].banner > bannerOn) j++;
     const last = runs[runs.length - 1];
     if (last && t[i] - t[last[1] - 1] <= 0.6) last[1] = j;
     else runs.push([i, j]);
@@ -680,19 +858,23 @@ function combos(samples: Sample[], on: boolean[]): { steps: Step[]; arts: number
     for (let k = 1; k < arts.length; k++) {
       const step = corr(arts[k - 1].art!, arts[k].art!);
       const after = arts[Math.min(k + 3, arts.length - 1)];
-      if (step < JUMP && corr(arts[k - 1].art!, after.art!) < JUMP && settled) {
+      // Frames without a banner between: its edges blurred while one replaced another.
+      const gap = arts[k].t - arts[k - 1].t > 0.2;
+      if ((settled && ((step < JUMP && corr(arts[k - 1].art!, after.art!) < JUMP) || (gap && step < 0.6))) || (gap && step < 0.45 && corr(arts[k - 1].art!, after.art!) < JUMP && arts[k - 1].t - parts[parts.length - 1].from >= 0.25)) {
         parts.push({ from: arts[k].t, arts: [] });
         steadySince = -1;
         settled = false;
       } else if (step >= 0.75) {
         if (steadySince < 0) steadySince = arts[k - 1].t;
-        settled ||= arts[k].t - steadySince >= STEADY;
+        settled ||= arts[k].t - steadySince >= STEADY - 1e-6;
       } else steadySince = -1;
       parts[parts.length - 1].arts.push(arts[k]);
     }
-    // A banner starting part-way that doesn't stay is the last one sliding out.
-    for (let k = parts.length - 1; k > 0; k--)
-      if (parts[k].arts[parts[k].arts.length - 1].t - parts[k].from < 0.3) parts[k - 1].arts.push(...parts.splice(k, 1)[0].arts);
+    // A banner starting part-way that doesn't stay (until the next one, or the stretch's end) is the last one sliding out.
+    for (let k = parts.length - 1; k > 0; k--) {
+      const until = parts[k + 1]?.from ?? parts[k].arts[parts[k].arts.length - 1].t;
+      if (until - parts[k].from < 0.3) parts[k - 1].arts.push(...parts.splice(k, 1)[0].arts);
+    }
     banners.push(...parts);
   }
   // A banner's art: its frames at the same moment of its animation (it slides in, then pans), cell by cell.
@@ -732,3 +914,4 @@ function combos(samples: Sample[], on: boolean[]): { steps: Step[]; arts: number
     arts: order.map((i) => artOf(banners[i])),
   };
 }
+

@@ -37,6 +37,7 @@ const PAGES = [
   'essences',
   'aic',
   'rotations',
+  'rotations/parser',
   'rotations/transcript',
   'achievements',
   'archives',

@@ -305,8 +305,15 @@ export interface SavedSim<R = unknown> {
   result: R;
   names: string[];
   ids: string[];
+  /** Kept on top of History and never trimmed. */
+  fav?: boolean;
+  /** The player's own name for it, and a note. */
+  name?: string;
+  note?: string;
+  /** A parsed run's reading (its presses), so its transcript can be edited and played again. */
+  video?: unknown;
 }
-/** How many Rotations results to keep (each run, for a team's history); the oldest go first. */
+/** How many Rotations results to keep (each run, for a team's history); the oldest go first, favorites never. */
 const MAX_SIMS = 100;
 
 export const listSims = <R>(): Promise<SavedSim<R>[]> =>
@@ -316,7 +323,24 @@ export const listSims = <R>(): Promise<SavedSim<R>[]> =>
 export async function saveSim<R>(entry: SavedSim<R>): Promise<void> {
   const list = await listSims<R>();
   list.push(entry);
-  await idb('data', 'readwrite', (s) => s.put(list.slice(-MAX_SIMS), 'sims'));
+  for (let i = 0; list.length > MAX_SIMS && i < list.length; ) if (list[i].fav) i++;
+    else list.splice(i, 1);
+  await idb('data', 'readwrite', (s) => s.put(list, 'sims'));
+}
+
+/** Changes a saved result (by its time): favorite, name, note; a parsed run's edited transcript and its new result. */
+export async function updateSim(at: number, change: Partial<Pick<SavedSim, 'fav' | 'name' | 'note' | 'key' | 'result' | 'video'>>): Promise<void> {
+  const list = await listSims();
+  const x = list.find((e) => e.at === at);
+  if (!x) return;
+  Object.assign(x, change);
+  await idb('data', 'readwrite', (s) => s.put(list, 'sims'));
+}
+
+/** Deletes a saved result (by its time). */
+export async function deleteSim(at: number): Promise<void> {
+  const list = await listSims();
+  await idb('data', 'readwrite', (s) => s.put(list.filter((e) => e.at !== at), 'sims'));
 }
 
 /** The last gameplay video's reading (Rotations), so it can be played again without reading the video again. */

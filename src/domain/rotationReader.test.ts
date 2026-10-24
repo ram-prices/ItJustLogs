@@ -1,7 +1,8 @@
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import fixture from './rotationReader.samples.json';
-import { clockAnchors, enemyName, measure, readRotation, SLOTS, type Px, type Sample } from './rotationReader';
+import phoneFixture from './rotationReader.mobile.json';
+import { clockAnchors, enemyName, measure, MOBILE, readRotation, SLOTS, type Px, type Sample } from './rotationReader';
 
 // A real recording (ef-alleikhreos.mp4: 2560×1600, Crisis Calamity, controller layout) as Chrome measured it with
 // ui/rotationReader.ts, 30 frames a second: per sample its time in ms, SP × 0.85, then × 255 the HUD, banner,
@@ -230,5 +231,86 @@ describe.each([0, 1])('rotation reader on every other frame (half %i)', (half) =
     expect(r.clock!.seconds).toBe(141);
     expect(near(r.clock!.end, 146.47, 0.15)).toBe(true);
     expect(r.clock!.pauses).toHaveLength(1);
+  });
+});
+
+// A phone recording (1560×720, Wall of Shields: Brutal), every frame measured with the phone HUD's areas at its own
+// time (phone recordings have a variable frame rate), checked frame by frame against the video. Its skill buttons,
+// upper right to lower: a crossed heart, a pinwheel, a zigzag, a lily.
+describe('rotation reader on a phone recording', () => {
+  const bytes = inflateSync(Buffer.from((phoneFixture as { data: string }).data, 'base64'));
+  const phone: Sample[] = [];
+  for (let k = 0; k < bytes.length; ) {
+    const b = bytes.subarray(k + 4, k + 16);
+    const s: Sample = { t: bytes.readUInt32LE(k) / 1000, sp: b[0] / 0.85, hud: b[1] / 255, banner: b[2] / 255, ready: [...b.subarray(3, 7)].map((x) => x / 255), wheel: [...b.subarray(7, 11)].map((x) => x / 255) };
+    k += 16;
+    if (b[11]) {
+      s.art = [...bytes.subarray(k, k + 648)];
+      k += 648;
+    }
+    s.clock = [...bytes.subarray(k, k + 140)];
+    k += 140;
+    phone.push(s);
+  }
+  // What text recognition read at each moment asked for, in the browser: the stopwatch counts down from 7:00 here;
+  // before the fight and after it the spot shows something else.
+  const read = ['1', '06:57', '06:26', '06:53', '06:40', '06:28', '06:22', '06:16', '06:11', '06:03', '', '4', ''];
+  const asked = clockAnchors(phone);
+  const r = readRotation(
+    phone,
+    asked.map((t, k) => ({ t, text: read[k] ?? '' })),
+    MOBILE,
+  );
+  const got = (input: string) => r.steps.filter((s) => s.input === input);
+  const button = (name: string) => MOBILE.slots.indexOf(name);
+
+  it('reads the battle skills, and whose by the button that lit up', () => {
+    const want: [number, string, boolean][] = [
+      [17.52, 'Upper', false],
+      [39.05, 'Upper', false],
+      [44.46, 'Upper', false],
+      // The lily glowed too; the crossed heart lit up as SP dropped.
+      [57.13, 'Upper right', true],
+    ];
+    expect(got('battle')).toHaveLength(want.length);
+    want.forEach(([t, b, unsure], i) => {
+      expect(near(got('battle')[i].t, t)).toBe(true);
+      expect(got('battle')[i].slot).toBe(button(b));
+      expect(!!got('battle')[i].unsure).toBe(unsure);
+    });
+  });
+
+  it('reads the ultimates by the button pressed just before the cut-in', () => {
+    expect(got('ultimate').map((s) => [Math.round(s.t * 10) / 10, MOBILE.slots[s.slot!]])).toEqual([
+      [35.6, 'Upper'],
+      [52.1, 'Middle'],
+    ]);
+  });
+
+  it('reads the combo banners, three of them back to back, one group per operator', () => {
+    // Silver hair, brown hair, blonde with horns, purple hair.
+    const who = ['silver', 'brown', 'blonde', 'purple', 'silver', 'brown', 'blonde', 'silver', 'purple', 'brown', 'blonde'];
+    const at = [8.34, 9.47, 10.11, 17.38, 28.21, 29.06, 29.51, 48.26, 49.32, 50.04, 50.47];
+    const combos = got('combo');
+    expect(combos).toHaveLength(who.length);
+    const groupOf = new Map<string, number>();
+    who.forEach((w, i) => {
+      expect(near(combos[i].t, at[i], 0.15)).toBe(true);
+      if (!groupOf.has(w)) groupOf.set(w, combos[i].group!);
+      expect(combos[i].group).toBe(groupOf.get(w));
+    });
+    expect(new Set(groupOf.values()).size).toBe(4);
+  });
+
+  it("reads Final Strikes, not the SP bar's blinks or its emptying at the end", () => {
+    expect(got('strike').map((s) => Math.round(s.t))).toEqual([40, 43, 48]);
+    expect(got('finisher')).toHaveLength(0);
+    expect(got('battle').every((s) => s.t < 63)).toBe(true);
+  });
+
+  it('times the fight by the stopwatch counting down, ultimates not stopping it', () => {
+    expect(r.clock!.seconds).toBe(62);
+    expect(near(r.clock!.end, 62.81, 0.15)).toBe(true);
+    expect(r.clock!.pauses).toHaveLength(0);
   });
 });

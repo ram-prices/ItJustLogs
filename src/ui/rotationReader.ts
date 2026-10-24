@@ -1,4 +1,4 @@
-import { FACES, READ_HEIGHT, READ_NAME, SLOTS, areas, clockAnchors, clockInk, enemyName, measure, readRotation, whiteInk, type Area, type ClockReading, type Px, type Read, type Reading, type Sample, type Slot, type Step } from '../domain/rotationReader';
+import { CONTROLLER, MOBILE, READ_HEIGHT, READ_NAME, areas, clockAnchors, clockInk, enemyName, hudIn, measure, readRotation, whiteInk, type Area, type ClockReading, type Layout, type Px, type Read, type Reading, type Sample, type Slot, type Step } from '../domain/rotationReader';
 import { toast } from './common';
 import { icon } from './components';
 import { html, raw, render } from './html';
@@ -6,7 +6,8 @@ import { recognize } from './screenReader';
 
 /**
  * "Read a gameplay video" on the Rotations page: the player picks a
- * recording of a fight (controller layout) and gets its rotation written
+ * recording of a fight (controller or phone HUD, told apart by where its HP
+ * bar shows) and gets its rotation written
  * out. The video plays in this browser at double speed; each frame's SP
  * bar, skill diamond and banner area are cut out and measured
  * (domain/rotationReader.ts turns that into presses). Then the stopwatch's
@@ -67,59 +68,98 @@ const canvasFor = (a: Area) => {
   return c;
 };
 
+/** A video being read: one at a time. */
+let busy = false;
+
+/** Leaving the site would lose the read. */
+const stay = (e: BeforeUnloadEvent) => e.preventDefault();
+
+/**
+ * Reads a video in the background: a small panel (bottom left) shows the video and how far it got, and the rest of
+ * the site stays usable meanwhile. When it's done the panel offers the transcript.
+ */
 export async function readGameplayFile(file: File, operators: string[], simulate?: (v: VideoRotation) => void): Promise<void> {
-  const dlg = document.createElement('dialog');
-  dlg.className = 'card reader-dialog';
-  document.body.append(dlg);
+  if (busy) return toast('A video is being read already.');
+  busy = true;
+  addEventListener('beforeunload', stay);
+  const panel = document.createElement('div');
+  panel.className = 'card gameplay-progress';
+  panel.setAttribute('role', 'status');
+  document.body.append(panel);
   let cancelled = false;
-  dlg.addEventListener('close', () => {
-    cancelled = true;
+  const video = document.createElement('video');
+  const finish = () => {
+    busy = false;
+    removeEventListener('beforeunload', stay);
     video.pause();
     URL.revokeObjectURL(video.src);
-    dlg.remove();
-  });
-  dlg.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('[data-reader-cancel]')) dlg.close();
-  });
+  };
+  const close = () => {
+    cancelled = true;
+    finish();
+    panel.remove();
+  };
   render(
-    dlg,
-    html`<div class="reader-head"><h2 class="heading-20">Reading the video</h2></div>
-      <div class="reader-body">
-        <div class="gameplay-preview"></div>
-        <p class="copy-14 gameplay-status">Opening the video…</p>
-        <div class="reader-bar"><span style="width:0%"></span></div>
-        <p class="copy-13 secondary">Everything is read here in your browser; nothing is uploaded.</p>
+    panel,
+    html`<div class="gameplay-progress-head">
+        <span class="label-14">Reading the video</span>
+        <button type="button" class="btn tertiary sm icon-btn" data-gameplay-cancel title="Cancel" aria-label="Cancel">${icon('close')}</button>
       </div>
-      <div class="reader-foot"><span></span><button type="button" class="btn secondary sm" data-reader-cancel>Cancel</button></div>`,
+      <div class="gameplay-preview"></div>
+      <p class="copy-13 secondary gameplay-status">Opening the video…</p>
+      <div class="reader-bar"><span style="width:0%"></span></div>`,
   );
-  dlg.showModal();
-  const video = document.createElement('video');
+  panel.querySelector('[data-gameplay-cancel]')!.addEventListener('click', close);
   video.muted = true;
   video.playsInline = true;
   video.preload = 'auto';
   video.src = URL.createObjectURL(file);
-  dlg.querySelector('.gameplay-preview')!.append(video);
-  const status = dlg.querySelector<HTMLElement>('.gameplay-status')!;
-  const bar = dlg.querySelector<HTMLElement>('.reader-bar span')!;
+  panel.querySelector('.gameplay-preview')!.append(video);
+  const status = panel.querySelector<HTMLElement>('.gameplay-status')!;
+  const bar = panel.querySelector<HTMLElement>('.reader-bar span')!;
   try {
     await new Promise<void>((resolve, reject) => {
       video.onloadedmetadata = () => resolve();
       video.onerror = () => reject(new Error(`Couldn't open ${file.name} (this browser may not play that format).`));
     });
     const started = Date.now();
-    const got = await sampleVideo(video, () => cancelled, (done) => {
+    const layout = await layoutOf(video);
+    const got = await sampleVideo(video, layout, () => cancelled, (done) => {
       status.textContent = `Reading ${Math.round(done * 100)}%…`;
       bar.style.width = `${Math.round(done * 100)}%`;
     });
     if (cancelled) return;
     status.textContent = 'Reading the stopwatch and the boss’s name…';
-    const words = await readWords(got);
+    const words = await readWords(got, layout);
     if (cancelled) return;
-    const reading = readRotation(got.samples, words.clock);
-    review(dlg, reading, got.portraits, operators, simulate, Math.round((Date.now() - started) / 1000), words.enemy);
+    const result = readRotation(got.samples, words.clock, layout);
+    finish();
+    // The transcript, in a dialog the panel opens (again, if closed: picks made in it stay).
+    const dlg = document.createElement('dialog');
+    dlg.className = 'card reader-dialog';
+    document.body.append(dlg);
+    dlg.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-reader-cancel]')) dlg.close();
+    });
+    const done = () => {
+      dlg.remove();
+      panel.remove();
+    };
+    review(dlg, result, got.portraits, operators, simulate, Math.round((Date.now() - started) / 1000), words.enemy, layout, done);
+    const presses = result.steps.filter((x) => x.input !== 'strike' && x.input !== 'finisher').length;
+    render(
+      panel,
+      html`<div class="gameplay-progress-head">
+          <span class="label-14">${result.start === null ? 'No fight found' : `Read ${presses} presses`}</span>
+          <button type="button" class="btn tertiary sm icon-btn" data-gameplay-dismiss title="Close" aria-label="Close">${icon('close')}</button>
+        </div>
+        <button type="button" class="btn primary sm" data-gameplay-open>Open the transcript</button>`,
+    );
+    panel.querySelector('[data-gameplay-dismiss]')!.addEventListener('click', done);
+    panel.querySelector('[data-gameplay-open]')!.addEventListener('click', () => dlg.showModal());
   } catch (e) {
     if (!cancelled) {
-      dlg.close();
+      close();
       toast((e as Error).message, 'error');
     }
   }
@@ -143,8 +183,32 @@ const canvasOf = (p: Px) => {
   return c;
 };
 
+/** Which HUD the video has, controller or phone: whose HP bar shows in a few frames across it. */
+async function layoutOf(video: HTMLVideoElement): Promise<Layout> {
+  const scale = READ_HEIGHT / video.videoHeight;
+  const width = Math.round(video.videoWidth * scale);
+  const hits = new Map<Layout, number>([
+    [CONTROLLER, 0],
+    [MOBILE, 0],
+  ]);
+  for (let f = 0.2; f < 0.85; f += 0.1) {
+    video.currentTime = f * video.duration;
+    await new Promise((r) => video.addEventListener('seeked', r, { once: true }));
+    for (const l of hits.keys()) {
+      const a = areas(width, l).centre;
+      const c = canvasFor(a);
+      const g = c.getContext('2d', { willReadFrequently: true })!;
+      g.drawImage(video, a.x / scale, a.y / scale, a.w / scale, a.h / scale, 0, 0, a.w, a.h);
+      if (hudIn(g.getImageData(0, 0, a.w, a.h), l) > 0.5) hits.set(l, hits.get(l)! + 1);
+    }
+  }
+  video.currentTime = 0;
+  await new Promise((r) => video.addEventListener('seeked', r, { once: true }));
+  return hits.get(MOBILE)! > hits.get(CONTROLLER)! ? MOBILE : CONTROLLER;
+}
+
 /** The stopwatch at the ticks the domain asks for, and the boss's name; nothing if the text reader can't load. */
-async function readWords(got: Sampled): Promise<{ clock: ClockReading[]; enemy?: string }> {
+async function readWords(got: Sampled, layout: Layout): Promise<{ clock: ClockReading[]; enemy?: string }> {
   // The stopwatch's picture nearest each time asked for.
   const near = (t: number) => got.clocks.reduce<[number, Px] | undefined>((a, b) => (Math.abs(b[0] - t) < Math.abs((a?.[0] ?? Infinity) - t) ? b : a), undefined);
   const picks = clockAnchors(got.samples).flatMap((t) => {
@@ -152,7 +216,7 @@ async function readWords(got: Sampled): Promise<{ clock: ClockReading[]; enemy?:
     return c && Math.abs(c[0] - t) <= CLOCK_EVERY ? [c] : [];
   });
   try {
-    const texts = await recognize(picks.map(([, px]) => canvasOf(clockInk(px))), '0123456789:');
+    const texts = await recognize(picks.map(([, px]) => canvasOf(clockInk(px, layout))), '0123456789:');
     const names = got.enemies.length ? await recognize(got.enemies.map((p) => canvasOf(whiteInk(p)))) : [];
     return { clock: picks.map(([t], k) => ({ t, text: texts[k] })), enemy: enemyName(names) };
   } catch {
@@ -160,10 +224,10 @@ async function readWords(got: Sampled): Promise<{ clock: ClockReading[]; enemy?:
   }
 }
 
-/** Plays the video through, measuring each frame shown. */
-async function sampleVideo(video: HTMLVideoElement, cancelled: () => boolean, progress: (done: number) => void): Promise<Sampled> {
+/** Plays the video through, measuring each frame shown with `layout`'s areas. */
+async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: () => boolean, progress: (done: number) => void): Promise<Sampled> {
   const scale = READ_HEIGHT / video.videoHeight;
-  const a = areas(Math.round(video.videoWidth * scale));
+  const a = areas(Math.round(video.videoWidth * scale), layout);
   const cut = (area: Area) => {
     const c = canvasFor(area);
     const g = c.getContext('2d', { willReadFrequently: true })!;
@@ -180,24 +244,26 @@ async function sampleVideo(video: HTMLVideoElement, cancelled: () => boolean, pr
   const banner = cut(a.banner);
   const portraits = cut(a.portraits);
   const clock = cut(a.clock);
-  const enemy = cut(a.enemy);
+  const enemy = a.enemy && cut(a.enemy);
   const out: Sampled = { samples: [], portraits: [], clocks: [], enemies: [] };
   let seenOn = 0;
   const take = (t: number) => {
     const px = clock.read();
-    const s = measure(t, right.read(), centre.read(), banner.read(), px);
+    const s = measure(t, right.read(), centre.read(), banner.read(), px, layout);
     out.samples.push(s);
     // The stopwatch now and then (the domain picks a few moments to read).
     if (t - (out.clocks[out.clocks.length - 1]?.[0] ?? -Infinity) >= CLOCK_EVERY) out.clocks.push([t, px]);
-    if (s.hud > 0.5 && [60, 600, 1800].includes(seenOn + 1)) out.enemies.push(enemy.read());
-    // The portraits, once the HUD has been up a moment.
+    if (enemy && s.hud > 0.5 && [60, 600, 1800].includes(seenOn + 1)) out.enemies.push(enemy.read());
+    // Each slot's picture (portraits, or the phone's skill buttons), once the HUD has been up a moment.
     if (s.hud > 0.5 && ++seenOn === 30) {
-      portraits.read();
-      out.portraits = FACES.map(([x, y]) => {
+      const { at, above, size } = layout.faces;
+      const from = layout.faces.area === 'right' ? right : portraits;
+      from.read();
+      out.portraits = at.map(([x, y]) => {
         const c = document.createElement('canvas');
         c.width = 64;
         c.height = 64;
-        c.getContext('2d')!.drawImage(portraits.c, x - 32, y - 20, 64, 64, 0, 0, 64, 64);
+        c.getContext('2d')!.drawImage(from.c, x - size / 2, y - above, size, size, 0, 0, 64, 64);
         return c.toDataURL('image/png');
       });
     }
@@ -249,7 +315,8 @@ async function sampleVideo(video: HTMLVideoElement, cancelled: () => boolean, pr
 const secs = (t: number) => `${t.toFixed(1)} s`;
 
 /** The transcript, for the player to name the operators and fix guesses. */
-function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], operators: string[], simulate: ((v: VideoRotation) => void) | undefined, seconds: number, enemy?: string): void {
+function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], operators: string[], simulate: ((v: VideoRotation) => void) | undefined, seconds: number, enemy: string | undefined, layout: Layout, done: () => void): void {
+  const SLOTS = layout.slots;
   const start = reading.start ?? 0;
   const clock = reading.clock;
   const mmss = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
@@ -298,7 +365,7 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
       html`<div class="reader-head">
           <h2 class="heading-20">${reading.start === null ? 'No fight found' : `Read ${presses()} presses`}</h2>
           <p class="copy-13 secondary">${reading.start === null
-            ? 'Record with a controller and the HUD showing: the SP bar, the skill diamond and the portraits.'
+            ? 'Record with the HUD showing: the SP bar, the skill buttons and the portraits.'
             : `${enemy ? `${enemy} · ` : ''}${clock ? `${mmss(clock.seconds)} on the stopwatch${clock.pauses.length ? `, stopped ${clock.pauses.map(([a, b]) => `${(b - a).toFixed(1)} s at ${secs(a - start)}`).join(', ')}` : ''}. ` : ''}Times from when the HUD first shows. Read in ${seconds}s. A list on a press means whose it was is a guess.`}</p>
         </div>
         ${reading.start === null
@@ -376,7 +443,12 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
         pauses: (clock?.pauses ?? []).map(([a, b]) => [a - start, b - start]),
         enemy,
       });
-      dlg.close();
+      done();
+      // Its results show on the Rotations page.
+      if (!location.pathname.startsWith('/rotations')) {
+        history.pushState(null, '', '/rotations');
+        dispatchEvent(new PopStateEvent('popstate'));
+      }
       return;
     }
     if (!(e.target as HTMLElement).closest('[data-gameplay-copy]')) return;

@@ -21,7 +21,7 @@ import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpa
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
-import { operatorInfoPage, operatorInfoTitle } from './pages/operator';
+import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
@@ -51,11 +51,11 @@ type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'aic' | 'rotations' 
 type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'aic' | 'rotations' | 'achievements' | 'archives' | 'story' | 'settings';
 const TABS: [Tab, string][] = [
   ['home', 'Home'],
-  ['database', 'Database'],
   ['pulls', 'Pulls'],
+  ['database', 'Database'],
+  ['rotations', 'Rotations'],
   ['essences', 'Essences'],
   ['aic', 'AIC'],
-  ['rotations', 'Rotations'],
   ['achievements', 'Achievements'],
   ['archives', 'Archive'],
   ['story', 'Story'],
@@ -108,6 +108,7 @@ export function currentPath(path: string): string {
   if (p === 'operators' || p === 'arsenal') return `/banner/${p === 'operators' ? 'headhunting' : 'arsenal'}${tail(a)}`;
   if (p === 'stats') return '/banner/stats';
   if (p === 'pulls') return '/banner';
+  if (p === 'rotations' && (a === 'transcript' || a === 'parse')) return '/rotations/parser';
   return path;
 }
 
@@ -298,7 +299,7 @@ function header(route: Route): Html {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
         const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
-        return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span>${tab === 'rotations' ? html`<span class="badge amber tab-wip">WIP</span>` : ''}</a>`;
+        return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span>${tab === 'rotations' || tab === 'aic' ? html`<span class="badge amber tab-wip">WIP</span>` : ''}</a>`;
       })}
     </nav>
   </div></header>`;
@@ -919,6 +920,10 @@ async function onClick(e: MouseEvent): Promise<void> {
       break;
     case 'sort-open':
       openSortPopup(el.dataset.kind as Kind, el);
+      break;
+    case 'fs-sort':
+      finalStrikeSort(el.dataset.value ?? '');
+      draw();
       break;
     case 'weapon-essence':
       setMaxEssence(el.dataset.wpn!, el.getAttribute('aria-pressed') !== 'true', (el.dataset.caps ?? '').split(',').filter(Boolean).map(Number));

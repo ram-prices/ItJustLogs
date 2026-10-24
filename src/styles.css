@@ -1043,6 +1043,68 @@ select.input {
 .table tr.clickable {
   cursor: pointer;
 }
+.fs-section {
+  margin-top: 32px;
+}
+.fs-table th {
+  padding: 0 8px;
+}
+.fs-table td {
+  padding: 0 16px;
+}
+.fs-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.fs-sort:hover,
+.fs-sort.on {
+  color: var(--gray-1000);
+}
+.fs-sort:hover {
+  background: var(--gray-alpha-100);
+}
+.fs-sort .icon {
+  font-size: 16px;
+}
+.fs-table th.num .fs-sort {
+  margin-left: auto;
+}
+.fs-table th.num {
+  text-align: right;
+}
+.fs-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.fs-op:hover span {
+  text-decoration: underline;
+}
+.fs-portrait {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gray-alpha-100);
+}
+@media (max-width: 640px) {
+  .fs-table td {
+    padding: 0 10px;
+  }
+  .fs-table th {
+    padding: 0 4px;
+  }
+}
 .table .right {
   text-align: right;
 }
@@ -4833,6 +4895,32 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   justify-content: space-between;
   gap: 12px;
 }
+.gameplay-progress {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 110;
+  display: grid;
+  gap: 8px;
+  width: min(300px, calc(100% - 32px));
+  padding: 12px;
+  box-shadow: var(--shadow-menu);
+}
+.gameplay-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.gameplay-progress .gameplay-preview video {
+  max-height: 140px;
+}
+@media (max-width: 640px) {
+  .gameplay-progress {
+    left: 16px;
+    bottom: 16px;
+  }
+}
 .gameplay-preview video {
   display: block;
   width: 100%;
@@ -7273,6 +7361,15 @@ a.six-item {
   flex: 1;
   min-width: 0;
 }
+.sim-op-link {
+  display: inline-flex;
+  flex: none;
+  border-radius: 50%;
+  transition: opacity 0.15s var(--ease);
+}
+.sim-op-link:hover {
+  opacity: 0.8;
+}
 .sim-p {
   width: 64px;
   height: 32px;
@@ -7354,6 +7451,18 @@ a.six-item {
   max-height: 260px;
   overflow: auto;
 }
+.sim-past-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+.sim-past-row:hover {
+  background: var(--gray-alpha-100);
+}
+.sim-past-row.on {
+  background: var(--gray-alpha-200);
+}
 .sim-past {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr) auto;
@@ -7368,11 +7477,84 @@ a.six-item {
   border: 0;
   cursor: pointer;
 }
-.sim-past:hover {
-  background: var(--gray-alpha-100);
+.sim-past-tools {
+  display: flex;
+  gap: 2px;
+  padding-right: 6px;
 }
-.sim-past.on {
-  background: var(--gray-alpha-200);
+.sim-past-tools .btn:not(.sim-fav):not(.error) {
+  color: var(--gray-900);
+}
+.sim-fav {
+  color: var(--amber);
+}
+.sim-run-edit,
+.sim-note-text {
+  grid-column: 1 / -1;
+  margin: 0 10px 8px;
+}
+.sim-run-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .sim-run-edit {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sim-run-edit > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+.sim-run-head {
+  padding: 6px 4px;
+  box-shadow: var(--shadow-border);
+}
+.sim-run-head .sim-past {
+  cursor: default;
+}
+.sim-run-head > .row {
+  gap: 4px;
+  padding-right: 6px;
+}
+.sim-run-head .sim-past-tools {
+  padding-right: 0;
+}
+.sim-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-border);
+  background: var(--background-200);
+}
+.sim-transcript > .sim-field {
+  max-width: 240px;
+}
+.sim-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 460px;
+  overflow: auto;
+  margin: 0;
+  padding: 4px 12px 4px 4px;
+  list-style: none;
+}
+.sim-step-list li {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) minmax(0, 1fr) 32px;
+  gap: 12px;
+  align-items: center;
+}
+.sim-transcript > .sim-run {
+  padding-top: 4px;
+}
+.sim-note-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 @media (max-width: 640px) {
   .sim-past {

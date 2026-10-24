@@ -190,6 +190,17 @@ export interface Run {
   main?: boolean;
   /** Its DoOnceActions that have run. */
   once?: Set<Data>;
+  /**
+   * Cast by the operator's own press as its next part (Typhoeus's hover: start, then its idle loop): in the game it
+   * becomes what the operator is doing, so the operator's next basic attack cuts it.
+   */
+  follow?: boolean;
+  /** A projectile's hit: the skill that launched it (or what launched that). */
+  origin?: Run;
+  /** Its Final Strike Stagger has been dealt. */
+  poised?: boolean;
+  /** The EntityBB_ keys its projectiles keep for themselves (projectileKeys). */
+  projBB?: Map<string, number>;
 }
 
 /** A stretch the enemy was Staggered: from `frame` to `end`. */
@@ -363,6 +374,8 @@ export class World {
   enemy: Entity;
   entities: Entity[] = [];
   runs: Run[] = [];
+  /** The skill launching a projectile, while its hit is cast (Run.origin). */
+  private launching?: Run;
   hits: Hit[] = [];
   /** The controlled operator's Final Strikes and Finishers, one per attack (shown in the rotation). */
   strikes: Strike[] = [];
@@ -577,7 +590,8 @@ export class World {
       return;
     }
     Map.prototype.delete.call(bb, key);
-    (bb.fallbacks.find((f) => f.has(key)) ?? ctx.owner.bb).set(key, v);
+    const local = ctx.run?.origin && projectileKeys(this.bundles).has(key) ? (ctx.run.origin.projBB ??= new Map()) : null;
+    (local ?? bb.fallbacks.find((f) => f.has(key)) ?? ctx.owner.bb).set(key, v);
   }
 
   private note(t: string): void {
@@ -1000,7 +1014,8 @@ export class World {
       case 'ModifyDynamicBlackboard': {
         // EntityBB_ keys live on an entity (the calculation target), others on the running skill or buff.
         const v = this.val(a.value, ctx.bb);
-        const store = a.key.startsWith('EntityBB_') ? (this.targets(a.calculationTarget, ctx)[0] ?? ctx.owner).bb : ctx.bb;
+        const local = ctx.run?.origin && projectileKeys(this.bundles).has(a.key) ? (ctx.run.origin.projBB ??= new Map()) : null;
+        const store = local ?? (a.key.startsWith('EntityBB_') ? (this.targets(a.calculationTarget, ctx)[0] ?? ctx.owner).bb : ctx.bb);
         const old = store.get(a.key) ?? 0;
         store.set(a.key, a.operation === 'Add' ? old + v : a.operation === 'Multiply' ? old * v : v);
         return;
@@ -1111,7 +1126,12 @@ export class World {
         const caster = from ? (from.owner ?? from) : ctx.owner;
         const handed = new Map<string, number>(a.assignBlackboard === false ? [] : ctx.bb);
         if (a.assignEntityBlackboard) for (const pr of a.assignPairs ?? []) handed.set(pr.targetKey, pr.useDirectValue ? Number(pr.numericValue) : (ctx.bb.get(pr.inputValueKey) ?? 0));
-        for (const target of at) for (const id of ids) this.cast(id, caster, caster, target, handed);
+        for (const target of at)
+          for (const id of ids) {
+            this.launching = ctx.run ? (ctx.run.origin ?? ctx.run) : undefined;
+            this.cast(id, caster, caster, target, handed);
+            this.launching = undefined;
+          }
         return;
       }
       // An entity with no skill of its own is still made: something to put buffs on (Arcane's array marks a Cluster
@@ -1145,6 +1165,15 @@ export class World {
           if (takes && this.main[slot] && !this.main[slot]!.ended) this.endRun(this.main[slot]!, true);
           const run = this.cast(skillId, caster, caster, target, from);
           if (run && a.inheritSourceSkillCastId) run.castBB = from;
+          // The operator's current skill (its press, or what that went on to) casting another of its own skills or
+          // attacks: the game's one skill at a time, so the new one takes over (Typhoeus's hover: start, Aerial Basic
+          // Attacks one after another, idle loop) and the operator's next basic attack cuts it.
+          const own = this.team.indexOf(caster);
+          const cur = ctx.run;
+          if (run && !takes && own >= 0 && cur && !cur.ended && cur.owner === caster && (this.main[own] === cur || cur.follow) && /^Character(NormalAttack|NormalSkill|ComboSkill|UltimateSkill)$/.test(run.skill.skillSpecification ?? '')) {
+            run.follow = true;
+            if (cur.follow) this.endRun(cur, true);
+          }
           if (takes && run) {
             run.main = true;
             this.main[slot] = run;
@@ -1536,13 +1565,14 @@ export class World {
       return null;
     }
     // The skill's own defaults, then what its caster hands over, then the skill table's values for it.
-    const bb = new BB(owner.bb);
+    // A projectile's hit reads its launch's own EntityBB_ keys first (projectileKeys).
+    const bb = this.launching ? new BB((this.launching.projBB ??= new Map()), owner.bb) : new BB(owner.bb);
     for (const b of skill.blackboard ?? []) bb.set(b.key, Number(b.valueDouble ?? b.value ?? 0));
     for (const [k, v] of inherit ?? []) bb.set(k, v);
     if (this.patchOf.has(skillId)) for (const [k, v] of this.skillBlackboard(skillId)) if (this.patchOf.get(skillId)!.some((l) => k in l.values)) bb.set(k, v);
     for (const m of this.skillMods.get(skillId) ?? []) bb.set(m.key, m.how === 1 ? (bb.get(m.key) ?? 0) + m.value : m.how === 2 ? (bb.get(m.key) ?? 0) * m.value : m.value);
     // The combo's trigger target (and any skill's chosen target): the enemy.
-    const run: Run = { skillId, skill, owner, source, start: this.frame, castAt: this.frame, bb, groups: new Map([['smart_target', [target ?? this.enemy]]]), target: target ?? this.enemy, done: new Set(), ended: false };
+    const run: Run = { skillId, skill, owner, source, start: this.frame, castAt: this.frame, bb, groups: new Map([['smart_target', [target ?? this.enemy]]]), target: target ?? this.enemy, done: new Set(), ended: false, ...(this.launching ? { origin: this.launching } : {}) };
     // Buffs the skill grants while cast (passives keep them), with the skill's values; a passive's attribute changes last.
     // A "ToggleBuff" passive's effect is in toggleBuffs (its buffs list is a leftover: several gear sets name another set's buff there).
     const granted: Data[] = skill.castType === 'Passive' && skill.passiveSkillType === 'ToggleBuff' ? (skill.toggleBuffs ?? []).flatMap((g: Data) => g.buffs ?? []) : (skill.buffs ?? []);
@@ -1809,6 +1839,13 @@ export class World {
         // Some hits count only from the controlled operator (a Final Strike's Stagger).
         if (u.onlyEnableForMainChar && !(attacker.side === 'team' && attacker.slot === this.controlled)) continue;
         if (u.damageAttributeType === 'Poise') {
+          // A Final Strike's Stagger counts once per strike, however many of its projectiles carry it (Gilberta's
+          // fourth attack fires three, each with the full 16: the wiki's 16 per Final Strike).
+          const strike = u.onlyEnableForMainChar ? (ctx.run?.origin ?? ctx.run) : undefined;
+          if (strike) {
+            if (strike.poised) continue;
+            strike.poised = true;
+          }
           this.poise(target, this.val(u.poiseCalculation?.value ?? u.atkScale, ctx.bb), attacker);
           continue;
         }
@@ -2312,7 +2349,7 @@ export class World {
 
   /** The controlled operator's basic attack chain: the step done, and the window for the next. */
   /** Each operator's basic attack chain; `held` while a skill kept it (dontInterruptCombo): the next attack goes on from it. */
-  private chains: ({ id: string; of: string; nextFrom: number; nextTo: number; held?: boolean } | null)[] = [null, null, null, null];
+  private chains: ({ id: string; of: string; nextFrom: number; nextTo: number; held?: boolean; run?: Run } | null)[] = [null, null, null, null];
   /**
    * Operators not controlled attacking on their own (the game's guard AI), a random 0–1 s late
    * (AIGlobalSetting characterAttackRandomDelay): here its mean, 0.5 s, before each chain. Off: in the game they
@@ -2453,9 +2490,15 @@ export class World {
    * itself is in the game's animation states, not the data.
    */
   private chainOf(op: Entity): string {
-    const ult = (this.modes.get(op) ?? []).some((x) => /^ult(mode)?$/i.test(x.mode) && x.buff.owner.buffs.includes(x.buff));
+    const modes = (this.modes.get(op) ?? []).filter((x) => x.buff.owner.buffs.includes(x.buff)).map((x) => x.mode);
+    const ult = modes.some((m) => /^ult(mode)?$/i.test(m));
     // Ultimate forms' chains: _ult_attack1, _attack1_ult, or numbered in parts (Yvonne's _ult_attack1_1, _1_2, _2_1...).
     if (ult) for (const t of [`${op.id}_ult_attack#`, `${op.id}_attack#_ult`, `${op.id}_ult_attack#_1`]) if (this.skillOf.has(t.replace('#', '1'))) return t;
+    // Another mode's own chain, <id>_<mode>_attack#: Typhoeus's hover ("floating") makes her Aerial Basic Attacks.
+    for (const m of modes) {
+      const t = `${op.id}_${m.toLowerCase()}_attack#`;
+      if (this.skillOf.has(t.replace('#', '1'))) return t;
+    }
     return `${op.id}_attack#`;
   }
 
@@ -2606,7 +2649,9 @@ export class World {
     if (this.busy(run) && !(this.cancels && this.windowStarted(run!))) return false;
     if (this.team[slot].buffs.some((b) => this.has(b.def, 'AttackClickListenerAction'))) return false;
     const c = this.chains[slot];
-    return !c || c.held || this.frame >= c.nextFrom || this.frame > c.nextTo;
+    // An attack with no next-attack window that ends itself (InterruptCurSkillAction: Typhoeus's Aerial Basic Attacks)
+    // lets the next one in when it ends.
+    return !c || c.held || this.frame >= c.nextFrom || this.frame > c.nextTo || (!!c.run && c.run.ended && c.nextFrom - c.run.start >= c.run.skill.durationFrame);
   }
 
   /** The next step of an operator's basic attack chain; the window for the one after (AllowNextSkillAction). */
@@ -2622,17 +2667,23 @@ export class World {
     if (finisher) this.enemy.bb.set('finisherReady', 0);
     const prev = this.main[slot];
     if (prev) this.endRun(prev, true);
+    for (const r of this.runs) if (r.follow && !r.ended && r.owner === op) this.endRun(r, true);
     this.abilityEvent(op, 'OnBeforeCastSkill', this.enemy, undefined, undefined, { origin: id, casting: true });
     this.main[slot] = this.cast(id, op, op, this.enemy);
     if (this.main[slot]) this.main[slot]!.main = true;
-    const next = skill.actionGroupData?.timelineActions?.find((ta: Data) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => /AllowNextSkillAction/.test(d.$type ?? '')));
+    // The next attack's window: AllowNextSkillAction, else a ComboCacheAction taking the Attack input (Typhoeus's
+    // fourth Aerial Basic Attack).
+    const tas: Data[] = skill.actionGroupData?.timelineActions ?? [];
+    const next =
+      tas.find((ta) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => /AllowNextSkillAction/.test(d.$type ?? ''))) ??
+      tas.find((ta) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'ComboCacheAction' && d.isEnable !== false && (d.mappingDataList ?? []).some((m: Data) => m.cmdType === 'Attack' && m.skillId)));
     const speed = 1 + this.hasteOf(op);
     const from = Math.round((next ? next._startFrame : (skill.exclusiveFrame ?? skill.durationFrame ?? 0)) / speed);
     const to = Math.round((next ? next._endFrame : (skill.exclusiveFrame ?? skill.durationFrame ?? 0)) / speed);
     // A Finisher counts as the chain's last attack.
     const steps = this.chainSteps(op);
     const at = finisher ? steps.at(-1)! : id;
-    this.chains[slot] = { id: at, of: this.chainOf(op), nextFrom: this.frame + from, nextTo: this.frame + to };
+    this.chains[slot] = { id: at, of: this.chainOf(op), nextFrom: this.frame + from, nextTo: this.frame + to, run: this.main[slot] ?? undefined };
     // A guard's delay comes before each new chain; within one it goes on as soon as it may.
     const last = at === steps.at(-1);
     this.guardNext[slot] = this.frame + from + (last ? Math.round(this.guardDelay * FPS) : 0);
@@ -2872,6 +2923,33 @@ const actionKinds = new WeakMap<object, Set<string>>();
 
 /** Everything reachable from the game data and builds, which fights only read (World.clone shares it). */
 const sharedCache = new WeakMap<object, WeakSet<object>>();
+/**
+ * EntityBB_ keys only projectile hits use (no other skill or buff touches them): the projectile's own, so each launch
+ * starts afresh (Tangtang's Final Strike gives SP on its first hit only, EntityBB_atk05_cnt; Perlica's combo bounce).
+ */
+const projectileKeyCache = new WeakMap<Bundle[], Set<string>>();
+function projectileKeys(bundles: Bundle[]): Set<string> {
+  let keys = projectileKeyCache.get(bundles);
+  if (keys) return keys;
+  const users = new Map<string, Set<string>>();
+  for (const b of bundles)
+    for (const [id, d] of [...Object.entries(b.skills), ...Object.entries(b.buffs)])
+      for (const m of JSON.stringify(d).matchAll(/"(?:EntityBB_)?(\w+)"/g)) {
+        const k = `EntityBB_${m[1]}`;
+        if (!users.has(k)) users.set(k, new Set());
+        users.get(k)!.add(id);
+      }
+  keys = new Set();
+  for (const b of bundles)
+    for (const d of [...Object.values(b.skills), ...Object.values(b.buffs)])
+      for (const m of JSON.stringify(d).matchAll(/"key":\s*"(EntityBB_\w+)"/g)) {
+        const ids = users.get(m[1]) ?? new Set();
+        if ([...ids].every((id) => /projhit/.test(id))) keys.add(m[1]);
+      }
+  projectileKeyCache.set(bundles, keys);
+  return keys;
+}
+
 function sharedData(bundles: Bundle[], settings: object, team: Entity[]): WeakSet<object> {
   let set = sharedCache.get(bundles);
   if (set) return set;

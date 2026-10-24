@@ -216,7 +216,7 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     paths (`/operators/info/<chr id>`, `/arsenal/<poolId>`, `/stats`, `/pulls`,
     `#/...`) are moved to today's (`currentPath`), and their folders are
     still built, so old links keep working.
-    Header tabs: Home, Database, Pulls, Essences, AIC, Rotations, Achievements, Archive, Story,
+    Header tabs: Home, Pulls, Database, Rotations (WIP), Essences, AIC (WIP), Achievements, Archive, Story,
     Settings. Database (`/database/...`) and Pulls (`/banner/...`) are
     sections picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/banner` open the page last used there.
@@ -367,7 +367,17 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   stack count, swapping out of Liino's stance and cutting it with her
   ultimate; End Stance is never pressed; Liino's beats reach every teammate). Teammates the AI controls
   don't basic attack (`guardAttacks` off: the owner sees them mostly stand around), so only the controlled
-  operator's Final Strikes give SP and trigger combos. Ultimate Energy blocks (RefrainObtainUsp) last only
+  operator's Final Strikes give SP and trigger combos. A mode's own basic attacks replace the chain while it's on
+  (`chainOf`: <id>_<mode>_attack#, Typhoeus's hover "floating"); an attack with no next-attack window opens the next
+  one when it ends itself, or by a ComboCacheAction for Attack. A skill an operator's current skill casts of its own
+  (Character* spec) takes over (`Run.follow`: one skill at a time, so Typhoeus's AI hover fires 5 shots, not a
+  runaway), and that operator's next basic attack cuts it. A Final Strike's Stagger counts once per strike however
+  many projectiles carry it (`Run.origin`/`poised`: Gilberta's fires three, each with the full 16). EntityBB_ keys
+  only projectile hits use are the launch's own (`projectileKeys`, `Run.projBB`): Tangtang's Final Strike gives SP
+  on its first hit each time, not once ever. Database shows each operator's basic attack chain (hits, seconds per
+  chain, Final Strike SP, SP per second) from `src/data/final-strikes.json`, made by the sim with
+  `GEN=1 npx vitest run scripts/final-strikes.test.ts` (COMBAT_DIR for a local ef-assets combat/; rerun for new
+  operators): a sortable table under the Operators list (`finalStrikeTable`) and rows in each page's Attributes. Ultimate Energy blocks (RefrainObtainUsp) last only
   while their buff or skill does and let their tags through (Last Rite's own skills, Arcane's array); a
   DoOnceAction runs once per cast.
   The enemy is the training dummy (`DUMMY` in team.ts) unless a request sets `enemy`: `ALLEIKHREOS`
@@ -375,8 +385,15 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   Stagger 320 / 11 s, Finisher ×1.75 via `Enemy.finisherMul`), picked with Enemy (`ENEMIES`, setting `enemy`). The
   timeline has an Enemy lane with its Staggered stretches (`World.staggers`). Cooldowns run through ultimate cut-ins
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
-  Simulator and Transcript (`/rotations/transcript`): a read video's team, enemy (`enemySeen`) and presses, not
-  editable but food (setting `videoFood`); its history lists recordings only. `replaySim` runs to the video stopwatch's stop, attacks nothing in its pauses and shows its time (`ReplayClock`); after a pause (a phase change) SP is refilled to 200, as the owner's video shows; it basic-attacks only while
+  Simulator and Parser (`/rotations/parser`; the old `/rotations/transcript` redirects): a read video's team, enemy
+  (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only. History
+  rows and an open parsed run can be starred (kept on top and never trimmed), named, noted and deleted
+  (`runTools`/`runEdit`; `updateSim`, `deleteSim` in store.ts). Controlled (setting `controlled`, request `main`, Team
+  `main`): the operator controlled the whole fight, no swaps; "Best (sim picks)" lets the search try each (Advanced
+  may still swap), and results show who (metric Controlled). Portraits link to the operator's page. The transcript editor's
+  Controlled gives every Final Strike and Finisher to one operator. Each parsed run keeps its reading (`SavedSim.video`) so
+  its transcript can be edited (presses' time, operator, press; added or removed) and played again into the same run
+  (`transcriptEditor`, `runReplay` `into`); runs saved before that use the last reading if it's the same team and length. `replaySim` runs to the video stopwatch's stop, attacks nothing in its pauses and shows its time (`ReplayClock`); after a pause (a phase change) SP is refilled to 200, as the owner's video shows; it basic-attacks only while
   the sim has fewer Final Strikes than the video by then.
   Uptime (setting `uptime`, %; `World.uptime`): the share of the fight the enemy can be hit, the rest a
   stretch at the end of every 10 s with no presses or basic attacks (100% unless set). The owner's gameplay

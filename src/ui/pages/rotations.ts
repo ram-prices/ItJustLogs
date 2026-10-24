@@ -31,7 +31,7 @@ import {
 } from '../../domain/sim/team';
 import { wikiId, type WikiGearFile, type WikiOperatorFile, type WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { cachedBannerDb, listSims, loadSimVideo, saveSim, saveSimVideo, type SavedSim } from '../../store';
+import { cachedBannerDb, deleteSim, listSims, loadSimVideo, saveSim, saveSimVideo, updateSim, type SavedSim } from '../../store';
 import { badge, icon, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { html, type Html } from '../html';
 import { infoHref, ownedOf, sideTabs, wikiFile } from './info';
@@ -81,6 +81,12 @@ let runs: SavedSim<SimResult>[] = [];
 let savedLoading = false;
 /** A run picked from the history: shown until the next run or another team. */
 let picked = false;
+/** History: the run being renamed or noted, and the one asking to be deleted. */
+let editing: number | null = null;
+/** A parsed run's transcript being edited: its presses, until played again or cancelled. */
+type VideoStep = VideoRotation['steps'][number];
+let draft: { at: number; steps: VideoStep[] } | null = null;
+let deleting: number | null = null;
 
 function loadSaved(redraw: () => void): void {
   if (saved || savedLoading) return;
@@ -106,10 +112,13 @@ let replay: { names: string[]; ids: string[]; result?: ReplayResult; error?: str
 let replayWorker: Worker | null = null;
 let redrawPage: () => void = () => {};
 
-/** Plays a video's presses in the sim (the worker's replay), the team as the page has it. */
-function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: string[], ids: string[], redraw: () => void): void {
+/**
+ * Plays a video's presses in the sim (the worker's replay), the team as the page has it. A new parsed run, or with
+ * `into` that saved run again (its transcript edited), keeping its star, name and note.
+ */
+function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: string[], ids: string[], redraw: () => void, into?: SavedSim<SimResult>): void {
   replayWorker?.terminate();
-  replay = { names, ids };
+  replay = { names, ids, at: into?.at };
   const steps: ReplayStep[] = v.steps.map((x) => ({ t: x.t, slot: at[x.slot], input: x.input }));
   const w = new Worker(new URL('../simWorker.ts', import.meta.url), { type: 'module' });
   replayWorker = w;
@@ -117,11 +126,15 @@ function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: strin
   w.onmessage = (e: MessageEvent<{ id: number; result?: ReplayResult; error?: string }>) => {
     if (e.data.id !== id || replayWorker !== w) return;
     if (e.data.result || e.data.error) {
-      const at = Date.now();
+      const at = into?.at ?? Date.now();
       replay = { names, ids, result: e.data.result, error: e.data.error, at };
-      // Kept in the history too, marked as a recording.
-      if (e.data.result) {
-        const entry = { key: JSON.stringify({ ...req, video: true }), result: e.data.result, names, ids, at };
+      // Kept in the history too, marked as a recording, with its reading.
+      const key = JSON.stringify({ ...req, video: true });
+      if (e.data.result && into) {
+        Object.assign(into, { key, result: e.data.result, video: v });
+        void updateSim(at, { key, result: e.data.result, video: v });
+      } else if (e.data.result) {
+        const entry = { key, result: e.data.result, names, ids, at, video: v };
         runs.push(entry);
         void saveSim(entry);
       }
@@ -137,7 +150,19 @@ function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: strin
 /** The video's rotation as the sim played it: the usual results, and the presses it couldn't make. */
 function replayView(r: NonNullable<typeof replay>): Html {
   const missed = r.result?.missed ?? [];
+  const entry = r.at === undefined ? undefined : runs.find((x) => x.at === r.at);
   return html`<section class="sim-video">
+    ${entry
+      ? html`<div class="sim-past-row sim-run-head">
+          <div class="sim-past min0"><span class="num secondary">${when(entry.at)}</span><span class="label-14 ellipsis">${entry.name ?? runLine(entry, entry.names)}</span><span></span></div>
+          <div class="row">
+            ${videoOf(entry) ? html`<button type="button" class="btn secondary sm" data-action="sim-transcript" data-value="${String(entry.at)}" aria-pressed="${draft?.at === entry.at ? 'true' : 'false'}">${icon('description')}Edit transcript</button>` : ''}
+            ${runTools(entry)}
+          </div>
+          ${runEdit(entry)}
+        </div>
+        ${transcriptEditor(entry)}`
+      : ''}
     ${r.error
       ? html`<p class="copy-14 sim-error">${r.error}</p>`
       : !r.result
@@ -186,6 +211,7 @@ function run(req: SimRequest, key: string, names: string[], cores: number, redra
 export function simAction(action: string, el: HTMLElement): boolean {
   const v = el.dataset.value ?? '';
   const team = teamOf(settings());
+  if (action !== 'sim-delete') deleting = null;
   switch (action) {
     case 'sim-style':
       save({ style: v as Style });
@@ -219,6 +245,69 @@ export function simAction(action: string, el: HTMLElement): boolean {
         result = { ...entry };
         picked = true;
       }
+      return true;
+    }
+    case 'sim-fav': {
+      const entry = runs.find((x) => String(x.at) === v);
+      if (entry) {
+        entry.fav = !entry.fav || undefined;
+        void updateSim(entry.at, { fav: entry.fav });
+      }
+      return true;
+    }
+    case 'sim-edit':
+      editing = editing === Number(v) ? null : Number(v);
+      return true;
+    case 'sim-transcript': {
+      const entry = runs.find((x) => String(x.at) === v);
+      const reading = entry && videoOf(entry);
+      draft = draft?.at === entry?.at || !entry || !reading ? null : { at: entry.at, steps: reading.steps.map((x) => ({ ...x })) };
+      return true;
+    }
+    case 'sim-step-add':
+      if (draft) {
+        const last = draft.steps[draft.steps.length - 1];
+        draft.steps.push({ t: Math.round(((last?.t ?? 0) + 0.5) * 100) / 100, slot: last?.slot ?? 0, input: 'battle' });
+      }
+      return true;
+    case 'sim-step-del':
+      draft?.steps.splice(Number(v), 1);
+      return true;
+    case 'sim-step-cancel':
+      draft = null;
+      return true;
+    case 'sim-step-save': {
+      const entry = draft && runs.find((x) => x.at === draft!.at);
+      const reading = entry && videoOf(entry);
+      if (entry && reading && draft) {
+        const { video: _, ...req } = JSON.parse(entry.key) as SimRequest & { video?: boolean };
+        const edited = { ...reading, steps: draft.steps.slice().sort((a, b) => a.t - b.t) };
+        draft = null;
+        runReplay(edited, edited.names.map((_, i) => i), req, entry.names, entry.ids, redrawPage, entry);
+      }
+      return true;
+    }
+    case 'sim-delete': {
+      const at = Number(v);
+      if (deleting !== at) {
+        deleting = at;
+        return true;
+      }
+      deleting = null;
+      if (draft?.at === at) draft = null;
+      const gone = runs.find((x) => x.at === at);
+      runs = runs.filter((x) => x.at !== at);
+      if (gone && saved?.get(gone.key) === gone) {
+        const left = runs.filter((x) => x.key === gone.key).pop();
+        if (left) saved.set(gone.key, left);
+        else saved.delete(gone.key);
+      }
+      if (result?.at === at) {
+        result = null;
+        picked = false;
+      }
+      if (replay?.at === at) replay = null;
+      void deleteSim(at);
       return true;
     }
     case 'sim-read':
@@ -262,7 +351,26 @@ export function simChange(el: HTMLInputElement | HTMLSelectElement): boolean {
   else if (f === 'sp') save({ startSp: el.value.trim() === '' ? undefined : Math.max(0, Math.min(300, Number(el.value))) });
   // The enemy's own HP for the HP goal, until one is typed.
   else if (f === 'enemy') save({ enemy: el.value === 'dummy' ? undefined : el.value, hp: undefined });
-  else if (f === 'vfood') {
+  else if (f === 'controlled') save({ controlled: el.value || undefined });
+  // Every Final Strike and Finisher in a transcript being edited: the one controlled.
+  else if (f === 'step-main') {
+    for (const step of draft?.steps ?? []) if (step.input === 'strike' || step.input === 'finisher') step.slot = Number(el.value) as VideoStep['slot'];
+    redrawPage();
+  }
+  // A press in a transcript being edited (no redraw, so Tab moves along; sorted by time when played).
+  else if (f === 'step-t' || f === 'step-slot' || f === 'step-input') {
+    const step = draft?.steps[Number(el.dataset.k)];
+    if (step && f === 'step-t') step.t = Math.max(0, Number(el.value) || 0);
+    else if (step && f === 'step-slot') step.slot = Number(el.value) as VideoStep['slot'];
+    else if (step) step.input = el.value as VideoStep['input'];
+  }
+  // A run's name or note: saved as typed, shown when the edit closes (no redraw, so Tab moves between the two).
+  else if (f === 'runname' || f === 'note') {
+    const entry = runs.find((x) => String(x.at) === el.dataset.at);
+    const value = el.value.trim() || undefined;
+    if (entry && f === 'runname') void updateSim(entry.at, { name: (entry.name = value) });
+    else if (entry) void updateSim(entry.at, { note: (entry.note = value) });
+  } else if (f === 'vfood') {
     const food = { ...(settings().videoFood ?? {}) };
     if (el.value) food[el.dataset.op!] = el.value;
     else delete food[el.dataset.op!];
@@ -360,7 +468,7 @@ function pickable(wiki: Wiki, index: CombatIndex, team: SimMember[]): string[] {
   return [...byName.values()].sort((x, y) => wiki.ops[x].name.localeCompare(wiki.ops[y].name));
 }
 
-function memberCard(m: SimMember, i: number, n: number, wiki: Wiki, index: CombatIndex, build: SimBuild, missing: string[], optimal: boolean, chosen: SimBuild | undefined, team: SimMember[]): Html {
+function memberCard(m: SimMember, i: number, n: number, wiki: Wiki, index: CombatIndex, build: SimBuild, optimal: boolean, chosen: SimBuild | undefined, team: SimMember[]): Html {
   const o = wiki.ops[m.op];
   const ops = pickable(wiki, index, team);
   // An operator can be in the team once: the others' picks are greyed out here.
@@ -378,7 +486,7 @@ function memberCard(m: SimMember, i: number, n: number, wiki: Wiki, index: Comba
       </span>
     </div>
     <div class="sim-op">
-      ${itemImg('char', m.op, 'sim-portrait')}
+      <a class="sim-op-link" href="${infoHref('char', m.op)}" title="${o ? `${o.name}’s page` : ''}" aria-label="${o ? `${o.name}’s page` : 'Operator page'}">${itemImg('char', m.op, 'sim-portrait')}</a>
       <select class="input" data-sim="op" data-i="${i}" aria-label="Operator">${ops.map((id) => html`<option value="${id}" ${id === m.op ? 'selected' : ''} ${taken.has(wiki.ops[id].name) ? 'disabled' : ''}>${wiki.ops[id].name}</option>`)}</select>
     </div>
     <div class="sim-pots">
@@ -406,7 +514,6 @@ function memberCard(m: SimMember, i: number, n: number, wiki: Wiki, index: Comba
         const g = id ? wiki.gear[id] : undefined;
         return g ? html`<div class="sim-piece secondary ellipsis">${g.name}${build.gear.find((x) => x.id === id)?.artifice ? html` <span class="label-12">+${artificeOf(l, slot, g)}</span>` : ''}</div>` : html`<div class="sim-piece secondary">No ${label.toLowerCase()}</div>`;
       })}
-      ${!optimal && missing.length ? html`<a class="copy-13" href="${infoHref('char', m.op)}">${o ? `Set ${o.name}’s loadout` : 'Set the loadout'}</a>` : ''}
     </div>
   </div>`;
 }
@@ -477,33 +584,108 @@ function runLine(entry: SavedSim<SimResult>, names: string[]): string {
     EFFORTS.find(([k]) => k === req.effort)?.[1] ?? '',
     req.hp ? `${big(req.hp)} HP` : `${req.seconds} s`,
     req.optimize ? 'Optimal gear' : 'My loadouts',
+    req.main != null ? `${entry.names[req.main]} controlled` : '',
   ];
   if (entry.names.join('|') !== names.join('|')) parts.push(entry.names.join(', '));
   return parts.filter(Boolean).join(' · ');
 }
 
-/** A saved run that played a video's rotation (the Transcript tab's). */
+/** A saved run that played a video's rotation (the Parser tab's). */
 const isRecording = (x: SavedSim<SimResult>) => !!(JSON.parse(x.key) as { video?: boolean }).video;
 
+const when = (at: number) => new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+const STEP_NAME: Record<VideoStep['input'], string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher' };
+
 /**
- * Every run of this team (its characters, whatever their loadouts), newest first; one opens its result. Recordings:
- * every video played, whatever its team.
+ * A parsed run's reading: its own, or for runs saved before readings were kept, the last reading when it's the same
+ * team and length.
+ */
+function videoOf(x: SavedSim<SimResult>): VideoRotation | undefined {
+  if (x.video) return x.video as VideoRotation;
+  const req = JSON.parse(x.key) as SimRequest & { video?: boolean };
+  return req.video && lastVideo && lastVideo.names.join('|') === x.names.join('|') && lastVideo.seconds === req.seconds ? lastVideo : undefined;
+}
+
+/** The open parsed run's presses to edit: time (seconds into the fight), operator, press; then played again. */
+function transcriptEditor(x: SavedSim<SimResult>): Html {
+  const reading = videoOf(x);
+  if (!draft || draft.at !== x.at || !reading) return html``;
+  const who = new Set(draft.steps.filter((s) => s.input === 'strike' || s.input === 'finisher').map((s) => s.slot));
+  const main = who.size === 1 ? [...who][0] : null;
+  return html`<div class="sim-transcript">
+    <label class="sim-field"><span class="label-12 secondary">Controlled</span><select class="input sim-enemy" data-sim="step-main" aria-label="Controlled">
+      ${main === null ? html`<option value="" selected>${who.size ? 'Mixed' : 'None'}</option>` : ''}
+      ${reading.names.map((n, i) => html`<option value="${i}" ${i === main ? 'selected' : ''}>${n}</option>`)}
+    </select></label>
+    <ol class="sim-step-list">
+      ${draft.steps.map(
+        (s, k) => html`<li>
+          <input class="input num" type="number" step="0.01" min="0" value="${s.t.toFixed(2)}" data-sim="step-t" data-k="${k}" aria-label="Time (s)" />
+          <select class="input" data-sim="step-slot" data-k="${k}" aria-label="Operator">
+            ${reading.names.map((n, i) => html`<option value="${i}" ${i === s.slot ? 'selected' : ''}>${n}</option>`)}
+          </select>
+          <select class="input" data-sim="step-input" data-k="${k}" aria-label="Press">
+            ${Object.entries(STEP_NAME).map(([id, n]) => html`<option value="${id}" ${id === s.input ? 'selected' : ''}>${n}</option>`)}
+          </select>
+          <button type="button" class="btn tertiary sm icon-only" data-action="sim-step-del" data-value="${k}" title="Remove" aria-label="Remove">${icon('close')}</button>
+        </li>`,
+      )}
+    </ol>
+    <div class="sim-run">
+      <button type="button" class="btn secondary sm" data-action="sim-step-add">${icon('add')}Add press</button>
+      <button type="button" class="btn primary sm" data-action="sim-step-save" ${replayWorker ? 'disabled' : ''}>${icon('play_arrow')}Play edited transcript</button>
+      <button type="button" class="btn tertiary sm" data-action="sim-step-cancel">Cancel</button>
+    </div>
+  </div>`;
+}
+
+/** A saved run's buttons: star (kept on top, never trimmed), edit (name and note), delete (asks once). */
+function runTools(x: SavedSim<SimResult>): Html {
+  const at = String(x.at);
+  const ask = deleting === x.at;
+  return html`<div class="sim-past-tools">
+    <button type="button" class="btn tertiary sm icon-only${x.fav ? ' sim-fav' : ''}" data-action="sim-fav" data-value="${at}" title="${x.fav ? 'Unfavorite' : 'Favorite'}" aria-label="${x.fav ? 'Unfavorite' : 'Favorite'}" aria-pressed="${x.fav ? 'true' : 'false'}">${icon('star', !!x.fav)}</button>
+    <button type="button" class="btn tertiary sm icon-only" data-action="sim-edit" data-value="${at}" title="Edit" aria-label="Edit name and note" aria-pressed="${editing === x.at ? 'true' : 'false'}">${icon('edit')}</button>
+    <button type="button" class="btn ${ask ? 'error' : 'tertiary icon-only'} sm" data-action="sim-delete" data-value="${at}" title="Delete" aria-label="${ask ? 'Confirm delete' : 'Delete'}">${ask ? 'Delete' : icon('delete')}</button>
+  </div>`;
+}
+
+/** A saved run's name and note fields while it's being edited, else its note. */
+function runEdit(x: SavedSim<SimResult>): Html {
+  const at = String(x.at);
+  if (editing === x.at)
+    return html`<div class="sim-run-edit">
+      <input class="input" data-sim="runname" data-at="${at}" value="${x.name ?? ''}" placeholder="Name" aria-label="Name" maxlength="80" autofocus />
+      <input class="input" data-sim="note" data-at="${at}" value="${x.note ?? ''}" placeholder="Note" aria-label="Note" maxlength="300" />
+      <button type="button" class="btn secondary sm" data-action="sim-edit" data-value="${at}">Done</button>
+    </div>`;
+  return x.note ? html`<p class="copy-13 secondary sim-note-text">${x.note}</p>` : html``;
+}
+
+/**
+ * Every run of this team (its characters, whatever their loadouts), favorites first, then newest first; one opens its
+ * result. Recordings (Parsed runs): every video played, whatever its team.
  */
 function historyView(names: string[], showing: number | undefined, recordings = false): Html {
   const team = teamKey(names);
   const list = runs.filter((x) => (recordings ? isRecording(x) : !isRecording(x) && teamKey(x.names) === team)).reverse();
+  list.sort((a, b) => Number(!!b.fav) - Number(!!a.fav));
   if (!list.length) return html``;
   return html`<section class="card"><div class="card-body sim-card">
-    <h2 class="heading-16">History</h2>
+    <h2 class="heading-16">${recordings ? 'Parsed runs' : 'History'}</h2>
     <div class="sim-history">
       ${list.map((x) => {
         const r = x.result;
         const value = r.hp ? (r.killed ? `${r.seconds.toFixed(1)} s` : 'Not defeated') : `${big(r.total / r.seconds)} DPS`;
-        return html`<button type="button" class="sim-past${x.at === showing ? ' on' : ''}" data-action="sim-past" data-value="${String(x.at)}">
-          <span class="num secondary">${new Date(x.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
-          <span class="min0 ellipsis">${runLine(x, names)}</span>
-          <span class="num">${value}</span>
-        </button>`;
+        return html`<div class="sim-past-row${x.at === showing ? ' on' : ''}">
+          <button type="button" class="sim-past" data-action="sim-past" data-value="${String(x.at)}">
+            <span class="num secondary">${when(x.at)}</span>
+            <span class="min0 ellipsis">${x.name ? html`<span class="label-14">${x.name}</span> <span class="secondary">${runLine(x, names)}</span>` : runLine(x, names)}</span>
+            <span class="num">${value}</span>
+          </button>
+          ${runTools(x)} ${runEdit(x)}
+        </div>`;
       })}
     </div>
   </div></section>`;
@@ -519,6 +701,7 @@ function resultsView(r: SimResult, names: string[], ids: string[], stale: boolea
       metric({ label: 'Damage per second', value: big(dps) }),
       metric({ label: 'Total damage', value: big(r.total), sub: `${time} duration` }),
       metric({ label: 'Presses', value: String(r.presses.length), sub: 'besides basic attacks' }),
+      ...(names[r.main] ? [metric({ label: 'Controlled', value: names[r.main], sub: new Set((r.strikes ?? []).map((x) => x.slot)).size > 1 ? 'at the start, swaps after' : 'the whole fight' })] : []),
     ])}
     <section class="card"><div class="card-body sim-card">
       <h2 class="heading-16">Damage by operator</h2>
@@ -558,7 +741,7 @@ function resultsView(r: SimResult, names: string[], ids: string[], stale: boolea
   </div>`;
 }
 
-/** Rotations: the Simulator (/rotations) and the Transcript of a gameplay video (/rotations/transcript), as side tabs. */
+/** Rotations: the Simulator (/rotations) and the Parser (/rotations/parser: a gameplay recording's rotation), as side tabs. */
 export function rotationsPage(redraw: () => void, view?: string): Html {
   const header = pageHeader('Rotations', 'The whole sim is still very much a work in progress: expect bugs and results that don’t make sense.');
   const index = wikiFile<CombatIndex>('index.json', redraw, 'combat');
@@ -580,8 +763,8 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   redrawPage = redraw;
   loadSaved(redraw);
   const tabs = (current: string, body: Html) =>
-    html`${header}<main class="container fade-in">${sideTabs('Rotations', [['/rotations', 'Simulator', ''], ['/rotations/transcript', 'Transcript', '']], current, html`<div class="sim-page">${body}</div>`)}</main>`;
-  if (view === 'transcript') return tabs('/rotations/transcript', transcriptView(wiki, index.data, s, redraw));
+    html`${header}<main class="container fade-in">${sideTabs('Rotations', [['/rotations', 'Simulator', ''], ['/rotations/parser', 'Parser', '']], current, html`<div class="sim-page">${body}</div>`)}</main>`;
+  if (view === 'parser') return tabs('/rotations/parser', parseView(wiki, index.data, s, redraw));
   const style = styleOf(s.style);
   const effort = s.effort ?? 'normal';
   const goal = s.goal ?? 'time';
@@ -591,6 +774,8 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   const enemy = foe.id === 'dummy' ? {} : { enemy: foe.enemy };
   // The share of the fight the enemy can be hit (unset or 100%: all of it).
   const uptime = s.uptime && s.uptime < 100 ? s.uptime / 100 : undefined;
+  const at = s.controlled ? team.findIndex((m) => m.op === s.controlled) : -1;
+  const main = at >= 0 ? { main: at } : {};
   const req: SimRequest = optimal
     ? {
         builds: team.map((m, i) => optimalBuildOf(m, built[i].build)),
@@ -599,11 +784,12 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         startSp: s.startSp,
         uptime,
         ...enemy,
+        ...main,
         style,
         effort,
         optimize: { weapons: team.map((m) => (m.weapon ? [m.weapon] : weaponsFor(m.op, wiki, index.data!))), limited: limitedWeapons() },
       }
-    : { builds: built.map((b) => b.build), seconds, hp, startSp: s.startSp, uptime, ...enemy, style, effort };
+    : { builds: built.map((b) => b.build), seconds, hp, startSp: s.startSp, uptime, ...enemy, ...main, style, effort };
   const key = JSON.stringify(req);
   // A run picked from the history stays while the team's the same; else this setup's saved result, when there's one
   // and nothing newer for it is showing.
@@ -627,7 +813,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
       <section class="card"><div class="card-body sim-card">
         <h2 class="heading-16">Team</h2>
         ${toggleGroup('sim-builds', BUILD_MODES, mode)}
-        <div class="sim-team">${team.map((m, i) => memberCard(m, i, team.length, wiki, index.data!, built[i].build, built[i].missing, optimal, chosen(i), team))}</div>
+        <div class="sim-team">${team.map((m, i) => memberCard(m, i, team.length, wiki, index.data!, built[i].build, optimal, chosen(i), team))}</div>
       </div></section>
       <section class="card"><div class="card-body sim-card">
         <h2 class="heading-16">Rotation</h2>
@@ -638,6 +824,10 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         </div>
         <p class="copy-13 secondary">${STYLE_NOTE[style]}</p>
         <div class="sim-options">
+          <label class="sim-field"><span class="label-12 secondary">Controlled</span><select class="input sim-enemy" data-sim="controlled" aria-label="Controlled">
+            <option value="" ${at < 0 ? 'selected' : ''}>Best (sim picks)</option>
+            ${team.map((m, i) => html`<option value="${m.op}" ${i === at ? 'selected' : ''}>${names[i]}</option>`)}
+          </select></label>
           <label class="sim-field"><span class="label-12 secondary">Enemy</span><select class="input sim-enemy" data-sim="enemy" aria-label="Enemy">
             ${ENEMIES.map((e) => html`<option value="${e.id}" ${e.id === foe.id ? 'selected' : ''}>${e.name}</option>`)}
           </select></label>
@@ -677,11 +867,11 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
 const CREDIT = html`<p class="copy-13 secondary">Game data © Gryphline / Hypergryph. Damage formula from endfield.wiki.gg, CC BY-SA 4.0. Simulated in this browser.</p>`;
 
 /**
- * The Transcript tab: a gameplay video's rotation as read (ui/rotationReader.ts), played in the sim. What the video
+ * The Parser tab: a gameplay recording's rotation as read (ui/rotationReader.ts), played in the sim. What the video
  * shows (team, enemy, every press) can't be changed here; only food, which a video can't show. Builds are the
  * operators' loadouts.
  */
-function transcriptView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw: () => void): Html {
+function parseView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw: () => void): Html {
   const v = video ?? lastVideo;
   const idOf = new Map(pickable(wiki, index, []).map((id) => [wiki.ops[id].name, id]));
   // The boss bar's name.
@@ -719,20 +909,20 @@ function transcriptView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw: 
                 const op = ops[i];
                 const b = builds[i]?.build;
                 return html`<div class="sim-member">
-                  <div class="sim-op">${op ? itemImg('char', op, 'sim-portrait') : ''}<span class="label-14 ellipsis">${name}</span>${b ? html`<span class="label-12 secondary">P${b.potential}</span>` : ''}</div>
+                  <div class="sim-op">${op ? html`<a class="sim-op-link" href="${infoHref('char', op)}" title="${name}’s page" aria-label="${name}’s page">${itemImg('char', op, 'sim-portrait')}</a>` : ''}<span class="label-14 ellipsis">${name}</span>${b ? html`<span class="label-12 secondary">P${b.potential}</span>` : ''}</div>
                   ${op
                     ? html`<label class="label-12 secondary">Food <select class="input sim-food" data-sim="vfood" data-op="${op}" aria-label="Food">
                         <option value="" ${s.videoFood?.[op] ? '' : 'selected'}>None</option>
                         ${Object.entries(FOODS).map(([id, f]) => html`<option value="${id}" ${id === s.videoFood?.[op] ? 'selected' : ''}>${f.name}</option>`)}
                       </select></label>`
                     : ''}
-                  <div class="sim-gear copy-13">${b ? buildLines(b, wiki) : ''}${op && builds[i]!.missing.length ? html`<a class="copy-13" href="${infoHref('char', op)}">Set ${name}’s loadout</a>` : ''}</div>
+                  <div class="sim-gear copy-13">${b ? buildLines(b, wiki) : ''}</div>
                 </div>`;
               })}
             </div>`
-        : html`<p class="copy-14 secondary">Read a gameplay video to see its rotation, timeline and damage.</p>`}
+        : html`<p class="copy-14 secondary">Parse a gameplay recording to see its rotation, timeline and damage.</p>`}
       <div class="sim-run">
-        <button type="button" class="btn ${v ? 'secondary' : 'primary'}" data-action="sim-read">${icon('movie')}Read a gameplay video</button>
+        <button type="button" class="btn ${v ? 'secondary' : 'primary'}" data-action="sim-read">${icon('movie')}Parse gameplay recording</button>
         ${lastVideo && !replayWorker ? html`<button type="button" class="btn secondary" data-action="sim-video-again">${icon('replay')}Play again</button>` : ''}
       </div>
     </div></section>

@@ -38,6 +38,8 @@ export interface Team {
   spec?: unknown;
   /** What the style allows (default: everything). */
   rules?: Rules;
+  /** Who's controlled at the start (team slot), the only one the search tries; unset: it tries each. */
+  main?: number;
 }
 
 /** What a style allows: swapping who's controlled, animation cancels. */
@@ -391,14 +393,17 @@ export async function search(team: Team, opts: SearchOptions = {}, runner: Runne
   const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
   const startBudget = Math.min(Math.max(n, Math.round(listBudget * 0.4)), Math.ceil(listBudget));
   const policies: Policy[] = [];
+  // With one operator controlled, one plain start does.
+  const plain = team.main == null ? n : 1;
   for (let k = 0; k < startBudget; k++) {
     const order = all.map((x) => [...x] as [number, Input]);
-    if (k >= n)
+    if (k >= plain)
       for (let i = order.length - 1; i > 0; i--) {
         const j = Math.floor(rnd() * (i + 1));
         [order[i], order[j]] = [order[j], order[i]];
       }
-    policies.push({ order, main: k < n ? k : Math.floor(rnd() * n) });
+    const main = k < n ? k : Math.floor(rnd() * n);
+    policies.push({ order, main: team.main ?? main });
   }
   const fights = await runner.plays(policies.map((policy) => ({ team, policy, seconds })));
   const starts = policies.map((policy, k) => {
@@ -499,16 +504,18 @@ export async function searchCycle(team: Team, opts: SearchOptions = {}, runner: 
   const of = (slots: number[], main: number): Policy => ({ order: slots.map((s) => [s, 'battle'] as [number, Input]), main, cycle: true });
   const policies: Policy[] = [];
   const starts = Math.min(Math.max(n, Math.round(budget * 0.4)), budget);
+  const plain = team.main == null ? n : 1;
   for (let k = 0; k < starts; k++) {
     const slots = Array.from({ length: n }, (_, i) => i);
-    if (k >= n) {
+    if (k >= plain) {
       for (let i = n - 1; i > 0; i--) {
         const j = Math.floor(rnd() * (i + 1));
         [slots[i], slots[j]] = [slots[j], slots[i]];
       }
       if (k % 3 === 0) slots[Math.floor(rnd() * n)] = Math.floor(rnd() * n);
     }
-    policies.push(of(slots, k < n ? k : Math.floor(rnd() * n)));
+    const main = k < n ? k : Math.floor(rnd() * n);
+    policies.push(of(slots, team.main ?? main));
   }
   const fights = await runner.plays(policies.map((policy) => ({ team, policy, seconds })));
   const tried = policies.map((policy, k) => {
@@ -527,7 +534,7 @@ export async function searchCycle(team: Team, opts: SearchOptions = {}, runner: 
       const moves: Policy[] = [];
       for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (slots[i] !== slots[j]) moves.push(of(slots.map((s, k) => (k === i ? slots[j] : k === j ? slots[i] : s)), policy.main));
       for (let i = 0; i < n; i++) for (let s = 0; s < n; s++) if (s !== slots[i]) moves.push(of(slots.map((x, k) => (k === i ? s : x)), policy.main));
-      for (let m = 0; m < n; m++) if (m !== policy.main) moves.push(of(slots, m));
+      if (team.main == null) for (let m = 0; m < n; m++) if (m !== policy.main) moves.push(of(slots, m));
       let at = 0;
       while (at < moves.length && played < stop && !improved) {
         const tries = moves.slice(at, at + Math.min(batch, stop - played));

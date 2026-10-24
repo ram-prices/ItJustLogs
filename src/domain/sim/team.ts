@@ -70,8 +70,10 @@ export interface SimSettings {
   cores?: number;
   /** The enemy fought (ENEMIES id; unset: the training dummy). */
   enemy?: string;
-  /** Transcript: the food each operator ate (operator id → FOODS id); a video can't show it. */
+  /** Parser: the food each operator ate (operator id → FOODS id); a video can't show it. */
   videoFood?: Record<string, string>;
+  /** The operator controlled the whole fight (operator id); unset: the search picks. */
+  controlled?: string;
 }
 
 export type Goal = 'time' | 'hp';
@@ -123,6 +125,8 @@ export interface SimRequest {
   optimize?: Optimize;
   /** The enemy (unset: the training dummy). */
   enemy?: Enemy;
+  /** Who's controlled the whole fight (team slot); unset: the search picks, and Advanced may swap. */
+  main?: number;
 }
 
 export interface SimProgress {
@@ -246,6 +250,7 @@ export interface TeamSpec {
   rules?: Rules;
   enemy?: Enemy;
   uptime?: number;
+  main?: number;
 }
 
 /** A fight's team from what it's made of and the combat data. */
@@ -268,6 +273,7 @@ export function teamFromSpec(spec: TeamSpec, data: SimData): Team {
     ...(spec.uptime != null && spec.uptime < 1 ? { uptime: spec.uptime } : {}),
     hp: spec.hp,
     rules: spec.rules,
+    ...(spec.main != null ? { main: spec.main } : {}),
     spec,
   };
 }
@@ -279,7 +285,9 @@ export const teamOf = (req: SimRequest, data: SimData): Team =>
       builds: req.builds,
       startSp: req.startSp,
       hp: req.hp,
-      rules: STYLE_RULES[styleOf(req.style)],
+      // An operator picked to be controlled stays so: no swaps.
+      rules: req.main != null ? { ...STYLE_RULES[styleOf(req.style)], swaps: false } : STYLE_RULES[styleOf(req.style)],
+      ...(req.main != null ? { main: req.main } : {}),
       ...(req.enemy ? { enemy: req.enemy } : {}),
       ...(req.uptime != null && req.uptime < 1 ? { uptime: req.uptime } : {}),
     },

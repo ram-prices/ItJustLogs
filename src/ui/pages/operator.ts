@@ -11,6 +11,7 @@ import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, sp
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, heroGlow, icon, itemImg, stars, tileArt, trait, withStars } from '../components';
 import { html, type Html } from '../html';
+import finalStrikes from '../../data/final-strikes.json';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
 /**
@@ -22,6 +23,62 @@ import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, info
  */
 
 const MAX_RANK = 12;
+
+/**
+ * Each operator's basic attack chain as the sim plays it (scripts/final-strikes.test.ts): hits, seconds from one Final
+ * Strike to the next, and the SP a chain gives; SP per second spreads the Final Strike's SP over the chain.
+ */
+type Chain = { hits: number; seconds: number; sp: number };
+const CHAINS = (finalStrikes as { operators: Record<string, Chain> }).operators;
+const spRate = (c: Chain) => c.sp / c.seconds;
+
+/** The Operators list's Final Strikes table: its sort column and direction. */
+const FS_COLUMNS: [key: string, label: string, value: (c: Chain, name: string) => number | string][] = [
+  ['name', 'Operator', (_, name) => name],
+  ['hits', 'Hits', (c) => c.hits],
+  ['seconds', 'Chain (s)', (c) => c.seconds],
+  ['sp', 'Final Strike SP', (c) => c.sp],
+  ['rate', 'SP per second', (c) => spRate(c)],
+];
+let fsSort: { key: string; desc: boolean } = { key: 'rate', desc: true };
+
+/** A Final Strikes column header click: sorts by it, or flips the direction. */
+export function finalStrikeSort(key: string): void {
+  fsSort = fsSort.key === key ? { key, desc: !fsSort.desc } : { key, desc: key !== 'name' };
+}
+
+function finalStrikeTable(rows: { id: string; name: string }[]): Html {
+  const list = rows.flatMap((r) => (CHAINS[r.id] ? [{ ...r, c: CHAINS[r.id] }] : []));
+  if (!list.length) return html``;
+  const col = FS_COLUMNS.find(([k]) => k === fsSort.key) ?? FS_COLUMNS[4];
+  list.sort((a, b) => {
+    const x = col[2](a.c, a.name);
+    const y = col[2](b.c, b.name);
+    const d = typeof x === 'string' ? x.localeCompare(String(y)) : x - (y as number);
+    return (fsSort.desc ? -d : d) || a.name.localeCompare(b.name);
+  });
+  return html`<section class="section fs-section">
+    <div class="section-head"><h2 class="heading-20">Final Strikes</h2><span class="label-13 secondary">Basic attack chains in the sim</span></div>
+    <div class="card table-wrap"><table class="table fs-table">
+      <thead><tr>${FS_COLUMNS.map(
+        ([k, label]) => html`<th class="${k === 'name' ? '' : 'num'}" aria-sort="${k === fsSort.key ? (fsSort.desc ? 'descending' : 'ascending') : 'none'}">
+          <button type="button" class="fs-sort${k === fsSort.key ? ' on' : ''}" data-action="fs-sort" data-value="${k}">${label}${k === fsSort.key ? icon(fsSort.desc ? 'arrow_downward' : 'arrow_upward') : ''}</button>
+        </th>`,
+      )}</tr></thead>
+      <tbody>
+        ${list.map(
+          (r) => html`<tr>
+            <td><a class="fs-op" href="${operatorInfoHref(r.id)}">${itemImg('char', r.id, 'fs-portrait')}<span>${r.name}</span></a></td>
+            <td class="num">${r.c.hits}</td>
+            <td class="num">${r.c.seconds.toFixed(2)}</td>
+            <td class="num">${Math.round(r.c.sp)}</td>
+            <td class="num">${spRate(r.c).toFixed(2)}</td>
+          </tr>`,
+        )}
+      </tbody>
+    </table></div>
+  </section>`;
+}
 
 /** Link to an operator's info page (or the list of all of them). */
 export const operatorInfoHref = (id?: string): string => infoHref('char', id);
@@ -72,7 +129,8 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
           </div>
         </section>`,
       )}
-      <p class="copy-14 secondary list-search-empty" hidden>No operators match your search.</p>`,
+      <p class="copy-14 secondary list-search-empty" hidden>No operators match your search.</p>
+      ${finalStrikeTable(ops.map(([id, o]) => ({ id, name: o.name })))}`,
     )}
       ${credit(f.attribution)}
     </main>`;
@@ -150,9 +208,10 @@ function attributeTotal(o: WikiOperator, bonuses: Map<string, Bonus> | null, lab
   return k && Array.isArray(s[k]) ? Math.floor(statTotal((s[k] as number[])[at], bonuses?.get(label))) : 0;
 }
 
-function statsSection(o: WikiOperator, bonuses: Map<string, Bonus> | null, potential: number | null): Html {
+function statsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> | null, potential: number | null): Html {
   const s = o.stats;
   if (!s) return html``;
+  const chain = CHAINS[id];
   const tag = (label: string) =>
     label === o.mainAttribute ? badge('Main', 'purple') : label === o.secondaryAttribute ? badge('Secondary') : '';
   // Lv 90, else the highest level the wiki lists.
@@ -187,6 +246,11 @@ function statsSection(o: WikiOperator, bonuses: Map<string, Bonus> | null, poten
         <div class="minor"><dt>Critical rate</dt><dd class="num">${s.critRate != null ? withBonus(s.critRate * 100, bonuses?.get('Critical rate'), (n) => `${Math.round(n * 10) / 10}%`, true) : '–'}</dd></div>
         <div class="minor"><dt>Attack speed</dt><dd class="num">${s.attackSpeed ?? '–'}</dd></div>
         <div class="minor"><dt>Range</dt><dd>${s.range ?? '–'}</dd></div>
+        ${chain
+          ? html`<div class="minor"><dt>Basic attack chain</dt><dd class="num">${chain.hits} hits · ${chain.seconds.toFixed(2)} s</dd></div>
+              <div class="minor"><dt>Final Strike SP</dt><dd class="num">${Math.round(chain.sp)}</dd></div>
+              <div class="minor"><dt>SP per second</dt><dd class="num">${spRate(chain).toFixed(2)}</dd></div>`
+          : ''}
         ${def ? html`<div class="minor loadout-only"><dt>DEF</dt><dd class="num"><span class="attr-note">${defReduction(def.flat).toFixed(1)}% less DMG taken</span>${loadoutOnly(def)}</dd></div>` : ''}
         ${treatment ? html`<div class="minor"><dt>Treatment received</dt><dd class="num" title="0.1% per point of Will">+${Math.round(treatment * 10) / 10}%</dd></div>` : ''}
         ${others.map(([k, b]) =>
@@ -443,7 +507,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
     <main class="container fade-in wiki-page${backdrop ? ' has-backdrop' : ''}">
       ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined)}
       <div class="wiki-cols even">
-        <div class="wiki-col">${statsSection(o, bonuses, owned?.copies ? owned.potential : null)}</div>
+        <div class="wiki-col">${statsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
         <div class="wiki-col">${loadoutSection(id, a, redraw)}</div>
       </div>
       ${owned?.copies
