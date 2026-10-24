@@ -222,10 +222,48 @@ export const ALLEIKHREOS: Enemy = {
 /** Each phase's HP (Lv 90; the second starts at full when the first runs out), so both. */
 export const ALLEIKHREOS_HP = 2_476_341 * 2;
 
+/**
+ * Skydrummer in Echoes of War's "Howling of Undying Beasts" (eny_0082_hsbear_race007: DungeonTable
+ * indie_battletower007, _s, _ex), from EnemyAttributeTemplateTable and the endfield.wiki.gg page: DEF 100, a 320
+ * Stagger meter with no node, 9 s Staggered, Finishers ×1.5 and 50 SP, one phase. The stage's own rules: Resistance 50
+ * to every element but Ether (the template's; the game text says "gains 50 Resistance against all elements"), no
+ * Enraged state, the level by difficulty (Normal 60, Hard 75, Brutal 90: the HP below), only HP tacticals. Its roar
+ * (skill08) interrupted in its weakness window gives buff_common_interrupted_face_to_attacker, poise_value 20. Its guard stance
+ * is short (see SKYDRUMMER.guard's note).
+ * Stage rules as endfield.wiki.gg/wiki/Howling_of_Undying_Beasts lists them (Brutal: no Enraged state, 50 Resistance to all
+ * elements on entering battle, better stats, HP Treatment tacticals only; the bonus goal is a clear within 3 minutes).
+ */
+export const SKYDRUMMER: Enemy = {
+  def: 100,
+  resist: { Physical: 50, Fire: 50, Pulse: 50, Cryst: 50, Natural: 50 },
+  poise: 320,
+  staggerSeconds: 9,
+  finisherSp: 50,
+  finisherMul: 1.5,
+  nodes: [],
+  interrupt: { stagger: 20 },
+  // Its guard stance, skill06 (cast below 85%, 55% and 25% HP: ratio_maxhp01..03; buff_eny_0082_hsbear_skill06:
+  // ratio_damagetaken -0.9, ratio_def -0.3, its meter healed by a tenth every 0.25 s, default duration 25 s), isn't
+  // simulated: at the recording's real HP scale no stretch of the fight shows a tenth of the damage, and 1:45-2:25 of
+  // it matches the sim with no stance, so the stance must end with its next skill (finishWithNextSkillIfNotInherited).
+  // Enemy.guard is there for an enemy whose stance lasts.
+};
+/**
+ * Brutal's HP is an estimate from the owner's recording: two clean events (the first Finisher's 296,434 took 8.4% of the
+ * bar; the last 178,000 took the final 5.4%) put it near 3.5M, ×3.2 the Lv 90 template's 1,100,596 ("Enemies have
+ * better stats"; no multiplier found in DungeonTable or the SeasonTower tables). Hard and Normal keep the template's
+ * Lv 75 and 60 values until a recording says otherwise.
+ */
+export const SKYDRUMMER_HP = { brutal: 3_521_907, hard: 610_197, normal: 297_005 };
+
 /** The enemies a fight can be against: the name shown, its numbers, its HP for an HP goal, and how a video names it. */
 export const ENEMIES: { id: string; name: string; enemy: Enemy; hp: number; seen: RegExp }[] = [
   { id: 'dummy', name: 'Training dummy', enemy: DUMMY, hp: DEFAULT_HP, seen: /dummy/i },
   { id: 'alleikhreos', name: 'Alleikhreos (Crisis Calamity)', enemy: ALLEIKHREOS, hp: ALLEIKHREOS_HP, seen: /alleikhreos/i },
+  // One phase: its HP as phaseHp, so a recording's bar and the Parser's fit know the boss's size.
+  { id: 'skydrummer', name: 'Skydrummer (Echoes of War, Brutal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.brutal }, hp: SKYDRUMMER_HP.brutal, seen: /skydrummer/i },
+  { id: 'skydrummer-hard', name: 'Skydrummer (Echoes of War, Hard)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.hard }, hp: SKYDRUMMER_HP.hard, seen: /skydrummer.*hard/i },
+  { id: 'skydrummer-normal', name: 'Skydrummer (Echoes of War, Normal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.normal }, hp: SKYDRUMMER_HP.normal, seen: /skydrummer.*normal/i },
 ];
 export const enemyById = (id?: string) => ENEMIES.find((e) => e.id === id) ?? ENEMIES[0];
 /** The enemy a video's boss bar names, if it's one the sim has. */
@@ -473,6 +511,8 @@ const SP_BACK_REACH: Record<string, number[]> = {
 /** A video's rotation played in the sim: the fight, and the presses the sim couldn't make near their time. */
 export interface ReplayResult extends SimResult {
   missed: { t: number; slot: number; input: Input | 'strike' }[];
+  /** Damage each second of the fight by `<operator>|<source>`, so the recording's own damage can be split the same way. */
+  perSecond?: Record<string, number>[];
 }
 
 /** A video's stopwatch: when it stopped and the stretches it stood still (a phase change), seconds into the fight. */
@@ -483,6 +523,11 @@ export interface ReplayClock {
   away?: [number, number][];
   /** Stretches the enemy took no Stagger (its meter didn't move: Alleikhreos's Foundite Weapon), seconds into the fight. */
   guard?: [number, number][];
+  /**
+   * Which pauses (their starts, seconds) are phase changes: the boss's bar was full again after them. Without this
+   * list, any pause of PHASE_CHANGE seconds or more is one.
+   */
+  phases?: number[];
 }
 
 /** A stopwatch pause at least this long (seconds) is a phase change, not a cut-in hiding the stopwatch. */
@@ -597,7 +642,9 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     if (clock() % 8 === 0 && !paused(clock())) track.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
     clockAt[w.frame] ??= clock();
     while (resumed < pauses.length && clock() >= pauses[resumed][1]) {
-      if (pauses[resumed][1] - pauses[resumed][0] >= PHASE_CHANGE * FPS) {
+      const [from, to] = pauses[resumed];
+      const phase = stopwatch?.phases ? stopwatch.phases.some((p) => Math.abs(Math.round(p * FPS) - from) <= 1) : to - from >= PHASE_CHANGE * FPS;
+      if (phase) {
         w.sp = Math.max(w.sp, team.startSp ?? START_SP);
         w.newPhase();
       }
@@ -675,5 +722,13 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     mechanics: w.mechanics.map((m) => ({ ...m, frame: toClock(m.frame) })),
     away: w.away.map(([a, b]) => [game(a), game(b)] as [number, number]),
   };
-  return { ...summary(f, req, start), missed, track };
+  const perSecond: Record<string, number>[] = [];
+  for (const h of hits) {
+    if (!h.amount) continue;
+    const k = Math.max(0, Math.floor(h.frame / FPS));
+    while (perSecond.length <= k) perSecond.push({});
+    const key = `${h.operator}|${sourceOf(h.skill, h.skillKind)}`;
+    perSecond[k][key] = (perSecond[k][key] ?? 0) + h.amount;
+  }
+  return { ...summary(f, req, start), missed, track, perSecond };
 }

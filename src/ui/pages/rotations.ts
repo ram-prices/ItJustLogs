@@ -1,6 +1,6 @@
 import { GEAR_SLOTS, artificeOf, type Loadout } from '../../domain/loadout';
 import { FPS, type Enemy, type Input } from '../../domain/sim/engine';
-import { compareWithVideo } from '../../domain/sim/videoCheck';
+import { compareWithVideo, fitToRecording } from '../../domain/sim/videoCheck';
 import {
   BUILD_MODES,
   CHECKED,
@@ -88,6 +88,16 @@ let editing: number | null = null;
 /** A parsed run's transcript being edited: its presses, until played again or cancelled. */
 type VideoStep = VideoRotation['steps'][number];
 let draft: { at: number; steps: VideoStep[]; away: [number, number][] } | null = null;
+
+/** The pauses after which the boss's bar was full again (a phase change), by their start, from the recording's bars. */
+function phaseChanges(boss: [number, number, number][], pauses: [number, number][]): number[] {
+  return pauses.filter(([a]) => {
+    const i = boss.findIndex(([t]) => t >= a);
+    const before = boss[(i < 0 ? boss.length : i) - 1];
+    const after = boss[i];
+    return !!before && !!after && after[1] > before[1] + 0.3;
+  }).map(([a]) => a);
+}
 let deleting: number | null = null;
 
 function loadSaved(redraw: () => void): void {
@@ -146,7 +156,7 @@ function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: strin
     }
   };
   // Readings saved before the stopwatch was read have no end: the fight's length stands in.
-  w.postMessage({ id, req, replay: steps, stopwatch: { end: v.end ?? v.seconds, pauses: v.pauses ?? [], away: v.away ?? [], guard: v.guard ?? [] } });
+  w.postMessage({ id, req, replay: steps, stopwatch: { end: v.end ?? v.seconds, pauses: v.pauses ?? [], away: v.away ?? [], guard: v.guard ?? [], ...(v.boss ? { phases: phaseChanges(v.boss, v.pauses ?? []) } : {}) } });
 }
 
 /** A parsed run as a file to share or open elsewhere (Import run): its reading, the request (team, loadouts, enemy), result, name and note. */
@@ -247,26 +257,21 @@ function videoCheck(r: NonNullable<typeof replay>): Html {
 }
 
 /**
- * A parsed run's own timeline, 1:1 with the recording (recordingTrack), with the player's controls and the video's
- * boss bars under it; the sim's timeline follows with its own bars. The damage lanes share one scale.
+ * A parsed run's own track, 1:1 with the recording (recordingTrack): the Parser tab's timeline shows it by default,
+ * with the video's boss bars, and a switch shows the sim's instead (its damage lane on the same scale).
  */
-function recordingCard(r: NonNullable<typeof replay>): { before?: Html; dpsMax?: number } {
+function recordingCard(r: NonNullable<typeof replay>): { recording?: Track; simTrack?: Track; dpsMax?: number; unattributed?: number; shown: ReplayResult } {
   const entry = r.at === undefined ? undefined : runs.find((x) => x.at === r.at);
   const reading = entry && videoOf(entry);
-  if (!r.result || !entry || !reading?.boss?.length) return {};
+  if (!r.result || !entry || !reading?.boss?.length) return { shown: r.result! };
   const asked = (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy;
   const enemy = typeof asked === 'object' ? asked : asked ? enemyById(asked).enemy : undefined;
-  const rec = recordingTrack(reading, r.result.seconds, enemy?.phaseHp ?? r.result.hp);
-  const dpsMax = Math.max(...rec.dps, ...simTrack(r.result).dps, 0);
-  preparePlay(r.result);
-  return {
-    dpsMax,
-    before: html`<section class="card"><div class="card-body sim-card">
-      <div class="sim-fold-head"><h2 class="heading-16">Timeline · Recording</h2>${foldButton('video', '')}</div>
-      ${playControls(r.result)}
-      ${fold.video ? html`${lanes(rec, r.names, dpsMax)}${bossRow('Video', 'video')}` : ''}
-    </div></section>`,
-  };
+  const phaseHp = enemy?.phaseHp ?? r.result.hp ?? 0;
+  const rec = recordingTrack(reading, r.result.seconds, phaseHp);
+  const sim = simTrack(r.result);
+  // The Parser tells what each operator did: the recording's damage, split as the sim split its own.
+  const fit = fitToRecording(r.result, reading.boss, reading.pauses ?? [], phaseHp);
+  return { recording: rec, simTrack: sim, dpsMax: Math.max(...rec.dps, ...sim.dps, 0), unattributed: fit.unattributed, shown: fit.result };
 }
 
 /** The video's rotation as the sim played it: the usual results, and the presses it couldn't make. */
@@ -277,7 +282,10 @@ function replayView(r: NonNullable<typeof replay>): Html {
       ? html`<p class="copy-14 sim-error">${r.error}</p>`
       : !r.result
         ? html`<p class="copy-14 secondary">${icon('hourglass_empty')} Playing the recording’s actions…</p>`
-        : html`${resultsView(r.result, r.names, r.ids, false, { ...recordingCard(r), underTimeline: videoCheck(r) })}
+        : html`${(() => {
+            const card = recordingCard(r);
+            return resultsView(card.shown, r.names, r.ids, false, { ...card, underTimeline: videoCheck(r) });
+          })()}
             ${missed.length ? html`<p class="copy-13 secondary">The sim couldn’t make ${missed.length === 1 ? 'this action' : `these ${missed.length} actions`} in time: ${missed.map((m) => `${secs(m.t * FPS)} ${r.names[m.slot]} · ${m.input === 'strike' ? 'Final Strike' : INPUT_NAME[m.input]}`).join(', ')}.</p>` : ''}`}
   </section>`;
 }
@@ -385,6 +393,9 @@ export function simAction(action: string, el: HTMLElement): boolean {
     }
     case 'sim-fold':
       if (v === 'video' || v === 'checks') fold[v] = !fold[v];
+      return true;
+    case 'sim-view':
+      if (v === 'recording' || v === 'sim') view = v;
       return true;
     case 'sim-play':
       if (!playBars) return false;
@@ -853,8 +864,10 @@ const play = { t: 0, speed: 1, running: false, of: null as SimResult | null, raf
 /** The boss's bars over the fight: HP left (0–1) and its Stagger meter (0–1, -1 Staggered, NaN unknown). */
 type Bars = { t: number[]; hp: number[]; meter: number[] };
 let playBars: { sim: Bars; video?: Bars; seconds: number } | null = null;
-/** What's shown under the timeline: the video's bars, the discrepancies list. */
+/** What's shown under the timeline: the discrepancies list. */
 const fold = { video: true, checks: true };
+/** The Parser tab's timeline: the recording's own (what happened) or the sim's (how it adds up). */
+let view: 'recording' | 'sim' = 'recording';
 const foldButton = (what: keyof typeof fold, label: string) =>
   html`<button type="button" class="sim-fold-btn label-12 secondary" data-action="sim-fold" data-value="${what}" title="${fold[what] ? 'Hide' : 'Show'}" aria-expanded="${fold[what] ? 'true' : 'false'}">${label} ${icon(fold[what] ? 'visibility_off' : 'visibility')}</button>`;
 
@@ -991,13 +1004,13 @@ function runPlay(): void {
 }
 
 /** The presses, with the controlled operator's Final Strikes and Finishers between them (how long to keep attacking). */
-function steps(r: SimResult): { frame: number; slot: number; label: string; strike: boolean }[] {
+function steps(r: Track): { frame: number; slot: number; label: string; strike: boolean }[] {
   const out = [
-    ...r.presses.map((p) => ({ frame: p.frame, slot: p.slot, label: INPUT_NAME[p.input], strike: false })),
-    ...(r.strikes ?? []).map((s) => ({ frame: s.frame, slot: s.slot, label: s.finisher ? 'Finisher' : 'Final Strike', strike: true })),
-    ...(r.staggers ?? []).map((s) => ({ frame: s.frame, slot: -1, label: 'Staggered', strike: true })),
-    ...(r.mechanics ?? []).map((m) => ({ frame: m.frame, slot: -1, label: m.label, strike: true })),
-    ...(r.away ?? []).map(([a]) => ({ frame: a, slot: -1, label: 'Invulnerable', strike: true })),
+    ...r.presses.filter((p) => p.input !== 'swap').map((p) => ({ frame: p.frame, slot: p.slot, label: INPUT_NAME[p.input], strike: false })),
+    ...r.strikes.map((s) => ({ frame: s.frame, slot: s.slot, label: s.finisher ? 'Finisher' : 'Final Strike', strike: true })),
+    ...r.staggers.map((s) => ({ frame: s.frame, slot: -1, label: 'Staggered', strike: true })),
+    ...r.mechanics.map((m) => ({ frame: m.frame, slot: -1, label: m.label, strike: true })),
+    ...r.away.map(([a]) => ({ frame: a, slot: -1, label: 'Invulnerable', strike: true })),
   ];
   return out.sort((a, b) => a.frame - b.frame);
 }
@@ -1133,7 +1146,9 @@ function historyView(names: string[], showing: number | undefined, recordings = 
   </div></section>`;
 }
 
-function resultsView(r: SimResult, names: string[], ids: string[], stale: boolean, extra: { before?: Html; underTimeline?: Html; dpsMax?: number } = {}): Html {
+function resultsView(r: SimResult, names: string[], ids: string[], stale: boolean, extra: { recording?: Track; simTrack?: Track; underTimeline?: Html; dpsMax?: number; unattributed?: number } = {}): Html {
+  const rec = extra.recording;
+  const shown: Track | null = rec ? (view === 'recording' ? rec : (extra.simTrack ?? simTrack(r))) : null;
   const dps = r.total / r.seconds;
   const time = clockTime(r.seconds);
   const shares = ids.map((id, slot) => ({ id, slot, total: r.byOperator[id] ?? 0 })).sort((a, b) => b.total - a.total);
@@ -1145,6 +1160,7 @@ function resultsView(r: SimResult, names: string[], ids: string[], stale: boolea
       metric({ label: 'Actions', value: String(r.presses.length), sub: 'besides basic attacks' }),
       ...(names[r.main] ? [metric({ label: 'Controlled', value: names[r.main], sub: new Set((r.strikes ?? []).map((x) => x.slot)).size > 1 ? 'at the start, swaps after' : 'the whole fight' })] : []),
     ])}
+    ${rec ? html`<p class="copy-13 secondary">Damage from the recording’s HP bar, split among operators and skills as the sim split its own.</p>` : ''}
     <section class="card"><div class="card-body sim-card">
       <h2 class="heading-16">Damage by operator</h2>
       ${shares.map(
@@ -1156,24 +1172,27 @@ function resultsView(r: SimResult, names: string[], ids: string[], stale: boolea
         </div>`,
       )}
     </div></section>
-    ${extra.before ?? ''}
     <section class="card"><div class="card-body sim-card">
-      <h2 class="heading-16">${extra.before ? 'Timeline · Sim' : 'Timeline'}</h2>
+      ${rec
+        ? html`<div class="sim-fold-head"><h2 class="heading-16">Timeline</h2>${toggleGroup('sim-view', [['recording', 'Recording'], ['sim', 'Sim']], view)}</div>`
+        : html`<h2 class="heading-16">Timeline</h2>`}
       ${r.order
         ? html`<p class="copy-14">Control ${names[r.main]}. Combo skills as they come up, ultimates when charged, and these battle skills in turn, over and over:</p>
             <ol class="sim-order copy-14">${r.order.map(([slot, input]) => html`<li>${names[slot]} · ${INPUT_NAME[input]}</li>`)}</ol>`
         : ''}
-      ${extra.before ? html`${lanes(simTrack(r), names, extra.dpsMax ?? Math.max(...simTrack(r).dps, 0))}${bossRow('Sim', 'sim')}` : timeline(r, names)}
+      ${shown
+        ? html`${(preparePlay(r), '')}${playControls(r)}${lanes(shown, names, extra.dpsMax ?? Math.max(...shown.dps, 0))}${view === 'recording' ? bossRow('Video', 'video') : bossRow('Sim', 'sim')}`
+        : timeline(r, names)}
       ${extra.underTimeline ?? ''}
       <ol class="sim-steps copy-14">
-        ${steps(r).map((p) => html`<li class="${p.strike ? 'secondary' : ''}"><span class="num secondary">${secs(p.frame)}</span> ${p.slot < 0 ? 'Enemy' : names[p.slot]} · ${p.label}</li>`)}
+        ${steps(shown ?? simTrack(r)).map((p) => html`<li class="${p.strike ? 'secondary' : ''}"><span class="num secondary">${secs(p.frame)}</span> ${p.slot < 0 ? 'Enemy' : names[p.slot]} · ${p.label}</li>`)}
       </ol>
     </div></section>
     <section class="card"><div class="card-body sim-card">
       <h2 class="heading-16">Where the damage comes from</h2>
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Operator</th><th>Source</th><th class="num">Hits</th><th class="num">Damage</th><th class="num">Share</th></tr></thead>
-        <tbody>${r.sources.slice(0, 24).map((s) => html`<tr><td>${names[ids.indexOf(s.op)] ?? s.op}</td><td>${s.source}</td><td class="num">${s.hits}</td><td class="num">${big(s.total)}</td><td class="num">${pct(s.total / r.total)}</td></tr>`)}</tbody>
+        <tbody>${r.sources.slice(0, 24).map((s) => html`<tr><td>${names[ids.indexOf(s.op)] ?? s.op}</td><td>${s.source}</td><td class="num">${s.hits}</td><td class="num">${big(s.total)}</td><td class="num">${pct(s.total / r.total)}</td></tr>`)}${extra.unattributed ? html`<tr><td class="secondary">Not attributed</td><td class="secondary">No action read for it</td><td class="num"></td><td class="num">${big(extra.unattributed)}</td><td class="num">${pct(extra.unattributed / r.total)}</td></tr>` : ''}</tbody>
       </table></div>
     </div></section>
     ${r.unknown.length

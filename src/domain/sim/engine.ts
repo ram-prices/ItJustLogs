@@ -397,6 +397,12 @@ export interface Enemy {
   /** Each phase's HP, and how low a phase before the last can take it (a share of it). */
   phaseHp?: number;
   phaseFloor?: number;
+  /**
+   * A guard stance it takes when its HP falls below each share in `below` (needs phaseHp): for `seconds`, damage
+   * taken changes by `damageTaken` (-0.9: a tenth), its DEF by `def`, and its Stagger meter heals faster than hits
+   * fill it (no Stagger). The Skydrummer's skill06 buff: ratio_damagetaken, ratio_def, ratio_maxpoise healed each 0.25 s.
+   */
+  guard?: { below: number[]; seconds: number; damageTaken: number; def?: number };
 }
 
 export class World {
@@ -465,6 +471,9 @@ export class World {
   private interrupts = new Map<number, { kind: string; until: number }>();
   /** A stretch after a node the enemy takes no Stagger (Enemy.nodeGuard), in frames. */
   private poiseGuard: [number, number] | null = null;
+  /** The enemy's guard stance (Enemy.guard): until which frame, and the HP shares that have started one. */
+  private guardUntil = -1;
+  private guarded: number[] = [];
   /**
    * Stretches the enemy takes no Stagger, in frames of the clock that runs through cut-ins (a recording's, read from
    * its boss's meter); when there are any, they stand in for Enemy.nodeGuard.
@@ -1986,9 +1995,33 @@ export class World {
     return (e.bb.get('staggeredUntil') ?? -1) > this.frame;
   }
 
+  /** The enemy is in its guard stance (Enemy.guard). */
+  guarding(): boolean {
+    return this.frame < this.guardUntil;
+  }
+
+  /** After damage: the enemy's HP share just fell below one of its guard stance's thresholds (Enemy.guard). */
+  private checkGuard(): void {
+    const g = this.foe.guard;
+    if (!g || !this.foe.phaseHp) return;
+    // One phase assumed: all the damage so far is this phase's.
+    const left = 1 - this.dealt / this.foe.phaseHp;
+    let starts = false;
+    for (const k of g.below)
+      if (!this.guarded.includes(k) && left < k) {
+        this.guarded.push(k);
+        starts = true;
+      }
+    if (!starts) return;
+    this.guardUntil = this.frame + Math.round(g.seconds * FPS);
+    this.mechanics.push({ frame: this.frame, label: 'Guard stance' });
+  }
+
   /** Stagger on an enemy: a full meter Staggers it for its time, with a Finisher ready; none adds up meanwhile (wiki: Stagger). */
   private poise(target: Entity, v: number, attacker?: Entity): void {
     if (target.side !== 'enemy' || !this.foe.poise || this.staggered(target)) return;
+    // Its guard stance heals its meter faster than hits fill it.
+    if (this.guarding()) return;
     if (this.noStagger.length) {
       const c = this.frame + this.frozenFrames;
       if (this.noStagger.some(([a, b]) => c >= a && c < b)) return;
@@ -2026,6 +2059,7 @@ export class World {
     const dmg: Ctx['damage'] = { type: 'Fixed', mask, attacker, defender, skillKind: this.kindOfSkill(ctx.skillId), amount };
     this.hits.push({ frame: this.frame, operator: attacker.id, skill: ctx.skillId, type: 'Fixed', amount, kind: 'skill' });
     this.dealt += amount;
+    this.checkGuard();
     this.abilityEvent(attacker, 'OnBeforeOutputDamage', defender, dmg);
     this.abilityEvent(defender, 'OnTakeDamage', attacker, dmg);
   }
@@ -2080,13 +2114,16 @@ export class World {
     // Critical hits as their expected value: base 50% Critical DMG.
     const critRate = Math.min(1, Math.max(0, (this.stat(attacker, 'CriticalRate') + (added.Attacker.get('CriticalRate') ?? 0)) * (scaled.Attacker.get('CriticalRate') ?? 1)));
     const crit = 1 + critRate * (0.5 + this.attribute(attacker, 'CriticalDamageIncrease') + (added.Attacker.get('CriticalDamageIncrease') ?? 0));
-    const def = this.attribute(defender, 'Def') + (added.Defender.get('Def') ?? 0);
+    const guard = defender === this.enemy && this.guarding() ? this.foe.guard! : null;
+    const def = (this.attribute(defender, 'Def') + (added.Defender.get('Def') ?? 0)) * (1 + (guard?.def ?? 0));
     const defMul = def >= 0 ? 100 / (def + 100) : 2 - 0.99 ** -def;
     const resName = `${type === 'Physical' ? 'Physical' : type}Resistance`;
     const res = this.attribute(defender, resName) + (added.Defender.get(resName) ?? 0);
     const resMul = (100 - res) / 100;
     let other = 1;
     for (const [zone, v] of zones) if (zone !== 'NormalCalcZone') other *= 1 + v;
+    // Its guard stance: a ProdCalcZone addition on the defender's side.
+    if (guard) other *= 1 + guard.damageTaken;
     // Staggered: 1.3 (wiki: Stagger); a Finisher also takes the enemy's own multiplier (Alleikhreos: 1.75).
     const finisherHit = defender === this.enemy && /_power_?attack/.test(ctx.skillId);
     const staggered = (this.staggered(defender) ? 1.3 : 1) * (finisherHit ? (this.foe.finisherMul ?? 1) : 1);
@@ -2116,6 +2153,7 @@ export class World {
     dmg.amount = amount;
     this.hits.push({ frame: this.frame, operator: attacker.id, skill: ctx.skillId, type, amount, kind, skillKind: dmg.skillKind, parts: { atk, scale, bonus, crit, other, staggered, susceptibility, amp: ampMul, taken: takenMul, def: defMul, res: resMul, link } });
     this.dealt += amount;
+    this.checkGuard();
     this.abilityEvent(attacker, 'OnBeforeOutputDamage', defender, dmg);
     this.abilityEvent(defender, 'OnTakeDamage', attacker, dmg);
     this.abilityEvent(attacker, 'OnOutputDamage', defender, dmg);
@@ -2697,6 +2735,8 @@ export class World {
       if (last) last.end = Math.min(last.end, this.frame);
     }
     this.poiseGuard = null;
+    this.guardUntil = -1;
+    this.guarded = [];
   }
 
   /**

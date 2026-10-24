@@ -268,7 +268,8 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
     out.samples.push(s);
     // The stopwatch now and then (the domain picks a few moments to read).
     if (t - (out.clocks[out.clocks.length - 1]?.[0] ?? -Infinity) >= CLOCK_EVERY) out.clocks.push([t, px]);
-    if (enemy && s.hud > 0.5 && [60, 600, 1800].includes(seenOn + 1)) out.enemies.push(enemy.read());
+    // Several times, since a bright sky behind the white name spoils some reads (the Skydrummer's arena).
+    if (enemy && s.hud > 0.5 && [60, 300, 600, 1200, 1800, 2700, 3600, 5400].includes(seenOn + 1)) out.enemies.push(enemy.read());
     // Each slot's picture (portraits, or the phone's skill buttons), once the HUD has been up a moment.
     if (s.hud > 0.5 && ++seenOn === 30) {
       const { at, above, size } = layout.faces;

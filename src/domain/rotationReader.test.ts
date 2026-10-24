@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from './rotationReader.samples.json';
 import phoneFixture from './rotationReader.mobile.json';
 import staggerFixture from './rotationReader.stagger.json';
-import { clockAnchors, enemyName, guards, interrupts, measure, MOBILE, readRotation, SLOTS, staggerOf, type Px, type Sample, type Step } from './rotationReader';
+import { clockAnchors, endsAtZero, enemyName, guards, interrupts, measure, MOBILE, readRotation, SLOTS, staggerOf, type Px, type Sample, type Step } from './rotationReader';
 
 // A real recording (ef-alleikhreos.mp4: 2560×1600, Crisis Calamity, controller layout) as Chrome measured it with
 // ui/rotationReader.ts, 30 frames a second: per sample its time in ms, SP × 0.85, then × 255 the HUD, banner,
@@ -194,6 +194,8 @@ describe('rotation reader', () => {
     // As text recognition read it from the video: a full stop for the comma.
     expect(enemyName(['Alleikhreos. Chiliarch', 'Alleikhreos. Chiliarch »', 'Alleikhreos. Chiliarch'])).toBe('Alleikhreos, Chiliarch');
     expect(enemyName(['', '~ |'])).toBeUndefined();
+    // The Skydrummer's arena: a bright sky behind the name spoils reads into scraps.
+    expect(enemyName(['Skydrummer', 'Ea oo Ld Fale', 'Sk drumm er'])).toBe('Skydrummer');
   });
 });
 
@@ -323,6 +325,21 @@ describe('rotation reader on a phone recording', () => {
 
 // The same recording's boss Stagger meter (rotationReader.stagger.json): real crops, and the meter traced with the
 // presses read, where the boss's attack was interrupted five times (his meter +20 on top of the skill's, the big X).
+describe('boss HP bar', () => {
+  // The owner's Alleikhreos recording: phase 1's last reading is 10% before the Finisher's cut-in (the pause), the
+  // bar full again after it; the last reading of all 1% as the HUD leaves with the stopwatch.
+  it('reads zero where a phase ends in a pause and where the stopwatch stops', () => {
+    const bars: [number, number, number][] = [[64.75, 0.115, -1], [65.25, 0.103, -1], [69.5, 1, 0.002], [145.5, 0.03, -1], [146, 0.012, -1]];
+    endsAtZero(bars, { end: 145.815, seconds: 141, pauses: [[65.31, 70]] });
+    expect(bars).toEqual([[64.75, 0.115, -1], [65.25, 0.103, -1], [65.25, 0, -1], [69.5, 1, 0.002], [145.5, 0.03, -1], [146, 0.012, -1], [146, 0, -1]]);
+  });
+  it('leaves a bar that was read to zero, and readings that end long before the stop', () => {
+    const bars: [number, number, number][] = [[10, 0.5, 0.1], [12, 0, -1], [20, 1, 0], [100, 0.4, 0.2]];
+    endsAtZero(bars, { end: 110, seconds: 105, pauses: [[13, 18]] });
+    expect(bars).toEqual([[10, 0.5, 0.1], [12, 0, -1], [20, 1, 0], [100, 0.4, 0.2]]);
+  });
+});
+
 describe('boss Stagger meter', () => {
   const sf = staggerFixture as { crops: { t: number; w: number; h: number; px: string }[]; trace: string; steps: Step[] };
   const crop = (c: (typeof sf.crops)[number]): Px => ({ data: new Uint8ClampedArray(inflateSync(Buffer.from(c.px, 'base64'))), width: c.w, height: c.h });

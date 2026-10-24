@@ -3,6 +3,99 @@
  * in the video (the parser's `boss` readings), so the player can look there and fix the transcript.
  */
 
+import type { ReplayResult } from './team';
+
+/** Seconds per bin when fitting: wide enough that a hit the sim lands a second early or late stays in its bin. */
+const FIT_BIN = 2;
+
+/**
+ * The replay with the recording's own damage: each FIT_BIN seconds' damage from the boss's HP bar (the game's rolls,
+ * crits and all), split among the sim's hits of those seconds as the sim split them. Stretches the bar wasn't read
+ * keep the sim's damage; damage where the sim made no hit goes to the nearest stretch it did, else is
+ * `unattributed` (an action the transcript lacks).
+ */
+export function fitToRecording(r: ReplayResult, boss: [number, number, number][], pauses: [number, number][], phaseHp: number): { result: ReplayResult; unattributed: number } {
+  const per = r.perSecond;
+  if (!per || !boss.length || !phaseHp) return { result: r, unattributed: 0 };
+  const clock = (t: number) => t - pauses.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, t) - a), 0);
+  // The game's damage each second of the fight's clock, phases refilling the bar.
+  const game: number[] = [];
+  const read: boolean[] = [];
+  let last = 1;
+  let lastT = -Infinity;
+  for (const [t, hp] of boss) {
+    if (pauses.some(([a, b]) => t >= a && t < b)) continue;
+    if (t - lastT > 2 && hp > last + 0.3) last = 1;
+    const k = Math.floor(clock(t));
+    while (game.length <= k) {
+      game.push(0);
+      read.push(false);
+    }
+    game[k] += Math.max(0, last - hp) * phaseHp;
+    read[k] = true;
+    last = Math.min(last, hp);
+    lastT = t;
+  }
+  // Per bin: the sim's hits summed, the game's damage, whether the bar was read.
+  const bins = Math.ceil(Math.max(per.length, game.length) / FIT_BIN);
+  const simBin: Record<string, number>[] = [];
+  const gameBin: number[] = [];
+  const readBin: boolean[] = [];
+  for (let b = 0; b < bins; b++) {
+    const sum: Record<string, number> = {};
+    let g = 0;
+    let rd = false;
+    for (let k = b * FIT_BIN; k < (b + 1) * FIT_BIN; k++) {
+      for (const [key, v] of Object.entries(per[k] ?? {})) sum[key] = (sum[key] ?? 0) + v;
+      g += game[k] ?? 0;
+      rd ||= !!read[k];
+    }
+    simBin.push(sum);
+    gameBin.push(g);
+    readBin.push(rd);
+  }
+  // Game damage where the sim hit nothing: to the nearest bin with hits (the one before, else after).
+  const want = gameBin.slice();
+  let unattributed = 0;
+  for (let b = 0; b < bins; b++) {
+    if (!readBin[b] || Object.keys(simBin[b]).length || !want[b]) continue;
+    const to = [b - 1, b + 1, b - 2, b + 2].find((x) => x >= 0 && x < bins && readBin[x] && Object.keys(simBin[x]).length);
+    if (to !== undefined) want[to] += want[b];
+    else unattributed += want[b];
+    want[b] = 0;
+  }
+  const fitted: Record<string, number>[] = [];
+  for (let b = 0; b < bins; b++) {
+    const sim = simBin[b];
+    const simSum = Object.values(sim).reduce((n, v) => n + v, 0);
+    if (!readBin[b] || !simSum) {
+      fitted.push({ ...sim });
+      continue;
+    }
+    const scale = want[b] / simSum;
+    fitted.push(Object.fromEntries(Object.entries(sim).map(([key, v]) => [key, v * scale])));
+  }
+  const byOperator: Record<string, number> = {};
+  const sources = new Map<string, { op: string; source: string; hits: number; total: number }>();
+  const hitsOf = new Map(r.sources.map((x) => [`${x.op}|${x.source}`, x.hits]));
+  let total = unattributed;
+  const track: [number, number, number][] = [];
+  let dealt = 0;
+  fitted.forEach((bin, k) => {
+    for (const [key, v] of Object.entries(bin)) {
+      const [op, source] = key.split('|');
+      byOperator[op] = (byOperator[op] ?? 0) + v;
+      const x = sources.get(key) ?? { op, source, hits: hitsOf.get(key) ?? 0, total: 0 };
+      x.total += v;
+      sources.set(key, x);
+      total += v;
+      dealt += v;
+    }
+    track.push([(k + 1) * FIT_BIN, Math.round(dealt), r.track?.find(([t]) => t >= (k + 1) * FIT_BIN)?.[2] ?? -2]);
+  });
+  return { result: { ...r, total, byOperator, sources: [...sources.values()].sort((a, b) => b.total - a.total), track }, unattributed };
+}
+
 /** A moment the replay stops matching the video. */
 export interface Divergence {
   /** Seconds on the fight's clock (pauses taken out, as the run's times). */

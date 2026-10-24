@@ -384,7 +384,20 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   DoOnceAction runs once per cast.
   The enemy is the training dummy (`DUMMY` in team.ts) unless a request sets `enemy`: `ALLEIKHREOS`
   (Crisis Calamity boss) is defined from EnemyAttributeTemplateTable and its wiki page (Resistance 20,
-  Stagger 320 / 11 s, Finisher ×1.75 via `Enemy.finisherMul`), picked with Enemy (`ENEMIES`, setting `enemy`). The
+  Stagger 320 / 11 s, Finisher ×1.75 via `Enemy.finisherMul`), picked with Enemy (`ENEMIES`, setting `enemy`);
+  `SKYDRUMMER` is Echoes of War's "Howling of Undying Beasts" boss (eny_0082_hsbear_race007: DEF 100, Resistance 50,
+  Stagger 320 / 9 s, Finisher ×1.5 / 50 SP, no node, interrupt +20; one entry per difficulty, Brutal/Hard/Normal
+  = Lv 90/75/60 HP, each entry's `phaseHp`, which the Parser's fit and bars need). Brutal's HP is an
+  estimate from the owner's recording, ×3.2 the template (`SKYDRUMMER_HP` note: "Enemies have better stats"; no
+  multiplier in the tables), so Hard/Normal keep the template's. `Enemy.guard` (a stance below HP shares: damage
+  taken ×(1+x), DEF, no Stagger, `World.checkGuard`, a Guard stance mechanic) is implemented but no enemy uses it:
+  the Skydrummer's skill06 stance proved short in the recording. Against it the sim deals about 60% of the game's
+  damage, nearly all of the gap in the Staggered bursts (1:00–1:15: game 1.36M, sim ~0.3M; the Finisher 296k vs 73k);
+  steady stretches (1:45–2:25) match. Next suspect: Yvonne's Solidified detonations under Resistance 50. A replay takes a pause as a phase change
+  only where the recording's bar was full again after it (`phaseChanges` in rotations.ts → `ReplayClock.phases`);
+  without bars, any pause of 2 s or more. A stage's own rules (DungeonTable `featureDesc`/`paramList`, the enemy variant's template and
+  skills) go in the entry, not the base enemy's: the dump's raw Json/SkillData and BuffData are binary, read them
+  from the EndfieldData repo (text). The
   timeline has an Enemy lane with its Staggered stretches (`World.staggers`). Cooldowns run through ultimate cut-ins
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
   Simulator and Parser (`/rotations/parser`; the old `/rotations/transcript` redirects): a read video's team, enemy
@@ -471,11 +484,21 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   An Invulnerable enemy takes no HP damage and no Stagger, but hits still land (`deal` amount 0): statuses apply and
   critical hits count, as in the video (her bomb into the phantoms Solidified him). The sim averages critical hits,
   so a recording's big rolls (the Finisher that ends phase 1, the 266k bomb) are luck it can't follow.
-  A parsed run shows two timelines: Timeline · Recording first (`recordingTrack`: the presses, Final Strikes and
+  A parsed run's Timeline card has a Recording | Sim switch (`view`, default Recording: what happened; the sim
+  tells who dealt how much). Recording (`recordingTrack`) is 1:1 with the video: the presses, Final Strikes and
   interrupts as read, Staggered where the meter went yellow, the Stagger node where it passed half, Invulnerable
-  and no-Stagger stretches, and a Damage lane with each second's damage from the HP bar, crits and all) with the
-  player's controls and the video's bars under it, then Timeline · Sim (`simTrack`) with the sim's bars; the two
-  Damage lanes share a scale. The Recording timeline hides with its eye button (`fold.video`).
+  and no-Stagger stretches, a Damage lane with each second's damage from the HP bar (crits and all) and the
+  video's bars; Sim (`simTrack`) is the same actions as the sim made them, its expected damage and its bars. One
+  play control, one damage scale; the action list follows the view.
+  The Parser's numbers are the recording's: `fitToRecording` (videoCheck.ts) takes each second's damage from the
+  boss's HP bar and splits it among that second's hits as the sim split them (`ReplayResult.perSecond`,
+  operator|source), so a crit shows at its real size and totals match the video; damage in a second the sim made no
+  hit in is a "Not attributed" row (an action the transcript lacks). The discrepancies list still compares the raw
+  sim track with the video, which is how transcript mistakes are found; the Simulator tab stays expected-value.
+  The HUD leaving as the stopwatch stops is the kill, and a phase ending in a pause (the bar full again after it)
+  reached zero in the cut-in: the parser adds a zero-HP reading at each (`endsAtZero`; the kill within 5 s of the stop).
+  The boss's name is read on eight frames with the band's own ink threshold and scraps voted down (`whiteInk`,
+  `enemyName`): the Skydrummer's bright sky spoiled single reads.
   Uptime (setting `uptime`, %; `World.uptime`): the share of the fight the enemy can be hit, the rest a
   stretch at the end of every 10 s with no presses or basic attacks (100% unless set). The owner's gameplay
   videos only confirm game mechanics (energy, combo triggers, cooldowns), never a target for the sim's pace or

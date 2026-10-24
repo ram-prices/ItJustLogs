@@ -321,11 +321,15 @@ export function clockInk(c: Px, layout: Layout = CONTROLLER, scale = 3, margin =
 export function whiteInk(c: Px, scale = 2): Px {
   const w = c.width * scale;
   const h = c.height * scale;
+  // White text over a bright sky (min channel 230 or so): ink is what's brighter than the band's bright tenth.
+  const mins = new Uint8Array(c.width * c.height);
+  for (let k = 0; k < mins.length; k++) mins[k] = Math.min(c.data[k * 4], c.data[k * 4 + 1], c.data[k * 4 + 2]);
+  const limit = Math.min(240, Math.max(190, mins.slice().sort()[Math.floor(mins.length * 0.9)] + 12));
   const data = new Uint8ClampedArray(w * h * 4);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = at(c, Math.floor(x / scale), Math.floor(y / scale));
-      const v = Math.min(c.data[i], c.data[i + 1], c.data[i + 2]) > 190 ? 0 : 255;
+      const v = Math.min(c.data[i], c.data[i + 1], c.data[i + 2]) > limit ? 0 : 255;
       data.set([v, v, v, 255], (y * w + x) * 4);
     }
   return { data, width: w, height: h };
@@ -615,7 +619,6 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = [], layo
   const reading: Reading = { steps: steps.sort((a, b) => a.t - b.t), start: t[first], end: t[end], arts: combo.arts };
   if (guard.length) reading.guards = guard;
   const bars = bossBars(samples);
-  if (bars.length) reading.boss = bars;
   const c = clockOf(samples, on, gaps, clock, t[first]);
   if (c) reading.clock = c;
   // The phase change's black screen stops the stopwatch: when its digits weren't read at all, a HUD-hidden stretch
@@ -623,7 +626,26 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = [], layo
   // recording hides the HUD that long with the stopwatch running.)
   const black = gaps.filter(([i, j]) => i > first && j < n && t[j] - t[i] >= PHASE).map(([i, j]) => [t[i], t[j]] as [number, number]);
   if (!c && black.length) reading.clock = { end: t[end], seconds: Math.round(t[end] - t[first] - black.reduce((a, [x, y]) => a + (y - x), 0)), pauses: black };
+  endsAtZero(bars, reading.clock);
+  if (bars.length) reading.boss = bars;
   return reading;
+}
+
+/**
+ * The bar reaching zero where the frames don't show it: a phase ending in a pause (the bar full again after it: the
+ * cut-in or black screen hid the last of it) and the HUD leaving as the stopwatch stops (the kill). Each gets a
+ * zero-HP reading, at the last reading before the pause and at the stop.
+ */
+export function endsAtZero(bars: [number, number, number][], clock: Reading['clock']): void {
+  if (!clock) return;
+  for (const [a] of clock.pauses) {
+    const i = bars.findIndex(([t]) => t >= a);
+    const before = bars[(i < 0 ? bars.length : i) - 1];
+    const after = bars[i]; // the HUD can be back before the stopwatch runs again
+    if (before && after && before[1] > 0 && after[1] > before[1] + 0.3) bars.splice(bars.indexOf(before) + 1, 0, [before[0], 0, before[2]]);
+  }
+  const last = bars[bars.length - 1];
+  if (last && last[1] > 0 && Math.abs(clock.end - last[0]) <= 5) bars.push([Math.round(Math.max(clock.end, last[0]) * 1000) / 1000, 0, last[2]]);
 }
 
 /**
@@ -811,7 +833,9 @@ export function enemyName(texts: string[]): string | undefined {
     .filter((x) => /[A-Za-z]{3}/.test(x));
   const count = new Map<string, number>();
   for (const x of names) count.set(x, (count.get(x) ?? 0) + 1);
-  return [...count].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0]?.[0];
+  // Read most often; then with the fewest scraps (a bright sky behind the name reads as short words), then longest.
+  const scraps = (x: string) => x.split(/[ ,]+/).filter((w) => w.length <= 2).length;
+  return [...count].sort((a, b) => b[1] - a[1] || scraps(a[0]) - scraps(b[0]) || b[0].length - a[0].length)[0]?.[0];
 }
 
 /** "01:05" as seconds, or null. */

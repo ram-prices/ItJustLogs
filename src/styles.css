@@ -7727,6 +7727,9 @@ a.six-item {
 .sim-fold-head > .heading-16 {
   margin: 0;
 }
+.sim-fold-head > .toggle {
+  margin-left: auto;
+}
 .sim-boss-hp,
 .sim-boss-meter {
   display: block;
