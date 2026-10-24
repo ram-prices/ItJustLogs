@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from './rotationReader.samples.json';
 import phoneFixture from './rotationReader.mobile.json';
 import staggerFixture from './rotationReader.stagger.json';
+import ultsFixture from './rotationReader.ults.json';
 import { clockAnchors, endsAtZero, enemyName, guards, interrupts, measure, MOBILE, readRotation, SLOTS, staggerOf, type Px, type Sample, type Step } from './rotationReader';
 
 // A real recording (ef-alleikhreos.mp4: 2560×1600, Crisis Calamity, controller layout) as Chrome measured it with
@@ -371,6 +372,19 @@ describe('boss Stagger meter', () => {
       [101.72, 0, 'battle'],
       [120.7, 1, 'battle'],
       [134.12, 1, 'battle'],
+    ]);
+  });
+});
+
+// Two ultimates in one cut-in (rotationReader.ults.json): both dots empty a moment before the HUD hides, Arcane's
+// (Bottom) shows alone just before it and is full again after.
+describe('two ultimates in one cut-in', () => {
+  it('reads both, from dots full until a moment before the cut-in', () => {
+    const samples: Sample[] = ultsFixture.samples.map(([t, hud, ...ready]) => ({ t, hud, ready, sp: 100, banner: 0, wheel: [0, 0, 0, 0] }));
+    const ults = readRotation(samples).steps.filter((s) => s.input === 'ultimate');
+    expect(ults.map((s) => [SLOTS[s.slot!], Math.round(s.t * 100) / 100])).toEqual([
+      ['Top', 67.04],
+      ['Left', 67.04],
     ]);
   });
 });

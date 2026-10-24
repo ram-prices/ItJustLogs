@@ -491,6 +491,9 @@ const ON = 0.5;
 const CUT_IN = 0.25;
 /** HUD back for less than this between two hidden stretches: the same cut-in. */
 const REJOIN = 0.4;
+/** An Ultimate dot full at least HELD seconds within RECENT seconds before a cut-in: that ultimate was used. */
+const RECENT = 1;
+const HELD = 0.2;
 const DROP = 12;
 const GAIN = 8;
 const FINISHER = 40;
@@ -565,11 +568,25 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = [], layo
     const before = seen.filter((k) => t[k] >= t[seen[0]] - 0.3);
     const after: number[] = [];
     for (let k = j; k < n && t[k] < t[j] + 1.5; k++) if (on[k]) after.push(k);
-    if (!before.length || !after.length) continue;
+    if (!after.length) continue;
+    // A dot empties as its ultimate is pressed, which can be a moment before the cut-in: with two ultimates in one
+    // cut-in the HUD stays up a while with both dots empty (the owner's Skydrummer video, 1:07: 0.35 s), and then
+    // only the other dots show just before it. So a dot full for a while in the last second before it counts too.
+    const recent: number[] = [];
+    for (let k = i - 1; k >= 0 && t[k] >= t[i] - RECENT; k--) if (on[k]) recent.unshift(k);
+    const heldFull = (slot: number) => {
+      let from = -1;
+      for (const k of recent) {
+        if (samples[k].ready[slot] <= ON) from = -1;
+        else if (from < 0) from = k;
+        if (from >= 0 && t[k] - t[from] >= HELD) return true;
+      }
+      return false;
+    };
     for (let slot = 0; slot < 4; slot++) {
-      const full = before.filter((k) => samples[k].ready[slot] > ON).length / before.length;
+      const full = before.length ? before.filter((k) => samples[k].ready[slot] > ON).length / before.length : 0;
       const later = Math.max(...after.map((k) => samples[k].ready[slot]));
-      if (full > 0.5 && later < 0.3) steps.push({ t: t[i], input: 'ultimate', slot: slot as Slot });
+      if ((full > 0.5 || heldFull(slot)) && later < 0.3) steps.push({ t: t[i], input: 'ultimate', slot: slot as Slot });
     }
   }
 

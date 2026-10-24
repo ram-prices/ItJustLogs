@@ -1995,6 +1995,18 @@ export class World {
     return (e.bb.get('staggeredUntil') ?? -1) > this.frame;
   }
 
+  /**
+   * Time the game's stopwatch stood still while this world ran on (a recording's cut-in the sim has none of): the
+   * enemy's Staggered time doesn't pass then (the owner's Skydrummer video: 9 s of stopwatch with a 5 s cut-in inside).
+   */
+  holdStagger(frames: number): void {
+    const e = this.enemy;
+    if (frames <= 0 || !this.staggered(e)) return;
+    e.bb.set('staggeredUntil', e.bb.get('staggeredUntil')! + frames);
+    const last = this.staggers.at(-1);
+    if (last) last.end = e.bb.get('staggeredUntil')!;
+  }
+
   /** The enemy is in its guard stance (Enemy.guard). */
   guarding(): boolean {
     return this.frame < this.guardUntil;

@@ -387,13 +387,21 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   Stagger 320 / 11 s, Finisher ×1.75 via `Enemy.finisherMul`), picked with Enemy (`ENEMIES`, setting `enemy`);
   `SKYDRUMMER` is Echoes of War's "Howling of Undying Beasts" boss (eny_0082_hsbear_race007: DEF 100, Resistance 50,
   Stagger 320 / 9 s, Finisher ×1.5 / 50 SP, no node, interrupt +20; one entry per difficulty, Brutal/Hard/Normal
-  = Lv 90/75/60 HP, each entry's `phaseHp`, which the Parser's fit and bars need). Brutal's HP is an
-  estimate from the owner's recording, ×3.2 the template (`SKYDRUMMER_HP` note: "Enemies have better stats"; no
-  multiplier in the tables), so Hard/Normal keep the template's. `Enemy.guard` (a stance below HP shares: damage
+  = Lv 90/75/60, each entry's HP as `phaseHp`, which the Parser's fit and bars need). Its HP is the
+  template's × 3.6 at every difficulty: the stage's spawner gives it buff_dung_maxhp_01, ratio 2.6, at birth. Stage
+  stat changes live in the spawner (dump `Json/SpawnerConfig/<scene>/sc_<scene>_<id>.json` `enemyLibrary`: level and
+  `bornBuffList`), found from SubGameInstanceDataTable's `bindScriptId` → the level script's EncounterData `spawnerId`;
+  the local dump has those as binary, the EndfieldData repo as text. `Enemy.guard` (a stance below HP shares: damage
   taken ×(1+x), DEF, no Stagger, `World.checkGuard`, a Guard stance mechanic) is implemented but no enemy uses it:
-  the Skydrummer's skill06 stance proved short in the recording. Against it the sim deals about 60% of the game's
-  damage, nearly all of the gap in the Staggered bursts (1:00–1:15: game 1.36M, sim ~0.3M; the Finisher 296k vs 73k);
-  steady stretches (1:45–2:25) match. Next suspect: Yvonne's Solidified detonations under Resistance 50. A replay takes a pause as a phase change
+  the Skydrummer's skill06 stance proved short in the recording. The owner's recording replays to 86% (3.47M of
+  4.03M) once its transcript has a Final Strike the parser missed at 0:28.9 (the meter's +17) and Yvonne's and
+  Tangtang's ultimates in the 5 s pause at 1:07. The parser now reads such pairs: a dot full for 0.2 s within the
+  last second before a cut-in counts as used (`RECENT`/`HELD`; both dots emptied 0.35 s before the HUD hid),
+  pinned by `rotationReader.ults.json`.
+  The enemy's Staggered time stands still while the stopwatch does and the sim isn't frozen itself
+  (`World.holdStagger`, from replaySim): the game's Stagger lasted 9 s of stopwatch with that 5 s pause inside.
+  Arcane's Cluster Strike lasers deal 0.45 each in the sim (four per strike, 1.8); the wiki's "Cluster Strike Total
+  DMG Multiplier 360%" may be both strikes together, so it's left as is. A replay takes a pause as a phase change
   only where the recording's bar was full again after it (`phaseChanges` in rotations.ts → `ReplayClock.phases`);
   without bars, any pause of 2 s or more. A stage's own rules (DungeonTable `featureDesc`/`paramList`, the enemy variant's template and
   skills) go in the entry, not the base enemy's: the dump's raw Json/SkillData and BuffData are binary, read them

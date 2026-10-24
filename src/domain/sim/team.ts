@@ -249,12 +249,11 @@ export const SKYDRUMMER: Enemy = {
   // Enemy.guard is there for an enemy whose stance lasts.
 };
 /**
- * Brutal's HP is an estimate from the owner's recording: two clean events (the first Finisher's 296,434 took 8.4% of the
- * bar; the last 178,000 took the final 5.4%) put it near 3.5M, ×3.2 the Lv 90 template's 1,100,596 ("Enemies have
- * better stats"; no multiplier found in DungeonTable or the SeasonTower tables). Hard and Normal keep the template's
- * Lv 75 and 60 values until a recording says otherwise.
+ * Each difficulty's HP: the template's at its level (60/75/90) × 3.6. The stage's spawners
+ * (SpawnerConfig sc_indie_tower001_43000010047/48/49) give it buff_dung_maxhp_01 at birth with ratio 2.6, a MaxHp
+ * Multiplier (+260%); the owner's Brutal recording agrees (its first Finisher, 296,434, took 7.7% of the bar).
  */
-export const SKYDRUMMER_HP = { brutal: 3_521_907, hard: 610_197, normal: 297_005 };
+export const SKYDRUMMER_HP = { brutal: 3_962_146, hard: 2_196_709, normal: 1_069_218 };
 
 /** The enemies a fight can be against: the name shown, its numbers, its HP for an HP goal, and how a video names it. */
 export const ENEMIES: { id: string; name: string; enemy: Enemy; hp: number; seen: RegExp }[] = [
@@ -672,7 +671,11 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     const finisher = w.finisherWaiting() && w.strikes.filter((x) => x.finisher).length < finishers.filter((at) => at <= clock() + FPS).length;
     if (!pressed && !paused(clock()) && (unseen || finisher || w.strikes.length - free < due)) w.press(w.controlled, 'attack');
     const before = w.strikes.length;
+    const stood = paused(clock());
+    const f0 = w.frame;
     w.tick();
+    // The stopwatch stood still (a cut-in) while the sim ran on: the boss's Staggered time stands still too.
+    if (stood) w.holdStagger(w.frame - f0);
     for (const x of w.strikes.slice(before)) if (x.unseen || w.attacksUnseen(x.slot)) free++;
   }
   for (; k < todo.length; k++) missed.push({ t: game(todo[k].at) / FPS, slot: todo[k].slot, input: todo[k].input });
