@@ -2,7 +2,8 @@ import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import fixture from './rotationReader.samples.json';
 import phoneFixture from './rotationReader.mobile.json';
-import { clockAnchors, enemyName, measure, MOBILE, readRotation, SLOTS, type Px, type Sample } from './rotationReader';
+import staggerFixture from './rotationReader.stagger.json';
+import { clockAnchors, enemyName, guards, interrupts, measure, MOBILE, readRotation, SLOTS, staggerOf, type Px, type Sample, type Step } from './rotationReader';
 
 // A real recording (ef-alleikhreos.mp4: 2560×1600, Crisis Calamity, controller layout) as Chrome measured it with
 // ui/rotationReader.ts, 30 frames a second: per sample its time in ms, SP × 0.85, then × 255 the HUD, banner,
@@ -142,14 +143,18 @@ describe('rotation reader', () => {
 
   it('reads each combo banner and groups them by art, one group per operator', () => {
     // Checked by eye: the four operators' banners.
-    const want: [number, (typeof SLOTS)[number]][] = [
-      [7.57, 'Bottom'],
+    // Tangtang's combo cut short by Arcane's (0:07 and 0:57): 0.1 s of her banner sliding in, then his. A banner cut
+    // short is grouped only with others cut short ("Top short").
+    const want: [number, (typeof SLOTS)[number] | 'Top short'][] = [
+      [7.61, 'Top short'],
+      [7.78, 'Bottom'],
       [15.31, 'Right'],
       [18.79, 'Left'],
       [30.0, 'Top'],
       [30.5, 'Bottom'],
       [47.87, 'Left'],
-      [58.23, 'Bottom'],
+      [58.28, 'Top short'],
+      [58.41, 'Bottom'],
       [75.04, 'Top'],
       [87.19, 'Bottom'],
       [90.08, 'Top'],
@@ -170,7 +175,7 @@ describe('rotation reader', () => {
       if (!groupOf.has(s)) groupOf.set(s, got[i].group!);
       expect(got[i].group).toBe(groupOf.get(s));
     });
-    expect(new Set(groupOf.values()).size).toBe(4);
+    expect(new Set(groupOf.values()).size).toBe(5);
   });
 
   it('outvotes a misread of the stopwatch in each stretch', () => {
@@ -216,7 +221,8 @@ describe.each([0, 1])('rotation reader on every other frame (half %i)', (half) =
 
   it('still splits the combos back to back and groups them by operator', () => {
     const who = ['Bottom', 'Right', 'Left', 'Top', 'Bottom', 'Left', 'Bottom', 'Top', 'Bottom', 'Top', 'Right', 'Left', 'Bottom', 'Top', 'Bottom', 'Top', 'Left'];
-    const combos = got('combo');
+    // Tangtang's banners cut short (0.1 s) may or may not show in every other frame.
+    const combos = got('combo').filter((s, i, all) => !(all[i + 1] && all[i + 1].t - s.t < 0.3));
     expect(combos).toHaveLength(who.length);
     const groupOf = new Map<string, number>();
     who.forEach((w, i) => {
@@ -312,5 +318,42 @@ describe('rotation reader on a phone recording', () => {
     expect(r.clock!.seconds).toBe(62);
     expect(near(r.clock!.end, 62.81, 0.15)).toBe(true);
     expect(r.clock!.pauses).toHaveLength(0);
+  });
+});
+
+// The same recording's boss Stagger meter (rotationReader.stagger.json): real crops, and the meter traced with the
+// presses read, where the boss's attack was interrupted five times (his meter +20 on top of the skill's, the big X).
+describe('boss Stagger meter', () => {
+  const sf = staggerFixture as { crops: { t: number; w: number; h: number; px: string }[]; trace: string; steps: Step[] };
+  const crop = (c: (typeof sf.crops)[number]): Px => ({ data: new Uint8ClampedArray(inflateSync(Buffer.from(c.px, 'base64'))), width: c.w, height: c.h });
+  it('reads how full it is, and yellow while Staggered', () => {
+    const got = sf.crops.map((c) => staggerOf(crop(c)));
+    const want = [0, 0.471, 0.785, 0.562, 0.502];
+    got.forEach((g, i) => expect(Math.abs(g.full - want[i])).toBeLessThan(0.02));
+    expect(got.map((g) => g.yellow)).toEqual([false, false, false, true, false]);
+  });
+  it('finds the presses that interrupted the boss', () => {
+    const samples = sf.trace.split(' ').map((p) => {
+      const [t, v] = p.split(':');
+      const s: Sample = { t: Number(t), sp: 0, hud: v.endsWith('H') ? 0 : 1, banner: 0, ready: [], wheel: [] };
+      if (!v.endsWith('H')) {
+        s.stagger = Number(v.slice(0, 5));
+        if (v[5] === 'Y') s.staggered = true;
+      }
+      return s;
+    });
+    const steps = sf.steps.map((x) => ({ ...x }));
+    interrupts(samples, steps);
+    // After the meter's node, the stretch the boss took no Stagger (the Foundite Weapon): edges within 0.3 s.
+    const g = guards(samples, steps);
+    expect(g).toHaveLength(2);
+    [[24.7, 30.7], [113.3, 119.2]].forEach(([a, b], i) => expect(Math.abs(g[i][0] - a) < 0.3 && Math.abs(g[i][1] - b) < 0.3).toBe(true));
+    expect(steps.filter((x) => x.interrupt).map((x) => [Math.round((x.t - 0.6) * 100) / 100, x.slot, x.input])).toEqual([
+      [3.1, 1, 'battle'],
+      [15.3, 0, 'battle'],
+      [101.72, 0, 'battle'],
+      [120.7, 1, 'battle'],
+      [134.12, 1, 'battle'],
+    ]);
   });
 });

@@ -7510,19 +7510,27 @@ a.six-item {
     grid-row: 2;
   }
 }
-.sim-run-head {
-  padding: 6px 4px;
-  box-shadow: var(--shadow-border);
+.sim-run-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-width: 0;
 }
-.sim-run-head .sim-past {
-  cursor: default;
+.sim-run-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
 }
-.sim-run-head > .row {
-  gap: 4px;
-  padding-right: 6px;
-}
-.sim-run-head .sim-past-tools {
+.sim-run-buttons .sim-past-tools {
   padding-right: 0;
+  gap: 4px;
+}
+.sim-run-head .sim-run-edit,
+.sim-run-head .sim-note-text {
+  margin: 14px 0 0;
 }
 .sim-transcript {
   display: flex;
@@ -7548,9 +7556,36 @@ a.six-item {
 }
 .sim-step-list li {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) minmax(0, 1fr) 32px;
+  grid-template-columns: 104px minmax(0, 1fr) minmax(0, 1fr) 64px 96px 32px;
   gap: 12px;
   align-items: center;
+}
+.sim-transcript > .label-12 {
+  padding: 8px 4px 0;
+}
+.sim-step-int {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.sim-check {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+.sim-check li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 32px;
+  gap: 10px;
+  align-items: center;
+}
+.sim-away-list li {
+  grid-template-columns: 104px 104px 32px;
 }
 .sim-transcript > .sim-run {
   padding-top: 4px;
@@ -7613,6 +7648,110 @@ a.six-item {
   position: absolute;
   transform: translateX(-50%);
 }
+/* The timeline playing: a line across the lanes, the controls and the boss's bars under it. */
+.sim-timeline {
+  position: relative;
+}
+.sim-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 22px;
+  left: 104px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--gray-1000);
+  pointer-events: none;
+}
+.sim-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px 4px;
+}
+.sim-play {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 64px 72px;
+  gap: 12px;
+  align-items: center;
+}
+.sim-play-seek {
+  width: 100%;
+  accent-color: var(--gray-1000);
+}
+.sim-boss {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-boss-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: 10px 4px;
+  column-gap: 8px;
+  row-gap: 3px;
+  align-items: center;
+}
+.sim-boss-row > .label-12 {
+  grid-row: 1 / 3;
+}
+.sim-boss-row.folded {
+  grid-template-rows: auto;
+}
+/* Hide/show buttons for the video's bars and the discrepancies, and the list under the bars. */
+.sim-fold-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sim-fold-btn .icon {
+  font-size: 16px;
+}
+.sim-fold {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 4px 4px;
+}
+.sim-fold-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sim-fold-head > .heading-16 {
+  margin: 0;
+}
+.sim-boss-hp,
+.sim-boss-meter {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gray-alpha-200);
+  overflow: hidden;
+}
+.sim-boss-hp i,
+.sim-boss-meter i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transition: width 80ms linear;
+}
+.sim-boss-hp i {
+  background: var(--red);
+}
+.sim-boss-meter i {
+  width: 0;
+  background: color-mix(in srgb, var(--red) 45%, var(--gray-1000));
+}
+.sim-boss-meter i.staggered {
+  background: var(--amber);
+}
 /* Who's controlled: a band under that operator's presses. */
 .sim-control {
   position: absolute;
@@ -7649,12 +7788,53 @@ a.six-item {
   border-radius: 50%;
   background: var(--gray-700);
 }
+/* An enemy mechanic (the Foundite Weapon's blade): a mark in its lane. */
+.sim-mechanic {
+  position: absolute;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  color: var(--background-100);
+  background: var(--blue, #3b9eff);
+  z-index: 1;
+}
+.sim-mechanic .icon {
+  font-size: 14px;
+}
 /* The enemy Staggered: a band in its lane. */
 .sim-stagger {
   position: absolute;
   top: 0;
   bottom: 0;
   background: color-mix(in srgb, var(--red) 35%, transparent);
+  border-radius: var(--radius-sm);
+}
+/* Damage each second: bars from the lane's floor. */
+.sim-dmg i {
+  position: absolute;
+  bottom: 0;
+  background: color-mix(in srgb, var(--gray-1000) 55%, transparent);
+  border-radius: 1px 1px 0 0;
+}
+/* The boss taking no Stagger (the Foundite Weapon): a faint band. */
+.sim-guard {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(45deg, var(--gray-alpha-300) 0 3px, transparent 3px 7px);
+  border-radius: var(--radius-sm);
+}
+/* The enemy out of reach: hatched. */
+.sim-away {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, var(--gray-alpha-400) 0 4px, transparent 4px 8px);
   border-radius: var(--radius-sm);
 }
 .sim-strike.finisher {

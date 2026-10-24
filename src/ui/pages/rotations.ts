@@ -1,5 +1,6 @@
 import { GEAR_SLOTS, artificeOf, type Loadout } from '../../domain/loadout';
-import { FPS } from '../../domain/sim/engine';
+import { FPS, type Enemy, type Input } from '../../domain/sim/engine';
+import { compareWithVideo } from '../../domain/sim/videoCheck';
 import {
   BUILD_MODES,
   CHECKED,
@@ -33,6 +34,7 @@ import { wikiId, type WikiGearFile, type WikiOperatorFile, type WikiWeaponFile }
 import { state, updateSettings } from '../../state';
 import { cachedBannerDb, deleteSim, listSims, loadSimVideo, saveSim, saveSimVideo, updateSim, type SavedSim } from '../../store';
 import { badge, icon, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
+import { toast } from '../common';
 import { html, type Html } from '../html';
 import { infoHref, ownedOf, sideTabs, wikiFile } from './info';
 import type { VideoRotation } from '../rotationReader';
@@ -85,7 +87,7 @@ let picked = false;
 let editing: number | null = null;
 /** A parsed run's transcript being edited: its presses, until played again or cancelled. */
 type VideoStep = VideoRotation['steps'][number];
-let draft: { at: number; steps: VideoStep[] } | null = null;
+let draft: { at: number; steps: VideoStep[]; away: [number, number][] } | null = null;
 let deleting: number | null = null;
 
 function loadSaved(redraw: () => void): void {
@@ -119,7 +121,7 @@ let redrawPage: () => void = () => {};
 function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: string[], ids: string[], redraw: () => void, into?: SavedSim<SimResult>): void {
   replayWorker?.terminate();
   replay = { names, ids, at: into?.at };
-  const steps: ReplayStep[] = v.steps.map((x) => ({ t: x.t, slot: at[x.slot], input: x.input }));
+  const steps: ReplayStep[] = v.steps.map((x) => ({ t: x.t, slot: at[x.slot], input: x.input, ...(x.interrupt ? { interrupt: true } : {}), ...(x.back !== undefined ? { back: x.back } : {}) }));
   const w = new Worker(new URL('../simWorker.ts', import.meta.url), { type: 'module' });
   replayWorker = w;
   const id = ++seq;
@@ -144,31 +146,139 @@ function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: strin
     }
   };
   // Readings saved before the stopwatch was read have no end: the fight's length stands in.
-  w.postMessage({ id, req, replay: steps, stopwatch: { end: v.end ?? v.seconds, pauses: v.pauses ?? [] } });
+  w.postMessage({ id, req, replay: steps, stopwatch: { end: v.end ?? v.seconds, pauses: v.pauses ?? [], away: v.away ?? [], guard: v.guard ?? [] } });
+}
+
+/** A parsed run as a file to share or open elsewhere (Import run): its reading, the request (team, loadouts, enemy), result, name and note. */
+const RUN_FILE = 'itjustlogs-parsed-run';
+
+function exportRun(x: SavedSim<SimResult>): void {
+  const file = { kind: RUN_FILE, version: 1, at: x.at, name: x.name, note: x.note, names: x.names, ids: x.ids, request: JSON.parse(x.key), result: x.result, video: videoOf(x) };
+  const title = (x.name ?? `${x.names.join('-')}-${new Date(x.at).toISOString().slice(0, 10)}`).replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '');
+  const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: `parsed-run-${title || 'run'}.json` });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Opens an exported parsed run: it joins Parsed runs (as new, so it never replaces one) and opens. */
+function importRun(): void {
+  const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'application/json,.json' });
+  input.onchange = async () => {
+    const f = input.files?.[0];
+    if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if (d?.kind !== RUN_FILE || !d.result || !Array.isArray(d.names) || !d.request) throw new Error('not a parsed run');
+      const entry: SavedSim<SimResult> = { key: JSON.stringify({ ...d.request, video: true }), result: d.result, names: d.names, ids: d.ids ?? [], at: Date.now(), ...(d.name ? { name: d.name } : {}), ...(d.note ? { note: d.note } : {}), ...(d.video ? { video: d.video } : {}) };
+      runs.push(entry);
+      void saveSim(entry);
+      replay = { names: entry.names, ids: entry.ids, result: entry.result as ReplayResult, at: entry.at };
+      redrawPage();
+    } catch {
+      toast('That file isn’t an exported parsed run.', 'error');
+    }
+  };
+  input.click();
+}
+
+/**
+ * The open parsed run, above the Recording: its time and name, its buttons under them (Edit transcript, star, edit,
+ * delete), the name and note fields while edited, and the transcript editor.
+ */
+function runHead(): Html {
+  const entry = replay?.at === undefined ? undefined : runs.find((x) => x.at === replay!.at);
+  if (!entry) return html``;
+  return html`<section class="card sim-run-head"><div class="card-body">
+      <div class="sim-run-title"><span class="num secondary">${when(entry.at)}</span><span class="label-16 ellipsis">${entry.name ?? runLine(entry, entry.names)}</span></div>
+      <div class="sim-run-buttons">
+        ${videoOf(entry) ? html`<button type="button" class="btn secondary sm" data-action="sim-transcript" data-value="${String(entry.at)}" aria-pressed="${draft?.at === entry.at ? 'true' : 'false'}">${icon('description')}Edit transcript</button>` : ''}
+        <button type="button" class="btn secondary sm" data-action="sim-export" data-value="${String(entry.at)}">${icon('download')}Export</button>
+        ${runTools(entry)}
+      </div>
+      ${runEdit(entry)}
+    </div></section>
+    ${transcriptEditor(entry)}`;
+}
+
+/**
+ * Where the replay parts from the video's boss bars (its HP and Stagger meter, read by the parser), so the
+ * transcript can be fixed there.
+ */
+function videoCheck(r: NonNullable<typeof replay>): Html {
+  const entry = r.at === undefined ? undefined : runs.find((x) => x.at === r.at);
+  const reading = entry && videoOf(entry);
+  const track = r.result?.track;
+  if (!entry || !reading?.boss?.length || !track?.length) return html``;
+  const asked = (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy;
+  const enemy = typeof asked === 'object' ? asked : enemyById(asked).enemy;
+  if (!enemy.phaseHp || !enemy.poise) return html``;
+  const dismissed = new Set(entry.dismissed ?? []);
+  const keyOf = (d: { kind: string; t: number }) => `${d.kind}@${d.t.toFixed(1)}`;
+  const all = compareWithVideo(track, reading.boss, reading.pauses ?? [], enemy.phaseHp, enemy.poise);
+  const found = all.filter((d) => !dismissed.has(keyOf(d)));
+  const hidden = all.length - found.length;
+  const what = (d: (typeof found)[number]) =>
+    d.kind === 'damage'
+      ? `Damage ${Math.round(Math.abs(d.by) * 100)}% ${d.by > 0 ? 'above' : 'below'} the video`
+      : d.kind === 'staggered'
+        ? d.by > 0
+          ? 'Staggered before the video'
+          : 'Staggered after the video'
+        : `Stagger ${Math.abs(d.by)} ${d.by > 0 ? 'above' : 'below'} the video`;
+  const at = String(entry.at);
+  return html`<div class="sim-fold">
+    <div class="sim-fold-head">${foldButton('checks', `Recording-sim discrepancies${found.length ? ` (${found.length})` : ''}`)}</div>
+    ${!fold.checks
+      ? ''
+      : found.length
+      ? html`<ol class="sim-check copy-14">
+          ${found.map(
+            (d) => html`<li>
+              <span class="num secondary">${clockTime(d.t)}</span>
+              <span class="min0">${what(d)}${d.hint ? html` <span class="secondary">· ${d.hint}</span>` : ''}</span>
+              <button type="button" class="btn tertiary sm icon-only" data-action="sim-dismiss" data-at="${at}" data-value="${keyOf(d)}" title="Dismiss" aria-label="Dismiss">${icon('check')}</button>
+            </li>`,
+          )}
+        </ol>`
+        : html`<p class="copy-14 secondary">${all.length ? 'All dismissed.' : 'Matches the boss’s bars: damage within 10%, Stagger within 12.'}</p>`}
+    ${fold.checks && hidden ? html`<div class="sim-run"><button type="button" class="btn tertiary sm" data-action="sim-undismiss" data-value="${at}">Show ${hidden} dismissed</button></div>` : ''}
+  </div>`;
+}
+
+/**
+ * A parsed run's own timeline, 1:1 with the recording (recordingTrack), with the player's controls and the video's
+ * boss bars under it; the sim's timeline follows with its own bars. The damage lanes share one scale.
+ */
+function recordingCard(r: NonNullable<typeof replay>): { before?: Html; dpsMax?: number } {
+  const entry = r.at === undefined ? undefined : runs.find((x) => x.at === r.at);
+  const reading = entry && videoOf(entry);
+  if (!r.result || !entry || !reading?.boss?.length) return {};
+  const asked = (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy;
+  const enemy = typeof asked === 'object' ? asked : asked ? enemyById(asked).enemy : undefined;
+  const rec = recordingTrack(reading, r.result.seconds, enemy?.phaseHp ?? r.result.hp);
+  const dpsMax = Math.max(...rec.dps, ...simTrack(r.result).dps, 0);
+  preparePlay(r.result);
+  return {
+    dpsMax,
+    before: html`<section class="card"><div class="card-body sim-card">
+      <div class="sim-fold-head"><h2 class="heading-16">Timeline · Recording</h2>${foldButton('video', '')}</div>
+      ${playControls(r.result)}
+      ${fold.video ? html`${lanes(rec, r.names, dpsMax)}${bossRow('Video', 'video')}` : ''}
+    </div></section>`,
+  };
 }
 
 /** The video's rotation as the sim played it: the usual results, and the presses it couldn't make. */
 function replayView(r: NonNullable<typeof replay>): Html {
   const missed = r.result?.missed ?? [];
-  const entry = r.at === undefined ? undefined : runs.find((x) => x.at === r.at);
   return html`<section class="sim-video">
-    ${entry
-      ? html`<div class="sim-past-row sim-run-head">
-          <div class="sim-past min0"><span class="num secondary">${when(entry.at)}</span><span class="label-14 ellipsis">${entry.name ?? runLine(entry, entry.names)}</span><span></span></div>
-          <div class="row">
-            ${videoOf(entry) ? html`<button type="button" class="btn secondary sm" data-action="sim-transcript" data-value="${String(entry.at)}" aria-pressed="${draft?.at === entry.at ? 'true' : 'false'}">${icon('description')}Edit transcript</button>` : ''}
-            ${runTools(entry)}
-          </div>
-          ${runEdit(entry)}
-        </div>
-        ${transcriptEditor(entry)}`
-      : ''}
     ${r.error
       ? html`<p class="copy-14 sim-error">${r.error}</p>`
       : !r.result
-        ? html`<p class="copy-14 secondary">${icon('hourglass_empty')} Playing the recording’s presses…</p>`
-        : html`${resultsView(r.result, r.names, r.ids, false)}
-            ${missed.length ? html`<p class="copy-13 secondary">The sim couldn’t make ${missed.length === 1 ? 'this press' : `these ${missed.length} presses`}: ${missed.map((m) => `${secs(m.t * FPS)} ${r.names[m.slot]} · ${m.input === 'strike' ? 'Final Strike' : INPUT_NAME[m.input]}`).join(', ')}.</p>` : ''}`}
+        ? html`<p class="copy-14 secondary">${icon('hourglass_empty')} Playing the recording’s actions…</p>`
+        : html`${resultsView(r.result, r.names, r.ids, false, { ...recordingCard(r), underTimeline: videoCheck(r) })}
+            ${missed.length ? html`<p class="copy-13 secondary">The sim couldn’t make ${missed.length === 1 ? 'this action' : `these ${missed.length} actions`} in time: ${missed.map((m) => `${secs(m.t * FPS)} ${r.names[m.slot]} · ${m.input === 'strike' ? 'Final Strike' : INPUT_NAME[m.input]}`).join(', ')}.</p>` : ''}`}
   </section>`;
 }
 
@@ -258,10 +368,36 @@ export function simAction(action: string, el: HTMLElement): boolean {
     case 'sim-edit':
       editing = editing === Number(v) ? null : Number(v);
       return true;
+    // A recording-sim discrepancy put away (or all of them back).
+    case 'sim-dismiss': {
+      const entry = runs.find((x) => String(x.at) === el.dataset.at);
+      if (!entry) return false;
+      entry.dismissed = [...new Set([...(entry.dismissed ?? []), v])];
+      void updateSim(entry.at, { dismissed: entry.dismissed });
+      return true;
+    }
+    case 'sim-undismiss': {
+      const entry = runs.find((x) => String(x.at) === v);
+      if (!entry) return false;
+      entry.dismissed = undefined;
+      void updateSim(entry.at, { dismissed: undefined });
+      return true;
+    }
+    case 'sim-fold':
+      if (v === 'video' || v === 'checks') fold[v] = !fold[v];
+      return true;
+    case 'sim-play':
+      if (!playBars) return false;
+      play.running = !play.running;
+      if (play.running) {
+        if (play.t >= playBars.seconds) play.t = 0;
+        runPlay();
+      } else cancelAnimationFrame(play.raf);
+      return true;
     case 'sim-transcript': {
       const entry = runs.find((x) => String(x.at) === v);
       const reading = entry && videoOf(entry);
-      draft = draft?.at === entry?.at || !entry || !reading ? null : { at: entry.at, steps: reading.steps.map((x) => ({ ...x })) };
+      draft = draft?.at === entry?.at || !entry || !reading ? null : { at: entry.at, steps: reading.steps.map((x) => ({ ...x })), away: (reading.away ?? []).map(([a, b]) => [a, b]) };
       return true;
     }
     case 'sim-step-add':
@@ -273,6 +409,15 @@ export function simAction(action: string, el: HTMLElement): boolean {
     case 'sim-step-del':
       draft?.steps.splice(Number(v), 1);
       return true;
+    case 'sim-away-add':
+      if (draft) {
+        const from = draft.away[draft.away.length - 1]?.[1] ?? draft.steps[draft.steps.length - 1]?.t ?? 0;
+        draft.away.push([from, Math.round((from + 5) * 100) / 100]);
+      }
+      return true;
+    case 'sim-away-del':
+      draft?.away.splice(Number(v), 1);
+      return true;
     case 'sim-step-cancel':
       draft = null;
       return true;
@@ -281,7 +426,8 @@ export function simAction(action: string, el: HTMLElement): boolean {
       const reading = entry && videoOf(entry);
       if (entry && reading && draft) {
         const { video: _, ...req } = JSON.parse(entry.key) as SimRequest & { video?: boolean };
-        const edited = { ...reading, steps: draft.steps.slice().sort((a, b) => a.t - b.t) };
+        const away = draft.away.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
+        const edited = { ...reading, steps: draft.steps.slice().sort((a, b) => a.t - b.t), away };
         draft = null;
         runReplay(edited, edited.names.map((_, i) => i), req, entry.names, entry.ids, redrawPage, entry);
       }
@@ -323,6 +469,14 @@ export function simAction(action: string, el: HTMLElement): boolean {
     case 'sim-video-again':
       video = lastVideo;
       return true;
+    case 'sim-export': {
+      const entry = runs.find((x) => String(x.at) === v);
+      if (entry) exportRun(entry);
+      return true;
+    }
+    case 'sim-import':
+      importRun();
+      return true;
     case 'sim-run':
       pending = true;
       return true;
@@ -358,11 +512,31 @@ export function simChange(el: HTMLInputElement | HTMLSelectElement): boolean {
     redrawPage();
   }
   // A press in a transcript being edited (no redraw, so Tab moves along; sorted by time when played).
+  // A stretch the enemy is invulnerable: from, to.
+  else if (f === 'away-a' || f === 'away-b') {
+    const stretch = draft?.away[Number(el.dataset.k)];
+    if (stretch) stretch[f === 'away-a' ? 0 : 1] = Math.max(0, Number(el.value) || 0);
+  }
   else if (f === 'step-t' || f === 'step-slot' || f === 'step-input') {
     const step = draft?.steps[Number(el.dataset.k)];
     if (step && f === 'step-t') step.t = Math.max(0, Number(el.value) || 0);
     else if (step && f === 'step-slot') step.slot = Number(el.value) as VideoStep['slot'];
     else if (step) step.input = el.value as VideoStep['input'];
+  }
+  // The timeline player: where, how fast.
+  else if (f === 'play-seek') {
+    play.t = Math.max(0, Number(el.value) || 0);
+    paintPlay();
+  } else if (f === 'play-speed') play.speed = Number(el.value) || 1;
+  // A battle skill's SP back in the recording (blank: unknown).
+  else if (f === 'step-back') {
+    const step = draft?.steps[Number(el.dataset.k)];
+    if (step) step.back = el.value.trim() === '' ? undefined : Math.max(0, Number(el.value) || 0);
+  }
+  // A press that interrupted the boss's attack (the meter's +20, the big X).
+  else if (f === 'step-int') {
+    const step = draft?.steps[Number(el.dataset.k)];
+    if (step) step.interrupt = (el as HTMLInputElement).checked || undefined;
   }
   // A run's name or note: saved as typed, shown when the edit closes (no redraw, so Tab moves between the two).
   else if (f === 'runname' || f === 'note') {
@@ -432,6 +606,21 @@ function optimalBuildOf(m: SimMember, mine: SimBuild): SimBuild {
   return { op: m.op, potential: mine.potential, weapon: m.weapon ? { id: m.weapon, potential: m.weaponPotential ?? 0 } : { id: '', potential: m.weaponPotential ?? 0 }, gear: mine.gear, ...(m.food ? { food: m.food } : {}) };
 }
 
+/**
+ * Each limited operator's signature weapon: the Arsenal Issue that ran with their banner (special_<n> with
+ * weponbox_<n>: Winter Hunt's Typhoeus with Deep Cold Issue's Umbra of Frigid Eventide).
+ */
+function signatureWeapons(): Record<string, string> {
+  const db = cachedBannerDb();
+  const out: Record<string, string> = {};
+  for (const [pool, b] of Object.entries(db)) {
+    if (!pool.startsWith('special_')) continue;
+    const weapon = db[`weponbox_${pool.slice('special_'.length)}`]?.rateUpIds?.find((id) => id.startsWith('wpn_'));
+    if (weapon) for (const op of b.rateUpIds ?? []) if (op.startsWith('chr_')) out[op] = weapon;
+  }
+  return out;
+}
+
 /** Weapons only Arsenal Issues give: their rate-ups (weponbox_ pools; weaponbox_constant_ is the standard pool). */
 const limitedWeapons = (): string[] =>
   [...new Set(Object.entries(cachedBannerDb()).flatMap(([pool, b]) => (pool.startsWith('weponbox_') ? (b.rateUpIds ?? []).filter((id) => id.startsWith('wpn_')) : [])))].sort();
@@ -440,10 +629,10 @@ const limitedWeapons = (): string[] =>
 const HOW: [string, string][] = [
   ['Fight', 'The training dummy (DEF 100, a 280 Stagger meter, Staggered 12 s), frame by frame at 30 fps. Each operator runs the game’s own skill, buff and talent files: every hit, buff, Arts Infliction, reaction, Physical Status, cooldown, SP and Ultimate Energy gain as the game defines them. Only the controlled operator basic attacks; the others stand by, as they mostly do in the game.'],
   ['Damage', 'ATK × multiplier × DMG bonus × critical hits (their expected value) × Amp × Susceptibility × DMG taken × DEF × Resistance × Stagger, as endfield.wiki.gg’s Damage page lays it out.'],
-  ['Search', 'Step 1 finds a priority list: a ranking of buttons, where the first one that’s ready gets pressed. Many rankings are tried, and the best ones are improved by swapping pairs. Step 2 goes through the fight press by press: each time a skill could be pressed, it tries every option (each ready skill, or waiting a moment), plays out the rest of the fight for each, and keeps the few that did best.'],
-  ['Styles', 'Advanced: anything the game allows, swaps and animation cancels too. Standard: one operator controlled the whole fight, no animation cancels, at least half a second between presses. Basic: one operator controlled; combos as they come up, ultimates when charged, and the battle skills in one order, over and over.'],
+  ['Search', 'Step 1 finds a priority list: a ranking of buttons, where the first one that’s ready gets pressed. Many rankings are tried, and the best ones are improved by swapping pairs. Step 2 goes through the fight action by action: each time a skill could be pressed, it tries every option (each ready skill, or waiting a moment), plays out the rest of the fight for each, and keeps the few that did best.'],
+  ['Styles', 'Advanced: anything the game allows, swaps and animation cancels too. Standard: one operator controlled the whole fight, no animation cancels, at least half a second between actions. Basic: one operator controlled; combos as they come up, ultimates when charged, and the battle skills in one order, over and over.'],
   ['Goal', 'Fight length: the most damage in that time. Dummy HP: the fight ends when it’s defeated, and the fastest wins.'],
-  ['Optimal gear', 'Each weapon is tried in a fight (Maxed Essence; a gacha-only weapon goes to one operator at most). Then it measures how much each stat adds for this team, and tries gear sets and pieces at their top Artifice.'],
+  ['Optimal gear', 'Each weapon is tried in a fight (Maxed Essence; a gacha-only weapon goes to one operator at most). Then it measures how much each stat adds for this team, and tries gear sets and pieces at their top Artifice. Twice over: the second time, weapons are tried with the gear found. It also starts once from each operator’s signature weapon, and keeps whichever start plays best.'],
   ['Uptime', 'How much of the fight the enemy can be hit. The rest comes at the end of every 10 s: nothing is pressed and basic attacks stop, while what’s already running goes on.'],
   ['Threads', 'Fights that don’t depend on each other are played side by side on several threads of this device; the rotation found is the same as on one.'],
   ['Not simulated', 'Enemy attacks, positions and distances (counters, shields, attacks landing on random spots), and inputs timed by the player (perfect timing).'],
@@ -451,7 +640,9 @@ const HOW: [string, string][] = [
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const big = (n: number) => Math.round(n).toLocaleString();
-const secs = (frame: number) => `${(frame / FPS).toFixed(1)} s`;
+/** A time as m:ss.s, as the game's stopwatch reads (with tenths). */
+const clockTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+const secs = (frame: number) => clockTime(frame / FPS);
 
 /**
  * The operators to pick from, one per name: the Endministrator's two appearances (chr_0002_endminm,
@@ -525,7 +716,86 @@ function buildLines(b: SimBuild, wiki: Wiki): Html {
 }
 
 /** Where each press falls in the fight, one row per team position. */
-function timeline(r: SimResult, names: string[]): Html {
+/** What a timeline shows: a sim's result, or a recording's own reading, on the fight's clock (frames). */
+interface Track {
+  seconds: number;
+  main: number;
+  presses: { frame: number; slot: number; input: Input }[];
+  strikes: { frame: number; slot: number; finisher: boolean }[];
+  staggers: { frame: number; end: number }[];
+  mechanics: { frame: number; label: string }[];
+  away: [number, number][];
+  guard: [number, number][];
+  /** Damage dealt each second of the fight. */
+  dps: number[];
+}
+
+/** A sim result as a track: its damage each second from its own track. */
+function simTrack(r: SimResult): Track {
+  const dps: number[] = [];
+  let last = 0;
+  for (const [t, dealt] of r.track ?? []) {
+    const k = Math.floor(t);
+    while (dps.length <= k) dps.push(0);
+    dps[k] += dealt - last;
+    last = dealt;
+  }
+  return { seconds: r.seconds, main: r.main, presses: r.presses, strikes: r.strikes ?? [], staggers: r.staggers ?? [], mechanics: r.mechanics ?? [], away: r.away ?? [], guard: [], dps };
+}
+
+/**
+ * A recording as a track, 1:1 with the video: its presses, Final Strikes and interrupts as read, the boss Staggered
+ * where its meter went yellow, its Stagger node where the meter passed half, and its damage each second from its
+ * HP bar (the game's own rolls, crits and all), on the fight's clock (the stopwatch's pauses taken out).
+ */
+function recordingTrack(reading: VideoRotation, seconds: number, phaseHp: number | undefined): Track {
+  const pauses = reading.pauses ?? [];
+  const clock = (t: number) => t - pauses.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, t) - a), 0);
+  const f = (t: number) => Math.round(clock(t) * FPS);
+  const presses: Track['presses'] = [];
+  const strikes: Track['strikes'] = [];
+  const mechanics: Track['mechanics'] = [];
+  const who = new Map<number, number>();
+  for (const x of reading.steps) {
+    if (x.input === 'strike' || x.input === 'finisher') {
+      strikes.push({ frame: f(x.t), slot: x.slot, finisher: x.input === 'finisher' });
+      who.set(x.slot, (who.get(x.slot) ?? 0) + 1);
+    } else presses.push({ frame: f(x.t), slot: x.slot, input: x.input });
+    if (x.interrupt) mechanics.push({ frame: f(x.t) + FPS, label: 'Interrupted' });
+  }
+  const main = [...who.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+  const staggers: Track['staggers'] = [];
+  const dps: number[] = [];
+  let lastHp = 1;
+  let lastT = -Infinity;
+  let open: Track['staggers'][number] | null = null;
+  let under = true;
+  for (const [t, hp, meter] of reading.boss ?? []) {
+    if (pauses.some(([a, b]) => t >= a && t < b)) continue;
+    const c = clock(t);
+    if (meter < 0) {
+      if (!open) staggers.push((open = { frame: Math.round(c * FPS), end: Math.round(c * FPS) }));
+      open.end = Math.round(c * FPS);
+    } else open = null;
+    // The meter reaching half: the boss's Stagger node.
+    if (meter >= 0.5 && under) mechanics.push({ frame: Math.round(c * FPS), label: 'Stagger node' });
+    if (meter >= 0 && meter < 0.5) under = true;
+    if (meter >= 0.5) under = false;
+    // A new phase refills the bar; otherwise what it lost is damage.
+    if (phaseHp) {
+      if (t - lastT > 2 && hp > lastHp + 0.3) lastHp = 1;
+      const k = Math.floor(c);
+      while (dps.length <= k) dps.push(0);
+      dps[k] += Math.max(0, lastHp - hp) * phaseHp;
+      lastHp = Math.min(lastHp, hp);
+    }
+    lastT = t;
+  }
+  return { seconds, main, presses, strikes, staggers, mechanics, away: (reading.away ?? []).map(([a, b]) => [clock(a), clock(b)] as [number, number]).map(([a, b]) => [a * FPS, b * FPS] as [number, number]), guard: (reading.guard ?? []).map(([a, b]) => [clock(a) * FPS, clock(b) * FPS] as [number, number]), dps };
+}
+
+/** The lanes of a track: each operator's presses and Final Strikes, the damage each second, the enemy's stretches. */
+function lanes(r: Track, names: string[], dpsMax: number): Html {
   const end = r.seconds * FPS;
   // Who's controlled when: the swaps.
   const spans: { slot: number; from: number; to: number }[] = [];
@@ -540,7 +810,7 @@ function timeline(r: SimResult, names: string[]): Html {
   spans.push({ slot: cur, from, to: end });
   const at = (f: number) => `${Math.min(100, (f / end) * 100).toFixed(2)}%`;
   const ticks = Array.from({ length: Math.floor(r.seconds / 10) + 1 }, (_, k) => k * 10);
-  return html`<div class="sim-timeline" role="img" aria-label="Presses over the fight">
+  return html`<div class="sim-timeline" role="img" aria-label="Actions over the fight">
     ${names.map(
       (name, slot) => html`<div class="sim-lane">
         <span class="sim-lane-name label-12 ellipsis">${name}</span>
@@ -548,21 +818,176 @@ function timeline(r: SimResult, names: string[]): Html {
           ${spans.filter((s) => s.slot === slot).map((s) => html`<i class="sim-control" style="left:${at(s.from)};width:${at(s.to - s.from)}"></i>`)}
           ${r.presses
             .filter((p) => p.slot === slot && p.input !== 'swap')
-            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : 'U'}</i>`)}
-          ${(r.strikes ?? [])
+            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : 'U'}</i>`)}
+          ${r.strikes
             .filter((s) => s.slot === slot)
             .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" title="${secs(s.frame)} · ${s.finisher ? 'Finisher' : 'Final Strike'}"></i>`)}
         </span>
       </div>`,
     )}
-    ${r.staggers?.length
+    ${r.dps.length && dpsMax > 0
       ? html`<div class="sim-lane">
-          <span class="sim-lane-name label-12 ellipsis">Enemy</span>
-          <span class="sim-lane-track">${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${at(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}</span>
+          <span class="sim-lane-name label-12 ellipsis">Damage</span>
+          <span class="sim-lane-track sim-dmg">${r.dps.map((d, k) => (d > 0 ? html`<i style="left:${at(k * FPS)};width:${at(FPS)};height:${Math.max(4, Math.round((d / dpsMax) * 100))}%" title="${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')} · ${big(d)}"></i>` : ''))}</span>
         </div>`
       : ''}
-    <div class="sim-lane sim-axis"><span></span><span class="sim-lane-track">${ticks.map((t) => html`<span class="label-12 secondary" style="left:${at(t * FPS)}">${t}s</span>`)}</span></div>
+    ${r.staggers.length || r.mechanics.length || r.away.length || r.guard.length
+      ? html`<div class="sim-lane">
+          <span class="sim-lane-name label-12 ellipsis">Enemy</span>
+          <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · Invulnerable ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · No Stagger ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${at(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" title="${secs(m.frame)} · ${m.label}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
+        </div>`
+      : ''}
+    <div class="sim-lane sim-axis"><span></span><span class="sim-lane-track">${ticks.map((t) => html`<span class="label-12 secondary" style="left:${at(t * FPS)}">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`)}</span></div>
+    <i class="sim-playhead" aria-hidden="true"></i>
   </div>`;
+}
+
+/** The sim's timeline with the player under it (a run that isn't a recording's: one timeline). */
+function timeline(r: SimResult, names: string[]): Html {
+  const t = simTrack(r);
+  return html`${lanes(t, names, Math.max(...t.dps, 0))}${player(r)}`;
+}
+
+/** The timeline playing: where it is (seconds on the fight's clock), how fast, whether it runs, and for which result. */
+const play = { t: 0, speed: 1, running: false, of: null as SimResult | null, raf: 0, last: 0 };
+/** The boss's bars over the fight: HP left (0–1) and its Stagger meter (0–1, -1 Staggered, NaN unknown). */
+type Bars = { t: number[]; hp: number[]; meter: number[] };
+let playBars: { sim: Bars; video?: Bars; seconds: number } | null = null;
+/** What's shown under the timeline: the video's bars, the discrepancies list. */
+const fold = { video: true, checks: true };
+const foldButton = (what: keyof typeof fold, label: string) =>
+  html`<button type="button" class="sim-fold-btn label-12 secondary" data-action="sim-fold" data-value="${what}" title="${fold[what] ? 'Hide' : 'Show'}" aria-expanded="${fold[what] ? 'true' : 'false'}">${label} ${icon(fold[what] ? 'visibility_off' : 'visibility')}</button>`;
+
+/**
+ * The boss's bars as the sim's fight would show them, from its track (a replay's has its meter; a search's only
+ * when it was Staggered). A boss with phases (a recording's pauses) starts each phase full; without HP to go by (a
+ * dummy for a time), the bar empties as the fight's damage adds up.
+ */
+function simBars(r: SimResult, enemy: Enemy | undefined, pauses: [number, number][], clock: (t: number) => number): Bars {
+  const out: Bars = { t: [], hp: [], meter: [] };
+  const track = r.track ?? [];
+  const phases = pauses.filter(([a, b]) => b - a >= 2).map(([a]) => clock(a));
+  const max = (phases.length ? enemy?.phaseHp : undefined) ?? r.hp ?? (track.at(-1)?.[1] || 1);
+  let k = 0;
+  let base = 0;
+  for (const [t, dealt, meter] of track) {
+    while (k < phases.length && t >= phases[k]) {
+      base = dealt;
+      k++;
+    }
+    out.t.push(t);
+    out.hp.push(Math.max(0, 1 - (dealt - base) / max));
+    out.meter.push(meter === -2 ? NaN : meter);
+  }
+  return out;
+}
+
+/** The value of a bar series at a moment (the last reading at or before it). */
+function barAt(b: Bars, t: number): { hp: number; meter: number } {
+  let lo = 0;
+  let hi = b.t.length - 1;
+  if (hi < 0 || t < b.t[0]) return { hp: 1, meter: 0 };
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (b.t[mid] <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  return { hp: b.hp[lo], meter: b.meter[lo] };
+}
+
+/** Under the timeline: play it, and the boss's bars as it goes (the sim's, and the video's for a parsed run). */
+/** The boss's bars for a result (the sim's; and the video's, for a parsed run), ready for the player. */
+function preparePlay(r: SimResult): { video?: Bars } {
+  if (play.of !== r) {
+    cancelAnimationFrame(play.raf);
+    Object.assign(play, { t: 0, running: false, of: r });
+  }
+  const entry = replay?.result === r && replay.at !== undefined ? runs.find((x) => x.at === replay!.at) : undefined;
+  const reading = entry && videoOf(entry);
+  const asked = entry ? (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy : settings().enemy;
+  const enemy = typeof asked === 'object' ? asked : asked ? enemyById(asked).enemy : undefined;
+  const pauses = reading?.pauses ?? [];
+  const clock = (t: number) => t - pauses.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, t) - a), 0);
+  let video: Bars | undefined;
+  if (reading?.boss?.length) {
+    video = { t: [], hp: [], meter: [] };
+    for (const [t, hp, meter] of reading.boss)
+      if (!pauses.some(([a, b]) => t >= a && t < b)) {
+        video.t.push(clock(t));
+        video.hp.push(hp);
+        video.meter.push(meter);
+      }
+  }
+  playBars = { sim: simBars(r, enemy, pauses, clock), video, seconds: r.seconds };
+  queueMicrotask(paintPlay);
+  return { video };
+}
+
+/** Play, scrub, time and speed. */
+function playControls(r: SimResult): Html {
+  return html`<div class="sim-play">
+    <button type="button" class="btn secondary sm icon-only" data-action="sim-play" title="${play.running ? 'Pause' : 'Play'}" aria-label="${play.running ? 'Pause' : 'Play'}">${icon(play.running ? 'pause' : 'play_arrow')}</button>
+    <input class="sim-play-seek" type="range" min="0" max="${r.seconds}" step="0.1" value="${play.t}" data-sim="play-seek" aria-label="Time" />
+    <span class="num sim-play-time">${clockTime(play.t)}</span>
+    <select class="input" data-sim="play-speed" aria-label="Speed">
+      ${[1, 2, 4].map((s) => html`<option value="${s}" ${s === play.speed ? 'selected' : ''}>${s}×</option>`)}
+    </select>
+  </div>`;
+}
+
+/** The boss's HP and Stagger bars for one source, painted as the timeline plays. */
+function bossRow(label: string, kind: 'sim' | 'video'): Html {
+  return html`<div class="sim-boss"><div class="sim-boss-row" data-bars="${kind}">
+    <span class="label-12 secondary">${label}</span>
+    <span class="sim-boss-hp" title="HP"><i></i></span>
+    <span class="sim-boss-meter" title="Stagger"><i></i></span>
+  </div></div>`;
+}
+
+/** Under a lone timeline: the controls and the boss's bars. */
+function player(r: SimResult): Html {
+  preparePlay(r);
+  return html`<div class="sim-player">${playControls(r)}${bossRow('Boss', 'sim')}</div>`;
+}
+
+/** Puts the playhead, the time and the bars where play.t is. */
+function paintPlay(): void {
+  const d = playBars;
+  if (!d) return;
+  const frac = Math.min(1, play.t / d.seconds);
+  for (const el of document.querySelectorAll<HTMLElement>('.sim-playhead')) el.style.left = `calc(104px + (100% - 104px) * ${frac})`;
+  for (const el of document.querySelectorAll<HTMLElement>('.sim-play-time')) el.textContent = clockTime(play.t);
+  for (const el of document.querySelectorAll<HTMLInputElement>('.sim-play-seek')) if (document.activeElement !== el) el.value = String(play.t);
+  for (const el of document.querySelectorAll<HTMLElement>('.sim-boss-row')) {
+    const b = el.dataset.bars === 'video' ? d.video : d.sim;
+    if (!b) continue;
+    const { hp, meter } = barAt(b, play.t);
+    const hpBar = el.querySelector<HTMLElement>('.sim-boss-hp i');
+    const meterBar = el.querySelector<HTMLElement>('.sim-boss-meter i');
+    if (hpBar) hpBar.style.width = `${(hp * 100).toFixed(1)}%`;
+    if (meterBar) {
+      meterBar.style.width = Number.isNaN(meter) ? '0%' : meter < 0 ? '100%' : `${(meter * 100).toFixed(1)}%`;
+      meterBar.classList.toggle('staggered', meter < 0);
+    }
+  }
+}
+
+/** Plays the timeline from where it is (in real time × its speed) until its end or a pause. */
+function runPlay(): void {
+  const step = (now: number) => {
+    if (!play.running || !playBars) return;
+    play.t = Math.min(playBars.seconds, play.t + ((now - play.last) / 1000) * play.speed);
+    play.last = now;
+    paintPlay();
+    if (play.t >= playBars.seconds) {
+      play.running = false;
+      redrawPage();
+      return;
+    }
+    play.raf = requestAnimationFrame(step);
+  };
+  play.last = performance.now();
+  play.raf = requestAnimationFrame(step);
 }
 
 /** The presses, with the controlled operator's Final Strikes and Finishers between them (how long to keep attacking). */
@@ -571,6 +996,8 @@ function steps(r: SimResult): { frame: number; slot: number; label: string; stri
     ...r.presses.map((p) => ({ frame: p.frame, slot: p.slot, label: INPUT_NAME[p.input], strike: false })),
     ...(r.strikes ?? []).map((s) => ({ frame: s.frame, slot: s.slot, label: s.finisher ? 'Finisher' : 'Final Strike', strike: true })),
     ...(r.staggers ?? []).map((s) => ({ frame: s.frame, slot: -1, label: 'Staggered', strike: true })),
+    ...(r.mechanics ?? []).map((m) => ({ frame: m.frame, slot: -1, label: m.label, strike: true })),
+    ...(r.away ?? []).map(([a]) => ({ frame: a, slot: -1, label: 'Invulnerable', strike: true })),
   ];
   return out.sort((a, b) => a.frame - b.frame);
 }
@@ -595,7 +1022,7 @@ const isRecording = (x: SavedSim<SimResult>) => !!(JSON.parse(x.key) as { video?
 
 const when = (at: number) => new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
-const STEP_NAME: Record<VideoStep['input'], string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher' };
+const STEP_NAME: Record<VideoStep['input'], string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher', dive: 'Dive attack' };
 
 /**
  * A parsed run's reading: its own, or for runs saved before readings were kept, the last reading when it's the same
@@ -625,15 +1052,30 @@ function transcriptEditor(x: SavedSim<SimResult>): Html {
           <select class="input" data-sim="step-slot" data-k="${k}" aria-label="Operator">
             ${reading.names.map((n, i) => html`<option value="${i}" ${i === s.slot ? 'selected' : ''}>${n}</option>`)}
           </select>
-          <select class="input" data-sim="step-input" data-k="${k}" aria-label="Press">
+          <select class="input" data-sim="step-input" data-k="${k}" aria-label="Action">
             ${Object.entries(STEP_NAME).map(([id, n]) => html`<option value="${id}" ${id === s.input ? 'selected' : ''}>${n}</option>`)}
           </select>
+          <span class="sim-step-back">${s.input === 'battle' ? html`<input class="input num" type="number" min="0" max="300" value="${s.back ?? ''}" placeholder="SP" data-sim="step-back" data-k="${k}" title="SP back after it (blank: unknown)" aria-label="SP back" />` : ''}</span>
+          <label class="sim-step-int label-12" title="It interrupted the boss's attack">${s.input === 'battle' || s.input === 'combo' || s.input === 'ultimate' ? html`<input type="checkbox" data-sim="step-int" data-k="${k}" ${s.interrupt ? 'checked' : ''} />Interrupt` : ''}</label>
           <button type="button" class="btn tertiary sm icon-only" data-action="sim-step-del" data-value="${k}" title="Remove" aria-label="Remove">${icon('close')}</button>
         </li>`,
       )}
     </ol>
+    ${draft.away.length
+      ? html`<span class="label-12 secondary">Invulnerable</span>
+          <ol class="sim-step-list sim-away-list">
+            ${draft.away.map(
+              ([a, b], k) => html`<li>
+                <input class="input num" type="number" step="0.01" min="0" value="${a.toFixed(2)}" data-sim="away-a" data-k="${k}" aria-label="From (s)" />
+                <input class="input num" type="number" step="0.01" min="0" value="${b.toFixed(2)}" data-sim="away-b" data-k="${k}" aria-label="To (s)" />
+                <button type="button" class="btn tertiary sm icon-only" data-action="sim-away-del" data-value="${k}" title="Remove" aria-label="Remove">${icon('close')}</button>
+              </li>`,
+            )}
+          </ol>`
+      : ''}
     <div class="sim-run">
-      <button type="button" class="btn secondary sm" data-action="sim-step-add">${icon('add')}Add press</button>
+      <button type="button" class="btn secondary sm" data-action="sim-step-add">${icon('add')}Add action</button>
+      <button type="button" class="btn secondary sm" data-action="sim-away-add">${icon('add')}Add invulnerable</button>
       <button type="button" class="btn primary sm" data-action="sim-step-save" ${replayWorker ? 'disabled' : ''}>${icon('play_arrow')}Play edited transcript</button>
       <button type="button" class="btn tertiary sm" data-action="sim-step-cancel">Cancel</button>
     </div>
@@ -677,30 +1119,30 @@ function historyView(names: string[], showing: number | undefined, recordings = 
     <div class="sim-history">
       ${list.map((x) => {
         const r = x.result;
-        const value = r.hp ? (r.killed ? `${r.seconds.toFixed(1)} s` : 'Not defeated') : `${big(r.total / r.seconds)} DPS`;
+        const value = r.hp ? (r.killed ? clockTime(r.seconds) : 'Not defeated') : `${big(r.total / r.seconds)} DPS`;
         return html`<div class="sim-past-row${x.at === showing ? ' on' : ''}">
           <button type="button" class="sim-past" data-action="sim-past" data-value="${String(x.at)}">
             <span class="num secondary">${when(x.at)}</span>
             <span class="min0 ellipsis">${x.name ? html`<span class="label-14">${x.name}</span> <span class="secondary">${runLine(x, names)}</span>` : runLine(x, names)}</span>
             <span class="num">${value}</span>
           </button>
-          ${runTools(x)} ${runEdit(x)}
+          ${recordings ? (x.note ? html`<p class="copy-13 secondary sim-note-text">${x.note}</p>` : '') : html`${runTools(x)} ${runEdit(x)}`}
         </div>`;
       })}
     </div>
   </div></section>`;
 }
 
-function resultsView(r: SimResult, names: string[], ids: string[], stale: boolean): Html {
+function resultsView(r: SimResult, names: string[], ids: string[], stale: boolean, extra: { before?: Html; underTimeline?: Html; dpsMax?: number } = {}): Html {
   const dps = r.total / r.seconds;
-  const time = `${r.seconds.toFixed(1)} s`;
+  const time = clockTime(r.seconds);
   const shares = ids.map((id, slot) => ({ id, slot, total: r.byOperator[id] ?? 0 })).sort((a, b) => b.total - a.total);
   return html`<div class="sim-results${stale ? ' stale' : ''}">
     ${metrics([
       ...(r.hp ? [metric({ label: 'Clear time', value: r.killed ? time : 'Not defeated', sub: r.killed ? `${big(r.hp)} HP` : `${big(r.total)} of ${big(r.hp)} HP in ${time}` })] : []),
       metric({ label: 'Damage per second', value: big(dps) }),
       metric({ label: 'Total damage', value: big(r.total), sub: `${time} duration` }),
-      metric({ label: 'Presses', value: String(r.presses.length), sub: 'besides basic attacks' }),
+      metric({ label: 'Actions', value: String(r.presses.length), sub: 'besides basic attacks' }),
       ...(names[r.main] ? [metric({ label: 'Controlled', value: names[r.main], sub: new Set((r.strikes ?? []).map((x) => x.slot)).size > 1 ? 'at the start, swaps after' : 'the whole fight' })] : []),
     ])}
     <section class="card"><div class="card-body sim-card">
@@ -714,13 +1156,15 @@ function resultsView(r: SimResult, names: string[], ids: string[], stale: boolea
         </div>`,
       )}
     </div></section>
+    ${extra.before ?? ''}
     <section class="card"><div class="card-body sim-card">
-      <h2 class="heading-16">Timeline</h2>
+      <h2 class="heading-16">${extra.before ? 'Timeline · Sim' : 'Timeline'}</h2>
       ${r.order
         ? html`<p class="copy-14">Control ${names[r.main]}. Combo skills as they come up, ultimates when charged, and these battle skills in turn, over and over:</p>
             <ol class="sim-order copy-14">${r.order.map(([slot, input]) => html`<li>${names[slot]} · ${INPUT_NAME[input]}</li>`)}</ol>`
         : ''}
-      ${timeline(r, names)}
+      ${extra.before ? html`${lanes(simTrack(r), names, extra.dpsMax ?? Math.max(...simTrack(r).dps, 0))}${bossRow('Sim', 'sim')}` : timeline(r, names)}
+      ${extra.underTimeline ?? ''}
       <ol class="sim-steps copy-14">
         ${steps(r).map((p) => html`<li class="${p.strike ? 'secondary' : ''}"><span class="num secondary">${secs(p.frame)}</span> ${p.slot < 0 ? 'Enemy' : names[p.slot]} · ${p.label}</li>`)}
       </ol>
@@ -765,7 +1209,8 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   const tabs = (current: string, body: Html) =>
     html`${header}<main class="container fade-in">${sideTabs('Rotations', [['/rotations', 'Simulator', ''], ['/rotations/parser', 'Parser', '']], current, html`<div class="sim-page">${body}</div>`)}</main>`;
   if (view === 'parser') return tabs('/rotations/parser', parseView(wiki, index.data, s, redraw));
-  const style = styleOf(s.style);
+  // Standard and Moderate unless picked.
+  const style = s.style ? styleOf(s.style) : 'standard';
   const effort = s.effort ?? 'normal';
   const goal = s.goal ?? 'time';
   const seconds = goal === 'hp' ? (s.limit ?? DEFAULT_LIMIT) : (s.seconds ?? DEFAULT_SECONDS);
@@ -787,7 +1232,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         ...main,
         style,
         effort,
-        optimize: { weapons: team.map((m) => (m.weapon ? [m.weapon] : weaponsFor(m.op, wiki, index.data!))), limited: limitedWeapons() },
+        optimize: { weapons: team.map((m) => (m.weapon ? [m.weapon] : weaponsFor(m.op, wiki, index.data!))), limited: limitedWeapons(), signatures: signatureWeapons() },
       }
     : { builds: built.map((b) => b.build), seconds, hp, startSp: s.startSp, uptime, ...enemy, ...main, style, effort };
   const key = JSON.stringify(req);
@@ -825,7 +1270,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         <p class="copy-13 secondary">${STYLE_NOTE[style]}</p>
         <div class="sim-options">
           <label class="sim-field"><span class="label-12 secondary">Controlled</span><select class="input sim-enemy" data-sim="controlled" aria-label="Controlled">
-            <option value="" ${at < 0 ? 'selected' : ''}>Best (sim picks)</option>
+            <option value="" ${at < 0 ? 'selected' : ''}>Auto (Best)</option>
             ${team.map((m, i) => html`<option value="${m.op}" ${i === at ? 'selected' : ''}>${names[i]}</option>`)}
           </select></label>
           <label class="sim-field"><span class="label-12 secondary">Enemy</span><select class="input sim-enemy" data-sim="enemy" aria-label="Enemy">
@@ -850,7 +1295,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
                   : progress?.phase === 'gear'
                     ? `Choosing weapons and gear · ${Math.min(100, Math.round((progress.played / progress.budget) * 100))}%`
                     : progress
-                      ? `${progress.killedIn !== undefined ? `Fastest so far ${progress.killedIn.toFixed(1)} s` : `Best so far ${big(progress.dps)} DPS`} · ${Math.min(100, Math.round((progress.played / progress.budget) * 100))}%${(running.cores ?? 1) > 1 ? ` · ${running.cores} threads` : ''}`
+                      ? `${progress.killedIn !== undefined ? `Fastest so far ${clockTime(progress.killedIn)}` : `Best so far ${big(progress.dps)} DPS`} · ${Math.min(100, Math.round((progress.played / progress.budget) * 100))}%${(running.cores ?? 1) > 1 ? ` · ${running.cores} threads` : ''}`
                       : 'Searching…'}</span>`
             : html`<button type="button" class="btn primary" data-action="sim-run" ${blocked ? 'disabled' : ''}>${icon(fresh ? 'refresh' : 'play_arrow')}${fresh ? 'Run again' : 'Find rotation'}</button>
                 ${fresh && result?.at ? html`<span class="copy-13 secondary">Saved ${new Date(result.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · took ${Math.max(1, Math.round(result.result.ms / 1000))} s</span>` : ''}
@@ -896,13 +1341,13 @@ function parseView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw: () =>
       );
   }
   const fact = (label: string, value: string) => html`<div class="sim-field"><span class="label-12 secondary">${label}</span><span class="copy-14">${value}</span></div>`;
-  return html`<section class="card"><div class="card-body sim-card">
+  return html`${runHead()}<section class="card"><div class="card-body sim-card">
       <h2 class="heading-16">Recording</h2>
       ${v
         ? html`<div class="sim-options">
               ${fact('Enemy', foe?.name ?? (seen ? `${seen} (not in the sim yet: fought as the training dummy)` : 'Not read from the video: fought as the training dummy'))}
-              ${fact('Duration', `${v.seconds.toFixed(1)} s`)}
-              ${fact('Presses', String(v.steps.filter((x) => x.input !== 'strike' && x.input !== 'finisher').length))}
+              ${fact('Duration', clockTime(v.seconds))}
+              ${fact('Actions', String(v.steps.filter((x) => x.input !== 'strike' && x.input !== 'finisher').length))}
             </div>
             <div class="sim-team">
               ${v.names.map((name, i) => {
@@ -923,6 +1368,7 @@ function parseView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw: () =>
         : html`<p class="copy-14 secondary">Parse a gameplay recording to see its rotation, timeline and damage.</p>`}
       <div class="sim-run">
         <button type="button" class="btn ${v ? 'secondary' : 'primary'}" data-action="sim-read">${icon('movie')}Parse gameplay recording</button>
+        <button type="button" class="btn secondary" data-action="sim-import">${icon('upload_file')}Import run</button>
         ${lastVideo && !replayWorker ? html`<button type="button" class="btn secondary" data-action="sim-video-again">${icon('replay')}Play again</button>` : ''}
       </div>
     </div></section>

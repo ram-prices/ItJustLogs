@@ -18,10 +18,14 @@ import { recognize } from './screenReader';
  * where it was a guess.
  */
 
-/** Played this much faster than real time: about every other frame of a 60 fps video is still seen. */
-const SPEED = 2;
-/** A longer step between frames seen means some were missed (a press can show for a few frames only). */
-const MISSED = 0.15;
+/**
+ * Played in real time: as many frames seen as the device can measure (a combo banner cut short by the next shows for
+ * about 0.1 s, a Final Strike's SP step for a few frames); slower than this costs time, faster loses them.
+ */
+const SPEED = 1;
+/** A longer step between frames seen means some were missed: back up and slow down (to SLOWEST). */
+const MISSED = 0.05;
+const SLOWEST = 0.25;
 /** The stopwatch's picture is kept this often (seconds), to read a few of them afterwards. */
 const CLOCK_EVERY = 0.2;
 /**
@@ -35,13 +39,19 @@ export interface VideoRotation {
   /** Who's in each HUD slot. */
   names: string[];
   /** Seconds from the fight's start; whose (HUD slot); what. Final Strikes and Finishers by the controlled operator. */
-  steps: { t: number; slot: Slot; input: Read }[];
+  steps: { t: number; slot: Slot; input: Read; interrupt?: boolean; back?: number }[];
   /** The fight's length: what the stopwatch showed when it stopped, else how long the HUD showed. */
   seconds: number;
   /** When the stopwatch stopped (seconds from the fight's start; else when the HUD last showed). */
   end: number;
   /** Stretches the stopwatch stood still (a phase change), seconds from the fight's start. */
   pauses: [number, number][];
+  /** Stretches the enemy couldn't be hit (added in the transcript editor), seconds from the fight's start. */
+  away?: [number, number][];
+  /** Stretches the boss took no Stagger (read from its meter, or edited), seconds from the fight's start. */
+  guard?: [number, number][];
+  /** The boss's bars as the video shows them: seconds from the fight's start, HP left (0–1), Stagger meter (0–1, -1 Staggered). */
+  boss?: [number, number, number][];
   /** The boss's name, as shown above its HP bar. */
   enemy?: string;
 }
@@ -150,7 +160,7 @@ export async function readGameplayFile(file: File, operators: string[], simulate
     render(
       panel,
       html`<div class="gameplay-progress-head">
-          <span class="label-14">${result.start === null ? 'No fight found' : `Read ${presses} presses`}</span>
+          <span class="label-14">${result.start === null ? 'No fight found' : `Read ${presses} actions`}</span>
           <button type="button" class="btn tertiary sm icon-btn" data-gameplay-dismiss title="Close" aria-label="Close">${icon('close')}</button>
         </div>
         <button type="button" class="btn primary sm" data-gameplay-open>Open the transcript</button>`,
@@ -245,11 +255,16 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
   const portraits = cut(a.portraits);
   const clock = cut(a.clock);
   const enemy = a.enemy && cut(a.enemy);
+  const meter = a.stagger && cut(a.stagger);
+  const hpBar = a.bossHp && cut(a.bossHp);
+  // The boss's bars change slowly: every third frame, so reading them costs few frames.
+  let frames = 0;
   const out: Sampled = { samples: [], portraits: [], clocks: [], enemies: [] };
   let seenOn = 0;
   const take = (t: number) => {
     const px = clock.read();
-    const s = measure(t, right.read(), centre.read(), banner.read(), px, layout);
+    const bars = frames++ % 3 === 0;
+    const s = measure(t, right.read(), centre.read(), banner.read(), px, layout, bars ? meter?.read() : undefined, bars ? hpBar?.read() : undefined);
     out.samples.push(s);
     // The stopwatch now and then (the domain picks a few moments to read).
     if (t - (out.clocks[out.clocks.length - 1]?.[0] ?? -Infinity) >= CLOCK_EVERY) out.clocks.push([t, px]);
@@ -274,17 +289,26 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
   if (typeof (video as { requestVideoFrameCallback?: unknown }).requestVideoFrameCallback === 'function') {
     await new Promise<void>((resolve, reject) => {
       let speed = SPEED;
+      let missedAt = -Infinity;
       const onFrame = (_: number, meta: VideoFrameCallbackMetadata) => {
         if (cancelled()) return resolve();
         if (video.paused) return;
-        if (last >= 0 && meta.mediaTime - last > MISSED) {
+        // Already at the slowest: what it shows is what this device can measure, so go on.
+        if (last >= 0 && meta.mediaTime - last > MISSED && speed > SLOWEST) {
           // Frames went by unseen (a busy device): back up, a little slower.
-          speed = Math.max(0.5, speed - 0.5);
+          speed = Math.max(SLOWEST, speed / 2);
+          missedAt = last;
           video.playbackRate = speed;
           video.currentTime = last + 1 / 60;
         } else if (meta.mediaTime > last) {
           take(meta.mediaTime);
           last = meta.mediaTime;
+          // 5 s with none missed: back up to speed.
+          if (speed < SPEED && last - missedAt > 5) {
+            speed = Math.min(SPEED, speed * 2);
+            missedAt = last;
+            video.playbackRate = speed;
+          }
         }
         if (!video.ended) video.requestVideoFrameCallback(onFrame);
       };
@@ -312,7 +336,8 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
   return out;
 }
 
-const secs = (t: number) => `${t.toFixed(1)} s`;
+/** Seconds as m:ss.s, as the game's stopwatch reads (with tenths). */
+const secs = (t: number) => `${t < 0 ? '-' : ''}${Math.floor(Math.abs(t) / 60)}:${(Math.abs(t) % 60).toFixed(1).padStart(4, '0')}`;
 
 /** The transcript, for the player to name the operators and fix guesses. */
 function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], operators: string[], simulate: ((v: VideoRotation) => void) | undefined, seconds: number, enemy: string | undefined, layout: Layout, done: () => void): void {
@@ -323,6 +348,8 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
   const steps = reading.steps;
   // Who's in each HUD slot: the player picks, beside the portrait from the video (until then, the slot's place).
   const slotName: string[] = [...SLOTS];
+  // The slots in team position order (position 01 matters to some kits), for the review and the sim.
+  const order = SLOTS.map((_, i) => i).sort((a, b) => (layout.positions?.[a] ?? a + 1) - (layout.positions?.[b] ?? b + 1));
   const picked: boolean[] = SLOTS.map(() => false);
   const groups = [...new Set(steps.filter((s) => s.group !== undefined).map((s) => s.group!))].sort((a, b) => a - b);
   const groupSlot = new Map<number, Slot | null>(groups.map((g) => [g, steps.find((s) => s.group === g)!.slot]));
@@ -363,19 +390,19 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
     render(
       dlg,
       html`<div class="reader-head">
-          <h2 class="heading-20">${reading.start === null ? 'No fight found' : `Read ${presses()} presses`}</h2>
+          <h2 class="heading-20">${reading.start === null ? 'No fight found' : `Read ${presses()} actions`}</h2>
           <p class="copy-13 secondary">${reading.start === null
             ? 'Record with the HUD showing: the SP bar, the skill buttons and the portraits.'
-            : `${enemy ? `${enemy} · ` : ''}${clock ? `${mmss(clock.seconds)} on the stopwatch${clock.pauses.length ? `, stopped ${clock.pauses.map(([a, b]) => `${(b - a).toFixed(1)} s at ${secs(a - start)}`).join(', ')}` : ''}. ` : ''}Times from when the HUD first shows. Read in ${seconds}s. A list on a press means whose it was is a guess.`}</p>
+            : `${enemy ? `${enemy} · ` : ''}${clock ? `${mmss(clock.seconds)} on the stopwatch${clock.pauses.length ? `, stopped ${clock.pauses.map(([a, b]) => `${(b - a).toFixed(1)} s at ${secs(a - start)}`).join(', ')}` : ''}. ` : ''}Times from when the HUD first shows. Read in ${seconds}s. A list on an action means whose it was is a guess.`}</p>
         </div>
         ${reading.start === null
           ? ''
           : html`<div class="reader-body reader-list">
               <div class="gameplay-slots">
-                ${SLOTS.map(
-                  (label, i) => html`<label class="gameplay-slot">
+                ${order.map(
+                  (i, k) => html`<label class="gameplay-slot">
                     ${portraits[i] ? html`<img src="${portraits[i]}" alt="" width="40" height="40" />` : ''}
-                    <span class="label-12 secondary">${label}</span>
+                    <span class="label-12 secondary">${k + 1} · ${SLOTS[i]}</span>
                     <select class="input gameplay-select" data-gameplay-slot="${i}">
                       <option value="" ${picked[i] ? '' : 'selected'}>Pick</option>
                       ${operators.map((n) => html`<option ${picked[i] && n === slotName[i] ? 'selected' : ''}>${n}</option>`)}
@@ -401,7 +428,7 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
                   const pick = guessed.has(k);
                   return html`<li class="${strike ? 'secondary' : ''}">
                     <span class="num secondary">${secs(s.t - start)}</span>
-                    ${strike ? '' : pick ? slotSelect(slotOf(s), `data-gameplay-step="${k}"`) : nameOf(s)}${strike ? '' : ' · '}${READ_NAME[s.input]}
+                    ${strike ? '' : pick ? slotSelect(slotOf(s), `data-gameplay-step="${k}"`) : nameOf(s)}${strike ? '' : ' · '}${READ_NAME[s.input]}${s.interrupt ? ' · Interrupt' : ''}${s.back ? ` · ${s.back} SP back` : ''}
                   </li>`;
                 })}
               </ol>
@@ -436,11 +463,13 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
     if ((e.target as HTMLElement).closest('[data-gameplay-sim]') && simulate && ready()) {
       const end = reading.end ?? start;
       simulate({
-        names: slotName.slice(),
-        steps: steps.map((s) => ({ t: s.t - start, slot: slotOf(s)!, input: s.input })),
+        names: order.map((i) => slotName[i]),
+        steps: steps.map((s) => ({ t: s.t - start, slot: order.indexOf(slotOf(s)!) as Slot, input: s.input, ...(s.interrupt ? { interrupt: true } : {}), ...(s.back ? { back: s.back } : {}) })),
         seconds: clock ? clock.seconds : Math.ceil(end - start),
         end: (clock?.end ?? end) - start,
         pauses: (clock?.pauses ?? []).map(([a, b]) => [a - start, b - start]),
+        ...(reading.guards ? { guard: reading.guards.map(([a, b]) => [a - start, b - start] as [number, number]) } : {}),
+        ...(reading.boss ? { boss: reading.boss.map(([t, hp, st]) => [Math.round((t - start) * 1000) / 1000, hp, st] as [number, number, number]) } : {}),
         enemy,
       });
       done();

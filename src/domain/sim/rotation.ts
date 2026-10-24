@@ -107,6 +107,10 @@ export interface Fight {
   strikes?: Strike[];
   /** When the enemy was Staggered. */
   staggers?: Stagger[];
+  /** The enemy's mechanics (World.mechanics). */
+  mechanics?: { frame: number; label: string }[];
+  /** When the enemy couldn't be hit (World.away). */
+  away?: [number, number][];
 }
 
 /** Above any damage: a defeat scores this less its time. */
@@ -184,6 +188,7 @@ export function play(team: Team, policy: Policy, seconds: number, script: Step[]
     ...(team.hp ? { killed } : {}),
     strikes: w.strikes.filter((s) => s.frame <= last),
     staggers: w.staggers.filter((s) => s.frame <= last).map((s) => ({ ...s, end: Math.min(s.end, last) })),
+    mechanics: w.mechanics.filter((m) => m.frame <= last),
   };
 }
 

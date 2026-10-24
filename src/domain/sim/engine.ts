@@ -87,7 +87,8 @@ export interface Stats {
 export type Side = 'team' | 'enemy';
 
 /** What the player can press: the controlled operator's basic attack, an operator's battle skill, combo or ultimate, or swapping to them. */
-export type Input = 'attack' | 'battle' | 'combo' | 'ultimate' | 'swap';
+/** 'dive': the controlled operator's dive attack (only played back from a recording; the search never presses it). */
+export type Input = 'attack' | 'battle' | 'combo' | 'ultimate' | 'swap' | 'dive';
 
 export interface Entity {
   id: string;
@@ -150,6 +151,8 @@ export interface Buff {
   done: Set<number>;
   /** The blackboard of the skill cast that created it (or that cast's own source). */
   castBB?: Map<string, number>;
+  /** The kind of skill whose cast created it (kindOfSkill), for CheckSkillCastId. */
+  castKind?: string;
   groups: Map<string, Entity[]>;
   /** Its timer stopped (PauseBuffTime): Laevatain's skills during Twilight don't shorten it. */
   paused?: boolean;
@@ -195,6 +198,8 @@ export interface Run {
    * becomes what the operator is doing, so the operator's next basic attack cuts it.
    */
   follow?: boolean;
+  /** A basic attack pressed while attacksUnseen. */
+  unseen?: boolean;
   /** A projectile's hit: the skill that launched it (or what launched that). */
   origin?: Run;
   /** Its Final Strike Stagger has been dealt. */
@@ -214,6 +219,8 @@ export interface Strike {
   frame: number;
   slot: number;
   finisher: boolean;
+  /** Made by an attack a recording's SP bar can't show (attacksUnseen when it was pressed). */
+  unseen?: boolean;
 }
 
 export interface Hit {
@@ -230,6 +237,8 @@ export interface Hit {
 }
 
 interface Ctx {
+  /** OnBeforeOutputBuff: the kind of skill whose cast is giving the buff (CheckSkillCastId). */
+  eventCastKind?: string;
   owner: Entity;
   source: Entity;
   target: Entity | null;
@@ -311,6 +320,13 @@ const SUMMON_TAGS: Record<number, RegExp> = {
   [-13979809]: /_normal_skill_sword$/,
   // Arcane's Tactical Doubles (his combo's entity): its explosion ends each once.
   [-1480463572]: /^abilityentity_chr_0032_lizhiyan_combo_skill$/,
+  // Arcane's ultimate array: its end finishes its own entities, not the Tactical Doubles (the owner's video: a
+  // combo's explosion lands after an ultimate cast during its Imprisonment).
+  [464088014]: /^abilityentity_chr_0032_lizhiyan_ultimate_skill/,
+  // Tangtang's Whirlpools (her combo's), which her battle skill counts and wakes (the owner's video's SP bar: her
+  // ultimate leaves none); and the battle skill's own moving Waterspout.
+  [45117620]: /^abilityentity_chr_0027_tangtang_comboskill_water$/,
+  [77793925]: /^abilityentity_chr_0027_tangtang_normal_skill_move$/,
 };
 /**
  * Projectiles that are waves spreading from their source (Liino's beats: each teammate hit is healed, the enemy
@@ -366,6 +382,21 @@ export interface Enemy {
   /** Stagger nodes: shares of the meter where it stumbles (poiseKnotPctList), and the buff it gets (poiseKnotBuffList). */
   nodes?: number[];
   nodeBuff?: string;
+  /** Stagger added when the meter passes a node (none unless set). */
+  nodeStagger?: number;
+  /** What the enemy does after a node, as the timeline names it, and how long after (s). */
+  nodeMechanic?: string;
+  nodeMechanicAt?: number;
+  /** After a node, a stretch it takes no Stagger: from `after` seconds past the node, `seconds` long. */
+  nodeGuard?: { after: number; seconds: number };
+  /**
+   * Interrupting one of its attacks in its weakness window (SetWeaknessAction): the Stagger that adds (Alleikhreos's
+   * buff_eny_0125_fdcentur_interrupt, poise_value 20). When it can be done is its AI's, so only a recording says.
+   */
+  interrupt?: { stagger: number };
+  /** Each phase's HP, and how low a phase before the last can take it (a share of it). */
+  phaseHp?: number;
+  phaseFloor?: number;
 }
 
 export class World {
@@ -374,6 +405,11 @@ export class World {
   enemy: Entity;
   entities: Entity[] = [];
   runs: Run[] = [];
+  /**
+   * A running skill's event listeners (EventListenerAction) while their timeline entry lasts: Tangtang's OLDEN STARE
+   * waits for the dive attack's buff (OnOutputBuff) and jumps to the early rogue wave.
+   */
+  private runListeners: { run: Run; until: number; map: Data[] }[] = [];
   /** The skill launching a projectile, while its hit is cast (Run.origin). */
   private launching?: Run;
   hits: Hit[] = [];
@@ -381,6 +417,8 @@ export class World {
   strikes: Strike[] = [];
   /** Each time the enemy was Staggered: from, to (frames). */
   staggers: Stagger[] = [];
+  /** The enemy's own mechanics as they happen (the Foundite Weapon's blade), for the timeline. */
+  mechanics: { frame: number; label: string }[] = [];
   private strikeRun: Run | null = null;
   sp = 200;
   /** Action types met but not simulated, with how often. */
@@ -412,6 +450,28 @@ export class World {
    * running goes on (assumed: the game has no such number).
    */
   uptime = 1;
+  /**
+   * Stretches the enemy is invulnerable (a boss's untouchable move: Alleikhreos's phantoms), in frames of the clock that
+   * runs through cut-ins: the team's hits on it do nothing then.
+   */
+  away: [number, number][] = [];
+  /** While a buff is being given: the kind of skill whose cast gives it (castKindOf). */
+  private creating?: string;
+  /** JumpToActions waiting for their condition while their timeline entry lasts. */
+  private jumpWatch: { run: Run; a: Data; ctx: Ctx; until: number }[] = [];
+  /** How many of an operator's summons its next skill reaches (World.reachOnly), by team slot. */
+  private reach = new Map<number, { n: number; until: number }>();
+  /** Presses that interrupt the enemy, by team slot, waiting for their first hit (World.interrupt). */
+  private interrupts = new Map<number, { kind: string; until: number }>();
+  /** A stretch after a node the enemy takes no Stagger (Enemy.nodeGuard), in frames. */
+  private poiseGuard: [number, number] | null = null;
+  /**
+   * Stretches the enemy takes no Stagger, in frames of the clock that runs through cut-ins (a recording's, read from
+   * its boss's meter); when there are any, they stand in for Enemy.nodeGuard.
+   */
+  noStagger: [number, number][] = [];
+  /** The last summons' hit that Staggered: skill and frame. */
+  private summonPoise = '';
   /** Swapping who's controlled (off: one operator the whole fight). */
   swaps = true;
   /** Animation cancels: a press in a skill's AllowNextSkillAction window, before it would otherwise end. */
@@ -557,10 +617,15 @@ export class World {
     // its Tactical Doubles must not end Si's Ink Lung or Camille's bats): the source's (a buff's giver: Xaihi's heal on a
     // teammate looks for Xaihi's crystal).
     else if (tagValidators.length) {
-      list = this.entities.filter((e) => e.alive && !e.marker && e.owner === (ctx.source.owner ?? ctx.source));
+      const op = ctx.source.owner ?? ctx.source;
+      list = this.entities.filter((e) => e.alive && !e.marker && e.owner === op);
       // A tag known to be one kind of summon's (SUMMON_TAGS) finds only those.
       const kinds = tags.map((x) => SUMMON_TAGS[x.tagId]).filter(Boolean);
       if (kinds.length) list = list.filter((e) => kinds.some((k) => k.test(e.id)));
+      // Only so many in reach (a recording said: World.reachOnly), the newest; not a search for this cast's own
+      // spawn (SkillCastIdValidator).
+      const cap = op.slot >= 0 ? this.reach.get(op.slot) : undefined;
+      if (cap && this.frame <= cap.until && !(a.selectorData?.validatorData ?? []).some((v: Data) => /SkillCastIdValidator/.test(v.$type ?? ''))) list = cap.n ? list.slice(-cap.n) : [];
     }
     else if (/CharacterTeamFinder|SquadFinder/.test(t)) list = this.team;
     else if (/OwnerSpawnedEntityFinder/.test(t)) list = this.entities.filter((e) => e.owner === ctx.owner && e.slot < 0 && !e.marker);
@@ -755,9 +820,10 @@ export class World {
         if (c.mustBeforeExclusiveTime && this.frame - run.start >= (run.skill.exclusiveFrame ?? 0)) return false;
         return (c.skillTypeList ?? []).includes(KINDS[this.kindOfSkill(run.skillId)] ?? '');
       }
-      // Casts aren't told apart by id here.
+      // The same cast, told apart by its kind of skill: Yvonne's bomb's listener takes the Solidification her bomb
+      // applies, not her combo's (Barrage of Technology: the battle skill's).
       case 'Conditions.CheckSkillCastId':
-        return true;
+        return !ctx.self?.castKind || !ctx.eventCastKind || ctx.self.castKind === ctx.eventCastKind;
       // How many (also kept in storeKey: Zhuang Fangyi counts her Sunderblades this way).
       case 'Conditions.CheckEntityNum': {
         const n = this.targets(c.checkTarget, ctx).filter((e) => !c.excludeDeadEntity || e.alive).length;
@@ -879,8 +945,9 @@ export class World {
       // The kind of skill an event comes from (battle skill, combo, ultimate, basic attack).
       case 'Conditions.CheckOriginSkillType': {
         const KINDS: Record<string, string> = { normal: 'NormalSkill', combo: 'ComboSkill', ultimate: 'UltimateSkill', basic: 'NormalAttack' };
-        const kind = KINDS[ctx.origin ? this.kindOfSkill(ctx.origin) : (ctx.damage?.skillKind ?? this.kindOfSkill(ctx.skillId))] ?? '';
-        return (c.skillTypeList ?? []).includes(kind);
+        const k = ctx.origin ? this.kindOfSkill(ctx.origin) : (ctx.damage?.skillKind ?? this.kindOfSkill(ctx.skillId));
+        // "Attack": any basic attack kind (a plunging/dive attack, a dash attack, a Finisher too).
+        return (c.skillTypeList ?? []).includes(KINDS[k] ?? '') || (k === 'basic' && (c.skillTypeList ?? []).includes('Attack'));
       }
       case 'Conditions.CheckDamageType':
         return !ctx.damage || ctx.damage.type === c.damageType;
@@ -1058,8 +1125,12 @@ export class World {
             if (spec.assignBlackboard)
               for (const it of spec.assignItems ?? []) assigned.set(it.targetKey, it.useDirectValue ? Number(it.numericValue) : (ctx.bb.get(it.inputValueKey) ?? 0));
             for (let i = 0; i < count; i++) {
+              const was = this.creating;
+              this.creating = this.castKindOf(ctx);
               const b = this.addBuff(e, id, ctx.source, assigned, a.inheritSourceSkillCastInfo || a.passTargetGroupsToBuff ? ctx.groups : undefined);
+              this.creating = was;
               if (b && a.inheritSourceSkillCastInfo) b.castBB = ctx.castBB ?? ctx.bb;
+              if (b) b.castKind ??= this.castKindOf(ctx);
               // autoFinishByAction: made by a timeline action that spans frames, it lasts as long as that action
               // (Laevatain's pause_ult for her skill during Twilight); an instant action's buff keeps its own life.
               if (b && a.autoFinishByAction && ctx.run && (ctx.span ?? 0) > 0) {
@@ -1252,14 +1323,16 @@ export class World {
         return;
       }
       // The timeline jumps to a frame (skipping what's between) if its conditions hold.
+      // Its condition is watched while its timeline entry lasts (Tangtang's Whirlpool waits for her battle skill's
+      // wake buff over 50 s, then jumps to its end).
       case 'JumpToAction': {
         const run = ctx.run;
-        if (!run || !this.check(a.conditionAction?.actionData, ctx)) return;
-        const dest = Number(a.destFrame);
-        run.start = this.frame - dest;
-        (run.skill.actionGroupData?.timelineActions ?? []).forEach((ta: Data, i: number) => {
-          if ((ta._startFrame ?? 0) < dest) run.done.add(i);
-        });
+        if (!run) return;
+        if (!this.check(a.conditionAction?.actionData, ctx)) {
+          if ((ctx.span ?? 0) > 1) this.jumpWatch.push({ run, a, ctx, until: this.frame + (ctx.span ?? 0) });
+          return;
+        }
+        this.jumpTo(run, Number(a.destFrame));
         return;
       }
       case 'MarkCanInterrupt':
@@ -1449,6 +1522,8 @@ export class World {
       case 'MarkCanDash':
       case 'ReceiveMoveInputAction':
       case 'EventListenerAction':
+        if (ctx.run && a.abilityActionMap?.length) this.runListeners.push({ run: ctx.run, until: this.frame + (ctx.span ?? 0), map: a.abilityActionMap });
+        return;
       case 'ShelterAction':
       case 'CreateAdditionalBattleShape':
       case 'EnableMoveColliderAction':
@@ -1640,7 +1715,10 @@ export class World {
     const duration = this.val(def.duration, bb);
     const end = def.lifeType === 'Infinity' || duration < 0 ? Infinity : this.frame + Math.round(duration * FPS);
     const by = source.owner ?? source;
-    this.abilityEvent(by, 'OnBeforeOutputBuff', e, undefined, undefined, { buff: existing });
+    // The buff about to be given (a stand-in with its id and tags when it's new: Yvonne's bomb listens for the
+    // Solidification it gives).
+    const giving = existing ?? this.standIn(id, (def.applyTags ?? []).map((x: Data) => x.tagId), e, source, 1);
+    this.abilityEvent(by, 'OnBeforeOutputBuff', e, undefined, undefined, { buff: giving, eventCastKind: this.creating });
     // A one-layer "Stack" buff is replaced by the new one, which starts over (its OnBuffStart runs again).
     if (existing && st.stackingType === 'Stack' && max <= 1) this.endBuff(existing);
     else if (existing && st.stackingType !== 'Unlimited') {
@@ -1667,7 +1745,7 @@ export class World {
     const interval = this.val(def.triggerInterval, bb);
     // Ticks every interval: the first after one interval (waitFirstTriggerInterval) or right away.
     const first = interval > 0 ? this.frame + (def.waitFirstTriggerInterval ? Math.round(interval * FPS) : 0) : Infinity;
-    const buff: Buff = { id, def, owner: e, source, stacks: 1, start: this.frame, end, bb, nextTrigger: first, triggers: 0, done: new Set(), groups: new Map(groups ?? []) };
+    const buff: Buff = { id, def, owner: e, source, stacks: 1, start: this.frame, end, bb, nextTrigger: first, triggers: 0, done: new Set(), groups: new Map(groups ?? []), ...(this.creating ? { castKind: this.creating } : {}) };
     e.buffs.push(buff);
     // While a buff starts, counts of buffs leave it out: its own OnBuffStart sees the ones before it (Laevatain's
     // combo energy: 25 for the first of its buffs, 5 after).
@@ -1761,6 +1839,15 @@ export class World {
         if (ev.abilityEvent === event)
           for (const a of ev.actions ?? [])
             this.execBlock(a, { owner: e, source: e, target: target ?? (e.side === 'team' ? this.enemy : e), bb: l.bb, groups: l.groups, skillId: l.id, damage, event: name, ...extra });
+    // A running skill's listeners hear their side's events, in the skill's own context (so a JumpToAction moves it).
+    if (this.runListeners.length) {
+      this.runListeners = this.runListeners.filter((l) => !l.run.ended && this.frame <= l.until);
+      for (const l of [...this.runListeners])
+        if ((l.run.owner.owner ?? l.run.owner).side === (e.owner ?? e).side)
+          for (const m of l.map)
+            if (m.abilityEvent === event)
+              for (const a of m.actions ?? []) this.execBlock(a, { ...this.ctxOf(l.run), target: target ?? this.enemy, damage, event: name, ...extra });
+    }
     this.eventDepth--;
   }
 
@@ -1834,17 +1921,42 @@ export class World {
     // "ActionSource": who the action comes from (a skill's caster, a buff's source), as its operator.
     const by = a.attacker === 'ActionOwner' ? ctx.owner : ctx.source;
     const attacker = by.owner ?? by;
-    for (const target of this.targets(a.targetSettings, ctx))
+    for (const target of this.targets(a.targetSettings, ctx)) {
+      // An untouchable enemy (Invulnerable) takes no HP damage and no Stagger, but a hit still lands: its statuses
+      // apply and its critical hit counts (the owner's video: Yvonne's bomb into Alleikhreos's phantoms Solidified
+      // him and armed her talent).
+      const immune = attacker.side === 'team' && target.side === 'enemy' && this.untouchable();
+      const pending = attacker.side === 'team' && target.side === 'enemy' ? this.interrupts.get(attacker.slot) : undefined;
+      if (pending && this.frame <= pending.until && this.kindOfSkill(ctx.skillId) === pending.kind && this.foe.interrupt) {
+        this.interrupts.delete(attacker.slot);
+        this.mechanics.push({ frame: this.frame, label: 'Interrupted' });
+        this.poise(target, this.foe.interrupt.stagger);
+      }
+      // Before it lands, an operator's damage action is heard as OnBeforeDamageAction (Tangtang's ultimate catches a
+      // dive attack this way: its Attack-type hit with the dive mask, 1024).
+      if (attacker.side === 'team' && target.side === 'enemy') {
+        const units: Data[] = a.damageUnits ?? [];
+        const pre: Ctx['damage'] = { type: units[0]?.damageType ?? 'Physical', mask: units.reduce((m: number, u: Data) => m | (u.damageDecorateMask ?? 0), 0), attacker, defender: target, skillKind: this.kindOfSkill(ctx.skillId) };
+        this.abilityEvent(attacker, 'OnBeforeDamageAction', target, pre, undefined, { origin: ctx.skillId });
+      }
       for (const u of a.damageUnits ?? []) {
         // Some hits count only from the controlled operator (a Final Strike's Stagger).
         if (u.onlyEnableForMainChar && !(attacker.side === 'team' && attacker.slot === this.controlled)) continue;
         if (u.damageAttributeType === 'Poise') {
+          if (immune) continue;
           // A Final Strike's Stagger counts once per strike, however many of its projectiles carry it (Gilberta's
           // fourth attack fires three, each with the full 16: the wiki's 16 per Final Strike).
           const strike = u.onlyEnableForMainChar ? (ctx.run?.origin ?? ctx.run) : undefined;
           if (strike) {
             if (strike.poised) continue;
             strike.poised = true;
+          }
+          // Summons hitting together Stagger once (Arcane's four Tactical Doubles' explosion: the wiki's 5, and the
+          // owner's count). Assumed for every summon: the data gives each double its own.
+          if (ctx.owner !== attacker && ctx.owner.slot < 0) {
+            const key = `${ctx.skillId}@${this.frame}`;
+            if (this.summonPoise === key) continue;
+            this.summonPoise = key;
           }
           this.poise(target, this.val(u.poiseCalculation?.value ?? u.atkScale, ctx.bb), attacker);
           continue;
@@ -1866,6 +1978,7 @@ export class World {
         this.deal(attacker, target, u.damageType, scale, u.damageDecorateMask ?? 0, u.damageTags?.length ? { ...ctx, damageTags: u.damageTags.map((x: Data) => x.tagId) } : ctx, 'skill', u.damageProcessors);
         for (const c of u.costDataList ?? []) if (c.costType === 'UltimateSp' && u.gainCost) this.obtain('UltimateSp', c.costValue, attacker);
       }
+    }
   }
 
   /** Whether an enemy is Staggered now. */
@@ -1876,15 +1989,23 @@ export class World {
   /** Stagger on an enemy: a full meter Staggers it for its time, with a Finisher ready; none adds up meanwhile (wiki: Stagger). */
   private poise(target: Entity, v: number, attacker?: Entity): void {
     if (target.side !== 'enemy' || !this.foe.poise || this.staggered(target)) return;
+    if (this.noStagger.length) {
+      const c = this.frame + this.frozenFrames;
+      if (this.noStagger.some(([a, b]) => c >= a && c < b)) return;
+    } else if (this.poiseGuard && this.frame >= this.poiseGuard[0] && this.frame < this.poiseGuard[1]) return;
     // Stagger Efficiency (PoiseEfficiency, 1 unless gear or buffs change it).
     if (attacker?.stats) v *= ((attacker.attr.PoiseEfficiency ?? 1) + this.modSum(attacker, 'PoiseEfficiency', false)) * (1 + this.multiplier(attacker, 'PoiseEfficiency'));
     const was = target.bb.get('stagger') ?? 0;
-    const n = was + v;
+    let n = was + v;
     // Crossing a node makes it stumble (its node buff, when the data has it).
     for (const k of this.foe.nodes ?? [])
       if (was < k * this.foe.poise && n >= k * this.foe.poise && n < this.foe.poise) {
         if (this.foe.nodeBuff && this.buffOf.has(this.foe.nodeBuff)) this.addBuff(target, this.foe.nodeBuff, attacker ?? target, new Map());
         this.comboEvent({ kind: 'stagger', target });
+        if (this.foe.nodeStagger) n += this.foe.nodeStagger;
+        if (this.foe.nodeMechanic) this.mechanics.push({ frame: this.frame + Math.round((this.foe.nodeMechanicAt ?? 0) * FPS), label: this.foe.nodeMechanic });
+        const g = this.foe.nodeGuard;
+        if (g) this.poiseGuard = [this.frame + Math.round(g.after * FPS), this.frame + Math.round((g.after + g.seconds) * FPS)];
       }
     if (n < this.foe.poise) {
       target.bb.set('stagger', n);
@@ -1901,6 +2022,7 @@ export class World {
   /** Fixed damage: the amount itself, no multipliers. */
   private dealFixed(attacker: Entity, defender: Entity, amount: number, mask: number, ctx: Ctx): void {
     if (!attacker.stats || !(amount > 0)) return;
+    if (defender.side === 'enemy' && this.untouchable()) amount = 0;
     const dmg: Ctx['damage'] = { type: 'Fixed', mask, attacker, defender, skillKind: this.kindOfSkill(ctx.skillId), amount };
     this.hits.push({ frame: this.frame, operator: attacker.id, skill: ctx.skillId, type: 'Fixed', amount, kind: 'skill' });
     this.dealt += amount;
@@ -1990,7 +2112,7 @@ export class World {
     // A Link the cast consumed: its skill's damage (its entities' too) until the operator's next such cast.
     const lk = this.linked.get(attacker);
     const link = lk && lk.kind === dmg.skillKind ? lk.mul : 1;
-    const amount = atk * scale * bonus * crit * other * staggered * susceptibility * ampMul * takenMul * defMul * resMul * link;
+    const amount = defender.side === 'enemy' && this.untouchable() ? 0 : atk * scale * bonus * crit * other * staggered * susceptibility * ampMul * takenMul * defMul * resMul * link;
     dmg.amount = amount;
     this.hits.push({ frame: this.frame, operator: attacker.id, skill: ctx.skillId, type, amount, kind, skillKind: dmg.skillKind, parts: { atk, scale, bonus, crit, other, staggered, susceptibility, amp: ampMul, taken: takenMul, def: defMul, res: resMul, link } });
     this.dealt += amount;
@@ -2000,17 +2122,21 @@ export class World {
     if (attacker.side === 'team' && defender.side === 'enemy') {
       const finisher = /_power_?attack/.test(ctx.skillId);
       if (attacker.slot === this.controlled && ((mask & FINAL_STRIKE) !== 0 || finisher)) {
-        if (!ctx.run || ctx.run !== this.strikeRun) this.strikes.push({ frame: this.frame, slot: attacker.slot, finisher });
-        this.strikeRun = ctx.run ?? null;
+        // One strike per attack, however many of its projectiles hit (a Finisher's several).
+        const strike = ctx.run?.origin ?? ctx.run;
+        if (!strike || strike !== this.strikeRun) this.strikes.push({ frame: this.frame, slot: attacker.slot, finisher, ...(finisher || strike?.unseen || this.main[attacker.slot]?.unseen ? { unseen: true } : {}) });
+        this.strikeRun = strike ?? null;
         this.comboEvent({ kind: 'finalStrike', finisher, target: defender });
       }
       if (dmg.skillKind === 'combo') this.comboEvent({ kind: 'comboDamage', by: attacker });
       if (kind === 'burst') this.comboEvent({ kind: 'burst', of: type, target: defender });
     }
     // Damage is the expected value; what listens for critical hits hears one each time the attacker's Critical
-    // Rates add up past a whole number (evenly, like Probablity).
-    const sum = this.critSum.get(attacker) ?? 0;
-    this.critSum.set(attacker, sum + critRate);
+    // Rates add up past a whole number (evenly, like Probablity), per kind of skill: a weapon that answers battle and
+    // combo skills' critical hits (Artzy Tyrannical) hears its share of them, not only what basic attacks leave over.
+    const critKey = `${attacker.id}|${dmg.skillKind}`;
+    const sum = this.critSum.get(critKey) ?? 0;
+    this.critSum.set(critKey, sum + critRate);
     if (Math.floor(sum + critRate) > Math.floor(sum)) {
       this.abilityEvent(attacker, 'OnOutputCriticalDamage', defender, dmg);
       this.abilityEvent(defender, 'OnTakeCriticalDamage', attacker, dmg);
@@ -2116,7 +2242,11 @@ export class World {
     e.bb.set('reaction', (ELEMENTS as readonly string[]).indexOf(element));
     e.bb.set('reactionLevel', level);
     this.forcing = true;
-    this.addBuff(e, buffId, attacker, new Map([['count', level], ['consumed_layer', level], ['consumed_type', 0]]));
+    const was = this.creating;
+    this.creating = this.castKindOf(ctx);
+    const b = this.addBuff(e, buffId, attacker, new Map([['count', level], ['consumed_layer', level], ['consumed_type', 0]]));
+    if (b) b.castKind ??= this.creating;
+    this.creating = was;
     this.forcing = false;
   }
 
@@ -2214,6 +2344,15 @@ export class World {
     }
     this.frame++;
     this.guards();
+    // Jumps whose condition is watched (JumpToAction over a span).
+    if (this.jumpWatch.length) {
+      this.jumpWatch = this.jumpWatch.filter((j) => !j.run.ended && this.frame <= j.until);
+      for (const j of [...this.jumpWatch])
+        if (this.check(j.a.conditionAction?.actionData, j.ctx)) {
+          this.jumpWatch = this.jumpWatch.filter((x) => x !== j);
+          this.jumpTo(j.run, Number(j.a.destFrame));
+        }
+    }
     this.sp = Math.min(300, this.sp + 8 / FPS);
     // Summons whose time is up.
     for (const e of this.entities) if (e.alive && e.until !== undefined && e.until <= this.frame) this.finishEntity(e);
@@ -2348,6 +2487,12 @@ export class World {
   // -------------------------------------------------------------------------
 
   /** The controlled operator's basic attack chain: the step done, and the window for the next. */
+  /**
+   * How long (frames) a basic attack chain stays where it was after its next attack's window closes: a dodge
+   * interrupts it without breaking it, as a skill does (the owner, and the game's tutorial). There is a limit, but
+   * neither the data nor the owner knows it: replays assume 2 s; fights use 0, as they attack as soon as they can.
+   */
+  chainGrace = 0;
   /** Each operator's basic attack chain; `held` while a skill kept it (dontInterruptCombo): the next attack goes on from it. */
   private chains: ({ id: string; of: string; nextFrom: number; nextTo: number; held?: boolean; run?: Run } | null)[] = [null, null, null, null];
   /**
@@ -2391,8 +2536,8 @@ export class World {
   private linked = new Map<Entity, { kind: string; mul: number }>();
   /** All the damage dealt so far (a dummy with HP is defeated when it reaches it). */
   dealt = 0;
-  /** Critical Rate added up per attacker, for critical-hit events. */
-  private critSum = new Map<Entity, number>();
+  /** Critical Rate added up per attacker and kind of skill, for critical-hit events. */
+  private critSum = new Map<string, number>();
   /** Chances added up per effect (Conditions.Probablity), so they come out evenly. */
   private chance = new Map<string, number>();
   /** How the last SP from an action came (Conditions.CheckObtainAtbType). */
@@ -2435,15 +2580,45 @@ export class World {
     return null;
   }
 
+  /**
+   * A dive attack: the controlled operator's plunging attack as it lands (the jump before it isn't played). Its hit
+   * carries the dive mask (1024), which Tangtang's ultimate listens for: a dive while OLDEN STARE still evolves calls
+   * the stronger rogue wave at once; a dive after it has ended is only a dive.
+   */
+  private dive(slot: number): void {
+    const op = this.team[slot];
+    const id = this.skillIdOf(op, 'dive');
+    const prev = this.main[slot];
+    if (prev) this.endRun(prev, true);
+    for (const r of this.runs) if (r.follow && !r.ended && r.owner === op) this.endRun(r, true);
+    this.abilityEvent(op, 'OnBeforeCastSkill', this.enemy, undefined, undefined, { origin: id, casting: true });
+    this.main[slot] = this.cast(id, op, op, this.enemy);
+    if (this.main[slot]) this.main[slot]!.main = true;
+    this.chains[slot] = null;
+  }
+
+  /** Frames a press would hold its operator before a basic attack may follow (its skill's exclusiveFrame). */
+  holdOf(slot: number, input: Input): number {
+    return this.skillOf.get(this.skillIdOf(this.team[slot], input))?.exclusiveFrame ?? 0;
+  }
+
+  /** Frames an operator's ultimate stops time for everyone else (its cut-in: UltimateTimeAction, time scale 0). */
+  cutInOf(slot: number): number {
+    for (const ta of this.skillOf.get(this.skillIdOf(this.team[slot], 'ultimate'))?.actionGroupData?.timelineActions ?? [])
+      if ((ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'UltimateTimeAction' && Number(d.timeScale ?? 1) === 0)) return (ta._endFrame ?? 0) - (ta._startFrame ?? 0);
+    return 0;
+  }
+
   private skillIdOf(op: Entity, input: Input): string {
+    if (input === 'dive') return `${op.id}_plunging_attack_end`;
     if (input === 'attack') {
       const mapped = this.attackMapping(op);
       if (mapped) return mapped.id;
       const chain = this.chainOf(op);
       const steps = this.chainSteps(op);
       const c = this.chains[op.slot];
-      const i = c && c.of === chain && (c.held || this.frame <= c.nextTo) ? steps.indexOf(c.id) : -1;
-      return i >= 0 && i < steps.length - 1 ? steps[i + 1] : (steps[0] ?? chain.replace('#', '1'));
+      const i = c && c.of === chain && (c.held || this.frame <= c.nextTo + this.chainGrace) ? steps.indexOf(c.id) : -1;
+      return i >= 0 ? this.nextAttack(steps, i) : (steps[0] ?? chain.replace('#', '1'));
     }
     const slot = input === 'battle' ? 'NormalSkill' : input === 'combo' ? 'ComboSkill' : 'UltimateSkill';
     const own = this.ownSkill(op, slot);
@@ -2502,6 +2677,74 @@ export class World {
     return `${op.id}_attack#`;
   }
 
+  /**
+   * Whether an operator's basic attacks now are ones a recording's SP bar can't show: its ultimate's own attacks
+   * (Yvonne's give no SP), or one its ultimate has waiting (Yvonne's closing Final Strike, ult_attack_end). Not
+   * another attack a buff has waiting: her talent's Final Strike after the bomb is an ordinary one.
+   */
+  attacksUnseen(slot: number): boolean {
+    return /_ult/.test(this.chainOf(this.team[slot])) || /_ult/.test(this.attackMapping(this.team[slot])?.id ?? '');
+  }
+
+  /** A new phase: the enemy's Stagger meter starts empty, not Staggered (the owner's video: Alleikhreos's second). */
+  newPhase(): void {
+    const e = this.enemy;
+    e.bb.set('stagger', 0);
+    e.bb.set('finisherReady', 0);
+    if (this.staggered(e)) {
+      e.bb.set('staggeredUntil', this.frame);
+      const last = this.staggers.at(-1);
+      if (last) last.end = Math.min(last.end, this.frame);
+    }
+    this.poiseGuard = null;
+  }
+
+  /**
+   * The operator's press just made interrupts the enemy (Enemy.interrupt): its first hit of that kind on it, within
+   * 3 s, does (by the operator, not the run: Yvonne's bomb is thrown by a buff).
+   */
+  interrupt(slot: number): void {
+    const run = this.main[slot];
+    if (run) this.interrupts.set(slot, { kind: this.kindOfSkill(run.skillId), until: this.frame + 3 * FPS });
+  }
+
+  /** The kind of skill a cast is (its press's: a projectile's launcher, a buff's own cast). */
+  private castKindOf(ctx: Ctx): string {
+    return ctx.self?.castKind ?? this.kindOfSkill(ctx.run?.origin?.skillId ?? ctx.run?.skillId ?? ctx.skillId);
+  }
+
+  /** Whether an operator's next basic attack is one a buff has waiting that a recording shows (Yvonne's talent's Final Strike). */
+  strikeWaiting(slot: number): boolean {
+    return !!this.attackMapping(this.team[slot]) && !this.attacksUnseen(slot);
+  }
+
+  /** A run goes on from a frame of its timeline (JumpToAction). */
+  private jumpTo(run: Run, dest: number): void {
+    run.start = this.frame - dest;
+    (run.skill.actionGroupData?.timelineActions ?? []).forEach((ta: Data, i: number) => {
+      if ((ta._startFrame ?? 0) < dest) run.done.add(i);
+    });
+  }
+
+  /** The enemy's Stagger meter now as a share of it (-1 while Staggered; 0 with no meter). */
+  meterNow(): number {
+    if (!this.foe.poise) return 0;
+    return this.staggered(this.enemy) ? -1 : (this.enemy.bb.get('stagger') ?? 0) / this.foe.poise;
+  }
+
+  /**
+   * Only n of the operator's summons are in reach of its next skill (a recording's SP back says: Tangtang's
+   * Whirlpools the boss moved away from), for the next 2 s.
+   */
+  reachOnly(slot: number, n: number): void {
+    this.reach.set(slot, { n, until: this.frame + 2 * FPS });
+  }
+
+  /** Whether a Finisher waits on the Staggered enemy. */
+  finisherWaiting(): boolean {
+    return !!this.enemy.bb.get('finisherReady') && this.staggered(this.enemy);
+  }
+
   chainLength(op: Entity): number {
     return this.chainSteps(op).length;
   }
@@ -2523,6 +2766,16 @@ export class World {
     }
     this.chainList.set(chain, steps);
     return steps;
+  }
+
+  /**
+   * The attack after a chain's step i: what its ComboCacheAction maps the Attack input to (Yvonne's ultimate's last
+   * sequence maps to itself and repeats), else the next step, else the first again.
+   */
+  private nextAttack(steps: string[], i: number): string {
+    const mapped = this.attackAfter(steps[i]);
+    if (mapped && this.skillOf.has(mapped)) return mapped;
+    return steps[i + 1] ?? steps[0];
   }
 
   /** The attack an attack's ComboCacheAction maps the Attack input to. */
@@ -2550,7 +2803,7 @@ export class World {
     const id = this.skillIdOf(op, input);
     if (!this.skillOf.has(id)) return false;
     if (this.down()) return false;
-    if (input === 'attack') {
+    if (input === 'attack' || input === 'dive') {
       if (slot !== this.controlled || this.freeze) return false;
       return this.canAttack(slot);
     }
@@ -2577,8 +2830,9 @@ export class World {
     const op = this.team[slot];
     this.log.push({ frame: this.frame, op: slot, input });
     if (input === 'swap') {
-      // The operator leaving stays on the field under the AI and finishes what it was doing. The one coming in
-      // stops whatever the AI had it doing: its basic attacks start a new chain (owner's observation).
+      // The operator leaving stays on the field under the AI and finishes what it was doing (no swapping out before
+      // its skill's MarkCanInterrupt). The one coming in stops whatever the AI had it doing: its basic attacks start a
+      // new chain. Both as the owner sees in game.
       this.controlled = slot;
       this.lastSwap = this.frame;
       this.chains[slot] = null;
@@ -2588,6 +2842,10 @@ export class World {
     }
     if (input === 'attack') {
       this.attack(slot);
+      return true;
+    }
+    if (input === 'dive') {
+      this.dive(slot);
       return true;
     }
     const id = this.skillIdOf(op, input);
@@ -2657,10 +2915,14 @@ export class World {
   /** The next step of an operator's basic attack chain; the window for the one after (AllowNextSkillAction). */
   private attack(slot: number): void {
     const op = this.team[slot];
-    // The controlled operator's first attack on a Staggered enemy is a Finisher (its power attack).
+    // The controlled operator's first attack on a Staggered enemy is a Finisher (its power attack), except in an
+    // ultimate form or with an attack a buff has waiting, which take the basic attack's place (the owner's video:
+    // Yvonne's ultimate on a Staggered Alleikhreos, twice, and no Finisher).
     const power = this.ownSkill(op, 'PowerAttack');
-    const finisher = slot === this.controlled && !!this.enemy.bb.get('finisherReady') && this.staggered(this.enemy) && this.skillOf.has(power);
-    const mapped = finisher ? null : this.attackMapping(op);
+    const unseen = this.attacksUnseen(slot);
+    const waiting = this.attackMapping(op);
+    const finisher = slot === this.controlled && !waiting && !!this.enemy.bb.get('finisherReady') && this.staggered(this.enemy) && this.skillOf.has(power) && !/_ult/.test(this.chainOf(op));
+    const mapped = finisher ? null : waiting;
     if (mapped) mapped.buff.mapUsed = true;
     const id = finisher ? power : (mapped?.id ?? this.skillIdOf(op, 'attack'));
     const skill = this.skillOf.get(id);
@@ -2670,12 +2932,20 @@ export class World {
     for (const r of this.runs) if (r.follow && !r.ended && r.owner === op) this.endRun(r, true);
     this.abilityEvent(op, 'OnBeforeCastSkill', this.enemy, undefined, undefined, { origin: id, casting: true });
     this.main[slot] = this.cast(id, op, op, this.enemy);
-    if (this.main[slot]) this.main[slot]!.main = true;
+    if (this.main[slot]) Object.assign(this.main[slot]!, { main: true, unseen });
     // The next attack's window: AllowNextSkillAction, else a ComboCacheAction taking the Attack input (Typhoeus's
     // fourth Aerial Basic Attack).
     const tas: Data[] = skill.actionGroupData?.timelineActions ?? [];
+    // The window for the attack that follows (AllowNextSkillAction's allowedSkillIdList: another window may be for
+    // a talent's Final Strike or the ultimate's closing attack and open at once), else any attack's, else any.
+    const steps0 = this.chainSteps(op);
+    const idx = steps0.indexOf(finisher ? steps0[steps0.length - 1] : id);
+    const following = idx >= 0 ? this.nextAttack(steps0, idx) : undefined;
+    const allows = (ta: Data): string[][] => (ta._sequenceActionData?.actionData ?? []).filter((d: Data) => /AllowNextSkillAction/.test(d.$type ?? '') && d.isEnable !== false).map((d: Data) => d.allowedSkillIdList ?? []);
     const next =
-      tas.find((ta) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => /AllowNextSkillAction/.test(d.$type ?? ''))) ??
+      (following && tas.find((ta) => allows(ta).some((l) => l.includes(following)))) ??
+      tas.find((ta) => allows(ta).some((l) => l.some((x) => steps0.includes(x)))) ??
+      tas.find((ta) => allows(ta).length > 0) ??
       tas.find((ta) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'ComboCacheAction' && d.isEnable !== false && (d.mappingDataList ?? []).some((m: Data) => m.cmdType === 'Attack' && m.skillId)));
     const speed = 1 + this.hasteOf(op);
     const from = Math.round((next ? next._startFrame : (skill.exclusiveFrame ?? skill.durationFrame ?? 0)) / speed);
@@ -2704,6 +2974,12 @@ export class World {
    */
   private stance(run: Run): boolean {
     return this.has(run.skill, 'SkillAIMoveAction') && this.allowedNow(run) !== null;
+  }
+
+  /** Whether the enemy is in one of its `away` stretches. */
+  private untouchable(): boolean {
+    const c = this.frame + this.frozenFrames;
+    return this.away.some(([a, b]) => c >= a && c < b);
   }
 
   /** Whether the enemy can't be hit now (uptime): the end of each UPTIME_PERIOD. */
@@ -2754,7 +3030,9 @@ export class World {
    * chain windows decide).
    */
   private busy(run: Run | null): boolean {
-    if (!run || run.ended || this.kindOfSkill(run.skillId) === 'basic') return false;
+    // Basic attacks never hold an operator up, but a Finisher does until its window (Yvonne's lands its 8.1× hit at
+    // frame 28 and lets the next skill in at 29: an ultimate pressed right after it no longer cuts it off).
+    if (!run || run.ended || (this.kindOfSkill(run.skillId) === 'basic' && !/_power_?attack$/.test(run.skillId))) return false;
     const marked = (run.skill.actionGroupData?.timelineActions ?? []).some((ta: Data) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'MarkCanInterrupt'));
     return marked ? !run.canInterrupt : this.frame - run.start < (run.skill.exclusiveFrame ?? 0);
   }

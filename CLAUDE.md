@@ -340,7 +340,9 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   01 matters: e.g. Si's ultimate cuts its combo cooldown), each from their
   loadout and copies ("My loadouts") or with weapon and gear the sim picks
   ("Optimal gear", `domain/sim/gearSearch.ts`: Maxed Essence, top Artifice,
-  chosen by fights); styles Advanced (swaps, animation cancels) / Standard (one
+  chosen by fights; weapons tried again on the second pass with the gear found; gear.json names a piece's slot
+  "Body"/"Hand"/"EDC", `partOf`; a third start gives each operator their signature weapon, the Arsenal Issue that ran
+  with their banner (`signatures`: special_<n> with weponbox_<n>), and the start whose rotation plays best is kept); styles Advanced (swaps, animation cancels) / Standard (the default, with search Moderate; one
   operator controlled, no cancels: `Rules`, World `swaps`/`cancels`; 0.5 s between presses) / Basic
   (one operator; combos as they come, ultimates when charged, battle skills in a fixed cycle:
   `searchCycle`, `Policy.cycle`); old saved names map by `styleOf`; goal a fight length, or a dummy HP to defeat fastest (within its own limit, 300 s unless set;
@@ -389,12 +391,91 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only. History
   rows and an open parsed run can be starred (kept on top and never trimmed), named, noted and deleted
   (`runTools`/`runEdit`; `updateSim`, `deleteSim` in store.ts). Controlled (setting `controlled`, request `main`, Team
-  `main`): the operator controlled the whole fight, no swaps; "Best (sim picks)" lets the search try each (Advanced
+  `main`): the operator controlled the whole fight, no swaps; "Auto (Best)" lets the search try each (Advanced
   may still swap), and results show who (metric Controlled). Portraits link to the operator's page. The transcript editor's
   Controlled gives every Final Strike and Finisher to one operator. Each parsed run keeps its reading (`SavedSim.video`) so
   its transcript can be edited (presses' time, operator, press; added or removed) and played again into the same run
   (`transcriptEditor`, `runReplay` `into`); runs saved before that use the last reading if it's the same team and length. `replaySim` runs to the video stopwatch's stop, attacks nothing in its pauses and shows its time (`ReplayClock`); after a pause (a phase change) SP is refilled to 200, as the owner's video shows; it basic-attacks only while
-  the sim has fewer Final Strikes than the video by then.
+  the sim has fewer Final Strikes than the video by then, and always for what the SP bar can't show
+  (`World.attacksUnseen`: a Finisher on the Staggered enemy, an ultimate form's attacks such as Yvonne's, which give no
+  SP, and an attack a buff has waiting, such as her ultimate's closing ult_attack_end), those not counted against the
+  video. A Finisher holds its operator until its next-skill window (`busy`), so a skill pressed right after it doesn't
+  cut its main hit off. A reading whose stopwatch digits weren't read takes a HUD-hidden stretch
+  of 3 s or more (`PHASE`, rotationReader.ts) as the phase change's pause. In a replay a chain the player paused
+  (dodging, moving) goes on for 2 s past its window (`World.chainGrace`; skills never break one: every operator has
+  CharacterTable dontInterruptCombo), and its Final Strikes are matched to the video's in fight frames, so a cut-in
+  between them doesn't count. The stopwatch's end without a read final value is its last tick that follows another
+  changing one (a lone change is the HUD fading out). Enemies can have mechanics (`Enemy.nodeStagger`/`nodeMechanic`:
+  Alleikhreos's Foundite Weapon, 20 Stagger when his meter passes its node, from his interrupt buff), drawn in the
+  Enemy lane (`World.mechanics`). Times show as m:ss.s (`clockTime`). A parsed run can be exported as a file and
+  imported elsewhere (Export, Import run: `RUN_FILE`). The transcript editor also takes Dive attack (`dive`: the
+  controlled operator's `_plunging_attack_end`; the parser can't see one) and Invulnerable stretches
+  (`VideoRotation.away` → `World.away`: the team's hits do nothing then, hatched in the Enemy lane; Alleikhreos's
+  phantoms). A dive ends Tangtang's ultimate early with its bigger wave only while her stare runs: her aura hears it
+  as OnBeforeDamageAction and the stare's EventListenerAction (`runListeners`, alive while its run is) jumps ahead;
+  a late dive is a plain dive. Summons hitting together Stagger once (`summonPoise`: Arcane's four Tactical Doubles'
+  explosion is 5, the wiki's and the owner's count; each still deals its 120%). Arcane's ultimate ends only its own
+  entities (`SUMMON_TAGS` 464088014), so a combo's doubles still explode after it.
+  Checked against the owner's Alleikhreos video by tracing its boss bar (HP and the Stagger meter under it, which
+  turns yellow while Staggered): no Finisher in an ultimate form or with an attack a buff has waiting; a replay
+  makes a Finisher only where the video shows one (`finisherWaiting`; the parser can't see one cut off by a phase
+  change, so it's added by hand); a video Final Strike's chain starts earlier by the operator's own battle and combo
+  skills' exclusiveFrame in between (`holdOf`); strikes from unseen attacks are marked (`Strike.unseen`) so they
+  aren't counted against the video; critical-hit events are counted per skill kind (`critSum`), so battle and combo
+  skills crit at their own rate (Artzy Tyrannical). Alleikhreos: no Stagger at his node; the Foundite Weapon about
+  6 s after it and no Stagger from 2.5 s after it for 6 s (`nodeGuard`); a phase's damage past its HP is lost
+  (`phaseHp`; the bar's white part is the damage effect, not HP); a phase change empties his meter (`newPhase`).
+  Interrupts: Alleikhreos's sword and lance attacks open a weakness window (SetWeaknessAction); a hit then
+  interrupts him for +20 Stagger (`Enemy.interrupt`, his interrupt buff's poise_value; the big X on screen). The sim
+  doesn't play his attacks, so a recording says which presses did it: a step's `interrupt` (the transcript editor's
+  Interrupt box; `World.interrupt`: the operator's next hit of that skill kind within 3 s). The parser reads his
+  Stagger meter under the HP bar (`Layout.stagger`, `staggerOf`: filled share, yellow while Staggered) and marks a
+  battle skill or combo near a rise of 16+ that no Final Strike explains (`interrupts`), pinned by
+  `rotationReader.stagger.json` (real crops and the traced meter).
+  A video Final Strike's chain also starts earlier by any ultimate cut-in over it (`cutInOf`: the video's clock runs
+  through it, the sim's frames don't); with an attack a buff has waiting that the video shows (`strikeWaiting`:
+  Yvonne's talent after her bomb makes her next basic attack the Final Strike) it's pressed just before the video's
+  strike (`QUICK_STRIKE`). Only an ultimate's own waiting attack is unseen. CheckSkillCastId compares the kind of
+  skill whose cast gives a buff (`Buff.castKind`, `creating`) with the listener's, and OnBeforeOutputBuff carries a
+  stand-in for a new buff: her talent takes her bomb's Solidification, not her combo's.
+  The parser also measures the stretches the boss took no Stagger after its meter's node (`guards`: from its meter's
+  last rise within 6 s of reaching half to its next, 4 s on with a press in between; `Reading.guards`,
+  `VideoRotation.guard` → `World.noStagger`, which replaces Enemy.nodeGuard's estimate in a replay). On the controller
+  HUD a combo banner cut short by the next (a dip with no banner between two different arts, before it settled) is its
+  own combo, and a stretch starts from its first readable art across a dip of up to two frames (Tangtang's combo
+  before Arcane's at 0:07 and 0:57); banners cut short are grouped only with each other (their slide-in looks like
+  the next one coming in), so the review can show one operator twice.
+  Against the video: the parser keeps the boss's bars (`Layout.bossHp`, `bossHpOf`: red only, the white part is the
+  damage effect; `Reading.boss` every 0.25 s, read every third frame so it costs few frames), a replay keeps its own
+  (`ReplayResult.track`: damage so far, `World.meterNow`), and the run shows where they first part
+  (`compareWithVideo` in domain/sim/videoCheck.ts: damage 10% apart for 3 s, Stagger 12 apart for 2 s, Staggered in
+  only one for 1.5 s; the meter's step hints what's missing: 20 an interrupt, 17 a Final Strike, 10 a skill). The
+  reader plays recordings in real time (`SPEED` 1), backing up and halving speed (to 0.25) when frames go unseen
+  for 0.05 s, back up to speed after 5 s without: short things (a banner cut short, a Final Strike's step) need
+  every frame. A Whirlpool-style JumpToAction over a span is watched each frame (`jumpWatch`); Tangtang's Whirlpool
+  tag counts her combo's and her ultimate's entity (assumed from the owner's video).
+  The report is titled Recording-sim discrepancies; each can be dismissed (`SavedSim.dismissed`, `kind@seconds`;
+  Show dismissed brings them back). The timeline plays (`player`/`runPlay`: a playhead, a scrubber, 1/2/4×) with the
+  boss's bars under it: the sim's from `SimResult.track` (every result keeps one: damage so far and, in a replay, the
+  meter; a search's only knows when it was Staggered), each phase starting full, and a parsed run's video bars beside.
+  A basic attack's next-attack window is the AllowNextSkillAction whose allowedSkillIdList names the attack that
+  follows (others open at once for a talent's Final Strike or an ultimate's closing attack), and the attack that
+  follows is the ComboCacheAction's mapping first (`nextAttack`: Yvonne's ult_attack3_2 maps to itself and repeats,
+  eight shots every 16 frames; her ultimate's three spawned entities are decoration, their skill empty).
+  A battle skill's SP back (`Step.back`, the parser's `spBack` amount less regeneration; the editor's SP box) says
+  how many of the operator's summons it reached (`SP_BACK_REACH` in team.ts: Tangtang 20 SP a Whirlpool;
+  `World.reachOnly` caps the newest n her next skill finds), since the sim has no positions and the boss walks away
+  from Whirlpools (the owner's video: 1 at 0:26, 0:36, 1:12, 1:46, 2:00; none at 0:03, 0:56, 1:25, 2:14). A
+  battle skill's caster is often the parser's guess: Xaihi's crystal at 1:25 and Yvonne's bomb at 2:14 in that video
+  were first taken for Tangtang's (the 266,083 Solidified crit at 2:10 is that bomb).
+  An Invulnerable enemy takes no HP damage and no Stagger, but hits still land (`deal` amount 0): statuses apply and
+  critical hits count, as in the video (her bomb into the phantoms Solidified him). The sim averages critical hits,
+  so a recording's big rolls (the Finisher that ends phase 1, the 266k bomb) are luck it can't follow.
+  A parsed run shows two timelines: Timeline · Recording first (`recordingTrack`: the presses, Final Strikes and
+  interrupts as read, Staggered where the meter went yellow, the Stagger node where it passed half, Invulnerable
+  and no-Stagger stretches, and a Damage lane with each second's damage from the HP bar, crits and all) with the
+  player's controls and the video's bars under it, then Timeline · Sim (`simTrack`) with the sim's bars; the two
+  Damage lanes share a scale. The Recording timeline hides with its eye button (`fold.video`).
   Uptime (setting `uptime`, %; `World.uptime`): the share of the fight the enemy can be hit, the rest a
   stretch at the end of every 10 s with no presses or basic attacks (100% unless set). The owner's gameplay
   videos only confirm game mechanics (energy, combo triggers, cooldowns), never a target for the sim's pace or

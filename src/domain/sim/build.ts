@@ -22,7 +22,7 @@ export interface WeaponData {
 }
 
 export interface GearData {
-  items: Record<string, { suit: string | null; part: number; level: number; stats: { attr: string; how: string; values: number[] }[] }>;
+  items: Record<string, { suit: string | null; part: number | string; level: number; stats: { attr: string; how: string; values: number[] }[] }>;
   /** Each set's effects by pieces worn. */
   sets: Record<string, { pieces: number; skill: string; level: number }[]>;
   skills: Record<string, Data>;

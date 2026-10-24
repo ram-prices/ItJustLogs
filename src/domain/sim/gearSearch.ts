@@ -34,11 +34,15 @@ const TOP = (gear: GearData) => Math.max(...Object.values(gear.items).map((g) =>
 type Piece = { id: string; suit: string | null; part: number; stats: { attr: string; how: string; value: number }[] };
 
 /** Every top-tier piece, its stats at its top Artifice level. */
+/** A piece's slot as a number (body 0, hand 1, EDC 2): gear.json names it ("Body", "Hand", "EDC"; older files a number). */
+const PARTS: Record<string, number> = { Body: 0, Hand: 1, EDC: 2 };
+const partOf = (part: number | string): number => (typeof part === 'number' ? part : (PARTS[part] ?? -1));
+
 function pieces(gear: GearData): Piece[] {
   const top = TOP(gear);
   return Object.entries(gear.items)
     .filter(([, g]) => g.level === top)
-    .map(([id, g]) => ({ id, suit: g.suit, part: g.part, stats: g.stats.map((s) => ({ attr: s.attr, how: s.how, value: s.values[s.values.length - 1] ?? 0 })) }));
+    .map(([id, g]) => ({ id, suit: g.suit, part: partOf(g.part), stats: g.stats.map((s) => ({ attr: s.attr, how: s.how, value: s.values[s.values.length - 1] ?? 0 })) }));
 }
 const artifice = (gear: GearData, id: string) => Math.max(0, ...gear.items[id].stats.map((s) => s.values.length - 1));
 
@@ -50,6 +54,8 @@ export interface Optimize {
    * each to one member at most.
    */
   limited?: string[];
+  /** Each operator's signature weapon (the Arsenal Issue that ran with their banner): a start where they hold it. */
+  signatures?: Record<string, string>;
 }
 
 /** The team for a fight: builds equipped, and any extra stats per member (to weigh gear stats). Damage over the time limit (no HP goal). */
@@ -68,7 +74,7 @@ export async function optimizeBuilds(
   const kinds = [...new Map(all.flatMap((p) => p.stats.map((s) => [`${s.attr}|${s.how}`, s] as const))).values()].filter((s) => s.attr !== 'Def');
   const sets = Object.entries(data.gear.sets).filter(([, e]) => e.some((x) => x.pieces === 3));
   const n = req.builds.length;
-  const of = opt.weapons.reduce((k, w) => k + (w.length > 1 ? w.length : 0), 0) + PASSES * n * (kinds.length + sets.length + 3 + SLOT_PARTS.length * PER_SLOT);
+  const of = PASSES * opt.weapons.reduce((k, w) => k + (w.length > 1 ? w.length : 0), 0) + PASSES * n * (kinds.length + sets.length + 3 + SLOT_PARTS.length * PER_SLOT);
   let done = 0;
   const tick = () => progress?.(++done, of);
 
@@ -91,7 +97,8 @@ export async function optimizeBuilds(
     for (let i = 0; i < n; i++) {
       const withOwn = (patch: Partial<SimBuild>) => builds.map((b, j) => (j === i ? { ...b, ...patch } : b));
       // 1. The weapon.
-      if (opt.weapons[i].length > 1 && pass === 0) {
+      // Every pass: the first chooses with no gear yet, the next with the gear the first found.
+      if (opt.weapons[i].length > 1) {
         let best = -1;
         const ids = opt.weapons[i].filter((id) => !(opt.limited?.includes(id) && builds.some((b, j) => j !== i && b.weapon?.id === id)));
         const potential = builds[i].weapon!.potential;

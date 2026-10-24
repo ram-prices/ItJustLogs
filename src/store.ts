@@ -312,6 +312,8 @@ export interface SavedSim<R = unknown> {
   note?: string;
   /** A parsed run's reading (its presses), so its transcript can be edited and played again. */
   video?: unknown;
+  /** Recording-sim discrepancies the player dismissed (`kind@seconds`). */
+  dismissed?: string[];
 }
 /** How many Rotations results to keep (each run, for a team's history); the oldest go first, favorites never. */
 const MAX_SIMS = 100;
@@ -329,7 +331,7 @@ export async function saveSim<R>(entry: SavedSim<R>): Promise<void> {
 }
 
 /** Changes a saved result (by its time): favorite, name, note; a parsed run's edited transcript and its new result. */
-export async function updateSim(at: number, change: Partial<Pick<SavedSim, 'fav' | 'name' | 'note' | 'key' | 'result' | 'video'>>): Promise<void> {
+export async function updateSim(at: number, change: Partial<Pick<SavedSim, 'fav' | 'name' | 'note' | 'key' | 'result' | 'video' | 'dismissed'>>): Promise<void> {
   const list = await listSims();
   const x = list.find((e) => e.at === at);
   if (!x) return;
