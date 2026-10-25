@@ -92,7 +92,7 @@ let picked = false;
 let editing: number | null = null;
 /** A parsed run's transcript being edited: its presses, until played again or cancelled. */
 type VideoStep = VideoRotation['steps'][number];
-let draft: { at: number; steps: VideoStep[]; away: [number, number][]; seconds: number; builds: SimBuild[] } | null = null;
+let draft: { at: number; steps: VideoStep[]; away: [number, number][]; seconds: number; builds: SimBuild[]; orig: Pick<SavedSim<SimResult>, 'key' | 'result' | 'video' | 'name' | 'note'> } | null = null;
 /** Parsed runs' list shown (true) or folded to its title row (false); null: folded while a run is open. */
 let runsShown: boolean | null = null;
 /**
@@ -165,7 +165,9 @@ let redrawPage: () => void = () => {};
  */
 function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: string[], ids: string[], redraw: () => void, into?: SavedSim<SimResult>): void {
   replayWorker?.terminate();
-  replay = { names, ids, at: into?.at };
+  // Replaying into the open run keeps its last result on screen until the new one replaces it.
+  const shown = into && replay?.at === into.at && replay.result ? replay.result : (into?.result as ReplayResult | undefined);
+  replay = { names, ids, at: into?.at, ...(shown ? { result: shown } : {}) };
   const steps: ReplayStep[] = v.steps.map((x) => ({ t: x.t, slot: at[x.slot], input: x.input, ...(x.interrupt ? { interrupt: true } : {}), ...(x.back !== undefined ? { back: x.back } : {}) }));
   const w = new Worker(new URL('../simWorker.ts', import.meta.url), { type: 'module' });
   replayWorker = w;
@@ -192,6 +194,21 @@ function runReplay(v: VideoRotation, at: number[], req: SimRequest, names: strin
   };
   // Readings saved before the stopwatch was read have no end: the fight's length stands in.
   w.postMessage({ id, req, replay: steps, stopwatch: { end: v.end ?? v.seconds, pauses: v.pauses ?? [], away: v.away ?? [], guard: v.guard ?? [], ...(v.boss ? { phases: phaseChanges(v.boss, v.pauses ?? []) } : {}) } });
+}
+
+/** Plays the edited transcript into its run; `close` also leaves the editor (the checkmark), else it stays (refresh). */
+function playDraft(close: boolean): void {
+  const entry = draft && runs.find((x) => x.at === draft!.at);
+  const reading = entry && videoOf(entry);
+  if (!entry || !reading || !draft) return;
+  const { video: _, ...asked } = JSON.parse(entry.key) as SimRequest & { video?: boolean };
+  const away = draft.away.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
+  // The fight's length as edited: the stopwatch's stop moves with it (the boss dies then).
+  const longer = draft.seconds - reading.seconds;
+  const req = { ...asked, seconds: draft.seconds, builds: draft.builds };
+  const edited = { ...reading, steps: draft.steps.slice().sort((a, b) => a.t - b.t), away, seconds: draft.seconds, end: (reading.end ?? reading.seconds) + longer };
+  if (close) draft = null;
+  runReplay(edited, edited.names.map((_, i) => i), req, entry.names, entry.ids, redrawPage, entry);
 }
 
 /** A parsed run as a file to share or open elsewhere (Import run): its reading, the request (team, loadouts, enemy), result, name and note. */
@@ -234,7 +251,7 @@ function importRun(): void {
 }
 
 /**
- * Files or text pasted or dropped on the Parser: a recording is parsed (as Parse gameplay recording), an exported run
+ * Files or text pasted or dropped on the Parser: a recording is parsed (as Parse gameplay), an exported run
  * opened (as Import run). False if it's neither, for the site's own import to try.
  */
 export async function parserFiles(files: File[], text = ''): Promise<boolean> {
@@ -265,19 +282,24 @@ function runHead(title: string, body: Html, enemy = ''): Html {
       <header class="sim-run-header">
         ${laneFoe ? foeFace(laneFoe, 'sim-run-foe') : ''}
         <div class="sim-run-title">
-          ${editing
-            ? html`<input class="heading-24 sim-run-name" data-sim="runname" data-at="${at}" data-title="${title}" value="${entry.name ?? title}" placeholder="${title}" aria-label="Name" maxlength="80" />`
-            : html`<h2 class="heading-24">${entry.name ?? title}</h2>`}
+          <div class="sim-run-name-row">
+            ${editing
+              ? html`<span class="heading-24 sim-run-name-wrap" data-value="${entry.name ?? title}"><input class="heading-24 sim-run-name" data-sim="runname" data-at="${at}" data-title="${title}" value="${entry.name ?? title}" placeholder="${title}" aria-label="Name" maxlength="80" size="1" /></span>`
+              : html`<h2 class="heading-24">${entry.name ?? title}</h2>`}
+            ${draft?.at === entry.at
+              ? html`<button type="button" class="btn primary sm icon-only" data-action="sim-step-save" title="${replayWorker ? 'Playing…' : 'Play edited transcript'}" aria-label="Play edited transcript" ${replayWorker ? 'disabled' : ''}>${icon(replayWorker ? 'hourglass_empty' : 'refresh')}</button>`
+              : ''}
+          </div>
           <p class="copy-14 secondary sim-run-sub">${when(entry.at)} · ${runLine(entry, entry.names)}${enemy ? ` · ${enemy}` : ''}</p>
         </div>
         <div class="sim-run-buttons">
           ${played && rec ? html`<div class="sim-run-play">${toggleGroup('sim-view', [['recording', 'Recording'], ['sim', 'Sim']], view)}</div>` : ''}
           ${draft?.at === entry.at
-            ? html`<button type="button" class="btn primary sm" data-action="sim-step-save" ${replayWorker ? 'disabled' : ''}>${icon('play_arrow')}Play edited transcript</button><button type="button" class="btn secondary sm" data-action="sim-step-cancel">Cancel</button>`
+            ? html`<button type="button" class="btn error sm icon-only" data-action="sim-step-cancel" title="Discard changes" aria-label="Discard changes">${icon('close')}</button><button type="button" class="btn secondary sm icon-only" data-action="sim-step-done" title="Save changes" aria-label="Save changes" ${replayWorker ? 'disabled' : ''}>${icon('check')}</button>`
             : videoOf(entry)
-              ? html`<button type="button" class="btn secondary sm" data-action="sim-transcript" data-value="${String(entry.at)}" title="Name, note, loadouts and transcript">${icon('edit')}Edit</button>`
+              ? html`<button type="button" class="btn secondary sm icon-only" data-action="sim-transcript" data-value="${String(entry.at)}" title="Edit name, note, loadouts and transcript" aria-label="Edit">${icon('edit')}</button>`
               : ''}
-          <button type="button" class="btn secondary sm" data-action="sim-export" data-value="${String(entry.at)}">${icon('download')}Export</button>
+          <button type="button" class="btn secondary sm icon-only" data-action="sim-export" data-value="${String(entry.at)}" title="Export" aria-label="Export">${icon('ios_share')}</button>
           ${headTools(entry)}
         </div>
       </header>
@@ -663,7 +685,8 @@ export function simAction(action: string, el: HTMLElement): boolean {
     case 'sim-transcript': {
       const entry = runs.find((x) => String(x.at) === v);
       const reading = entry && videoOf(entry);
-      draft = draft?.at === entry?.at || !entry || !reading ? null : { at: entry.at, steps: reading.steps.map((x) => ({ ...x })), away: (reading.away ?? []).map(([a, b]) => [a, b]), seconds: reading.seconds, builds: JSON.parse(JSON.stringify((JSON.parse(entry.key) as SimRequest).builds)) };
+      // The run as it was is kept, so the X can put it back after previews and name or note changes.
+      draft = draft?.at === entry?.at || !entry || !reading ? null : { at: entry.at, steps: reading.steps.map((x) => ({ ...x })), away: (reading.away ?? []).map(([a, b]) => [a, b]), seconds: reading.seconds, builds: JSON.parse(JSON.stringify((JSON.parse(entry.key) as SimRequest).builds)), orig: { key: entry.key, result: entry.result, video: entry.video, name: entry.name, note: entry.note } };
       return true;
     }
     case 'sim-step-add':
@@ -684,24 +707,24 @@ export function simAction(action: string, el: HTMLElement): boolean {
     case 'sim-away-del':
       draft?.away.splice(Number(v), 1);
       return true;
-    case 'sim-step-cancel':
+    // X: every change since Edit is discarded (previews, name, note), and the run is as it was.
+    case 'sim-step-cancel': {
+      const entry = draft && runs.find((x) => x.at === draft!.at);
+      if (entry && draft) {
+        replayWorker?.terminate();
+        replayWorker = null;
+        Object.assign(entry, draft.orig);
+        void updateSim(entry.at, draft.orig);
+        replay = { names: entry.names, ids: entry.ids, result: entry.result as ReplayResult, at: entry.at };
+      }
       draft = null;
       return true;
-    case 'sim-step-save': {
-      const entry = draft && runs.find((x) => x.at === draft!.at);
-      const reading = entry && videoOf(entry);
-      if (entry && reading && draft) {
-        const { video: _, ...asked } = JSON.parse(entry.key) as SimRequest & { video?: boolean };
-        const away = draft.away.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
-        // The fight's length as edited: the stopwatch's stop moves with it (the boss dies then).
-        const longer = draft.seconds - reading.seconds;
-        const req = { ...asked, seconds: draft.seconds, builds: draft.builds };
-        const edited = { ...reading, steps: draft.steps.slice().sort((a, b) => a.t - b.t), away, seconds: draft.seconds, end: (reading.end ?? reading.seconds) + longer };
-        draft = null;
-        runReplay(edited, edited.names.map((_, i) => i), req, entry.names, entry.ids, redrawPage, entry);
-      }
-      return true;
     }
+    // Refresh plays the edited transcript and stays in the editor; the checkmark plays it and closes the editor.
+    case 'sim-step-save':
+    case 'sim-step-done':
+      playDraft(action === 'sim-step-done');
+      return true;
     case 'sim-delete': {
       const at = Number(v);
       // A starred run is kept: unstar it to delete it.
@@ -794,6 +817,8 @@ function editBuild(k: number, name: string, v: number | undefined): void {
 // Dragging the scrubber moves the playhead with it (its time tip, the bars, the lanes), not only on release.
 document.addEventListener('input', (e) => {
   const el = e.target as HTMLInputElement | null;
+  // The run's name field grows with its text (its box sizes to a copy of it).
+  if (el?.dataset?.sim === 'runname' && el.parentElement) el.parentElement.dataset.value = el.value || el.placeholder;
   if (el?.dataset?.sim !== 'play-seek') return;
   play.t = Math.max(0, Number(el.value) || 0);
   paintPlay();
@@ -2142,14 +2167,14 @@ let actLabels: string[] = [];
 const actSizers = (labels: string[]) => html`${labels.map((n) => html`<span class="sim-move-size" aria-hidden="true">${n}</span>`)}`;
 const opSizers = (names: string[]) => html`${[...names, 'Enemy'].map((n) => html`<span class="sim-move-size" aria-hidden="true">${n}</span>`)}`;
 
-/** A parsed run's header buttons after Edit and Export, labelled like them: Star (kept on top, never trimmed or deleted), Delete (asks once). */
+/** A parsed run's header buttons after Edit and Export, boxed icons like them: Star (kept on top, never trimmed or deleted), Delete (asks once, red). */
 function headTools(x: SavedSim<SimResult>): Html {
   const at = String(x.at);
   const ask = deleting === x.at;
-  return html`<button type="button" class="btn secondary sm${x.fav ? ' sim-fav' : ''}" data-action="sim-fav" data-value="${at}" aria-pressed="${x.fav ? 'true' : 'false'}">${icon('star', !!x.fav)}${x.fav ? 'Starred' : 'Star'}</button>
+  return html`<button type="button" class="btn secondary sm icon-only${x.fav ? ' sim-fav' : ''}" data-action="sim-fav" data-value="${at}" title="${x.fav ? 'Starred' : 'Star'}" aria-label="${x.fav ? 'Starred' : 'Star'}" aria-pressed="${x.fav ? 'true' : 'false'}">${icon('star', !!x.fav)}</button>
     ${x.fav
-      ? html`<button type="button" class="btn secondary sm" disabled title="Starred: unstar it to delete">${icon('delete')}Delete</button>`
-      : html`<button type="button" class="btn ${ask ? 'error' : 'secondary'} sm" data-action="sim-delete" data-value="${at}">${icon('delete')}${ask ? 'Confirm delete' : 'Delete'}</button>`}`;
+      ? html`<button type="button" class="btn secondary sm icon-only" disabled title="Starred: unstar it to delete" aria-label="Starred: unstar it to delete">${icon('delete')}</button>`
+      : html`<button type="button" class="btn ${ask ? 'error' : 'secondary'} sm icon-only" data-action="sim-delete" data-value="${at}" title="${ask ? 'Click again to delete' : 'Delete'}" aria-label="${ask ? 'Confirm delete' : 'Delete'}">${icon('delete')}</button>`}`;
 }
 
 /** A saved run's buttons: star (kept on top, never trimmed), edit (name and note), delete (asks once). */
@@ -2188,7 +2213,7 @@ function historyView(names: string[], showing: number | undefined, recordings = 
   const list = runs.filter((x) => (recordings ? isRecording(x) : !isRecording(x) && teamKey(x.names) === team)).reverse();
   list.sort((a, b) => Number(!!b.fav) - Number(!!a.fav));
   if (!list.length && !recordings) return html``;
-  const buttons = (sm: boolean) => html`<button type="button" class="btn ${list.length ? 'secondary' : 'primary'}${sm ? ' sm' : ''}" data-action="sim-read">${icon('movie')}Parse gameplay recording</button>
+  const buttons = (sm: boolean) => html`<button type="button" class="btn ${list.length ? 'secondary' : 'primary'}${sm ? ' sm' : ''}" data-action="sim-read">${icon('movie')}Parse gameplay</button>
     <button type="button" class="btn secondary${sm ? ' sm' : ''}" data-action="sim-import">${icon('upload_file')}Import run</button>`;
   // Parsed runs fold to their title row (with the parse and import buttons) while a run is open.
   const shown = !recordings || !list.length || (runsShown ?? showing === undefined);
@@ -2558,7 +2583,7 @@ function parseView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw: () =>
 
 /** Parse a recording, or import a run file. */
 const parseButtons = (sm: boolean): Html =>
-  html`<button type="button" class="btn primary${sm ? ' sm' : ''}" data-action="sim-read">${icon('movie')}Parse gameplay recording</button>
+  html`<button type="button" class="btn primary${sm ? ' sm' : ''}" data-action="sim-read">${icon('movie')}Parse gameplay</button>
     <button type="button" class="btn secondary${sm ? ' sm' : ''}" data-action="sim-import">${icon('upload_file')}Import run</button>`;
 
 /**

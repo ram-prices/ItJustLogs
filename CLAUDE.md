@@ -446,7 +446,7 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
   Simulator and Parser (`/rotations/parser`; the old `/rotations/transcript` redirects): a read video's team, enemy
   (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only and comes
-  first, with Parse gameplay recording and Import run at its bottom; an opened run shows below it on the page, not in
+  first, with Parse gameplay and Import run at its bottom; an opened run shows below it on the page, not in
   a card (its name as a header, date and length under it, its buttons at the right; then Damage per second, Total
   damage, Duration, Actions, Controlled and Not attributed as laid-out figures; then the loadouts' boxes, from the
   run's own reading, each with its operator's share (the percentage by the name, a bar under the breakdown's Total) and its damage

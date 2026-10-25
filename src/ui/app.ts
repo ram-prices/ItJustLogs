@@ -419,6 +419,7 @@ function restoreTabRows(before: (number | null)[]): void {
   });
 }
 
+let redrawnTimer: ReturnType<typeof setTimeout> | undefined;
 function draw(): void {
   applyTheme();
   const route = parseRoute();
@@ -443,6 +444,11 @@ function draw(): void {
   // A redraw while the player types a search keeps the box focused.
   const searching = document.activeElement?.matches('[data-list-search]');
   const tabRows = tabRowScroll();
+  // A redraw puts new buttons under the pointer, whose hover outline would fade in again (a flash): for a moment
+  // styles change at once.
+  root().classList.add('redrawn');
+  clearTimeout(redrawnTimer);
+  redrawnTimer = setTimeout(() => root().classList.remove('redrawn'), 200);
   render(root(), html`${header(route)}${page(route)}${footer()}`);
   restoreTabRows(tabRows);
   if (searching) refocusListSearch();

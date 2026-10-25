@@ -791,6 +791,12 @@ main {
   height: 32px;
   padding: 0 10px;
 }
+/* Just after a redraw (app.ts draw): a new element under the pointer takes its hover look at once, not fading in. */
+.redrawn *,
+.redrawn *::before,
+.redrawn *::after {
+  transition: none !important;
+}
 .btn.primary {
   padding: 0 16px;
   background: var(--gray-1000);
@@ -8427,10 +8433,47 @@ input.sim-run-value-edit {
   flex: 1;
   min-width: 0;
 }
-.sim-run-title > h2 {
+.sim-run-title > h2,
+.sim-run-name-row > h2 {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* The title with, while the transcript is edited, the replay button right after it. */
+.sim-run-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sim-run-name-row > h2 {
+  min-width: 0;
+}
+/* The name field is as long as its text and grows as it's typed: field and a hidden copy of the text share one
+   grid cell, so the copy sets the width (any browser, any font). */
+.sim-run-name-wrap {
+  display: inline-grid;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0 -4px;
+}
+.sim-run-name-wrap::after {
+  content: attr(data-value) ' ';
+  grid-area: 1 / 1;
+  height: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  visibility: hidden;
+  white-space: pre;
+}
+.sim-run-name-wrap > .sim-run-name {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.sim-run-name-row > .btn {
+  flex: none;
 }
 .sim-buffs-now.lane {
   flex-wrap: nowrap;
@@ -8785,7 +8828,11 @@ input.sim-run-value-edit {
   /* The box reaches out past the text (padding, and a margin taking it back), so the text sits where it does unedited. */
   box-sizing: content-box;
   width: calc(var(--d, 2) * 1ch);
+  /* Exactly one line of the text around it: Firefox otherwise gives fields its own, taller line, so editing
+     pushes everything under a field down a pixel or two. */
   height: auto;
+  height: 1lh;
+  line-height: inherit;
   margin: 0 -3px;
   padding: 0 3px;
   border: 0;
@@ -8812,7 +8859,10 @@ input.sim-run-value-edit {
 /* A choice in place of text (the transcript's operator and action while edited). */
 .sim-inl-sel {
   max-width: 100%;
+  /* One line of the text around it, as .sim-inl. */
   height: auto;
+  height: 1lh;
+  line-height: inherit;
   margin: 0 -3px;
   padding: 0 3px;
   border: 0;
