@@ -37,6 +37,8 @@ export interface Base {
   levels: Record<string, Record<string, number>>;
   /** Attribute talents ("Forged": Strength +10/+15/+15/+20), each with the promotion it needs. */
   nodes?: { stage: number; attrs: { attr: string; value: number }[] }[];
+  /** Each talent level's promotion (CharGrowthTable); a level not listed isn't obtainable. */
+  talentStages?: Record<string, number>;
 }
 
 export interface Build {
@@ -59,6 +61,11 @@ export function equip(op: Bundle & { base?: Base }, build: Build, weapon?: Weapo
   const passives: string[] = [];
   const levels: Record<string, number> = {};
   const merged: Bundle = { ...op, skills: { ...op.skills }, buffs: { ...op.buffs }, patch: { ...op.patch } };
+  // Only the talent levels its promotion has unlocked (World.start takes the highest of those); bundles from before
+  // talentStages keep every level.
+  const stages = base?.talentStages;
+  if (stages && merged.talents)
+    merged.talents = Object.fromEntries(Object.entries(merged.talents).filter(([id]) => !/_talent_\d+_\d+$/.test(id) || (stages[id] ?? Infinity) <= (build.promotion ?? 4)));
   const add = (from: { skills: Record<string, Data>; buffs: Record<string, Data>; patch: Bundle['patch'] }) => {
     Object.assign(merged.skills, from.skills);
     Object.assign(merged.buffs, from.buffs);

@@ -143,6 +143,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     travel as `settings.deletedArt` tombstones. Downloaded full backups do
     include it (`Backup.art`, data URLs; `buildBackup({ art: true })`), and
     importing one restores pictures this browser lacks.
+  - Parsed runs (Rotations → Parser) sync too, each as its own appData file
+    `run:<at>` (`syncRuns`, its last change `edited` in appProperties; the newer
+    side wins); deletions travel as `settings.deletedRuns`. Simulator results
+    stay in this browser. Not in downloaded backups (Export run moves one).
   - The profile picture's original (at most 1024px) with its framing and
     painting (`AvatarEdit` in store.ts, for Edit picture) syncs as one
     appData file, `avatar-edit` (`syncAvatarEdit`; the newer `at` wins, gone
@@ -565,7 +569,7 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   so a recording's big rolls (the Finisher that ends phase 1, the 266k bomb) are luck it can't follow.
   A parsed run's Timeline card has a Recording | Sim switch (`view`, default Recording: what happened; the sim
   tells who dealt how much). Recording (`recordingTrack`) is 1:1 with the video: the presses, Final Strikes and
-  interrupts as read, Staggered where the meter went yellow, the Stagger node where it passed half, Invulnerable
+  interrupts as read, the boss's node mechanic (Foundite Weapon) at each no-Stagger stretch's start, Staggered where the meter went yellow, the Stagger node where it passed half, Invulnerable
   and no-Stagger stretches, a Damage lane with each second's damage from the HP bar (crits and all) and the
   video's bars; Sim (`simTrack`) is the same actions as the sim made them, its expected damage and its bars. One
   play control, one damage scale; the action list follows the view.
@@ -580,7 +584,8 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   hit that empties the last phase's HP, or, short of that by the recording's end, a copy of the fight going on the
   Basic way (combos and ultimates as they come, battle skills in team order) until it does; no time limit. That fight is kept
   (`ReplayResult.runOn`: presses, Final Strikes, Staggers, track, SP), and the Sim view's timeline plays on through it to
-  the sim's clear (`simLong`, `withRunOn`; the player keeps its place switching views, `baseOf`), with the sim's own
+  the sim's clear (`simLong`, `withRunOn`; the player keeps its place switching views, `baseOf`, and the run's
+  phases and nodes, `preparePlay` taking the base result; the engine marks each Stagger node it reaches), with the sim's own
   bars.
   The HUD leaving as the stopwatch stops is the kill, and a phase ending in a pause (the bar full again after it)
   reached zero in the cut-in: the parser adds a zero-HP reading at each (`endsAtZero`; the kill at the stop, however early the bar stopped being read), and every saved recording gets the same when shown (`killed` in videoOf), its last readings clamped to the timeline's end.
@@ -663,7 +668,9 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   operator's skills by `kindOf`, only its own: bundles carry other operators' skills and levels are one map for the
   team; a passive that levels with a skill follows its rank, `rankKind`: Tangtang's passive_0 holds Waterspout's tick;
   the World keeps skill levels by team position, `<slot>|<skill id>`, since weapons share attribute skills)
-  and `weapon.level`; `teamFromSpec` passes them on (90 / 12 / 90 unless set), with the promotion they imply (`promotionOf`: the lowest stage whose level and skill-rank caps hold them, CharBreakStageTable; a level at a cap, 80, takes the lower stage). A
+  and `weapon.level`; `teamFromSpec` passes them on (90 / 12 / 90 unless set), with the promotion they imply (it unlocks attribute nodes and talent levels: ef-assets combat bundles' `base.talentStages`,
+  CharGrowthTable's passive skill nodes, filtered in `equip`; a level with none, such as Xaihi's talent_2_2, is never
+  given; `promotionOf`: the lowest stage whose level and skill-rank caps hold them, CharBreakStageTable; a level at a cap, 80, takes the lower stage). A
   parsed run keeps the loadouts it ran with in its request; while it's edited each box has fields for them plus
   Potential, each gear piece's Artifice (0–3) and each weapon skill's rank (its level, the data's caps 9/9/4, plus
   the weapon's Potential on the last: `essenceCaps`, `skillRanks`) (`levelsEdit` in the top row, where the name gives way; `weaponLine`; `editBuild`),

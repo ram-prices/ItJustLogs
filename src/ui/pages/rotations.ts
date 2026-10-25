@@ -146,6 +146,20 @@ function loadSaved(redraw: () => void): void {
   });
 }
 
+// Drive sync brought parsed runs from another device (or deleted some there): the lists and the open run follow.
+addEventListener('ijl:runs', () => {
+  if (!saved) return;
+  void listSims<SimResult>().then((list) => {
+    runs = list;
+    saved = new Map(list.map((x) => [x.key, x]));
+    if (replay?.at !== undefined && !replayWorker && draft?.at !== replay.at) {
+      const open = list.find((x) => x.at === replay!.at);
+      replay = open ? { names: open.names, ids: open.ids, result: open.result as ReplayResult, at: open.at } : null;
+    }
+    redrawPage?.();
+  });
+});
+
 /** A team by its characters (any order, any loadouts). */
 const teamKey = (names: string[]) => names.slice().sort().join('|');
 let failed = '';
@@ -484,7 +498,7 @@ function fitRecording(r: NonNullable<typeof replay>): RecordingCard {
   const asked = (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy;
   const enemy = typeof asked === 'object' ? asked : asked ? enemyById(asked).enemy : undefined;
   const phaseHp = enemy?.phaseHp ?? r.result.hp ?? 0;
-  const rec = recordingTrack(reading, r.result.seconds, phaseHp, enemy?.nodes ?? []);
+  const rec = recordingTrack(reading, r.result.seconds, phaseHp, enemy?.nodes ?? [], enemy?.nodeMechanic);
   const sim = simTrack(r.result);
   // The Parser tells what each operator did: the recording's damage, split as the sim split its own.
   const fit = fitToRecording(r.result, reading.boss, reading.pauses ?? [], phaseHp);
@@ -1246,7 +1260,7 @@ function simTrack(r: SimResult): Track {
  * where its meter went yellow, its Stagger node where the meter passed half, and its damage each second from its
  * HP bar (the game's own rolls, crits and all), on the fight's clock (the stopwatch's pauses taken out).
  */
-function recordingTrack(reading: VideoRotation, seconds: number, phaseHp: number | undefined, nodes: number[] = []): Track {
+function recordingTrack(reading: VideoRotation, seconds: number, phaseHp: number | undefined, nodes: number[] = [], nodeMechanic?: string): Track {
   const pauses = reading.pauses ?? [];
   const clock = (t: number) => t - pauses.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, t) - a), 0);
   const f = (t: number) => Math.round(clock(t) * FPS);
@@ -1274,6 +1288,9 @@ function recordingTrack(reading: VideoRotation, seconds: number, phaseHp: number
     }
     if (x.interrupt) mechanics.push({ frame: f(x.t) + FPS, label: 'Interrupted' });
   }
+  // The boss's node mechanic (Alleikhreos's Foundite Weapon) where its effect shows: each stretch it took no Stagger,
+  // as the parser measured them from its meter.
+  if (nodeMechanic) for (const [a] of reading.guard ?? []) mechanics.push({ frame: f(a), label: nodeMechanic });
   const main = [...who.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
   const staggers: Track['staggers'] = [];
   const dps: number[] = [];
@@ -1401,7 +1418,11 @@ function timeline(r: SimResult, names: string[]): Html {
 const play = { t: 0, speed: 4, running: false, of: null as SimResult | null, raf: 0, last: 0 };
 /** The boss's bars over the fight: HP left (0–1) and its Stagger meter (0–1, -1 Staggered, NaN unknown). */
 /** A source's boss bars: readings in time (the meter -1 while Staggered), and its Staggered stretches (seconds). */
-type Bars = { t: number[]; hp: number[]; meter: number[]; staggered?: [number, number][] };
+type Bars = { t: number[]; hp: number[]; meter: number[]; staggered?: [number, number][]; staggerSeconds?: number; holds?: [number, number][] };
+
+/** How much of a to b the fight's clock stood still in (cut-ins, seconds). */
+const heldIn = (holds: [number, number][] | undefined, a: number, b: number): number =>
+  (holds ?? []).reduce((n, [x, y]) => n + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0);
 
 /** The Staggered stretches of a series' meter: each run of -1 readings, to the next reading after it. */
 function staggeredOf(b: Bars): [number, number][] {
@@ -1569,6 +1590,7 @@ function simLong(shown: SimResult, replayed: ReplayResult | undefined): SimResul
     staggers: [...(shown.staggers ?? []).map((x, k, all) => (k === all.length - 1 && on.lastEnd !== undefined ? { ...x, end: Math.max(x.end, on.lastEnd) } : x)), ...on.staggers],
     track: [...(replayed!.track ?? []), ...on.track],
     spTrack: [...(replayed!.spTrack ?? []), ...on.sp],
+    freezes: [...(replayed!.freezes ?? []), ...(on.freezes ?? [])],
   } as ReplayResult;
   longOf.set(shown, long);
   baseOf.set(long, shown);
@@ -1602,7 +1624,9 @@ function preparePlay(r: SimResult): { video?: Bars } {
     Object.assign(play, { t: 0, running: false, of: baseOf.get(r) ?? r });
   }
   // The open parsed run's: its result as the sim made it, or as fitted to the recording (what its timeline shows).
-  const ofRun = !!replay?.result && (replay.result === r || (fitted?.of === replay.result && fitted.card.shown === r));
+  // The Sim view's longer timeline (simLong) is the same run's: its base result decides.
+  const base = baseOf.get(r) ?? r;
+  const ofRun = !!replay?.result && (replay.result === base || (fitted?.of === replay.result && fitted.card.shown === base));
   const entry = ofRun && replay!.at !== undefined ? runs.find((x) => x.at === replay!.at) : undefined;
   const reading = entry && videoOf(entry);
   const asked = entry ? (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy : settings().enemy;
@@ -1625,6 +1649,10 @@ function preparePlay(r: SimResult): { video?: Bars } {
   const phaseStarts = reading?.boss?.length ? phaseChanges(reading.boss, pauses) : pauses.filter(([a, b]) => b - a >= 2).map(([a]) => a);
   const sim = simBars(r, enemy, phaseStarts, clock);
   sim.staggered = (r.staggers ?? []).map((s) => [s.frame / FPS, s.end / FPS]);
+  sim.staggerSeconds = enemy?.staggerSeconds;
+  // The game's Stagger time stands still through a cut-in, and so does its meter's drain: the sim's own cut-ins, and
+  // for the recording the replay's, made at the video's ultimates.
+  sim.holds = (r as ReplayResult).freezes;
   if (video) {
     // The meter only fills between resets (a Stagger, a phase change), so within each stretch a reading is the lowest
     // read after it: a rise counts once the readings after it hold it, and misreads (a hit's flash over the meter:
@@ -1643,6 +1671,8 @@ function preparePlay(r: SimResult): { video?: Bars } {
       m[i] = low;
     }
     video.staggered = staggeredOf(video);
+    video.staggerSeconds = enemy?.staggerSeconds;
+    video.holds = (replay?.result as ReplayResult | undefined)?.freezes;
   }
   // The SP bar: the sim's (a replay's), and the video's as read (seconds into the video, put on the fight's clock).
   const simSp = (r as ReplayResult).spTrack;
@@ -1678,14 +1708,16 @@ function playControls(r: SimResult, extra?: Html): Html {
  */
 /**
  * A source's boss bars at the playhead: HP's width, the Stagger meter's (a Staggered meter drains from full to empty
- * over its stretch, as the game draws it) and whether it's Staggered. The first markup draws them too, so a redraw
+ * over its stretch, as the game draws it, and never faster than the boss's Stagger duration: a kill or a phase change
+ * that cuts the stretch short leaves the rest of the meter; it stands still through cut-ins, as the game's does) and
+ * whether it's Staggered. The first markup draws them too, so a redraw
  * (playback's end) doesn't flash full bars before the next paint.
  */
 function barsNow(b: Bars, kind?: string): { hp: string; meter: string; staggered: boolean } {
   const raw = barAt(b, play.t);
   const s = b.staggered?.find(([a, z]) => play.t >= a && play.t < z);
   const on = !!s || (raw.meter < 0 && !b.staggered);
-  const left = s ? Math.max(0, 1 - (play.t - s[0]) / Math.max(1e-6, s[1] - s[0])) : 1;
+  const left = s ? Math.max(0, 1 - (play.t - s[0] - heldIn(b.holds, s[0], play.t)) / Math.max(1e-6, s[1] - s[0] - heldIn(b.holds, s[0], s[1]), b.staggerSeconds ?? 0)) : 1;
   // While playing (`kind`: which row), a reading's change slides in (barSlide); a Staggered meter drains as it is.
   const hp = kind ? barSlide(`${kind}|hp`, raw.hp) : raw.hp;
   const meter = on ? left : Number.isNaN(raw.meter) || raw.meter < 0 ? 0 : kind ? barSlide(`${kind}|meter`, raw.meter) : raw.meter;

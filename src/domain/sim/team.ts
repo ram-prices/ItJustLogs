@@ -581,7 +581,17 @@ export interface ReplayResult extends SimResult {
    * Strikes, Staggers, its track (as `track`: damage so far, meter) and SP (as `spTrack`). The Sim view's timeline
    * runs on through it.
    */
-  runOn?: { presses: Press[]; strikes: Strike[]; staggers: Stagger[]; track: [number, number, number][]; sp: [number, number][]; lastEnd?: number };
+  runOn?: { presses: Press[]; strikes: Strike[]; staggers: Stagger[]; track: [number, number, number][]; sp: [number, number][]; lastEnd?: number; freezes?: [number, number][] };
+  /** Where the fight's clock stood still for a cut-in (seconds on the fight's clock): no Stagger time passed. */
+  freezes?: [number, number][];
+}
+
+/** A frozen frame (from `t`, seconds) added to a list of spans, joined to the last one where it follows on. */
+function addFreeze(list: [number, number][], t: number): void {
+  const last = list.at(-1);
+  const to = t + 1 / FPS;
+  if (last && t - last[1] <= 0.5 / FPS) last[1] = to;
+  else list.push([t, to]);
 }
 
 /**
@@ -758,6 +768,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   let pendingSp: { i: number; before: number } | null = null;
   // The buffs shown on each operator and the enemy, sampled with the bars: stretches still open by key.
   const buffs: BuffSpan[] = [];
+  const freezes: [number, number][] = [];
   const holding = new Map<string, BuffSpan>();
   const noteBuffs = (t: number) => {
     const now = new Set<string>();
@@ -846,7 +857,10 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     w.holdSp = stood;
     const f0 = w.frame;
     const spTick = w.sp;
+    const z0 = w.frozenFrames;
+    const c0 = clock();
     w.tick();
+    if (w.frozenFrames > z0 && !stood) addFreeze(freezes, game(c0) / FPS);
     // A press's cost can land in the frame after it.
     if (pendingSp) {
       pressSp[pendingSp.i] = Math.round(w.sp - pendingSp.before);
@@ -926,7 +940,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   };
   const lastHp = team.enemy?.phaseHp ?? team.hp ?? 0;
   const clearTotal = clear !== undefined ? Math.round(total + Math.max(0, lastHp - (foe.phaseHp ? dealt[dealt.length - 1] : total))) : undefined;
-  return { ...summary(f, req, start), missed, track, perSecond, actionDamage, actionSp, spTrack, buffs, ...(clear !== undefined ? { clear, clearTotal } : {}), ...(runOn ? { runOn } : {}) };
+  return { ...summary(f, req, start), missed, track, perSecond, actionDamage, actionSp, spTrack, buffs, freezes: freezes.map(([a, b]) => [Math.round(a * 100) / 100, Math.round(b * 100) / 100]), ...(clear !== undefined ? { clear, clearTotal } : {}), ...(runOn ? { runOn } : {}) };
 }
 
 /**
@@ -958,7 +972,7 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
   const fight = (cf: number) => game(end) + cf - from;
   const secs = (cf: number) => Math.round((fight(cf) / FPS) * 100) / 100;
   const clockOf: number[] = [];
-  const runOn: NonNullable<ReplayResult['runOn']> = { presses: [], strikes: [], staggers: [], track: [], sp: [] };
+  const runOn: NonNullable<ReplayResult['runOn']> = { presses: [], strikes: [], staggers: [], track: [], sp: [], freezes: [] };
   const strikes0 = c.strikes.length;
   const staggers0 = c.staggers.length;
   const press = (slot: number, input: Input) => {
@@ -978,7 +992,9 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
     for (let k = 0; k < n && !pressed && !c.can(turn % n, 'battle', true); k++) turn++;
     if (!pressed && (pressed = press(turn % n, 'battle'))) turn++;
     if (!pressed) c.press(c.controlled, 'attack');
+    const z0 = c.frozenFrames;
     c.tick();
+    if (c.frozenFrames > z0) addFreeze(runOn.freezes!, fight(cf) / FPS);
   }
   if (c.dealt - base < hp) return {};
   const cf = c.frame + c.frozenFrames;

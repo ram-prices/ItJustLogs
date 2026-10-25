@@ -298,6 +298,19 @@ export async function uploadSnapshot(token: string, name: string, props: Record<
   });
 }
 
+/** Parsed runs (Rotations → Parser): one JSON file each, named "run:<at>", its last change in appProperties `edited`. */
+export async function listRunFiles(token: string): Promise<DriveSnapshot[]> {
+  const out: DriveSnapshot[] = [];
+  const q = encodeURIComponent("name contains 'run:' and trashed = false");
+  for (let page: string | undefined = ''; page !== undefined; ) {
+    const r = await call(token, `${API}/files?spaces=appDataFolder&q=${q}&pageSize=1000&fields=nextPageToken,files(id,name,appProperties)${page ? `&pageToken=${page}` : ''}`);
+    const body = (await r.json()) as { files: DriveSnapshot[]; nextPageToken?: string };
+    out.push(...body.files.filter((f) => f.name.startsWith('run:')));
+    page = body.nextPageToken;
+  }
+  return out;
+}
+
 /** Files named exactly `name` (the profile picture's original: "avatar-edit"), with their appProperties. */
 export async function listNamed(token: string, name: string): Promise<DriveSnapshot[]> {
   const q = encodeURIComponent(`name = '${name}' and trashed = false`);

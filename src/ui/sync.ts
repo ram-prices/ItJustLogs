@@ -2,7 +2,7 @@ import { compareHistories, mergeHistories, missingPulls } from '../domain/parse'
 import * as drive from '../drive';
 import { artChanged, clearHistory, importHistory, onChange, setImage, state, updateSettings } from '../state';
 import type { PullHistory } from '../domain/types';
-import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, deleteArt, deleteAvatarEdit, listSnapshots, loadAvatarEdit, saveAvatarEdit, loadSnapshot, loadSyncMeta, MAX_DRIVE_SNAPSHOTS, putArt, saveSyncMeta, type ChangeTimes, type SnapshotInfo } from '../store';
+import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, deleteArt, deleteAvatarEdit, deleteSim, isParsedRun, listSims, listSnapshots, loadAvatarEdit, onSimWrite, putSyncedSim, saveAvatarEdit, loadSnapshot, loadSyncMeta, MAX_DRIVE_SNAPSHOTS, putArt, saveSyncMeta, type ChangeTimes, type SavedSim, type SnapshotInfo } from '../store';
 import { forgetLoadedArt } from './pages/art';
 import { toast } from './common';
 import { askSamePlayer } from './dialog';
@@ -21,7 +21,9 @@ import { buildBackup, type Backup } from './io';
  *   newer copy from another device is merged in rather than overwritten;
  * - operator art isn't in that file: each picture is a file of its own,
  *   named by its key (syncArt), so the backup stays small and a picture is
- *   uploaded once, then downloaded only by devices without it.
+ *   uploaded once, then downloaded only by devices without it;
+ * - so is each parsed run (Rotations → Parser, syncRuns): the newer copy wins,
+ *   deletions travel as settings.deletedRuns. Simulator results stay local.
  */
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'reconnect' | 'paused' | 'error';
@@ -176,6 +178,7 @@ async function syncWith(token: string): Promise<void> {
     meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), paused: false };
     save();
     await syncArt(token);
+    await syncRuns(token);
     await syncAvatarEdit(token);
     await syncSnapshots(token);
     return;
@@ -215,6 +218,52 @@ async function syncArt(token: string): Promise<void> {
     forgetLoadedArt();
     artChanged(true);
   }
+}
+
+/**
+ * Parsed runs, after the backup file (so settings, with the list of deleted
+ * runs, are already merged): each is a Drive file "run:<at>" with its last
+ * change (`edited`) in appProperties. Deleted anywhere: deleted in Drive and
+ * here. Otherwise the newer side's copy is kept: downloaded when Drive's is
+ * newer or this browser lacks it, uploaded (replacing Drive's) when this one's is.
+ */
+async function syncRuns(token: string): Promise<void> {
+  const editedOf = (f: drive.DriveSnapshot) => Number(f.appProperties?.edited ?? 0);
+  const remote = (await drive.listRunFiles(token)).sort((a, b) => editedOf(b) - editedOf(a));
+  const removed = new Set(state.settings.deletedRuns ?? []);
+  const local = new Map((await listSims()).filter(isParsedRun).map((x) => [x.at, x]));
+  const inDrive = new Map<number, drive.DriveSnapshot>();
+  let changedHere = false;
+  for (const f of remote) {
+    const at = Number(f.name.slice('run:'.length));
+    // Deleted somewhere, or an older duplicate (two devices uploading at once): gone from Drive.
+    if (removed.has(at) || inDrive.has(at)) {
+      await drive.deleteFile(token, f.id);
+      continue;
+    }
+    inDrive.set(at, f);
+    const mine = local.get(at);
+    if (mine && (mine.edited ?? mine.at) >= editedOf(f)) continue;
+    const run = JSON.parse(await drive.downloadText(token, f.id)) as SavedSim;
+    if (run?.at !== at || !run.result || !isParsedRun(run)) continue;
+    await putSyncedSim({ ...run, edited: editedOf(f) });
+    local.set(at, { ...run, edited: editedOf(f) });
+    changedHere = true;
+  }
+  for (const [at, x] of local) {
+    if (removed.has(at)) {
+      await deleteSim(at, true);
+      changedHere = true;
+      continue;
+    }
+    const f = inDrive.get(at);
+    const edited = x.edited ?? x.at;
+    if (f && editedOf(f) >= edited) continue;
+    await drive.uploadSnapshot(token, `run:${at}`, { edited: String(edited) }, JSON.stringify({ ...x, edited }));
+    if (f) await drive.deleteFile(token, f.id);
+  }
+  // The Parser's list reloads (pages/rotations.ts listens).
+  if (changedHere) dispatchEvent(new Event('ijl:runs'));
 }
 
 /**
@@ -405,6 +454,16 @@ export function installSync(): void {
     if (meta.on) meta.pending = Date.now();
     save();
     if (meta.on && !meta.paused) schedule();
+  });
+  // A parsed run saved, changed or deleted here (Simulator results stay local). A deletion is remembered in
+  // settings, which also schedules the sync.
+  onSimWrite((w) => {
+    if (!w.parsed) return;
+    if (w.deleted) return updateSettings({ deletedRuns: [...(state.settings.deletedRuns ?? []), w.at].slice(-500) });
+    if (!meta.on) return;
+    meta.pending = Date.now();
+    save();
+    if (!meta.paused) schedule();
   });
   // Coming back to the tab: pick up what other devices synced meanwhile.
   document.addEventListener('visibilitychange', () => {

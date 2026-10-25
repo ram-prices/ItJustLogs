@@ -2136,6 +2136,8 @@ export class World {
         if (this.foe.nodeBuff && this.buffOf.has(this.foe.nodeBuff)) this.addBuff(target, this.foe.nodeBuff, attacker ?? target, new Map());
         this.comboEvent({ kind: 'stagger', target });
         if (this.foe.nodeStagger) n += this.foe.nodeStagger;
+        // Marked as the Recording view marks it (the meter passing its node).
+        this.mechanics.push({ frame: this.frame, label: 'Stagger node' });
         if (this.foe.nodeMechanic) this.mechanics.push({ frame: this.frame + Math.round((this.foe.nodeMechanicAt ?? 0) * FPS), label: this.foe.nodeMechanic });
         const g = this.foe.nodeGuard;
         if (g) this.poiseGuard = [this.frame + Math.round(g.after * FPS), this.frame + Math.round((g.after + g.seconds) * FPS)];

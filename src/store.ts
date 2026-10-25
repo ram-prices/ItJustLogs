@@ -114,6 +114,8 @@ export interface Settings {
   maxEssence?: string[];
   /** Operator art the player removed (keys), so sync removes it on their other devices and in Drive too. */
   deletedArt?: string[];
+  /** Parsed runs the player deleted (their `at`), so sync deletes them on their other devices and in Drive too. */
+  deletedRuns?: number[];
   /** Where each operator picture shows (by its key); unset = the banner. See ui/pages/art.ts. */
   artPlaces?: Record<string, string[]>;
   /** The operator and weapon lists' sort order (ui/pages/sorting.ts), when changed. */
@@ -297,7 +299,7 @@ export async function saveSnapshot(info: SnapshotInfo, history: PullHistory): Pr
   return keep;
 }
 
-/** A Rotations result, saved under the request that made it (team, builds, style, search, goal); this browser only. */
+/** A Rotations result, saved under the request that made it (team, builds, style, search, goal); parsed runs also sync to Drive. */
 export interface SavedSim<R = unknown> {
   key: string;
   /** When it was found (ms). */
@@ -314,35 +316,69 @@ export interface SavedSim<R = unknown> {
   video?: unknown;
   /** Recording-sim discrepancies the player dismissed (`kind@seconds`). */
   dismissed?: string[];
+  /** When it last changed (ms; unset: when it was found), so Drive sync keeps the newer copy of a parsed run. */
+  edited?: number;
 }
 /** How many Rotations results to keep (each run, for a team's history); the oldest go first, favorites never. */
 const MAX_SIMS = 100;
 
+/** A parsed run (a gameplay recording's replay), not a Simulator result: these sync to Drive. */
+export function isParsedRun(x: SavedSim): boolean {
+  try {
+    return (JSON.parse(x.key) as { video?: boolean }).video === true;
+  } catch {
+    return false;
+  }
+}
+
+/** The player saving, changing or deleting a result (not sync's own writes): Drive sync listens for parsed runs. */
+export interface SimWrite {
+  at: number;
+  parsed: boolean;
+  deleted?: boolean;
+}
+const simListeners = new Set<(w: SimWrite) => void>();
+export const onSimWrite = (fn: (w: SimWrite) => void): void => void simListeners.add(fn);
+const simWritten = (w: SimWrite) => simListeners.forEach((fn) => fn(w));
+
 export const listSims = <R>(): Promise<SavedSim<R>[]> =>
   idb<SavedSim<R>[] | undefined>('data', 'readonly', (s) => s.get('sims')).then((l) => l ?? []).catch(() => []);
 
-/** Saves a result after the others (the newest for a request is the one shown) and trims to MAX_SIMS. */
-export async function saveSim<R>(entry: SavedSim<R>): Promise<void> {
-  const list = await listSims<R>();
+/** Puts a result in the list (replacing one with the same time) and trims to MAX_SIMS, oldest first, favorites never. */
+async function putSims<R>(entry: SavedSim<R>): Promise<void> {
+  const list = (await listSims<R>()).filter((e) => e.at !== entry.at);
   list.push(entry);
   for (let i = 0; list.length > MAX_SIMS && i < list.length; ) if (list[i].fav) i++;
     else list.splice(i, 1);
   await idb('data', 'readwrite', (s) => s.put(list, 'sims'));
 }
 
+/** Saves a result after the others (the newest for a request is the one shown) and trims to MAX_SIMS. */
+export async function saveSim<R>(entry: SavedSim<R>): Promise<void> {
+  entry.edited = Date.now();
+  await putSims(entry);
+  simWritten({ at: entry.at, parsed: isParsedRun(entry) });
+}
+
+/** A parsed run from Drive, as it is there (sync's own write: not reported back to sync). */
+export const putSyncedSim = <R>(entry: SavedSim<R>): Promise<void> => putSims(entry);
+
 /** Changes a saved result (by its time): favorite, name, note; a parsed run's edited transcript and its new result. */
 export async function updateSim(at: number, change: Partial<Pick<SavedSim, 'fav' | 'name' | 'note' | 'key' | 'result' | 'video' | 'dismissed'>>): Promise<void> {
   const list = await listSims();
   const x = list.find((e) => e.at === at);
   if (!x) return;
-  Object.assign(x, change);
+  Object.assign(x, change, { edited: Date.now() });
   await idb('data', 'readwrite', (s) => s.put(list, 'sims'));
+  simWritten({ at, parsed: isParsedRun(x) });
 }
 
-/** Deletes a saved result (by its time). */
-export async function deleteSim(at: number): Promise<void> {
+/** Deletes a saved result (by its time). `fromSync`: deleted on another device, so not reported back to sync. */
+export async function deleteSim(at: number, fromSync = false): Promise<void> {
   const list = await listSims();
+  const gone = list.find((e) => e.at === at);
   await idb('data', 'readwrite', (s) => s.put(list.filter((e) => e.at !== at), 'sims'));
+  if (gone && !fromSync) simWritten({ at, parsed: isParsedRun(gone), deleted: true });
 }
 
 /** A read video waiting for the player's picks (Rotations → Parser), until it's simulated or discarded. */
