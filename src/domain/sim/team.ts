@@ -557,7 +557,7 @@ export interface ReplayResult extends SimResult {
    * operator's hits of that kind until their next press of it; a Final Strike or Finisher gets their basic attacks'
    * hits up to it (and its own projectiles just after).
    */
-  actionDamage?: { presses: [number, number][][]; strikes: [number, number][][] };
+  actionDamage?: { presses: ActionHits[]; strikes: ActionHits[]; top?: (TopHit | null)[] };
   /**
    * How SP moved with each action, in the order of `presses` and `strikes`: a battle skill's cost (and anything else
    * the press's first frame changed), a Final Strike's or Finisher's gain. The SP bar itself is `spTrack`.
@@ -581,9 +581,11 @@ export interface ReplayResult extends SimResult {
    * Strikes, Staggers, its track (as `track`: damage so far, meter) and SP (as `spTrack`). The Sim view's timeline
    * runs on through it.
    */
-  runOn?: { presses: Press[]; strikes: Strike[]; staggers: Stagger[]; track: [number, number, number][]; sp: [number, number][]; lastEnd?: number; freezes?: [number, number][] };
+  runOn?: { presses: Press[]; strikes: Strike[]; staggers: Stagger[]; track: [number, number, number][]; sp: [number, number][]; lastEnd?: number; freezes?: [number, number][]; staggerLeft?: [number, number][] };
   /** Where the fight's clock stood still for a cut-in (seconds on the fight's clock): no Stagger time passed. */
   freezes?: [number, number][];
+  /** The Staggered meter's fill while Staggered, with the bars: [seconds on the fight's clock, 0–1] (World.staggerLeft). */
+  staggerLeft?: [number, number][];
 }
 
 /** A frozen frame (from `t`, seconds) added to a list of spans, joined to the last one where it follows on. */
@@ -769,6 +771,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   // The buffs shown on each operator and the enemy, sampled with the bars: stretches still open by key.
   const buffs: BuffSpan[] = [];
   const freezes: [number, number][] = [];
+  const staggerLeft: [number, number][] = [];
   const holding = new Map<string, BuffSpan>();
   const noteBuffs = (t: number) => {
     const now = new Set<string>();
@@ -814,6 +817,8 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     if (clock() % 8 === 0 && !paused(clock())) {
       track.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
       spTrack.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.sp)]);
+      const left = w.staggerLeft();
+      if (left !== undefined) staggerLeft.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(left * 1000) / 1000]);
       noteBuffs(Math.round((game(clock()) / FPS) * 100) / 100);
     }
     clockAt[w.frame] ??= clock();
@@ -923,9 +928,12 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     mechanics: w.mechanics.map((m) => ({ ...m, frame: toClock(m.frame) })),
     away: w.away.map(([a, b]) => [game(a), game(b)] as [number, number]),
   };
-  const actionDamage = damageByAction(hits, f.presses, f.strikes ?? [], req.builds.map((b) => b.op));
+  // The recording's damage is split by what each hit would have dealt, not what the phase cap left it: a hit after the
+  // sim's phase ran out still claims its share of the bar's drop (the Finisher that ends the recording's phase 1).
+  const raw = w.hits.map((h) => ({ ...h, frame: toClock(h.frame) }));
+  const actionDamage = damageByAction(raw, f.presses, f.strikes ?? [], req.builds.map((b) => b.op));
   const perSecond: Record<string, number>[] = [];
-  for (const h of hits) {
+  for (const h of raw) {
     if (!h.amount) continue;
     const k = Math.max(0, Math.floor(h.frame / FPS));
     while (perSecond.length <= k) perSecond.push({});
@@ -940,7 +948,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   };
   const lastHp = team.enemy?.phaseHp ?? team.hp ?? 0;
   const clearTotal = clear !== undefined ? Math.round(total + Math.max(0, lastHp - (foe.phaseHp ? dealt[dealt.length - 1] : total))) : undefined;
-  return { ...summary(f, req, start), missed, track, perSecond, actionDamage, actionSp, spTrack, buffs, freezes: freezes.map(([a, b]) => [Math.round(a * 100) / 100, Math.round(b * 100) / 100]), ...(clear !== undefined ? { clear, clearTotal } : {}), ...(runOn ? { runOn } : {}) };
+  return { ...summary(f, req, start), missed, track, perSecond, actionDamage, actionSp, spTrack, buffs, staggerLeft, freezes: freezes.map(([a, b]) => [Math.round(a * 100) / 100, Math.round(b * 100) / 100]), ...(clear !== undefined ? { clear, clearTotal } : {}), ...(runOn ? { runOn } : {}) };
 }
 
 /**
@@ -972,7 +980,7 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
   const fight = (cf: number) => game(end) + cf - from;
   const secs = (cf: number) => Math.round((fight(cf) / FPS) * 100) / 100;
   const clockOf: number[] = [];
-  const runOn: NonNullable<ReplayResult['runOn']> = { presses: [], strikes: [], staggers: [], track: [], sp: [], freezes: [] };
+  const runOn: NonNullable<ReplayResult['runOn']> = { presses: [], strikes: [], staggers: [], track: [], sp: [], freezes: [], staggerLeft: [] };
   const strikes0 = c.strikes.length;
   const staggers0 = c.staggers.length;
   const press = (slot: number, input: Input) => {
@@ -986,6 +994,8 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
     if ((cf - from) % 8 === 0) {
       runOn.track.push([secs(cf), Math.round(c.dealt), Math.round(c.meterNow() * 1000) / 1000]);
       runOn.sp.push([secs(cf), Math.round(c.sp)]);
+      const left = c.staggerLeft();
+      if (left !== undefined) runOn.staggerLeft!.push([secs(cf), Math.round(left * 1000) / 1000]);
     }
     let pressed = false;
     for (const input of ['combo', 'ultimate'] as Input[]) for (let s = 0; s < n && !pressed; s++) pressed = press(s, input);
@@ -1009,20 +1019,40 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
   return { at: secs(cf), runOn };
 }
 
+/** One action's damage by second: [second, damage, its `<operator>|<source>`] (no source in runs replayed before it). */
+export type ActionHits = [number, number, string?][];
+
+/** A second's biggest single hit: its `<operator>|<source>`, its amount, and the action it counts for (actionDamage's index). */
+export interface TopHit {
+  key: string;
+  amount: number;
+  press?: number;
+  strike?: number;
+}
+
 /** Which action each hit belongs to (ReplayResult.actionDamage): by its operator and skill kind, on the fight's clock. */
 function damageByAction(
-  hits: { frame: number; operator: string; amount: number; skillKind?: string }[],
+  hits: { frame: number; operator: string; amount: number; skill: string; skillKind?: string }[],
   presses: { frame: number; slot: number; input: Input }[],
-  strikes: { frame: number; slot: number }[],
+  strikes: { frame: number; slot: number; finisher?: boolean }[],
   ops: string[],
 ): NonNullable<ReplayResult['actionDamage']> {
   const INPUT: Record<string, Input> = { normal: 'battle', combo: 'combo', ultimate: 'ultimate' };
   const slotOf = new Map(ops.map((op, i) => [op, i]));
-  const byPress = presses.map(() => new Map<number, number>());
-  const byStrike = strikes.map(() => new Map<number, number>());
-  const add = (m: Map<number, number>, frame: number, amount: number) => {
+  const byPress = presses.map(() => new Map<string, [number, number, string]>());
+  const byStrike = strikes.map(() => new Map<string, [number, number, string]>());
+  const top: (TopHit | null)[] = [];
+  const note = (frame: number, h: { operator: string; amount: number; skill: string; skillKind?: string }, at: { press?: number; strike?: number }) => {
     const s = Math.floor(frame / FPS);
-    m.set(s, (m.get(s) ?? 0) + amount);
+    while (top.length <= s) top.push(null);
+    if (!top[s] || h.amount > top[s]!.amount) top[s] = { key: `${h.operator}|${sourceOf(h.skill, h.skillKind)}`, amount: h.amount, ...at };
+  };
+  const add = (m: Map<string, [number, number, string]>, frame: number, h: { operator: string; amount: number; skill: string; skillKind?: string }) => {
+    const s = Math.floor(frame / FPS);
+    const key = `${h.operator}|${sourceOf(h.skill, h.skillKind)}`;
+    const x = m.get(`${s}|${key}`) ?? [s, 0, key];
+    x[1] += h.amount;
+    m.set(`${s}|${key}`, x);
   };
   const late = Math.round(0.5 * FPS);
   for (const h of hits) {
@@ -1032,14 +1062,24 @@ function damageByAction(
     if (input) {
       let i = -1;
       for (let k = 0; k < presses.length && presses[k].frame <= h.frame; k++) if (presses[k].slot === slot && presses[k].input === input) i = k;
-      if (i >= 0) add(byPress[i], h.frame, h.amount);
+      if (i >= 0) add(byPress[i], h.frame, h);
+      note(h.frame, h, i >= 0 ? { press: i } : {});
     } else if (h.skillKind === 'basic') {
-      // Its own Final Strike's projectiles land a moment after it; any other basic hit belongs to the next one.
-      let j = strikes.findIndex((s) => s.slot === slot && s.frame <= h.frame && h.frame - s.frame <= late);
+      // A Finisher's own hit belongs to it, however long after its strike it lands (Yvonne's lands ~0.6 s later and
+      // went to her next Final Strike). Its own Final Strike's projectiles land a moment after it; any other basic hit
+      // belongs to the next one.
+      // Its projectile lands before the strike is recorded (at the main hit), so a Finisher strike just after takes it.
+      let j = -1;
+      if (sourceOf(h.skill, h.skillKind) === 'Finisher') {
+        j = strikes.findIndex((s) => s.slot === slot && s.finisher && s.frame >= h.frame && s.frame - h.frame <= FPS);
+        if (j < 0) for (let k = 0; k < strikes.length && strikes[k].frame <= h.frame; k++) if (strikes[k].slot === slot && strikes[k].finisher) j = k;
+      }
+      if (j < 0) j = strikes.findIndex((s) => s.slot === slot && s.frame <= h.frame && h.frame - s.frame <= late);
       if (j < 0) j = strikes.findIndex((s) => s.slot === slot && s.frame >= h.frame);
-      if (j >= 0) add(byStrike[j], h.frame, h.amount);
+      if (j >= 0) add(byStrike[j], h.frame, h);
+      note(h.frame, h, j >= 0 ? { strike: j } : {});
     }
   }
-  const pairs = (m: Map<number, number>) => [...m.entries()].sort((a, b) => a[0] - b[0]).map(([s, d]) => [s, Math.round(d)] as [number, number]);
-  return { presses: byPress.map(pairs), strikes: byStrike.map(pairs) };
+  const pairs = (m: Map<string, [number, number, string]>): ActionHits => [...m.values()].sort((a, b) => a[0] - b[0]).map(([s, d, key]) => [s, Math.round(d), key]);
+  return { presses: byPress.map(pairs), strikes: byStrike.map(pairs), top };
 }

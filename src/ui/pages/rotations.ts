@@ -18,6 +18,7 @@ import {
   enemySeen,
   spGained,
   styleOf,
+  type ActionHits,
   type BuildMode,
   type Effort,
   type Goal,
@@ -498,31 +499,52 @@ function fitRecording(r: NonNullable<typeof replay>): RecordingCard {
   const asked = (JSON.parse(entry.key) as { enemy?: string | Enemy }).enemy;
   const enemy = typeof asked === 'object' ? asked : asked ? enemyById(asked).enemy : undefined;
   const phaseHp = enemy?.phaseHp ?? r.result.hp ?? 0;
-  const rec = recordingTrack(reading, r.result.seconds, phaseHp, enemy?.nodes ?? [], enemy?.nodeMechanic);
   const sim = simTrack(r.result);
-  // The Parser tells what each operator did: the recording's damage, split as the sim split its own.
-  const fit = fitToRecording(r.result, reading.boss, reading.pauses ?? [], phaseHp);
+  const rec = withUnseen(recordingTrack(reading, r.result.seconds, phaseHp, enemy?.nodes ?? [], enemy?.nodeMechanic), r.result.strikes ?? []);
+  // The Parser tells what each operator did: the recording's damage, split as the sim split its own, each of the sim's
+  // actions moved to where the recording made it.
+  const m = matchActions(rec, sim);
+  const shift = { presses: sim.presses.map((): number | undefined => undefined), strikes: sim.strikes.map((): number | undefined => undefined) };
+  m.presses.forEach((j, i) => j !== undefined && (shift.presses[j] = (rec.presses[i].frame - sim.presses[j].frame) / FPS));
+  m.strikes.forEach((j, i) => j !== undefined && (shift.strikes[j] = (rec.strikes[i].frame - sim.strikes[j].frame) / FPS));
+  const fit = fitToRecording(r.result, reading.boss, reading.pauses ?? [], phaseHp, shift);
   // Each action's damage, every second of it scaled as the fit scales that second.
-  const ad = r.result.actionDamage;
-  const sum = (pairs: [number, number][]) => Math.round(pairs.reduce((n, [s, d]) => n + d * fit.scaleAt(s), 0));
-  const press = ad?.presses.map(sum) ?? [];
-  const strike = ad?.strikes.map(sum) ?? [];
+  const ad = fit.actionDamage;
+  const sum = (pairs: ActionHits) => Math.round(pairs.reduce((n, [s, d]) => n + d * fit.scaleAt(s), 0));
+  // A crit's excess (fit.extras) to the action whose hit took it.
+  const press = (ad?.presses.map(sum) ?? []).map((d, i) => d + Math.round(fit.extras.filter((x) => x.hit.press === i).reduce((n, x) => n + x.amount, 0)));
+  const strike = (ad?.strikes.map(sum) ?? []).map((d, i) => d + Math.round(fit.extras.filter((x) => x.hit.strike === i).reduce((n, x) => n + x.amount, 0)));
   const simWithDmg = ad ? withDamage(sim, sim, press, strike, true) : sim;
   const asp = r.result.actionSp;
   const simWith = asp ? { ...simWithDmg, pressSp: asp.presses, strikeSp: asp.strikes, pressSpAfter: asp.pressesAfter, strikeSpAfter: asp.strikesAfter } : simWithDmg;
   // Each source's damage so far, each second scaled as the fit scales it.
   const live: LiveDamage = new Map();
-  const per = r.result.perSecond ?? [];
+  const per = fit.perSecond;
   for (const sec of per) for (const key of Object.keys(sec ?? {})) if (!live.has(key)) live.set(key, []);
   for (const [key, series] of live) {
     let run = 0;
     for (let k = 0; k < per.length; k++) {
-      run += (per[k]?.[key] ?? 0) * fit.scaleAt(k);
+      run += (per[k]?.[key] ?? 0) * fit.scaleAt(k) + fit.extras.filter((x) => x.second === k && x.hit.key === key).reduce((n, x) => n + x.amount, 0);
       series.push(run);
     }
   }
   const recWith = withExactSp(ad ? withDamage(rec, sim, press, strike, false) : rec, simWith);
   return { recording: recWith, simTrack: simWith, dpsMax: Math.max(...rec.dps, ...sim.dps, 0), unattributed: fit.unattributed, afterKill: fit.afterKill, shown: fit.result, live };
+}
+
+/**
+ * The sim's Final Strikes the recording can't show, put in a recording's track where none of its own matches: an
+ * ultimate form's attacks move no SP (Yvonne's closing ult_attack_end), so the reader never sees them.
+ */
+function withUnseen(track: Track, strikes: { frame: number; slot: number; finisher: boolean; unseen?: boolean }[]): Track {
+  const taken = new Set(matchActions(track, { presses: [], strikes }).strikes);
+  const add = strikes.filter((x, i) => x.unseen && !x.finisher && !taken.has(i));
+  if (!add.length) return track;
+  const rows = [
+    ...track.strikes.map((x, i) => ({ x, sp: track.strikeSp?.[i], after: track.strikeSpAfter?.[i] })),
+    ...add.map((x) => ({ x: { frame: x.frame, slot: x.slot, finisher: false }, sp: undefined, after: undefined })),
+  ].sort((a, b) => a.x.frame - b.x.frame);
+  return { ...track, strikes: rows.map((r) => r.x), ...(track.strikeSp ? { strikeSp: rows.map((r) => r.sp), strikeSpAfter: rows.map((r) => r.after) } : {}) };
 }
 
 /** The video's rotation as the sim played it: the usual results, and the presses it couldn't make. */
@@ -1418,7 +1440,18 @@ function timeline(r: SimResult, names: string[]): Html {
 const play = { t: 0, speed: 4, running: false, of: null as SimResult | null, raf: 0, last: 0 };
 /** The boss's bars over the fight: HP left (0–1) and its Stagger meter (0–1, -1 Staggered, NaN unknown). */
 /** A source's boss bars: readings in time (the meter -1 while Staggered), and its Staggered stretches (seconds). */
-type Bars = { t: number[]; hp: number[]; meter: number[]; staggered?: [number, number][]; staggerSeconds?: number; holds?: [number, number][] };
+type Bars = { t: number[]; hp: number[]; meter: number[]; staggered?: [number, number][]; staggerSeconds?: number; holds?: [number, number][]; left?: [number, number][] };
+
+/** A Staggered meter's fill at t from its readings within the stretch (between them in a straight line), if any. */
+function leftAt(left: [number, number][] | undefined, s: [number, number], t: number): number | undefined {
+  const inside = (left ?? []).filter(([x]) => x >= s[0] - 0.3 && x <= s[1] + 0.3);
+  if (!inside.length) return undefined;
+  const i = inside.findIndex(([x]) => x > t);
+  if (i === 0) return inside[0][1];
+  if (i < 0) return inside.at(-1)![1];
+  const [[a, va], [b, vb]] = [inside[i - 1], inside[i]];
+  return va + ((vb - va) * (t - a)) / Math.max(1e-6, b - a);
+}
 
 /** How much of a to b the fight's clock stood still in (cut-ins, seconds). */
 const heldIn = (holds: [number, number][] | undefined, a: number, b: number): number =>
@@ -1591,6 +1624,7 @@ function simLong(shown: SimResult, replayed: ReplayResult | undefined): SimResul
     track: [...(replayed!.track ?? []), ...on.track],
     spTrack: [...(replayed!.spTrack ?? []), ...on.sp],
     freezes: [...(replayed!.freezes ?? []), ...(on.freezes ?? [])],
+    staggerLeft: [...(replayed!.staggerLeft ?? []), ...(on.staggerLeft ?? [])],
   } as ReplayResult;
   longOf.set(shown, long);
   baseOf.set(long, shown);
@@ -1653,6 +1687,7 @@ function preparePlay(r: SimResult): { video?: Bars } {
   // The game's Stagger time stands still through a cut-in, and so does its meter's drain: the sim's own cut-ins, and
   // for the recording the replay's, made at the video's ultimates.
   sim.holds = (r as ReplayResult).freezes;
+  sim.left = (r as ReplayResult).staggerLeft;
   if (video) {
     // The meter only fills between resets (a Stagger, a phase change), so within each stretch a reading is the lowest
     // read after it: a rise counts once the readings after it hold it, and misreads (a hit's flash over the meter:
@@ -1673,6 +1708,8 @@ function preparePlay(r: SimResult): { video?: Bars } {
     video.staggered = staggeredOf(video);
     video.staggerSeconds = enemy?.staggerSeconds;
     video.holds = (replay?.result as ReplayResult | undefined)?.freezes;
+    // The meter's fill as the video showed it while Staggered, where the reading has it (the AI parser's).
+    video.left = reading?.staggerLeft?.filter(([t]) => !pauses.some(([a, b]) => t >= a && t < b)).map(([t, v]) => [clock(t), v] as [number, number]);
   }
   // The SP bar: the sim's (a replay's), and the video's as read (seconds into the video, put on the fight's clock).
   const simSp = (r as ReplayResult).spTrack;
@@ -1715,9 +1752,11 @@ function playControls(r: SimResult, extra?: Html): Html {
  */
 function barsNow(b: Bars, kind?: string): { hp: string; meter: string; staggered: boolean } {
   const raw = barAt(b, play.t);
-  const s = b.staggered?.find(([a, z]) => play.t >= a && play.t < z);
+  // The last stretch runs to its last reading: a kill while Staggered keeps the meter at the timeline's end.
+  const s = b.staggered?.find(([a, z], i, all) => play.t >= a && (play.t < z || (i === all.length - 1 && raw.meter < 0)));
   const on = !!s || (raw.meter < 0 && !b.staggered);
-  const left = s ? Math.max(0, 1 - (play.t - s[0] - heldIn(b.holds, s[0], play.t)) / Math.max(1e-6, s[1] - s[0] - heldIn(b.holds, s[0], s[1]), b.staggerSeconds ?? 0)) : 1;
+  // As it was where that's known (the sim's Stagger time left, the video's fill); else spread over the stretch.
+  const left = s ? (leftAt(b.left, s, play.t) ?? Math.max(0, 1 - (play.t - s[0] - heldIn(b.holds, s[0], play.t)) / Math.max(1e-6, s[1] - s[0] - heldIn(b.holds, s[0], s[1]), b.staggerSeconds ?? 0))) : 1;
   // While playing (`kind`: which row), a reading's change slides in (barSlide); a Staggered meter drains as it is.
   const hp = kind ? barSlide(`${kind}|hp`, raw.hp) : raw.hp;
   const meter = on ? left : Number.isNaN(raw.meter) || raw.meter < 0 ? 0 : kind ? barSlide(`${kind}|meter`, raw.meter) : raw.meter;

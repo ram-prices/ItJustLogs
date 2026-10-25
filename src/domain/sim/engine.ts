@@ -2262,11 +2262,18 @@ export class World {
     if (attacker.side === 'team' && defender.side === 'enemy') {
       const finisher = /_power_?attack/.test(ctx.skillId);
       if (attacker.slot === this.controlled && ((mask & FINAL_STRIKE) !== 0 || finisher)) {
-        // One strike per attack, however many of its projectiles hit (a Finisher's several).
+        // One strike per attack, however many of its projectiles hit (a Finisher's several). A Finisher counts at its
+        // own main hit when its skill has one, where its SP comes too (GainBreakingAttackAtb beside it): Yvonne's
+        // projectile lands ~0.67 s earlier, and the recording places her Finisher at the SP gain.
         const strike = ctx.run?.origin ?? ctx.run;
-        if (!strike || strike !== this.strikeRun) this.strikes.push({ frame: this.frame, slot: attacker.slot, finisher, ...(finisher || strike?.unseen || this.main[attacker.slot]?.unseen ? { unseen: true } : {}) });
-        this.strikeRun = strike ?? null;
-        this.comboEvent({ kind: 'finalStrike', finisher, target: defender });
+        const early = finisher && !!ctx.run?.origin && ownHit(ctx.run.origin.skill);
+        if (early) {
+          // Its main hit comes: the strike is recorded then.
+        } else if (!strike || strike !== this.strikeRun) this.strikes.push({ frame: this.frame, slot: attacker.slot, finisher, ...(finisher || strike?.unseen || this.main[attacker.slot]?.unseen ? { unseen: true } : {}) });
+        if (!early) {
+          this.strikeRun = strike ?? null;
+          this.comboEvent({ kind: 'finalStrike', finisher, target: defender });
+        }
       }
       if (dmg.skillKind === 'combo') this.comboEvent({ kind: 'comboDamage', by: attacker });
       if (kind === 'burst') this.comboEvent({ kind: 'burst', of: type, target: defender });
@@ -2921,6 +2928,15 @@ export class World {
   }
 
   /**
+   * The Staggered meter's fill (0–1) as the game drains it: the Stagger time left over its duration. It stands still
+   * through cut-ins and runs slow under Imprisonment, as the Staggered time does. Undefined when not Staggered.
+   */
+  staggerLeft(): number | undefined {
+    if (!this.staggered(this.enemy) || !this.foe.staggerSeconds) return undefined;
+    return Math.min(1, (this.enemy.bb.get('staggeredUntil')! - this.frame) / (this.foe.staggerSeconds * FPS));
+  }
+
+  /**
    * Only n of the operator's summons are in reach of its next skill (a recording's SP back says: Tangtang's
    * Whirlpools the boss moved away from), for the next 2 s.
    */
@@ -3490,6 +3506,10 @@ function isCondition(a: Data): boolean {
 }
 
 /** A skill's kind from its id: basic attacks, battle ("normal") skill, combo, ultimate. */
+/** Whether a skill deals damage on its own timeline (not only through what it launches): a Finisher's main hit. */
+const ownHit = (skill: Data): boolean =>
+  (skill?.actionGroupData?.timelineActions ?? []).some((ta: Data) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => /\.DamageAction\+/.test(d.$type ?? '')));
+
 export function kindOf(skillId: string): string {
   if (/_ultimate_skill/.test(skillId)) return 'ultimate';
   if (/_combo_skill/.test(skillId)) return 'combo';

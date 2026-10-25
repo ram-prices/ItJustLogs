@@ -56,6 +56,8 @@ export interface VideoRotation {
   guard?: [number, number][];
   /** The boss's bars as the video shows them: seconds from the fight's start, HP left (0–1), Stagger meter (0–1, -1 Staggered). */
   boss?: [number, number, number][];
+  /** The Staggered meter's fill as the video shows it (seconds from the fight's start, 0–1), while Staggered. */
+  staggerLeft?: [number, number][];
   /** The SP bar (0–300) as read: [seconds from the fight's start, SP]. */
   sp?: [number, number][];
   /** The boss's name, as shown above its HP bar. */

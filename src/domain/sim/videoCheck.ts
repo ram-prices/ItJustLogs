@@ -3,10 +3,62 @@
  * in the video (the parser's `boss` readings), so the player can look there and fix the transcript.
  */
 
-import type { ReplayResult } from './team';
+import type { ActionHits, ReplayResult, TopHit } from './team';
 
 /** Seconds per bin when fitting: wide enough that a hit the sim lands a second early or late stays in its bin. */
 const FIT_BIN = 2;
+/** A bin this far over the sim's expectation is a crit's: the excess goes to its biggest hit, not spread. */
+const CRIT_EXCESS = 0.25;
+/** The most a crit adds over a hit's expected size (expected values already average crits in: Yvonne's crits are
+ * ~1.43× her expected hit). */
+const CRIT_MOST = 0.5;
+
+/** Each sim action's offset to the recording's same action, in seconds (the recording's time less the sim's), by index. */
+export interface ActionShift {
+  presses: (number | undefined)[];
+  strikes: (number | undefined)[];
+}
+
+/**
+ * The sim's damage each second with each action's hits moved by its offset to the recording's same action, so a hit
+ * the sim lands a second late is fitted against the bar's drop where the game dealt it (the Skydrummer's first
+ * Finisher: the sim's Stagger came 1.1 s late). Runs replayed before actions kept their sources stay as they are.
+ */
+function alignActions(r: ReplayResult, shift: ActionShift): { perSecond: Record<string, number>[]; actionDamage: ReplayResult['actionDamage'] } {
+  const ad = r.actionDamage;
+  const per = (r.perSecond ?? []).map((x) => ({ ...(x ?? {}) }));
+  if (!ad) return { perSecond: per, actionDamage: ad };
+  const to = (s: number, d: number) => Math.max(0, Math.floor(s + 0.5 + d));
+  const movable = (pairs: ActionHits, d: number | undefined) => !!d && pairs.every((p) => !!p[2]);
+  const move = (list: ActionHits[], offsets: (number | undefined)[]) =>
+    list.map((pairs, i) => {
+      const d = offsets[i];
+      if (!movable(pairs, d)) return pairs;
+      return pairs.map(([s, v, key]): [number, number, string?] => {
+        const t = to(s, d!);
+        if (t === s) return [s, v, key];
+        const from = per[s] ?? {};
+        from[key!] = (from[key!] ?? 0) - v;
+        if (Math.abs(from[key!]) < 1) delete from[key!];
+        while (per.length <= t) per.push({});
+        per[t][key!] = (per[t][key!] ?? 0) + v;
+        return [t, v, key];
+      });
+    });
+  const presses = move(ad.presses, shift.presses);
+  const strikes = move(ad.strikes, shift.strikes);
+  // Each second's biggest hit moves with its action.
+  const top: (TopHit | null)[] = [];
+  (ad.top ?? []).forEach((h, s) => {
+    if (!h) return;
+    const pairs = h.press !== undefined ? ad.presses[h.press] : h.strike !== undefined ? ad.strikes[h.strike] : undefined;
+    const d = h.press !== undefined ? shift.presses[h.press] : h.strike !== undefined ? shift.strikes[h.strike] : undefined;
+    const t = pairs && movable(pairs, d) ? to(s, d!) : s;
+    while (top.length <= t) top.push(null);
+    if (!top[t] || h.amount > top[t]!.amount) top[t] = h;
+  });
+  return { perSecond: per, actionDamage: { presses, strikes, top } };
+}
 
 /**
  * The replay with the recording's own damage: each FIT_BIN seconds' damage from the boss's HP bar (the game's rolls,
@@ -14,9 +66,25 @@ const FIT_BIN = 2;
  * keep the sim's damage; damage where the sim made no hit goes to the nearest stretch it did, else is
  * `unattributed` (an action the transcript lacks).
  */
-export function fitToRecording(r: ReplayResult, boss: [number, number, number][], pauses: [number, number][], phaseHp: number): { result: ReplayResult; unattributed: number; afterKill: number; scaleAt: (second: number) => number } {
-  const per = r.perSecond;
-  if (!per || !boss.length || !phaseHp) return { result: r, unattributed: 0, afterKill: 0, scaleAt: () => 1 };
+export function fitToRecording(
+  r: ReplayResult,
+  boss: [number, number, number][],
+  pauses: [number, number][],
+  phaseHp: number,
+  shift: ActionShift = { presses: [], strikes: [] },
+): {
+  result: ReplayResult;
+  unattributed: number;
+  afterKill: number;
+  scaleAt: (second: number) => number;
+  extras: { second: number; amount: number; hit: TopHit }[];
+  /** The sim's damage each second and by action, each action moved to the recording's time (`alignActions`). */
+  perSecond: Record<string, number>[];
+  actionDamage: ReplayResult['actionDamage'];
+} {
+  if (!r.perSecond || !boss.length || !phaseHp) return { result: r, unattributed: 0, afterKill: 0, scaleAt: () => 1, extras: [], perSecond: r.perSecond ?? [], actionDamage: r.actionDamage };
+  const aligned = alignActions(r, shift);
+  const per = aligned.perSecond;
   const clock = (t: number) => t - pauses.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, t) - a), 0);
   // The game's damage each second of the fight's clock, phases refilling the bar.
   const game: number[] = [];
@@ -76,14 +144,30 @@ export function fitToRecording(r: ReplayResult, boss: [number, number, number][]
     want[b] = 0;
   }
   const fitted: Record<string, number>[] = [];
-  // Each bin's one factor (every hit in it scaled alike), for scaling one action's damage as the totals are.
+  // Each bin's one factor (every hit in it scaled alike), for scaling one action's damage as the totals are. A bin
+  // well over what the sim expects (a crit: the sim averages them) keeps every hit at its expected size and gives the
+  // excess to its biggest single hit, the one most likely to have crit (`extras`).
   const scales: number[] = [];
+  const extras: { second: number; amount: number; hit: TopHit }[] = [];
+  const tops = aligned.actionDamage?.top ?? [];
   for (let b = 0; b < bins; b++) {
     const sim = simBin[b];
     const simSum = Object.values(sim).reduce((n, v) => n + v, 0);
     if (!readBin[b] || !simSum) {
       fitted.push({ ...sim });
       scales.push(1);
+      continue;
+    }
+    let best: { second: number; hit: TopHit } | null = null;
+    for (let k = b * FIT_BIN; k < (b + 1) * FIT_BIN; k++) if (tops[k] && (!best || tops[k]!.amount > best.hit.amount)) best = { second: k, hit: tops[k]! };
+    if (best && want[b] > simSum * (1 + CRIT_EXCESS)) {
+      // A crit adds at most CRIT_MOST of the hit's expected size; the rest (the sim's timing off, an action it lacks)
+      // is shared out as usual.
+      const extra = Math.min(want[b] - simSum, best.hit.amount * CRIT_MOST);
+      const scale = (want[b] - extra) / simSum;
+      scales.push(scale);
+      extras.push({ second: best.second, amount: extra, hit: best.hit });
+      fitted.push(Object.fromEntries(Object.entries(sim).map(([key, v]) => [key, v * scale + (key === best!.hit.key ? extra : 0)])));
       continue;
     }
     const scale = want[b] / simSum;
@@ -108,7 +192,7 @@ export function fitToRecording(r: ReplayResult, boss: [number, number, number][]
     }
     track.push([(k + 1) * FIT_BIN, Math.round(dealt), r.track?.find(([t]) => t >= (k + 1) * FIT_BIN)?.[2] ?? -2]);
   });
-  return { result: { ...r, total, byOperator, sources: [...sources.values()].sort((a, b) => b.total - a.total), track }, unattributed, afterKill, scaleAt: (s) => scales[Math.floor(s / FIT_BIN)] ?? 1 };
+  return { result: { ...r, total, byOperator, sources: [...sources.values()].sort((a, b) => b.total - a.total), track }, unattributed, afterKill, scaleAt: (s) => scales[Math.floor(s / FIT_BIN)] ?? 1, extras, ...aligned };
 }
 
 /** A moment the replay stops matching the video. */

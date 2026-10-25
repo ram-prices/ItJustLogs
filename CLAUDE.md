@@ -569,12 +569,19 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   so a recording's big rolls (the Finisher that ends phase 1, the 266k bomb) are luck it can't follow.
   A parsed run's Timeline card has a Recording | Sim switch (`view`, default Recording: what happened; the sim
   tells who dealt how much). Recording (`recordingTrack`) is 1:1 with the video: the presses, Final Strikes and
-  interrupts as read, the boss's node mechanic (Foundite Weapon) at each no-Stagger stretch's start, Staggered where the meter went yellow, the Stagger node where it passed half, Invulnerable
+  interrupts as read (plus the sim's Final Strikes the SP bar can't show, an ultimate form's, where none of the
+  reading's matches: `withUnseen`), the boss's node mechanic (Foundite Weapon) at each no-Stagger stretch's start, Staggered where the meter went yellow, the Stagger node where it passed half, Invulnerable
   and no-Stagger stretches, a Damage lane with each second's damage from the HP bar (crits and all) and the
   video's bars; Sim (`simTrack`) is the same actions as the sim made them, its expected damage and its bars. One
   play control, one damage scale; the action list follows the view.
   The Parser's numbers are the recording's: `fitToRecording` (videoCheck.ts) takes each second's damage from the
-  boss's HP bar and splits it among that second's hits as the sim split them (`ReplayResult.perSecond`,
+  boss's HP bar and splits it among that second's hits as the sim split them, before the phase cap, so a hit after the
+  sim's phase ran out still claims its share (`ReplayResult.perSecond`; a 2 s bin 25% or more over the sim's expectation
+  gives up to half its biggest single hit's expected size to that hit, a crit (the rest shared out as usual): `actionDamage.top`,
+  `fit.extras`; a Finisher's hit counts for its Finisher however late it lands (its projectile, landing before the
+  strike is recorded, for the Finisher just after it); each sim action's hits are first moved by its offset to the
+  recording's same action (`alignActions`, `ActionShift`; actionDamage pairs carry their source, so runs replayed before
+  that stay put): the Skydrummer's Stagger came 1.1 s late in the sim, which put its Finisher in the next bin,
   operator|source), so a crit shows at its real size and totals match the video; damage in a second the sim made no
   hit in is a "Not attributed" row (an action the transcript lacks), unless the sim hits nothing more until the fight's end or
   the next phase: then its boss died sooner (`afterKill`, not counted there). The summary always compares the two clear
