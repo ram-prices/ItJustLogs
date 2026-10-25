@@ -460,11 +460,16 @@ export interface Enemy {
    * The stage's rules. `food`: a buff placed on each operator before the fight, allowed unless false (Re-Crisis only,
    * of the game's hard content; healing items used during a fight are another thing). `fullUltimate`: every
    * operator's ultimate full at the start (Re-Crisis). `prep`: the fight waits for a start button, so the team can set
-   * up first while SP regenerates (Echoes of War). Every stage starts at 200 SP of 300 (START_SP).
+   * up first while SP regenerates (Echoes of War). A stage starts at 200 SP of 300 (START_SP) unless `sp` says otherwise.
    */
   food?: boolean;
   fullUltimate?: boolean;
   prep?: boolean;
+  /**
+   * A stage's own SP: where it starts, its cap and its regeneration a second (Glaiver File: 620 of 700, about 4 a
+   * second, read from a recording). Unset: 200 of 300, 8 a second.
+   */
+  sp?: { start: number; max: number; regen: number };
   /**
    * A guard stance it takes when its HP falls below each share in `below` (needs phaseHp): for `seconds`, damage
    * taken changes by `damageTaken` (-0.9: a tenth), its DEF by `def`, and its Stagger meter heals faster than hits
@@ -608,6 +613,12 @@ export class World {
     for (const e of ELEMENTS) this.enemy.attr[`${e}Resistance`] = enemy.resist?.[e] ?? 0;
     this.enemy.attr.PhysicalResistance = enemy.resist?.Physical ?? 0;
     this.foe = enemy;
+    if (enemy.sp) this.sp = enemy.sp.start;
+  }
+
+  /** The SP bar's cap. */
+  get spMax(): number {
+    return this.foe.sp?.max ?? 300;
   }
 
   private entity(id: string, side: Side, owner: Entity | null, slot: number, stats?: Stats): Entity {
@@ -2451,7 +2462,7 @@ export class World {
     if (!amount) return;
     if (type === 'Atb') {
       this.lastAtbAmount = amount;
-      this.sp = Math.min(300, this.sp + amount);
+      this.sp = Math.min(this.spMax, this.sp + amount);
       this.abilityEvent(who.owner ?? who, 'OnObtainAtb', null);
     }
     else if (type === 'UltimateSp') {
@@ -2558,7 +2569,7 @@ export class World {
           this.jumpTo(j.run, Number(j.a.destFrame));
         }
     }
-    if (!this.holdSp) this.sp = Math.min(300, this.sp + 8 / FPS);
+    if (!this.holdSp) this.sp = Math.min(this.spMax, this.sp + (this.foe.sp?.regen ?? 8) / FPS);
     // Summons whose time is up.
     for (const e of this.entities) if (e.alive && e.until !== undefined && e.until <= this.frame) this.finishEntity(e);
     // Channels: their next hits, while their skill runs.

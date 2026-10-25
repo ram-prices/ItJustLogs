@@ -8,7 +8,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
   a vignette, mono rate-up chip with a left accent bar, and a pity ruler with
   6★ portrait pins inside the opened card). Keep that direction;
   the Geist rules below are a baseline, not a ceiling.
-  - `src/styles.css` is the only stylesheet: Geist tokens first
+  - Styles: `src/styles.css` imports `src/styles/*.css` in cascade order (keep it); `base.css` has the Geist tokens first
     (`--background-100/200`, `--gray-100..1000`, `--gray-alpha-*`, `--op`
     purple = operators, `--ars` teal = arsenals, `--green/--amber/--red`
     status, `--r6/5/4/3` rarity, `--radius-sm/md/lg` 6/8/12), then the Geist
@@ -42,7 +42,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `transform: perspective(600px) rotateY(0.02deg)` stops it, measured on a
     real screen (a flat `rotate` fixes headless Firefox only).
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
-    `ui/components.ts` (`public/icons/oroberyl.webp`, `--oroberyl`).
+    `ui/components.ts` (`OROBERYL_ICON`, ef-assets icons/items, `--oroberyl`).
   - Rarity is drawn with the game's emblem, not a ★ glyph: `STAR_SVG`,
     `stars(n)` and `withStars(text)` in `ui/components.ts` (endfield.wiki.gg
     Star.svg, in the text's colour). Keep "★" only in attributes and
@@ -51,7 +51,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     Artifice levels show the game's mark (`artificeIcon`, endfield.wiki.gg
     Artifice_<n>_icon.svg: a gear and three bars, lit per level, in the game's
     blue #26bbfd, its gear widgets' COLOR_ENHANCED); gear slots show the game's slot
-    marks (`slotIcon`, public/icons/gear-armor|gloves|kit.png, the wiki's Gear Icons),
+    marks (`slotIcon`, ef-assets icons/gear-slots, the wiki's Gear Icons),
     the weapon slot the operator's weapon type (`weaponTypeIcon`, ef-assets weapon-types).
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
@@ -105,7 +105,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     version/banner/event timeline; works without an import; anything with
     `data-link` or `data-card-image` gets a right-click / long-press menu
     (`installCopyMenu`: Copy link, Copy banner card, or Share banner card on phones, via `ui/cardImage.ts`); `kind.ts` = operators/arsenal: every banner as a fixed-height card
-    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/banner/headhunting/<banner>` opens one), `operator.ts` / `weapon.ts` = `/database/operators[/<name>]` / `/database/arsenals[/<name>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`); shared pieces in
+    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/banner/headhunting/<banner>` opens one), `operator.ts` / `weapon.ts` = `/database/operators[/<name>]` / `/database/arsenals[/<name>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`, `rotations.ts` with its parts in `rotations/` (docs/rotations.md)); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
   - Escape every user/game string: use the `html` tagged template from

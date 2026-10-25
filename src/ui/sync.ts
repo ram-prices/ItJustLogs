@@ -262,7 +262,7 @@ async function syncRuns(token: string): Promise<void> {
     await drive.uploadSnapshot(token, `run:${at}`, { edited: String(edited) }, JSON.stringify({ ...x, edited }));
     if (f) await drive.deleteFile(token, f.id);
   }
-  // The Parser's list reloads (pages/rotations.ts listens).
+  // The Parser's list reloads (pages/rotations/runs.ts listens).
   if (changedHere) dispatchEvent(new Event('ijl:runs'));
 }
 

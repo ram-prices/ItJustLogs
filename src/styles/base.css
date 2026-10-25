@@ -1,0 +1,265 @@
+/* Tokens, base, Geist type scale. */
+
+/* ==========================================================================
+   ItJustLogs — built on Vercel's Geist design language.
+   Typography leads; surfaces are monochrome with hairline borders; colour is
+   reserved for meaning (operators purple, arsenals teal, status, rarity).
+   Naming follows Geist: heading-*, copy-*, label-*, gray-*, gray-alpha-*.
+   ========================================================================== */
+
+/* ---------- Tokens ------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+  --background-100: #0a0a0a;
+  --background-200: #000000;
+  --gray-100: #1a1a1a;
+  --gray-200: #1f1f1f;
+  --gray-300: #292929;
+  --gray-400: #2e2e2e;
+  --gray-500: #454545;
+  --gray-600: #878787;
+  --gray-700: #8f8f8f;
+  --gray-900: #a1a1a1;
+  --gray-1000: #ededed;
+  --gray-alpha-100: rgba(255, 255, 255, 0.06);
+  --gray-alpha-200: rgba(255, 255, 255, 0.09);
+  --gray-alpha-300: rgba(255, 255, 255, 0.13);
+  --gray-alpha-400: rgba(255, 255, 255, 0.14);
+  --gray-alpha-600: rgba(255, 255, 255, 0.3);
+  --focus: hsla(212, 100%, 48%, 1);
+  --link: #52a8ff;
+  --blue: #52a8ff;
+  --blue-bg: rgba(0, 114, 245, 0.18);
+  --milestone: #2f8cf5;
+  /* Shadow-as-border: borders live in the shadow layer, not the box model. */
+  --ring: rgba(255, 255, 255, 0.14);
+  --shadow-border: 0 0 0 1px var(--ring);
+  --shadow-card: 0 0 0 1px var(--ring), 0 2px 2px rgba(0, 0, 0, 0.32), 0 8px 8px -8px rgba(0, 0, 0, 0.32);
+  --shadow-card-hover: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 2px 2px rgba(0, 0, 0, 0.4), 0 8px 16px -8px rgba(0, 0, 0, 0.5);
+  --shadow-menu: 0 0 0 1px var(--ring), 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Meaning */
+  --op: #8e4ec6;
+  --op-text: #bf7af0;
+  --op-bg: rgba(142, 78, 198, 0.16);
+  --ars: #12a594;
+  --ars-text: #0ac5b3;
+  --ars-bg: rgba(18, 165, 148, 0.16);
+  --green: #4cc38a;
+  --green-bg: rgba(70, 167, 88, 0.16);
+  --amber: #ffb224;
+  --amber-bg: rgba(255, 178, 36, 0.14);
+  --orange: #f76808;
+  --red: #ff6369;
+  --oroberyl: #ff7350; /* the Oroberyl crystal's red */
+  --chartered: #e2d957; /* the Chartered HH Permit's yellow */
+  --basic-permit: #4a9be0; /* the Basic HH Permit's blue */
+  --origeometry: #e8b13a; /* the Origeometry crystal's gold */
+  --arsenal-ticket: #8fb0dc; /* the Arsenal Ticket's silver-blue */
+  --red-bg: rgba(229, 72, 77, 0.16);
+  --muted: #5c5c5c;
+  --r6: #ff7a3d;
+  --r5: #ffbb33;
+  --r4: #a07cff;
+  --r3: #6aa8ff;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --font-sans: 'Jost', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background-100: #ffffff;
+  --background-200: #fafafa;
+  --gray-100: #f2f2f2;
+  --gray-200: #ebebeb;
+  --gray-300: #e6e6e6;
+  --gray-400: #ebebeb;
+  --gray-500: #c9c9c9;
+  --gray-600: #808080;
+  --gray-700: #666666;
+  --gray-900: #4d4d4d;
+  --gray-1000: #171717;
+  --gray-alpha-100: rgba(0, 0, 0, 0.04);
+  --gray-alpha-200: rgba(0, 0, 0, 0.065);
+  --gray-alpha-300: rgba(0, 0, 0, 0.085);
+  --gray-alpha-400: rgba(0, 0, 0, 0.08);
+  --gray-alpha-600: rgba(0, 0, 0, 0.28);
+  --focus: hsla(212, 100%, 48%, 1);
+  --link: #0072f5;
+  --blue: #0068d6;
+  --blue-bg: #ebf5ff;
+  --milestone: #0072f5;
+  --ring: rgba(0, 0, 0, 0.08);
+  --shadow-border: 0 0 0 1px var(--ring);
+  --shadow-card: 0 0 0 1px var(--ring), 0 2px 2px rgba(0, 0, 0, 0.04), 0 8px 8px -8px rgba(0, 0, 0, 0.04), 0 0 0 1px #fafafa;
+  --shadow-card-hover: 0 0 0 1px rgba(0, 0, 0, 0.14), 0 2px 2px rgba(0, 0, 0, 0.06), 0 8px 16px -8px rgba(0, 0, 0, 0.1), 0 0 0 1px #fafafa;
+  --shadow-menu: 0 0 0 1px var(--ring), 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  --op: #8e4ec6;
+  --op-text: #7d3db5;
+  --op-bg: rgba(142, 78, 198, 0.1);
+  --ars: #0d9488;
+  --ars-text: #0b7f75;
+  --ars-bg: rgba(13, 148, 136, 0.1);
+  --green: #18794e;
+  --green-bg: rgba(41, 124, 59, 0.1);
+  --amber: #a35200;
+  --amber-bg: rgba(255, 178, 36, 0.18);
+  --orange: #bd4b00;
+  --red: #cd2b31;
+  --oroberyl: #d2381f;
+  --chartered: #9a8a07;
+  --basic-permit: #2a72b8;
+  --origeometry: #a06d05;
+  --arsenal-ticket: #4a6a96;
+  --red-bg: rgba(229, 72, 77, 0.1);
+  --muted: #a8a8a8;
+  --r6: #e85d1e;
+  --r5: #c98d00;
+  --r4: #7c55f0;
+  --r3: #3f7fe0;
+}
+
+/* ---------- Base --------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--background-100);
+  color: var(--gray-1000);
+  font: 400 14px/20px var(--font-sans);
+  font-feature-settings: 'liga' 1, 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  overflow-y: scroll;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+a {
+  color: inherit;
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+img {
+  display: block;
+}
+img.missing {
+  visibility: hidden;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.link,
+p a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-alpha-400) transparent;
+}
+.icon {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  text-transform: none; /* icons are ligatures: uppercase text turns them back into words */
+  letter-spacing: normal;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* ---------- Geist type scale -------------------------------------------- */
+.heading-48 {
+  font: 600 48px/56px var(--font-sans);
+  letter-spacing: -1.2px;
+}
+.heading-32 {
+  font: 600 32px/40px var(--font-sans);
+  letter-spacing: -0.64px;
+}
+.heading-24 {
+  font: 600 24px/32px var(--font-sans);
+  letter-spacing: -0.48px;
+}
+.heading-20 {
+  font: 600 20px/28px var(--font-sans);
+  letter-spacing: -0.3px;
+}
+.heading-16 {
+  font: 600 16px/24px var(--font-sans);
+  letter-spacing: -0.16px;
+}
+.heading-14 {
+  font: 600 14px/20px var(--font-sans);
+}
+.copy-16 {
+  font: 400 16px/24px var(--font-sans);
+}
+.copy-14 {
+  font: 400 14px/20px var(--font-sans);
+}
+.copy-13 {
+  font: 400 13px/18px var(--font-sans);
+}
+.label-14 {
+  font: 500 14px/20px var(--font-sans);
+}
+.label-13 {
+  font: 400 13px/16px var(--font-sans);
+}
+.label-12 {
+  font: 400 12px/16px var(--font-sans);
+}
+.secondary {
+  color: var(--gray-900);
+}
+.tertiary {
+  color: var(--gray-700);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+/* Uppercase labels: Jost Medium with a touch of tracking. */
+.label-mono,
+.metric-label,
+.table th,
+.mini-stat .label-12 {
+  font: 500 12px/16px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+@media (max-width: 640px) {
+  .heading-48 {
+    font-size: 36px;
+    line-height: 40px;
+    letter-spacing: -0.9px;
+  }
+  .heading-32 {
+    font-size: 28px;
+    line-height: 34px;
+    letter-spacing: -0.56px;
+  }
+}

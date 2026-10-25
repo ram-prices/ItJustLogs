@@ -831,7 +831,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
       const [from, to] = pauses[resumed];
       const phase = stopwatch?.phases ? stopwatch.phases.some((p) => Math.abs(Math.round(p * FPS) - from) <= 1) : to - from >= PHASE_CHANGE * FPS;
       if (phase) {
-        w.sp = Math.max(w.sp, team.startSp ?? START_SP);
+        w.sp = Math.max(w.sp, team.startSp ?? team.enemy?.sp?.start ?? START_SP);
         w.newPhase();
       }
       resumed++;

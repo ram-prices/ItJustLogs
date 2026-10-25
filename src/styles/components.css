@@ -1,0 +1,889 @@
+/* Layout, header and tabs, page header, cards, metrics, badges, buttons, toggles, inputs, tables. */
+
+/* ---------- Layout ------------------------------------------------------- */
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (max-width: 640px) {
+  .container {
+    padding: 0 16px;
+  }
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.spacer {
+  flex: 1;
+}
+
+/* ---------- Header + tabs (Vercel dashboard) ---------------------------- */
+.header {
+  background: var(--background-100);
+  box-shadow: 0 1px 0 var(--ring);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font: 600 16px/1 var(--font-sans);
+  letter-spacing: -0.16px;
+}
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  color: var(--gray-1000);
+}
+.crumb-sep {
+  color: var(--gray-alpha-600);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.header-user .avatar {
+  --s: 32px;
+}
+.avatar {
+  --s: 24px;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  object-fit: cover;
+  /* A picture framed to rise above the circle is taller: its circle part is at the bottom. */
+  object-position: center bottom;
+  background: linear-gradient(135deg, var(--op), var(--ars));
+  flex-shrink: 0;
+}
+.avatar.lg {
+  --s: 56px;
+}
+/* A picture framed beyond its circle (cropper.ts): it sits on the circle's
+   bottom, its circle the same size, reaching --l and --r circle widths to the
+   left and right. In the circle it's cut round; above the circle (`pop`) what
+   was painted outside shows, with room made only on the sides it reaches. */
+.avatar.framed {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+.avatar.framed img {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--l) * -100%);
+  width: calc((1 + var(--l) + var(--r)) * 100%);
+  max-width: none;
+  height: auto;
+}
+.avatar.framed.pop {
+  overflow: visible;
+  margin-left: calc(var(--l) * var(--s));
+  margin-right: calc(var(--r) * var(--s));
+}
+/* Saved profile pictures: click one to use it again; the one in use is ringed. */
+.profile-saved {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-saved-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px 12px;
+  padding-top: 24px;
+}
+.profile-saved-item {
+  position: relative;
+  display: inline-flex;
+}
+.profile-saved-use {
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+.profile-saved-use:hover {
+  background: var(--gray-alpha-200);
+}
+.profile-saved-item.current .profile-saved-use {
+  box-shadow: 0 0 0 2px var(--focus);
+  cursor: default;
+}
+.profile-saved-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--background-100);
+  box-shadow: var(--shadow-border);
+  color: var(--gray-900);
+  cursor: pointer;
+  opacity: 0;
+}
+.profile-saved-x .icon {
+  font-size: 14px;
+}
+.profile-saved-item:hover .profile-saved-x,
+.profile-saved-x:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .profile-saved-x {
+    opacity: 1;
+  }
+}
+.profile-shape {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 16px;
+}
+/* Settings → Personalization: picture beside the name field. */
+.profile-edit {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+.profile-edit .field {
+  flex: 1;
+  max-width: 320px;
+}
+.tabs {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  margin: 0 -8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--gray-900);
+  font: 500 14px/1 var(--font-sans);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab-icon {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  margin-right: 7px;
+  flex-shrink: 0;
+}
+/* The traced Operators/Arsenal marks fill their whole box, while Material
+   glyphs keep a margin inside theirs; at 13px the two read the same size. */
+svg.tab-icon {
+  width: 13px;
+  height: 13px;
+  margin: 0 8px 0 1px;
+}
+/* Font icons in the tab row: a glyph's box has padding, so draw it a bit larger. */
+.tab-icon.icon {
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  overflow: visible;
+}
+/* The gear fills its whole glyph box; this brings it to the others' ~13px. */
+.tab-settings .tab-icon.icon {
+  font-size: 15px;
+}
+.tab::before {
+  content: '';
+  position: absolute;
+  inset: 8px 2px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s var(--ease);
+}
+.tab:hover {
+  color: var(--gray-1000);
+}
+.tab:hover::before {
+  background: var(--gray-alpha-100);
+}
+.tab > * {
+  position: relative;
+}
+.tab[aria-current='page'] {
+  color: var(--gray-1000);
+}
+.tab[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  background: var(--gray-1000);
+}
+.tab[aria-disabled='true'] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ---------- Page header band -------------------------------------------- */
+.page-header {
+  background: var(--background-100);
+}
+.page-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-block: 56px 32px;
+}
+/* The title and description share the row with the actions: a long description
+   wraps within its column instead of pushing the buttons below (phones still stack). */
+.page-header-inner > .min0 {
+  flex: 1 1 320px;
+}
+.page-header p {
+  color: var(--gray-900);
+  margin-top: 8px;
+}
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--gray-900);
+  font: 400 14px/20px var(--font-sans);
+}
+.breadcrumb a {
+  text-decoration: none;
+}
+.breadcrumb a:hover {
+  color: var(--gray-1000);
+}
+main {
+  padding: 0 0 120px;
+}
+.section {
+  margin-top: 56px;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+/* ---------- Card --------------------------------------------------------- */
+.card {
+  background: var(--background-100);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-md);
+}
+.card-body {
+  padding: 24px;
+}
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  border-top: 1px solid var(--ring);
+  background: var(--background-200);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  color: var(--gray-900);
+  font: 400 14px/20px var(--font-sans);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--ring);
+}
+
+/* ---------- Metrics ------------------------------------------------------ */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  overflow: hidden;
+}
+.metric {
+  padding: 24px;
+  border-right: 1px solid var(--ring);
+  margin-right: -1px;
+  border-bottom: 1px solid var(--ring);
+  margin-bottom: -1px;
+  min-width: 0;
+}
+/* Page-level stats: no panel, just big numbers on the canvas. */
+.metrics.plain {
+  box-shadow: none;
+  background: none;
+  border-radius: 0;
+  overflow: visible;
+  gap: 32px;
+  padding-bottom: 8px;
+}
+.metrics.plain .metric {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+.metrics.plain .metric-value {
+  margin-top: 8px;
+  font-size: 40px;
+  line-height: 48px;
+  letter-spacing: -1px;
+}
+.metrics.plain .metric-sub {
+  margin-top: 4px;
+}
+.luck-word {
+  font-weight: 500;
+}
+.metric-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+  color: var(--gray-900);
+}
+.metric-value {
+  margin-top: 12px;
+  font: 600 32px/40px var(--font-sans);
+  letter-spacing: -0.64px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.metric-value small {
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.16px;
+  color: var(--gray-700);
+}
+.metric-sub {
+  margin-top: 4px;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--gray-900);
+}
+.progress {
+  height: 4px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: var(--gray-alpha-200);
+  overflow: hidden;
+}
+.progress > i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gray-1000);
+}
+
+/* ---------- Badge (Geist) ------------------------------------------------ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  font: 500 12px/1 var(--font-sans);
+  white-space: nowrap;
+  color: var(--gray-1000);
+  background: var(--gray-alpha-200);
+}
+/* Rotations: how it works. */
+.sim-how > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.sim-how > summary::-webkit-details-marker {
+  display: none;
+}
+.sim-how > summary::after {
+  content: ' +';
+  color: var(--gray-900);
+}
+.sim-how[open] > summary::after {
+  content: ' −';
+}
+.sim-how dl {
+  display: grid;
+  gap: 12px;
+  padding-top: 0;
+}
+.sim-how dd {
+  margin: 2px 0 0;
+}
+/* The Rotations tab's work-in-progress mark. */
+.tab-wip {
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 6px;
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: 0;
+}
+.badge.lg {
+  height: 24px;
+  padding: 0 10px;
+}
+.badge.green {
+  color: var(--green);
+  background: var(--green-bg);
+}
+.badge.amber {
+  color: var(--amber);
+  background: var(--amber-bg);
+}
+.badge.red {
+  color: var(--red);
+  background: var(--red-bg);
+}
+.badge.purple {
+  color: var(--op-text);
+  background: var(--op-bg);
+}
+.badge.teal {
+  color: var(--ars-text);
+  background: var(--ars-bg);
+}
+.badge.blue {
+  color: var(--blue);
+  background: var(--blue-bg);
+}
+.badge.outline {
+  background: none;
+  box-shadow: var(--shadow-border);
+  color: var(--gray-900);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+
+/* ---------- Buttons (Geist) --------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 0;
+  font: 500 14px/1 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s var(--ease), box-shadow 0.15s var(--ease), color 0.15s var(--ease);
+}
+.btn.sm {
+  height: 32px;
+  padding: 0 10px;
+}
+/* Just after a redraw (app.ts draw): a new element under the pointer takes its hover look at once, not fading in. */
+.redrawn *,
+.redrawn *::before,
+.redrawn *::after {
+  transition: none !important;
+}
+.btn.primary {
+  padding: 0 16px;
+  background: var(--gray-1000);
+  color: var(--background-100);
+}
+.btn.primary:hover {
+  background: color-mix(in srgb, var(--gray-1000) 82%, var(--background-100));
+}
+.btn.secondary {
+  background: var(--background-100);
+  box-shadow: var(--shadow-border);
+  color: var(--gray-1000);
+}
+.btn.secondary:hover {
+  background: var(--gray-alpha-100);
+  box-shadow: 0 0 0 1px var(--gray-alpha-600);
+}
+.btn.tertiary {
+  background: none;
+  color: var(--gray-1000);
+}
+.btn.tertiary:hover {
+  background: var(--gray-alpha-100);
+}
+.btn.error {
+  background: #e5484d;
+  color: #fff;
+}
+.btn.error:hover {
+  background: #d93d42;
+}
+.btn.icon-only {
+  width: 32px;
+  padding: 0;
+}
+
+/* ---------- Segmented / toggle group ------------------------------------ */
+.toggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-border);
+  background: var(--background-200);
+}
+.toggle button {
+  white-space: nowrap;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--gray-900);
+  font: 500 13px/1 var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.toggle button:hover {
+  color: var(--gray-1000);
+}
+.toggle button[aria-pressed='true'] {
+  background: var(--background-100);
+  color: var(--gray-1000);
+  box-shadow: 0 0 0 1px var(--ring), 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Rarity filter: an outlined group of plain labels. Selected ones are full
+   strength, the rest dimmed; no fills. */
+.rarity-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  height: 28px;
+  border-radius: 9999px;
+  box-shadow: var(--shadow-border);
+}
+.rarity-filter button {
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--gray-700);
+  font: 500 13px/1 var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+.rarity-filter button:hover {
+  color: var(--gray-900);
+}
+.rarity-filter button[aria-pressed='true'] {
+  color: var(--gray-1000);
+}
+.rarity-filter button[aria-pressed='false'] {
+  opacity: 0.55;
+}
+.rarity-filter .filter-up {
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+}
+/* The rate-up mark: chevrons inside a thin ring, sized off the text. */
+.rateup-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15em;
+  height: 1.15em;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.75px currentColor;
+  flex-shrink: 0;
+}
+.rateup-icon .icon {
+  font-size: 0.85em;
+  font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
+}
+/* The chevrons sit 3.5% low in the glyph's box (measured): centre them in the circle. The check is centred already. */
+.rateup-icon:not(.got) .icon {
+  translate: 0 -0.035em;
+}
+/* Current Potential as the game's star (info.ts potentialStar), e.g. beside a metric. */
+.pot-star {
+  width: 28px;
+  height: 26px;
+}
+.char-card-pot {
+  display: inline-block;
+  vertical-align: -5px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}
+.rarity-filter .filter-up .icon {
+  font-size: 17px;
+}
+
+/* ---------- Inputs ------------------------------------------------------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.field > span {
+  font: 400 13px/16px var(--font-sans);
+  color: var(--gray-900);
+}
+.input {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 0;
+  box-shadow: var(--shadow-border);
+  background: var(--background-100);
+  color: var(--gray-1000);
+  font: 400 14px/1 var(--font-sans);
+  min-width: 0;
+  transition: box-shadow 0.15s var(--ease);
+}
+.input:hover {
+  box-shadow: 0 0 0 1px var(--gray-alpha-600);
+}
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px color-mix(in srgb, var(--focus) 24%, transparent);
+}
+select.input {
+  appearance: none;
+  padding-right: 36px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--gray-900) 50%), linear-gradient(135deg, var(--gray-900) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 17px, calc(100% - 13px) 17px;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+.switch {
+  appearance: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--gray-500);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s var(--ease);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s var(--ease);
+}
+.switch:checked {
+  background: var(--gray-1000);
+}
+.switch:checked::after {
+  transform: translateX(14px);
+  background: var(--background-100);
+}
+.check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gray-1000);
+}
+
+/* ---------- Table -------------------------------------------------------- */
+.table-wrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 14px/20px var(--font-sans);
+}
+.table th {
+  height: 40px;
+  padding: 0 16px;
+  text-align: left;
+  color: var(--gray-900);
+  border-bottom: 1px solid var(--ring);
+  white-space: nowrap;
+  background: var(--background-200);
+}
+.table td {
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ring);
+  white-space: nowrap;
+}
+.table tr:last-child td {
+  border-bottom: 0;
+}
+.table tbody tr {
+  transition: background 0.1s;
+}
+.table tr.six td:first-child {
+  box-shadow: inset 2px 0 0 var(--r6);
+}
+.table tr.five td:first-child {
+  box-shadow: inset 2px 0 0 var(--r5);
+}
+.table tbody tr:hover {
+  background: var(--gray-alpha-100);
+}
+.table tr.clickable {
+  cursor: pointer;
+}
+.fs-section {
+  margin-top: 32px;
+}
+.fs-table th {
+  padding: 0 8px;
+}
+.fs-table td {
+  padding: 0 16px;
+}
+.fs-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.fs-sort:hover,
+.fs-sort.on {
+  color: var(--gray-1000);
+}
+.fs-sort:hover {
+  background: var(--gray-alpha-100);
+}
+.fs-sort .icon {
+  font-size: 16px;
+}
+.fs-table th.num .fs-sort {
+  margin-left: auto;
+}
+.fs-table th.num {
+  text-align: right;
+}
+.fs-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.fs-op:hover span {
+  text-decoration: underline;
+}
+.fs-portrait {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gray-alpha-100);
+}
+@media (max-width: 640px) {
+  .fs-table td {
+    padding: 0 10px;
+  }
+  .fs-table th {
+    padding: 0 4px;
+  }
+}
+.table .right {
+  text-align: right;
+}
+.table .grow {
+  width: 100%;
+}
+.table-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--gray-900);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--gray-100);
+  box-shadow: var(--shadow-border);
+  flex-shrink: 0;
+}
+.item-icon.weapon {
+  object-fit: contain;
+}
+.rarity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.rarity .dot {
+  width: 6px;
+  height: 6px;
+}

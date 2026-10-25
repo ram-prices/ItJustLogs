@@ -130,7 +130,7 @@ export interface Settings {
   essencesRead?: number;
   /** The AIC planner's items, sites and options (ui/pages/aic.ts). */
   aic?: import('./domain/aic').AicSettings;
-  /** The Rotations page's team and options (ui/pages/rotations.ts). */
+  /** The Rotations page's team and options (ui/pages/rotations/state.ts). */
   sim?: import('./domain/sim/team').SimSettings;
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;

@@ -1,0 +1,275 @@
+/* Story. */
+
+/* ---------- Story (ui/pages/story.ts) ------------------------------------ */
+.story-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  margin-bottom: 6px;
+}
+.story-crumbs a {
+  color: inherit;
+  text-decoration: none;
+}
+.story-crumbs a:hover {
+  color: var(--gray-1000);
+  text-decoration: underline;
+}
+/* A breadcrumb's link to a list section lands below the sticky header. */
+.story-section,
+.section[id^='s-'] {
+  scroll-margin-top: 128px;
+}
+.story-crumbs .icon {
+  font-size: 16px;
+}
+.story-list {
+  overflow: hidden;
+}
+.story-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+.story-row + .story-row {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.story-row:hover {
+  background: var(--gray-alpha-100);
+}
+.story-row-name {
+  flex: 1;
+  font-weight: 500;
+}
+.story-row .icon {
+  font-size: 18px;
+  color: var(--gray-700);
+}
+/* Lines found by the Story search (pages/story.ts showHits). */
+.story-hits:not(:empty) {
+  margin: 16px 0 32px;
+}
+.story-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+.story-hit + .story-hit {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.story-hit:hover {
+  background: var(--gray-alpha-100);
+}
+.story-hit mark,
+.story-found mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--amber) 35%, transparent);
+  color: inherit;
+}
+/* The line a search result opened. */
+.story-found {
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+/* A process's summary and lore (pages/story.ts recap), folded under its heading. */
+.story-recap {
+  margin: -4px 0 10px;
+}
+.story-recap > summary {
+  cursor: pointer;
+  width: fit-content;
+  padding: 4px 0;
+  color: var(--gray-900);
+}
+.story-recap > summary:hover {
+  color: var(--gray-1000);
+}
+/* Dialogue is read, not scanned: a mission keeps to a readable width on wide screens. */
+.story-page > * {
+  max-width: 960px;
+}
+.event-details {
+  max-width: 80ch;
+}
+.story-recap-body {
+  max-width: 760px;
+  padding: 4px 0 8px;
+}
+.story-recap-body h4 {
+  margin: 12px 0 4px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+.story-recap-body p {
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+/* Searched (pages/search.ts) but not shown: the mission's chapter or section. */
+.story-row-where {
+  display: none;
+}
+/* A search field you can see (pages/search.ts searchField). */
+.list-search-field {
+  max-width: 420px;
+  margin-bottom: 8px;
+}
+.story-summary {
+  margin: 0 0 10px;
+}
+.story-lines {
+  padding: 6px 0;
+}
+.story-line {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+}
+.story-face {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gray-100);
+  box-shadow: var(--shadow-border);
+}
+.story-face-none {
+  display: grid;
+  place-items: center;
+  font: 600 14px/1 var(--font-sans);
+  color: var(--gray-900);
+}
+.story-who {
+  font: 600 13px/18px var(--font-sans);
+}
+.story-text {
+  white-space: pre-line;
+}
+.story-narr {
+  margin: 0;
+  padding: 8px 16px 8px 64px;
+  font-style: italic;
+  white-space: pre-line;
+}
+.story-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px 0;
+}
+.story-option {
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-border);
+}
+/* A section of the mission list: room before the next one's title. */
+.story-section + .story-section {
+  margin-top: 20px;
+}
+/* Choices in play order (a scene's flow): the Endministrator's line with its options, or a column per reply. */
+.story-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 4px;
+}
+.story-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 4px 16px 10px 64px;
+}
+.story-column {
+  min-width: 0;
+}
+/* Branching replies under the Endministrator's name, as their plain replies are. */
+.story-reply-body {
+  flex: 1;
+}
+.story-reply-body > .story-columns {
+  padding: 2px 0 0;
+}
+.story-reply-body .story-column-head {
+  padding-top: 4px;
+}
+/* Unnamed ways: side by side, "or" between. */
+.story-alts {
+  display: flex;
+  gap: 12px;
+  padding: 6px 16px 10px 64px;
+}
+.story-alts > .story-column {
+  flex: 1;
+}
+.story-or {
+  align-self: center;
+}
+.story-column-head {
+  padding: 4px 0 6px;
+}
+/* Lines that only play when a condition holds: in place, with a bar down the side and the condition above. */
+.story-when {
+  margin: 4px 0;
+  box-shadow: inset 2px 0 0 var(--gray-alpha-400);
+}
+.story-when-head {
+  padding: 4px 16px 0 64px;
+}
+.story-thread {
+  box-shadow: inset 2px 0 0 var(--gray-alpha-400);
+}
+.story-thread .story-line,
+.story-thread .story-narr {
+  padding-left: 14px;
+  padding-right: 4px;
+}
+.story-thread .story-narr {
+  padding-left: 14px;
+}
+.story-thread .story-columns,
+.story-thread .story-alts,
+.story-thread .story-when-head,
+.story-thread .story-back {
+  padding-left: 14px;
+  padding-right: 4px;
+}
+.story-back {
+  margin: 0;
+  padding: 2px 16px 6px 64px;
+}
+.story-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.story-nav-link {
+  max-width: 48%;
+  white-space: normal;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .story-narr,
+  .story-columns,
+  .story-alts,
+  .story-when-head,
+  .story-back {
+    padding-left: 16px;
+  }
+  .story-alts {
+    flex-direction: column;
+  }
+  .story-or {
+    align-self: flex-start;
+  }
+}

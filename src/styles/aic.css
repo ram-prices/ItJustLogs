@@ -1,0 +1,161 @@
+/* AIC planner. */
+
+/* ---------- AIC planner (pages/aic.ts) ----------------------------------- */
+.aic-panes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.aic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aic-target {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.aic-item {
+  flex: 1;
+}
+.aic-rate {
+  width: 96px;
+}
+.aic-region {
+  width: 140px;
+}
+.aic-num {
+  width: 72px;
+  height: 32px;
+  text-align: right;
+}
+.aic-level {
+  width: 76px;
+  height: 32px;
+}
+.aic-options,
+.aic-fuels,
+.aic-region-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+.aic-region-head {
+  justify-content: space-between;
+}
+.aic-check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.aic-sites td {
+  height: 44px;
+}
+.aic-sites tr.off td {
+  color: var(--gray-900);
+}
+.aic-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.2s var(--ease);
+}
+.aic-results.stale {
+  opacity: 0.6;
+}
+.aic-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  align-items: flex-end;
+}
+.aic-summary > div:not(.aic-proof) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aic-summary b {
+  font: 600 24px/32px var(--font-sans);
+  letter-spacing: -0.96px;
+}
+.aic-proof {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+.aic-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aic-section h3 {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.aic-steps td {
+  height: 44px;
+}
+.aic-recipe {
+  white-space: normal !important;
+  min-width: 280px;
+}
+.aic-flow {
+  white-space: nowrap;
+}
+.aic-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aic-credit {
+  margin-top: 24px;
+}
+@media (max-width: 640px) {
+  .aic-target {
+    flex-wrap: wrap;
+  }
+  .aic-item {
+    flex-basis: 100%;
+  }
+  .aic-proof {
+    margin-left: 0;
+  }
+  /* Each step on two lines: facility and count, then what it makes. */
+  .aic-steps thead {
+    display: none;
+  }
+  .aic-steps tr {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'name busy count' 'recipe recipe recipe';
+    gap: 2px 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ring);
+  }
+  .aic-steps td {
+    height: auto;
+    padding: 0;
+    border: 0;
+  }
+  .aic-steps td:nth-child(1) {
+    grid-area: name;
+  }
+  .aic-steps td:nth-child(2) {
+    grid-area: count;
+  }
+  .aic-steps td:nth-child(4) {
+    grid-area: busy;
+  }
+  .aic-steps .aic-recipe {
+    grid-area: recipe;
+    min-width: 0;
+    color: var(--gray-900);
+  }
+}

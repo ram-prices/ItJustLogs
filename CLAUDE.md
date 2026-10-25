@@ -26,6 +26,7 @@ event gets a built page with its Discord embed (`pageCopies` in
   screen readers).
 - `docs/income.md`: Stats → By patch free pull income.
 - `docs/pages.md`: built pages, Discord embeds, event pages, legacy links.
+- `docs/hub.md`: the coordinator/deployer hub session, its rules and the current task queue.
 
 Keep these up to date when you change an area; keep this file short.
 
@@ -42,6 +43,23 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   gitignored, excluded from both) run only on purpose:
   `DBG=1 npx vitest run src/domain/sim/dbg81.test.ts`.
 
+## Deploying
+
+Only when the owner says "deploy" (that batch only; afterwards changes stay local again).
+
+1. `git fetch`, `git status --short`, `git diff --stat`: know what's going out. Sessions still
+   editing site files must be idle and done; otherwise commit only the finished files by name.
+2. Never commit: `fixtures/`, `tools/ai-parser/`, `.claude/launch.json`, `src/domain/sim/dbg*`,
+   `essence-icon-preview.html`, `essence.svg`. Stage files by name, never `git add -A`.
+3. `npm run typecheck`, `npx vitest run --reporter=dot`, `npm run build 2>&1 | tail -4`: all clean.
+4. Commit (message ends with the Co-Authored-By line) and `git push origin main` (no PRs; `gh`
+   isn't installed). Pages deploys from the push.
+5. Confirm: poll `https://api.github.com/repos/ram-prices/ItJustLogs/actions/runs?head_sha=<sha>`
+   for `"conclusion": "success"` (in the background), then note the live commit in the
+   pending-work memory.
+
+ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@pm.me`.
+
 ## Layout
 
 - `src/domain/`: pure logic, no DOM. `parse.ts` (import formats, merge/dedupe),
@@ -52,8 +70,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   player changed: history, settings, a picture; sync listens to it).
 - `src/store.ts`: persistence (localStorage, IndexedDB, ef-assets fetch).
 - UI essentials (more in `docs/ui.md`): Geist tokens and type classes as a
-  baseline, drifting toward the old eftracker "acrylic" feel. `src/styles.css`
-  is the only stylesheet; light theme is `:root[data-theme='light']`; phone
+  baseline, drifting toward the old eftracker "acrylic" feel. Styles live in
+  `src/styles/*.css` by area (base, components, banners, home, database,
+  collections, loadout, story, aic, rotations), imported in cascade order by
+  `src/styles.css`; light theme is `:root[data-theme='light']`; phone
   tweaks in `max-width: 640px` blocks; pages up to 1600px (`.container`).
   Borders are shadows (`--shadow-border`); weights 400/500/600; Jost
   everywhere, Geist Mono only for code; colour for data only; sentence-case

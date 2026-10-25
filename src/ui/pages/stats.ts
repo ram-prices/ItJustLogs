@@ -16,7 +16,7 @@ import {
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
 import { weeklyChart } from '../charts';
-import { TAB_ICON, badge, colorOf, icon, iconOf, itemName, metric, metrics, pageHeader, withStars } from '../components';
+import { OROBERYL_ICON, TAB_ICON, badge, colorOf, icon, iconOf, itemName, metric, metrics, pageHeader, withStars } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { bannerHref, credit, external, pullsTabs, wikiFile } from './info';
 
@@ -54,7 +54,7 @@ const CURRENCY: Record<string, string> = {
  * (Oroberyl and Origeometry have no plural).
  */
 function amount(k: string, n: number): Html {
-  const src = k === 'Oroberyl' ? '/icons/oroberyl.webp' : iconOf('items', k);
+  const src = k === 'Oroberyl' ? OROBERYL_ICON : iconOf('items', k);
   const own = !CURRENCY[k] && colorOf(k);
   if (src && (CURRENCY[k] || own))
     return html`<span class="amt${CURRENCY[k] ? ` amt-${CURRENCY[k]}` : ''}" ${own ? html`style="--amt:${own}"` : ''} title="${k}" aria-label="${fmtInt(n)} ${k}"><img src="${src}" alt="" />${fmtInt(n)}</span>`;

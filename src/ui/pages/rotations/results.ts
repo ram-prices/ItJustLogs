@@ -1,0 +1,169 @@
+import { FPS } from '../../../domain/sim/engine';
+import { type BuffSpan, ENEMIES, INPUT_NAME, type ReplayResult, type SimResult } from '../../../domain/sim/team';
+import { icon, itemImg, metric, metrics } from '../../components';
+import { EF_ASSETS_CDN } from '../../../domain/banners';
+import { html, type Html } from '../../html';
+import { page, type VideoStep } from './state';
+import { big, clockTime, pct, secs, spText } from './text';
+import { dmgOf, formLength, formOf, simTrack, spOf, steps, type Track } from './track';
+import { buffRows } from './buffs';
+import { bossRow, playControls, player, preparePlay, spRow } from './player';
+
+const foeIcon = (foe: (typeof ENEMIES)[number]) => `${EF_ASSETS_CDN}/icons/enemies/${foe.icon}.webp`;
+/**
+ * A boss's face: its picture zoomed in on the face (ENEMIES `face`), as a box's background (the share each way that
+ * puts the face in the box's middle).
+ */
+export const foeFace = (foe: (typeof ENEMIES)[number], cls: string) => {
+  const [x, y, zoom] = foe.face;
+  const at = (f: number) => `${Math.max(0, Math.min(100, ((f * zoom - 0.5) / (zoom - 1)) * 100)).toFixed(1)}%`;
+  return html`<span class="${cls}" role="img" aria-label="${foeName(foe)}" title="${foeName(foe)}" style="background-image:url('${foeIcon(foe)}');background-size:${zoom * 100}%;background-position:${at(x)} ${at(y)}"></span>`;
+};
+/** The boss's short name: its entry's without the stage ("Skydrummer"). */
+const foeName = (foe: (typeof ENEMIES)[number]) => foe.name.replace(/\s*\(.*$/, '');
+
+function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], ids?: string[]): Html {
+  // With the operators' ids (a parsed run's), each lane is named by a small portrait, the buffs on them at the playhead
+  // beside it (paintBuffs), the enemy's by its lane: the timeline shows what's happening, so they're here.
+  const faces = !!ids?.length;
+  const who = (name: string, slot: number) =>
+    faces && ids![slot]
+      ? html`<span class="sim-lane-name sim-lane-who" title="${name}">${itemImg('char', ids![slot], 'sim-lane-face')}${buffs?.length ? html`<span class="sim-buffs-now lane" data-buffs-slot="${slot}" aria-label="${name}’s buffs"></span>` : ''}</span>`
+      : html`<span class="sim-lane-name label-12 ellipsis">${name}</span>`;
+  const end = r.seconds * FPS;
+  // Who's controlled when: the swaps.
+  const spans: { slot: number; from: number; to: number }[] = [];
+  let cur = r.main;
+  let from = 0;
+  for (const p of r.presses)
+    if (p.input === 'swap') {
+      spans.push({ slot: cur, from, to: p.frame });
+      cur = p.slot;
+      from = p.frame;
+    }
+  spans.push({ slot: cur, from, to: end });
+  const at = (f: number) => `${Math.min(100, (f / end) * 100).toFixed(2)}%`;
+  const ticks = Array.from({ length: Math.floor(r.seconds / 10) + 1 }, (_, k) => k * 10);
+  // A parsed run's lane is named by the boss's picture in a red ring, as operators' by their portraits.
+  const foe = faces ? page.laneFoe : undefined;
+  const foeWho = foe ? foeFace(foe, 'sim-lane-face sim-foe-face') : html`<span class="label-12">Enemy</span>`;
+  const enemyName = () =>
+    faces && buffs?.some((b) => b.slot < 0)
+      ? html`<span class="sim-lane-name sim-lane-who">${foeWho}<span class="sim-buffs-now lane" data-buffs-slot="-1" data-buffs-kind="other" aria-label="The enemy's debuffs"></span></span>`
+      : foe
+        ? html`<span class="sim-lane-name sim-lane-who">${foeWho}</span>`
+        : html`<span class="sim-lane-name label-12 ellipsis">Enemy</span>`;
+  return html`<div class="sim-timeline" role="img" aria-label="Actions over the fight">
+    ${names.map(
+      (name, slot) => html`<div class="sim-lane">
+        ${who(name, slot)}
+        <span class="sim-lane-track">
+          ${spans.filter((s) => s.slot === slot).map((s) => html`<i class="sim-control" style="left:${at(s.from)};width:${at(s.to - s.from)}"></i>`)}
+          ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${at(f.end - f.frame)}" title="${secs(f.frame)} · Ultimate ${formLength(f)}"></i>`)}
+          ${r.presses
+            .filter((p) => p.slot === slot && p.input !== 'swap')
+            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}${formOf(r, p) ? ` ${formLength(formOf(r, p))}` : ''}${dmgOf(r.pressDmg, r.presses, p)}${spOf(r.pressSp, r.presses, p)}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : 'U'}</i>`)}
+          ${r.strikes
+            .filter((s) => s.slot === slot)
+            .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" title="${secs(s.frame)} · ${s.finisher ? 'Finisher' : 'Final Strike'}${dmgOf(r.strikeDmg, r.strikes, s)}${spOf(r.strikeSp, r.strikes, s)}"></i>`)}
+        </span>
+      </div>${buffRows(buffs, slot, name, at)}`,
+    )}
+    ${r.dps.length && dpsMax > 0
+      ? html`<div class="sim-lane">
+          <span class="sim-lane-name label-12 ellipsis">Damage</span>
+          <span class="sim-lane-track sim-dmg">${r.dps.map((d, k) => (d > 0 ? html`<i style="left:${at(k * FPS)};width:${at(FPS)};height:${Math.max(4, Math.round((d / dpsMax) * 100))}%" title="${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')} · ${big(d)}"></i>` : ''))}</span>
+        </div>`
+      : ''}
+    ${r.staggers.length || r.mechanics.length || r.away.length || r.guard.length
+      ? html`<div class="sim-lane">
+          ${enemyName()}
+          <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · Invulnerable ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · No Stagger ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${at(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" title="${secs(m.frame)} · ${m.label}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
+        </div>`
+      : page.fold.buffs && buffs?.some((b) => b.slot < 0)
+        ? html`<div class="sim-lane">${enemyName()}<span class="sim-lane-track"></span></div>`
+        : ''}
+    ${buffRows(buffs, -1, 'Enemy', at)}
+    <div class="sim-lane sim-axis"><span></span><span class="sim-lane-track">${ticks.map((t) => html`<span class="label-12 secondary" style="left:${at(t * FPS)}">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`)}</span></div>
+    <i class="sim-playhead" aria-hidden="true"></i>
+  </div>`;
+}
+
+/** The sim's timeline with the player under it (a run that isn't a recording's: one timeline). */
+function timeline(r: SimResult, names: string[]): Html {
+  const t = simTrack(r);
+  return html`${lanes(t, names, Math.max(...t.dps, 0))}${player(r)}`;
+}
+export const foldButton = (what: keyof typeof page.fold, label: string, iconOnly = false) =>
+  html`<button type="button" class="sim-fold-btn label-12 secondary" data-action="sim-fold" data-value="${what}" title="${page.fold[what] ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}" aria-label="${label}" aria-expanded="${page.fold[what] ? 'true' : 'false'}">${iconOnly ? '' : `${label} `}${icon(page.fold[what] ? 'visibility_off' : 'visibility')}</button>`;
+
+export const STEP_NAME: Record<VideoStep['input'], string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher', dive: 'Dive attack' };
+
+/**
+ * Every name the transcript's operator column can hold, invisible and flat: the column is as wide as the widest in both
+ * views (a choice sizes itself by its options in another font, and lines only show some names).
+ */
+/** The action column's labels: the editor's choices and every label the transcript shows (Staggered, mechanics...). */
+export const moveLabels = (track: Track) => [...new Set([...Object.values(STEP_NAME), 'Invulnerable', ...steps(track).map((p) => p.label)])];
+/** Every label the action column can hold, invisible and flat: the column is as wide as the widest in both views. */
+export const actSizers = (labels: string[]) => html`${labels.map((n) => html`<span class="sim-move-size" aria-hidden="true">${n}</span>`)}`;
+export const opSizers = (names: string[]) => html`${[...names, 'Enemy'].map((n) => html`<span class="sim-move-size" aria-hidden="true">${n}</span>`)}`;
+
+/** How the controlled operator held: the whole fight, or swapped after the start. */
+const controlledSub = (r: SimResult) => (new Set((r.strikes ?? []).map((x) => x.slot)).size > 1 ? 'at the start, swaps after' : 'the whole fight');
+
+export function resultsView(r: SimResult, names: string[], ids: string[], stale: boolean, extra: { recording?: Track; simTrack?: Track; underTimeline?: Html; dpsMax?: number; unattributed?: number; noMetrics?: boolean; editor?: (track: Track) => Html; timeline?: SimResult } = {}): Html {
+  const rec = extra.recording;
+  const shown: Track | null = rec ? (page.view === 'recording' ? rec : (extra.simTrack ?? simTrack(r))) : null;
+  const dps = r.total / r.seconds;
+  const time = clockTime(r.seconds);
+  const shares = ids.map((id, slot) => ({ id, slot, total: r.byOperator[id] ?? 0 })).sort((a, b) => b.total - a.total);
+  return html`<div class="sim-results${stale ? ' stale' : ''}">
+    ${extra.noMetrics ? '' : metrics([
+      ...(r.hp ? [metric({ label: 'Clear time', value: r.killed ? time : 'Not defeated', sub: r.killed ? `${big(r.hp)} HP` : `${big(r.total)} of ${big(r.hp)} HP in ${time}` })] : []),
+      metric({ label: 'DPS', value: big(dps) }),
+      metric({ label: 'Total damage', value: big(r.total), sub: `${time} duration` }),
+      metric({ label: 'Actions', value: String(r.presses.length), sub: 'besides basic attacks' }),
+      ...(names[r.main] ? [metric({ label: 'Controlled', value: names[r.main], sub: controlledSub(r) })] : []),
+    ])}
+    ${extra.noMetrics ? '' : html`<section class="card"><div class="card-body sim-card">
+      <h2 class="heading-16">Damage by operator</h2>
+      ${shares.map(
+        (s) => html`<div class="sim-share">
+          ${itemImg('char', s.id, 'sim-portrait sm')}
+          <span class="min0 ellipsis">${names[s.slot]}</span>
+          <span class="sim-bar"><i style="width:${r.total ? (s.total / r.total) * 100 : 0}%"></i></span>
+          <span class="num">${pct(r.total ? s.total / r.total : 0)}</span>
+        </div>`,
+      )}
+    </div></section>`}
+    <section class="card"><div class="card-body sim-card${rec ? ' sim-faces' : ''}">
+      ${rec ? '' : html`<div class="sim-fold-head"><h2 class="heading-16">Timeline</h2></div>`}
+      ${r.order
+        ? html`<p class="copy-14">Control ${names[r.main]}. Combo skills as they come up, ultimates when charged, and these battle skills in turn, over and over:</p>
+            <ol class="sim-order copy-14">${r.order.map(([slot, input]) => html`<li>${names[slot]} · ${INPUT_NAME[input]}</li>`)}</ol>`
+        : ''}
+      ${shown
+        ? html`${(preparePlay(extra.timeline ?? r), '')}${playControls(extra.timeline ?? r, rec && (r as ReplayResult).buffs?.length ? html`<span class="sim-play-extra">${foldButton('buffs', 'Buffs', true)}</span>` : undefined)}${lanes(shown, names, extra.dpsMax ?? Math.max(...shown.dps, 0), (r as ReplayResult).buffs, rec ? ids : undefined)}${page.view === 'recording' ? html`${bossRow('', 'video')}${spRow('video')}` : html`${bossRow('', 'sim')}${spRow('sim')}`}`
+        : timeline(r, names)}
+      ${rec && page.view !== 'sim' ? '' : (extra.underTimeline ?? '')}
+      ${extra.editor
+        ? extra.editor(shown ?? simTrack(r))
+        : html`<div class="sim-moves-wrap">
+      <ol class="sim-moves copy-14${page.fold.moves ? '' : ' one'}">
+        ${((page.actLabels = moveLabels(shown ?? simTrack(r))), '')}${steps(shown ?? simTrack(r)).map((p) => html`<li class="${p.strike ? 'secondary' : ''}" data-t="${p.frame / FPS}"><span></span><button type="button" class="sim-seek num" data-action="sim-seek" data-value="${String(p.frame / FPS)}" title="Go to ${secs(p.frame)}">${secs(p.frame)}</button><span class="sim-move-op">${p.slot < 0 ? 'Enemy' : names[p.slot]}${opSizers(names)}</span><span class="sim-move-dot">·</span><span class="sim-move-act">${p.label}${actSizers(page.actLabels)}</span><span></span><span></span><span class="num secondary sim-move-len" title="${p.length ? 'How long the ultimate lasted' : ''}">${p.length ?? ''}</span><span class="num sim-move-sp${p.sp && p.sp < 0 ? ' used' : ''}" title="${p.sp ? `${p.sp > 0 ? 'Gained' : 'Used'} ${Math.abs(p.sp)} SP${p.spAfter !== undefined ? `, ${p.spAfter} after` : ''}` : ''}">${spText(p.sp)}</span><span class="num sim-move-spafter">${p.sp !== undefined && p.spAfter !== undefined ? `→ ${p.spAfter}` : ''}</span><span class="num sim-move-dmg">${p.dmg ? big(p.dmg) : ''}</span></li>`)}
+      </ol>
+      ${foldButton('moves', 'Full transcript')}
+      </div>`}
+    </div></section>
+    ${extra.noMetrics ? '' : html`<section class="card"><div class="card-body sim-card">
+      <h2 class="heading-16">Where the damage comes from</h2>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Operator</th><th>Source</th><th class="num">Hits</th><th class="num">Damage</th><th class="num">Share</th></tr></thead>
+        <tbody>${r.sources.slice(0, 24).map((s) => html`<tr><td>${names[ids.indexOf(s.op)] ?? s.op}</td><td>${s.source}</td><td class="num">${s.hits}</td><td class="num">${big(s.total)}</td><td class="num">${pct(s.total / r.total)}</td></tr>`)}${extra.unattributed ? html`<tr><td class="secondary">Not attributed</td><td class="secondary">No action read for it</td><td class="num"></td><td class="num">${big(extra.unattributed)}</td><td class="num">${pct(extra.unattributed / r.total)}</td></tr>` : ''}</tbody>
+      </table></div>
+    </div></section>`}
+  </div>`;
+}
+
+export const CREDIT = html`<p class="copy-13 secondary">Game data © Gryphline / Hypergryph. Damage formula from endfield.wiki.gg, CC BY-SA 4.0. Simulated in this browser.</p>`;

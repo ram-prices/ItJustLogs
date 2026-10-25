@@ -1,0 +1,735 @@
+/* Operator and weapon pages (wiki), operator art. */
+
+/* ---------- Operator info (/operators/info, wiki data) ------------------- */
+/* Highlights inside wiki text: the game's own colours for elements, numbers
+   and key terms (data, not chrome). The light theme gets darker ink. */
+.wk-num { color: #8da2df; }
+.wk-key { color: #33c2ff; }
+.wk-phys,
+.wk-physical { color: #dfbb92; }
+.wk-heat { color: #ff853f; }
+.wk-cryo { color: #00c0cb; }
+.wk-nature { color: #9cd54a; }
+.wk-elec,
+.wk-electric { color: #fdc038; }
+.wk-stagger { color: #dfc087; }
+.wk-heal { color: #abd040; }
+.wk-accent { color: #fff200; }
+.wk-muted { color: var(--gray-700); }
+:root[data-theme='light'] .wk-num { color: #3d55a8; }
+:root[data-theme='light'] .wk-key { color: #0072b8; }
+:root[data-theme='light'] :is(.wk-phys, .wk-physical) { color: #8a6232; }
+:root[data-theme='light'] .wk-heat { color: #c24a0a; }
+:root[data-theme='light'] .wk-cryo { color: #00808a; }
+:root[data-theme='light'] .wk-nature { color: #4b7f12; }
+:root[data-theme='light'] :is(.wk-elec, .wk-electric) { color: #a67500; }
+:root[data-theme='light'] .wk-stagger { color: #8c6a1c; }
+:root[data-theme='light'] .wk-heal { color: #557a0d; }
+:root[data-theme='light'] .wk-accent { color: #8a7d00; }
+/* The Final Strike's SP (operator pages): the number the sim measured. */
+.wk-sp { color: #fff200; font-weight: 600; }
+:root[data-theme='light'] .wk-sp { color: #8a7d00; }
+.wiki-em {
+  color: var(--gray-1000);
+}
+.wiki-crumbs {
+  margin-bottom: 8px;
+}
+.wiki-crumbs .icon {
+  color: var(--gray-700);
+}
+.wiki-fact-label,
+.wiki-skill-type,
+.wiki-req,
+.wiki-facts-list dt,
+.wiki-promo {
+  font: 500 12px/16px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-900);
+}
+
+/* Hero: acrylic, like the banner cards. The portrait blurred into a wash
+   behind a sharp copy, fading into the page. */
+.wiki-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+/* The header's ambient glow: the item's main colour, like its banner card (tint.ts tintHeroes). */
+.wiki-hero-glow {
+  position: absolute;
+  inset: -40% -20% -10%;
+  background: radial-gradient(ellipse 45% 60% at 35% 55%, var(--banner-tint, transparent) 0%, transparent 70%);
+  filter: blur(60px);
+  opacity: 0.5;
+  z-index: -2;
+  pointer-events: none;
+  transition: --banner-tint 1.2s ease;
+}
+@media (max-width: 640px) {
+  /* As on the cards: no blur filter on phones, a wider gradient instead. */
+  .wiki-hero-glow {
+    filter: none;
+    background: radial-gradient(ellipse 70% 70% at 30% 55%, var(--banner-tint, transparent) 0%, transparent 85%);
+  }
+}
+.wiki-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, var(--background-100));
+  z-index: -1;
+}
+.wiki-hero-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding-block: 48px 8px;
+}
+.wiki-hero-portrait {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: var(--gray-alpha-200);
+  box-shadow: var(--shadow-card);
+}
+.wiki-hero-text {
+  flex: 1;
+}
+/* The game's rarity emblem (components.ts STAR_SVG), sized and coloured like the text it replaces ★ in. */
+.rarity-star {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  fill: currentColor;
+}
+.rarity-star .t1 {
+  fill: color-mix(in srgb, currentColor 84%, #000);
+}
+.rarity-star .t2 {
+  fill: color-mix(in srgb, currentColor 70%, #000);
+}
+/* A gear slot's mark (Armor, Gloves, Kit), in the text's colour. */
+.slot-icon {
+  display: inline-block;
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.2em;
+  background: currentColor;
+  mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+}
+.slot-icon.armor {
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/armor.png);
+}
+.slot-icon.gloves {
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/gloves.png);
+}
+.slot-icon.kit {
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/kit.png);
+}
+.loadout-label .slot-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  vertical-align: -3px;
+}
+.loadout-icon > .slot-icon {
+  font-size: 24px;
+}
+/* A gear line in the Rotations team: the name cut short, never its Artifice mark, which keeps to the right edge. */
+.sim-piece {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sim-piece .artifice-icon,
+.sim-piece .essence-max,
+.sim-piece .essence-off {
+  flex: none;
+}
+/* A gear line's Artifice mark at the line's right edge. */
+.sim-piece > .artifice-icon {
+  margin-left: auto;
+}
+/* The weapon line's right end: its level, its skill ranks when not maxed, the essence icon. */
+.sim-weapon-end {
+  display: inline-flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 6px;
+}
+.sim-weapon-ranks {
+  white-space: nowrap;
+}
+/* An operator's level and skill ranks when not maxed, at their box's top right. */
+.sim-op-levels {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+}
+/* The weapon's line above the gear's: in the text's colour, its essence at the right (green when maxed). */
+.sim-weapon-line {
+  color: var(--gray-1000);
+}
+/* The weapon's name opens its Database page. */
+.sim-weapon-name {
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+.sim-weapon-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sim-weapon-name:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Centred on the gear marks' column (.slot-icon, 1.1em wide): a little bigger, its overhang taken back by margins. */
+.sim-weapon-mark {
+  width: 20px;
+  height: 20px;
+  margin: -3px calc((1.1em - 20px) / 2);
+  object-fit: contain;
+  flex: none;
+}
+.essence-off {
+  color: var(--gray-700);
+}
+.sim-piece .essence-icon {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  vertical-align: middle;
+}
+/* Artifice level, as the game draws it: lit parts blue, the rest dim. */
+.artifice-icon {
+  display: inline-block;
+  width: 1.9em;
+  height: 1em;
+  vertical-align: -0.12em;
+  fill: color-mix(in srgb, currentColor 30%, transparent);
+}
+/* The game's Artifice blue (its gear widgets' COLOR_ENHANCED). */
+.artifice-icon .on {
+  fill: #26bbfd;
+}
+:root[data-theme='light'] .artifice-icon .on {
+  fill: #0b8fc4;
+}
+/* On Home they're white, as in the game, not the grey of the text around them. */
+.home .rarity-star {
+  color: #fff;
+}
+:root[data-theme='light'] .home .rarity-star {
+  color: var(--gray-1000);
+}
+.wiki-stars {
+  display: flex;
+  gap: 2px;
+  font-size: 16px;
+  line-height: 18px;
+}
+.wiki-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin-top: 12px;
+  font: 500 14px/20px var(--font-sans);
+}
+.wiki-fact {
+  display: inline-flex;
+  flex-direction: column;
+}
+.wiki-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.wiki-hero-link {
+  align-self: flex-start;
+  text-decoration: none;
+}
+
+/* The player's art as the page's banner (pages/art.ts): it fills the
+   header at its usual size (the header doesn't grow for it), faded into the
+   page behind the operator's facts. */
+.wiki-hero-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  z-index: -2;
+  pointer-events: none;
+  animation: rise 0.6s var(--ease) both;
+}
+.wiki-hero.has-art::after {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent 25%, transparent 45%, var(--background-100));
+}
+/* A vignette over the banner picture: darker toward its edges. */
+.wiki-hero.has-art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 120% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+}
+/* Text over the player's banner stays readable on bright art. */
+.wiki-hero.has-art .wiki-hero-text {
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+}
+/* The player's character picture, in place of the portrait. */
+.wiki-hero-portrait.user-art {
+  object-fit: cover;
+  object-position: center 20%;
+}
+/* The player's background art: behind the whole page, vignetted, with
+   the page's cards turned acrylic so it shows through them. */
+.op-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  opacity: 0.5;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%);
+  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%);
+}
+/* No fade-in here: an animating page can't blur what's behind its cards. */
+.wiki-page.has-backdrop {
+  animation: none;
+}
+.wiki-page.has-backdrop .card,
+.wiki-page.has-backdrop .metrics:not(.plain) {
+  background: color-mix(in srgb, var(--background-100) 70%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+.wiki-page.has-backdrop .table th,
+.wiki-page.has-backdrop .card-footer {
+  background: color-mix(in srgb, var(--background-200) 45%, transparent);
+}
+/* Headings and notes between the cards stay readable over the art. */
+.wiki-page.has-backdrop .section-head {
+  text-shadow: 0 1px 8px var(--background-100);
+}
+/* The header lets the background through instead of fading to solid: a
+   light shade at the top for the text, gone by the bottom edge, so the
+   header melts into the wallpaper with no seam. */
+.wiki-hero.over-backdrop::after {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--background-100) 35%, transparent), transparent);
+}
+.wiki-hero.over-backdrop .wiki-hero-glow {
+  display: none;
+}
+.wiki-hero.over-backdrop .wiki-hero-art {
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+/* Gallery: the player's slideshow pictures, crossfading. */
+.art-slideshow {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-height: 520px;
+  width: 100%;
+  overflow: hidden;
+  background: var(--background-200);
+}
+.art-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.8s var(--ease);
+}
+.art-slide.on {
+  opacity: 1;
+}
+.art-slide-nav {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+}
+.art-slideshow:hover .art-slide-nav,
+.art-slide-nav:focus-visible {
+  opacity: 1;
+}
+.art-slide-nav.prev {
+  left: 12px;
+}
+.art-slide-nav.prev .icon {
+  transform: rotate(180deg);
+}
+.art-slide-nav.next {
+  right: 12px;
+}
+.art-slide-count {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+}
+/* A background picture's position sliders, under its spots. */
+.art-pos {
+  display: grid;
+  gap: 2px;
+}
+.art-pos label {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  font: 400 11px/16px var(--font-sans);
+  color: var(--gray-900);
+}
+.art-pos input {
+  width: 100%;
+  accent-color: var(--gray-1000);
+}
+.art-pos input:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* The art dialog: each picture with where it shows. */
+.art-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.art-places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.art-place {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
+  color: var(--gray-900);
+  font: 500 11px/16px var(--font-sans);
+  cursor: pointer;
+}
+.art-place[aria-pressed='true'] {
+  background: var(--gray-1000);
+  box-shadow: none;
+  color: var(--background-100);
+}
+
+/* The art dialog. */
+.art-dialog {
+  width: min(600px, 100%);
+  max-height: min(760px, calc(100dvh - 32px));
+  overflow-y: auto;
+}
+.art-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.art-thumb {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--gray-alpha-100);
+  box-shadow: var(--shadow-border);
+}
+.art-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.art-kind {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: 500 10px/16px var(--font-sans);
+}
+.art-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+.art-remove .icon {
+  font-size: 16px;
+}
+.art-remove:hover {
+  background: var(--red);
+}
+.art-add {
+  display: flex;
+  gap: 8px;
+}
+.art-add input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--background-200);
+  box-shadow: var(--shadow-border);
+  color: var(--gray-1000);
+  font: 400 13px/1 var(--font-sans);
+}
+.art-add input:focus {
+  outline: 2px solid var(--focus);
+}
+.art-error {
+  color: var(--red);
+}
+.art-upload {
+  margin-right: auto;
+  cursor: pointer;
+}
+.art-upload.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Attributes table */
+.wiki-stats th .wiki-promo {
+  margin-left: 6px;
+  color: var(--gray-700);
+}
+.wiki-stats td:not(:first-child),
+.wiki-stats th:not(:first-child) {
+  text-align: right;
+}
+.wiki-stats tr.main td {
+  background: var(--gray-alpha-100);
+}
+.wiki-stat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.wiki-page .card-footer b {
+  font-weight: 600;
+}
+
+/* Skills, talents, base skills */
+.wiki-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.wiki-rank input {
+  width: 160px;
+  accent-color: var(--gray-1000);
+}
+.wiki-rank-value {
+  min-width: 2ch;
+  text-align: right;
+}
+.wiki-variant {
+  margin: 24px 0 12px;
+}
+.wiki-variant:first-of-type {
+  margin-top: 0;
+}
+/* Arcane's skill sets (operator.ts skillsSection): why one is active; the other dimmed. */
+.wiki-variant-why {
+  margin-left: 8px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--gray-900);
+}
+.wiki-inactive {
+  opacity: 0.55;
+}
+.wiki-skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.wiki-skill {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+}
+.wiki-skill-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wiki-text b {
+  font-weight: 600;
+  color: var(--gray-1000);
+}
+.wiki-values {
+  margin: auto 0 0;
+  padding-top: 4px;
+}
+.wiki-values div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ring);
+  font: 400 14px/20px var(--font-sans);
+}
+.wiki-values dt {
+  color: var(--gray-900);
+}
+.wiki-values dd {
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wiki-levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wiki-levels li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Detail pages: two columns (attributes and Potentials | skills; talents |
+   base skills) that stack on narrow screens. */
+.wiki-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 0 24px;
+  align-items: start;
+}
+.wiki-cols.even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.wiki-col {
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .wiki-cols,
+  .wiki-cols.even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Attributes at one level: name on the left, value on the right. */
+.wiki-attrs {
+  margin: 0;
+}
+.wiki-attrs > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  font: 400 14px/20px var(--font-sans);
+}
+.wiki-attrs > div + div {
+  border-top: 1px solid var(--ring);
+}
+.wiki-attrs > div.main {
+  background: var(--gray-alpha-100);
+}
+.wiki-attrs dd {
+  margin: 0;
+  font-weight: 600;
+}
+.attr-total {
+  color: var(--green);
+}
+/* Attributes: Loadout splits each total into base + what the loadout adds. */
+.attr-toggle {
+  height: 24px;
+  padding: 0 10px;
+  /* A real border, not an inset shadow: shadows look jagged around a pill's tight curves. */
+  border: 1px solid var(--gray-alpha-400);
+  border-radius: 9999px;
+  background: none;
+  color: var(--gray-900);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.attr-toggle:hover {
+  color: var(--gray-1000);
+  background: var(--gray-alpha-100);
+}
+.attr-toggle[aria-pressed='true'] {
+  color: var(--green);
+  border-color: currentColor;
+}
+/* A change that makes a skill worse (rare): shown, but not as a gain. */
+.attr-loss {
+  color: var(--amber);
+}
+.attr-bonus {
+  margin-left: 8px;
+  color: var(--green);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.attr-note {
+  margin-right: 10px;
+  color: var(--gray-900);
+  font-weight: 400;
+}
+.wiki-attrs > .loadout-only .attr-bonus {
+  margin-left: 0;
+}
+.wiki-attrs > .minor {
+  color: var(--gray-900);
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 13px;
+}

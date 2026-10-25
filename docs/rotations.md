@@ -1,7 +1,18 @@
 # Rotations: DPS sim and Parser
 
-Everything about the team DPS sim, the gameplay-recording Parser and parsed runs (read before any work in `src/domain/sim/`, `rotationReader`, `pages/rotations.ts`).
+Everything about the team DPS sim, the gameplay-recording Parser and parsed runs (read before any work in `src/domain/sim/`, `rotationReader`, `pages/rotations.ts` and `pages/rotations/`).
 
+- Files: `ui/pages/rotations.ts` is the page (`rotationsPage`, `simAction`, `simChange`, `parserFiles`); its parts
+  are in `ui/pages/rotations/`: `state.ts` (every piece of page state in one `page` object, plus the settings
+  helpers), `text.ts` (number and time formats), `track.ts` (a `Track`: a sim result or a recording on the fight's
+  clock, its transcript steps, the Sim view's longer timeline), `fit.ts` (a recording fitted to the sim:
+  `recordingCard`, action matching, the game's SP amounts), `buffs.ts` (buff names, icons, rows and chips),
+  `player.ts` (the timeline player: boss bars, SP bar, playback, the loadout boxes' live numbers), `results.ts`
+  (lanes, the results view, fold buttons, boss faces), `builds.ts` (builds from loadouts, member cards, loadout
+  lines and their edit fields), `runs.ts` (saved runs: loading, the search and replay workers, export and import,
+  History and Parsed runs), `parser.ts` (the Parser tab: the run's head, discrepancies, the transcript editor,
+  `parseView`). Modules only import downwards (state, text, track, fit, buffs, player, results, builds, runs,
+  parser, then the page), so none runs another's code while loading.
 - Rotations tab (`/rotations`, `ui/pages/rotations.ts`): a team DPS simulator
   that teaches button order. Four operators in team position order (position
   01 matters: e.g. Si's ultimate cuts its combo cooldown), each from their
@@ -73,7 +84,9 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   Each boss entry carries its stage's rules (`Enemy.food`, `fullUltimate`, `prep`): Crisis Calamity (Alleikhreos) is
   the Re-Crisis kind, food allowed and every ultimate full at the start; every other fight forbids food (a buff placed
   on each operator before it; healing items used during a fight are another thing); Echoes of War waits for a start
-  button (`prep`, not simulated); every stage starts at 200 SP. Food pickers show only where allowed (`foodPicker`;
+  button (`prep`, not simulated); a stage starts at 200 SP of 300, regenerating 8 a second, unless its `Enemy.sp`
+  says otherwise (Glaiver File: 620 of 700, about 4 a second, read from a recording; the Recording view's SP bar then
+  shows a segment per 100). Food pickers show only where allowed (`foodPicker`;
   `teamFromSpec` drops food elsewhere), and the parser's review asks for it before simulating (Before the fight:
   the stage and its rules, each operator's food → `VideoRotation.food`). The Parser outlines the box of whoever made
   the most Final Strikes and Finishers (controlled most) and "Controlled" at the end of its name row (no tab or fill: the boxes aren't selectable), others who
@@ -95,7 +108,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   (`World.holdStagger`, from replaySim): the game's Stagger lasted 9 s of stopwatch with that 5 s pause inside.
   Arcane's Cluster Strike lasers deal 0.45 each in the sim (four per strike, 1.8); the wiki's "Cluster Strike Total
   DMG Multiplier 360%" may be both strikes together, so it's left as is. A replay takes a pause as a phase change
-  only where the recording's bar was full again after it (`phaseChanges` in rotations.ts → `ReplayClock.phases`);
+  only where the recording's bar was full again after it (`phaseChanges` in `pages/rotations/track.ts` → `ReplayClock.phases`);
   without bars, any pause of 2 s or more. A stage's own rules (DungeonTable `featureDesc`/`paramList`, the enemy variant's template and
   skills) go in the entry, not the base enemy's: the dump's raw Json/SkillData and BuffData are binary, read them
   from the EndfieldData repo (text). The
@@ -122,7 +135,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   `.sim-form`), the Recording view's moved with its press; scaled per second as `fitToRecording` scales, its `scaleAt`) shows at the right of the transcript and on the
   timeline markers' hover, the recording's actions matched to the sim's (same operator and kind, nearest within
   3 s); runs replayed before it show none until replayed again. The boss bars: a Staggered meter drains from full
-  to empty over its stretch, Stagger nodes (`Enemy.nodes`) are marked with the game's node sprite (`public/icons/poise-node.png`, deco_poise_knot_boss from its
+  to empty over its stretch, Stagger nodes (`Enemy.nodes`) are marked with the game's node sprite (ef-assets `icons/stagger/poise-node.png`, deco_poise_knot_boss from its
   UI bundle, a mask in the text's colour), and a boss with phases shows
   which one under the row's name; the sim's bars refill only at `phaseChanges`. The player keeps the run's fit
   (`fitted`): handing it a new object each redraw had stopped Play; `resultsView` `noMetrics` drops Damage by operator and Where the
@@ -351,3 +364,31 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   `strictCombos`/`strictUltimates` off). The page keeps the last reading (`simVideo` in IndexedDB) for runs saved without one, and
   each replay goes in History as a Recording. Scratch tests `src/domain/sim/dbg*.test.ts` and `dbgTeam.ts` (gitignored, run with `DBG=1 npx vitest run <file>`)
   read a local ef-assets clone: never commit them.
+
+## Current state and next steps (2026-10-25 handoff)
+
+- Nothing of the sim/Parser work is uncommitted: the last batch is 41db3bf (ultimate forms). Scratch only, never
+  committed: `src/domain/sim/dbgAudit*.test.ts` (the all-operator audit; it reads an ef-assets clone at a hard-coded
+  session scratchpad path, which goes away with that session: point `S` at a fresh clone) and its
+  `audit_compare.py` (same scratchpad, lost; it compared the audit's per-rank hit multipliers with wiki
+  `operators.json` skill values, 0.6% tolerance, sums of hits as candidates).
+- Saved runs replayed before 41db3bf lack actions' sources (no alignment) and forms: replay them (Edit, Play edited
+  transcript). The owner's two runs on 5175 (Alleikhreos 2:45 AM, Skydrummer 11:55 PM, Oct 24) are replayed.
+- Waiting on the owner: whether the site parser should emit `staggerLeft` (offered, not answered).
+- Gaps against the recordings:
+  - Skydrummer: the sim's Stagger starts 1.1 s after the video's at 1:02 (63.2 s against 62.1 s), so its first
+    Finisher lands late; the fit now moves it (`alignActions`), but the Stagger is still missing something before it.
+  - Skydrummer: the second Finisher lands 0.8 s late although the Stagger starts on time (132.9 s); fitted 306k
+    against the bar's ~235k.
+  - Yvonne's second Skydrummer Finisher is ~27% low in the sim itself (no "taken" bonus found).
+  - Arts Amp from Xaihi's crystal heal is given even at full HP (the sim's team takes no damage).
+- Engine gaps from the audit (multipliers 189 exact, 95 rounding, 77 conditional untested, 35 off; costs all match):
+  Purrchena's ultimate ticks (ExecuteIntervalAction), counter skills never fire (TakeDownAction: no enemy attacks),
+  CreateGlobalBuffAction (Akekuri, Liino), buff_common_try_pulse_cryst_triggered (Arclight, Liino),
+  CheckSkillCameraMotionFree, CheckSkillHasHit, Typhoeus's three. Not audited: conditional rows, buff durations and
+  stacks, weapons and gear.
+- Next, in order:
+  1. The Skydrummer's late Stagger at 1:02 (Sim view's discrepancies list, the meter's step hints).
+  2. The second Finisher's 0.8 s delay (`finisherWaiting`, `busy`, the 1 s press lead in replaySim).
+  3. Rule tests that run for every operator (skill levels per operator, aura sources, SP regen, durations).
+  4. The audit's engine gaps above, then audit conditional rows, buffs, weapons and gear.

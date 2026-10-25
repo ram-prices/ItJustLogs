@@ -1,0 +1,1579 @@
+/* Loadout, pickers, wiki extras, Home widgets, Character card, Arsenal Issue art. */
+
+/* Loadout (ui/pages/loadout.ts): weapon + four gear slots, one per row,
+   beside the attributes. */
+.loadout-slots {
+  display: flex;
+  flex-direction: column;
+}
+.loadout-slot {
+  position: relative;
+  min-width: 0;
+}
+.loadout-slot + .loadout-slot {
+  border-top: 1px solid var(--ring);
+}
+.loadout-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 8px 48px 8px 16px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+.loadout-pick:hover {
+  background: var(--gray-alpha-100);
+}
+.loadout-pick:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.loadout-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+  color: var(--gray-700);
+}
+.loadout-icon img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+.loadout-slot.vacant .loadout-icon {
+  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
+  background: none;
+}
+.loadout-text {
+  display: flex;
+  flex-direction: column;
+}
+.loadout-label {
+  font: 500 11px/16px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-900);
+}
+.loadout-name {
+  font: 600 14px/20px var(--font-sans);
+}
+.loadout-slot.vacant .loadout-name {
+  font-weight: 400;
+  color: var(--gray-700);
+}
+.loadout-sub {
+  font: 400 12px/16px var(--font-sans);
+  color: var(--gray-900);
+}
+/* Open dropdown lists take the theme's colours (Chrome otherwise draws
+   them white when the select's own background is translucent). */
+select option {
+  background-color: var(--background-100);
+  color: var(--gray-1000);
+}
+/* A gear piece's Artifice level, at the right of its slot. */
+.loadout-slot.has-extra .loadout-pick {
+  padding-right: 80px;
+}
+.loadout-artifice {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--background-200);
+  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
+  color: var(--gray-1000);
+  font-size: 18px;
+}
+.loadout-artifice:hover {
+  box-shadow: inset 0 0 0 1px var(--gray-alpha-600);
+}
+/* The select lies over the mark, unseen; its open list still shows. */
+.loadout-artifice select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  /* Solid, not translucent: Chrome draws the open list from this colour. */
+  background: var(--background-200);
+  color: var(--gray-1000);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.loadout-artifice:has(select:focus-visible) {
+  outline: 2px solid var(--focus);
+}
+/* The weapon's page, from its slot. */
+.loadout-link {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--gray-900);
+}
+.loadout-link .icon {
+  font-size: 16px;
+}
+.wielder-link {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--gray-900);
+}
+.wielder-link .icon {
+  font-size: 16px;
+}
+.wielder:hover .wielder-link,
+.loadout-link:hover {
+  background: var(--gray-alpha-200);
+  color: var(--gray-1000);
+}
+.loadout-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--ring);
+}
+.loadout-set-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 14px/20px var(--font-sans);
+}
+.loadout-set-head b {
+  font-weight: 600;
+}
+.loadout-set p {
+  margin-top: 4px;
+}
+.loadout-set:not(.on) {
+  color: var(--gray-900);
+}
+
+/* Loadout picker: a searchable list in a dialog. */
+.picker-dialog {
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100dvh - 32px));
+}
+.picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-border);
+  color: var(--gray-900);
+}
+.picker-search:focus-within {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+.picker-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--gray-1000);
+  font: 400 14px/20px var(--font-sans);
+  outline: none;
+}
+.picker-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -20px;
+  padding: 0 8px;
+}
+.picker-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.picker-option[hidden] {
+  display: none;
+}
+.picker-option:hover,
+.picker-option:focus-visible {
+  background: var(--gray-alpha-100);
+  outline: none;
+}
+.picker-option.current {
+  background: var(--gray-alpha-200);
+}
+.picker-option > .min0 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.picker-option .item-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  object-fit: contain;
+}
+.picker-name {
+  font: 600 14px/20px var(--font-sans);
+}
+.picker-meta {
+  font: 400 12px/16px var(--font-sans);
+  color: var(--gray-900);
+}
+.picker-none {
+  padding: 16px 12px;
+}
+.picker-clear {
+  margin-right: auto;
+}
+
+/* Ultimate breakpoints: UGE needed per rotation; green where the player's reaches it. */
+.bp-table {
+  table-layout: fixed;
+}
+.bp-table th,
+.bp-table td {
+  text-align: center;
+  padding: 8px 2px;
+  font-size: 13px;
+}
+.bp-table th {
+  height: 32px;
+}
+.bp-table th:first-child,
+.bp-table td:first-child {
+  width: 72px;
+  padding-left: 16px;
+}
+.bp-table .bp-group th {
+  border-bottom: 0;
+  height: 28px;
+  padding-bottom: 0;
+}
+.bp-table th:first-child,
+.bp-table td:first-child {
+  text-align: left;
+  white-space: nowrap;
+  color: var(--gray-900);
+}
+.bp-table td.bp-met {
+  color: var(--green);
+  background: var(--green-bg);
+  font-weight: 600;
+}
+.bp-table td.bp-none {
+  color: var(--gray-700);
+}
+.bp-note {
+  line-height: 18px;
+}
+/* The Ultimate Gain Efficiency row of Attributes, which opens the table:
+   laid out like the small stat rows above it. */
+.bp-acc > .wiki-acc > summary {
+  padding: 8px 20px;
+  font: 400 13px/20px var(--font-sans);
+  color: var(--gray-900);
+}
+.bp-acc .wiki-acc-title {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+.bp-hint {
+  font: 500 11px/16px var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-700);
+}
+.bp-value {
+  font-weight: 600;
+  color: var(--gray-1000);
+}
+.bp-acc .wiki-acc-body {
+  padding: 0 0 14px;
+  gap: 10px;
+}
+.bp-acc .bp-note {
+  padding: 0 20px;
+}
+.bp-acc .wiki-acc-body .table-wrap {
+  margin: 0;
+}
+
+/* Potentials */
+.wiki-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wiki-list li {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+}
+.wiki-list li + li {
+  border-top: 1px solid var(--ring);
+}
+.wiki-pot {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-200);
+  font: 600 13px/1 var(--font-sans);
+}
+
+/* Profile */
+.wiki-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.wiki-quote {
+  margin: 0;
+  padding-left: 16px;
+  box-shadow: inset 2px 0 0 var(--gray-alpha-600);
+  color: var(--gray-1000);
+  font-style: italic;
+}
+.wiki-facts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+.wiki-facts-list dd {
+  margin: 2px 0 0;
+}
+.wiki-more summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.wiki-more p {
+  margin-top: 12px;
+}
+
+/* Credit: CC BY-SA 4.0 asks for it wherever the data shows. */
+.wiki-credit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 56px;
+  color: var(--gray-900);
+}
+.wiki-credit a {
+  color: var(--link);
+  text-decoration: none;
+}
+.wiki-credit a:hover {
+  text-decoration: underline;
+}
+
+/* Index of every operator */
+.wiki-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.wiki-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  text-decoration: none;
+  transition: box-shadow 0.15s var(--ease);
+}
+.wiki-tile:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+.wiki-tile-portrait {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--gray-100);
+}
+/* Its rarity on the picture (components.ts tileArt): a band of the rarity's
+   colour along the bottom, glowing up behind the art. */
+.rarity-art {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background:
+    linear-gradient(to top, color-mix(in srgb, var(--rc, var(--gray-500)) 38%, transparent), transparent 75%),
+    var(--gray-100);
+}
+.rarity-art::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--rc, var(--gray-500));
+}
+.rarity-art.r6 {
+  --rc: var(--r6);
+}
+.rarity-art.r5 {
+  --rc: var(--r5);
+}
+.rarity-art.r4 {
+  --rc: var(--r4);
+}
+.rarity-art.r3 {
+  --rc: var(--r3);
+}
+.rarity-art.r2 {
+  --rc: var(--gray-700);
+}
+.rarity-art.r1 {
+  --rc: var(--gray-600);
+}
+.rarity-art > img {
+  display: block;
+  margin: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.wiki-tile-art {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+}
+.wiki-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wiki-tile-name {
+  font: 700 15px/20px var(--font-sans);
+}
+
+/* Operator portraits on the Operators page link to their info page. */
+a.six-item {
+  text-decoration: none;
+  color: inherit;
+}
+.ruler-pin-heads {
+  display: flex;
+}
+.ruler-pin-heads > a {
+  display: block;
+  line-height: 0;
+  border-radius: 50%;
+}
+/* Several 6★ from one Arsenal set: one gray oval holding their icons side
+   by side (no circle behind each), in the near-black ring a single pin
+   wears. Same height as a single pin, so the pointer works the same. */
+.ruler-pin-heads.multi {
+  padding: 0 4px;
+  border-radius: 999px;
+  overflow: hidden; /* the square weapon icons stay inside the oval's rounded ends */
+  background: var(--pin-fill, var(--gray-100));
+  box-shadow: 0 0 0 2px var(--pin-ring), 0 3px 8px 2px rgba(0, 0, 0, 0.55);
+}
+.ruler-pin-heads.multi .ruler-portrait {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+@media (max-width: 640px) {
+  .wiki-hero-inner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px;
+    padding-top: 32px;
+  }
+  .wiki-hero-portrait {
+    width: 72px;
+    height: 72px;
+  }
+  .wiki-hero-text {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .wiki-hero-link {
+    margin-left: auto;
+  }
+  .wiki-skills {
+    grid-template-columns: 1fr;
+  }
+  .wiki-skill,
+  .wiki-list li {
+    padding: 16px;
+  }
+  .wiki-rank input {
+    width: 120px;
+  }
+}
+
+/* Info pages: the player's copies and Potential */
+.wiki-pips {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+.wiki-pips i {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+  background: var(--gray-alpha-300);
+}
+.wiki-pips i.on {
+  background: var(--r5);
+}
+.wiki-fact-pot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Your pulls: the copies, and beside them what each Potential does (info.ts ownedSection). */
+.wiki-owned-body.with-pots {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+.wiki-owned-body.with-pots .wiki-pulls {
+  margin-top: 0;
+}
+@media (max-width: 900px) {
+  .wiki-owned-body.with-pots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.wiki-owned-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 24px;
+}
+.wiki-pulls {
+  margin-top: 16px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.wiki-pull {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto 96px 32px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 24px;
+  text-decoration: none;
+  font: 400 14px/20px var(--font-sans);
+}
+.wiki-pull + .wiki-pull {
+  border-top: 1px solid var(--ring);
+}
+.wiki-pull:hover {
+  background: var(--gray-alpha-100);
+}
+.wiki-pull-tag {
+  justify-self: end;
+}
+.wiki-note {
+  margin-top: 10px;
+}
+.wiki-skill .wiki-note {
+  margin-top: auto;
+}
+
+/* Index tiles: Potential tag on owned ones; the rest fade once there's an import. */
+.wiki-tile-tag {
+  margin-left: auto;
+  flex: none;
+  padding: 0 8px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-200);
+  font: 600 12px/20px var(--font-sans);
+}
+.wiki-tile.unowned .wiki-tile-portrait,
+.wiki-tile.unowned .wiki-tile-art,
+.wiki-tile.unowned .wiki-tile-text {
+  opacity: 0.45;
+}
+.wiki-tile.unowned .wiki-tile-art .wiki-tile-portrait {
+  opacity: 1;
+}
+.wiki-tile.unowned:hover .wiki-tile-art,
+.wiki-tile.unowned:hover .wiki-tile-portrait,
+.wiki-tile.unowned:hover .wiki-tile-text {
+  opacity: 1;
+}
+.wiki-type:first-child {
+  margin-top: 0;
+}
+/* The full list's heading, under a Coming soon row. */
+.wiki-all-head {
+  margin-top: 56px;
+}
+
+/* Potentials the player has unlocked */
+.wiki-list li.off {
+  opacity: 0.55;
+}
+.wiki-list li.on .wiki-pot {
+  background: var(--r5);
+  color: #000;
+}
+.wiki-pot .icon {
+  font-size: 16px;
+}
+.wiki-costs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  align-self: center;
+}
+
+/* Weapon art is a cut-out on transparency: contain it on a tile. */
+.wiki-hero-portrait.weapon,
+.wiki-tile-portrait.weapon {
+  object-fit: contain;
+  padding: 6px;
+}
+
+@media (max-width: 640px) {
+  .wiki-pull {
+    grid-template-columns: minmax(0, 1fr) auto 28px;
+    gap: 2px 12px;
+    padding: 10px 16px;
+  }
+  .wiki-pull > :first-child {
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .wiki-pull-at {
+    display: none;
+  }
+}
+.wiki-date {
+  font-size: 20px;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .wiki-date {
+    font-size: 16px;
+    letter-spacing: -0.32px;
+  }
+}
+/* Each copy's Potential step. The one that maxed it is gold; later ones are
+   a quiet +1, +2... (for the player who pulls a 7th copy and wants to know when). */
+.wiki-copy {
+  justify-self: end;
+  font: 600 12px/20px var(--font-sans);
+  color: var(--gray-700);
+}
+.wiki-pull.max .wiki-copy {
+  color: var(--r5);
+}
+.wiki-pull.spare .wiki-copy {
+  font-weight: 400;
+}
+.wiki-pot {
+  font-size: 12px;
+}
+/* "All banners": banners the player didn't pull on. Same art header, no
+   body to expand, quieter so the pulled ones still lead. */
+.banner.unpulled {
+  height: auto;
+}
+.banner-list > .banner.unpulled {
+  contain-intrinsic-size: auto 230px;
+}
+.banner.unpulled .banner-art img {
+  filter: saturate(0.55) brightness(0.8);
+  transition: filter 0.4s var(--ease);
+}
+.banner.unpulled:hover .banner-art img {
+  filter: none;
+}
+
+/* Banner cards (Operators, Arsenal and Home) under the pointer: a faint,
+   wide glow in the banner's colour follows the pointer (--mx/--my, set by installCardGlow in kind.ts), with
+   the card's edge lit where the pointer is nearest. Copy image draws the
+   card at rest (.capturing, see ui/cardImage.ts). */
+.sched-card {
+  position: relative;
+  isolation: isolate;
+}
+.banner,
+.sched-card {
+  transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease), height 0.4s cubic-bezier(0.25, 1, 0.5, 1), --banner-tint 1.2s ease;
+}
+.banner:not(.capturing):hover,
+.sched-card:not(.capturing):hover {
+  box-shadow: var(--shadow-card-hover), 0 10px 32px -14px rgb(from var(--banner-tint, transparent) r g b / 0.15);
+}
+.banner::before,
+.banner::after,
+.sched-card::before,
+.sched-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+  z-index: 2;
+}
+.banner::before,
+.sched-card::before {
+  /* The tint at a fixed strength, whatever its own alpha (the fallback is faint). */
+  background: radial-gradient(560px circle at var(--mx, 50%) var(--my, 50%), rgb(from var(--banner-tint, #fff) r g b / 0.06), transparent 70%);
+  mix-blend-mode: plus-lighter;
+}
+.banner::after,
+.sched-card::after {
+  padding: 1px;
+  background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgb(from color-mix(in srgb, rgb(from var(--banner-tint, #fff) r g b) 60%, #fff) r g b / 0.22), transparent 75%);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.banner:not(.capturing):hover::before,
+.banner:not(.capturing):hover::after,
+.sched-card:not(.capturing):hover::before,
+.sched-card:not(.capturing):hover::after {
+  opacity: 1;
+}
+:root[data-theme='light'] .banner::before,
+:root[data-theme='light'] .sched-card::before {
+  mix-blend-mode: normal;
+}
+/* Copy image: the card at rest, with square corners, and nothing mid-transition. */
+.capturing,
+.capturing *,
+.capturing::before,
+.capturing::after,
+.capturing *::before,
+.capturing *::after {
+  transition: none !important;
+  animation: none !important;
+}
+.capturing,
+.capturing .banner-art {
+  border-radius: 0 !important;
+}
+.capturing::before,
+.capturing::after {
+  opacity: 0 !important;
+}
+.unpulled-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+/* Home as widgets (pages/homeWidgets.ts): a 12-column grid, each widget
+   spanning 4, 6, 8 or 12; one column on phones. Customize shows each
+   widget's bar (drag, width, move, edit, remove). */
+.home-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 40px;
+  margin-bottom: 8px;
+}
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 40px 16px;
+  align-items: start;
+  position: relative;
+}
+/* Settings → Backgrounds: Home's clip, by its first frame (Random and None as plain buttons). */
+.clip-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.clip-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-border);
+}
+.clip-pick img {
+  width: 120px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+.clip-pick.plain {
+  justify-content: center;
+  min-width: 72px;
+  padding: 8px 12px;
+}
+.clip-pick[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+/* Home on a phone: one column in the phone's own order; widgets hidden there show faded while customizing. */
+.home-grid.phone {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 40px;
+}
+.home-grid.phone .widget-bar .widget-label {
+  margin-right: auto;
+}
+.widget.phone-hidden > .widget-body {
+  opacity: 0.35;
+}
+/* While dragging a widget over empty room: where it would land, and how wide. */
+.drop-ghost {
+  position: absolute;
+  z-index: 4;
+  border-radius: var(--radius-lg);
+  outline: 2px dashed var(--focus);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--focus) 8%, transparent);
+  pointer-events: none;
+}
+/* On a wide screen each widget or column sits at the row and column worked
+   out for it (homeWidgets.ts gridPlaces: its place left, middle or right,
+   Customize); narrower, they just follow one another. */
+@media (min-width: 901px) {
+  .home-grid > :is(.widget, .widget-col) {
+    grid-row: var(--row);
+    grid-column: var(--start) / span var(--span, 12);
+  }
+}
+/* Empty space: blank room across the page, of the player's chosen height (drag its bottom edge). */
+.widget-spacer {
+  min-height: 16px;
+}
+.home-grid.editing .widget[data-type='spacer'] {
+  background: repeating-linear-gradient(135deg, var(--gray-alpha-100) 0 8px, transparent 8px 16px);
+  border-radius: var(--radius-lg);
+}
+.spacer-edge {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 64px;
+  height: 18px;
+  margin-left: -32px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.spacer-edge::after {
+  content: '';
+  position: absolute;
+  inset: 7px 0;
+  border-radius: 2px;
+  background: var(--gray-700);
+}
+.widget {
+  grid-column: span var(--span, 12);
+  min-width: 0;
+  container-type: inline-size;
+}
+.widget-aligns .icon {
+  font-size: 16px;
+}
+/* Widgets stacked in one column (Customize: drop near a widget's top or bottom). */
+.widget-col {
+  grid-column: span var(--span, 12);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+/* Title hidden (Customize → Title): the heading goes, anything beside it stays. */
+.widget.no-title .widget-body .section-head > h2,
+.widget.no-title .widget-note > h2 {
+  display: none;
+}
+.widget.no-title .widget-body .section-head:not(:has(> :not(h2))) {
+  display: none;
+}
+.widget-body > .section:first-child,
+.widget-body > .sched-live:first-child {
+  margin-top: 0;
+}
+/* Editing keeps every widget exactly where and how big it shows: only an
+   outline (not laid out) and a toolbar floating over its top. */
+.home-grid.editing .widget {
+  position: relative;
+  border-radius: var(--radius-lg);
+  outline: 1px dashed var(--gray-alpha-400);
+  outline-offset: 6px;
+}
+.home-grid.editing .widget {
+  cursor: grab;
+  user-select: none;
+}
+.home-grid.editing .widget.dragging {
+  cursor: grabbing;
+}
+.home-grid.editing .widget:hover {
+  outline-color: var(--gray-alpha-600);
+}
+.home-grid.editing .widget-body {
+  pointer-events: none;
+}
+.widget.dragging {
+  opacity: 0.4;
+}
+.widget.drop-before {
+  box-shadow: -10px 0 0 -6px var(--focus);
+}
+.widget.drop-after {
+  box-shadow: 10px 0 0 -6px var(--focus);
+}
+.widget[data-size='12'].drop-before {
+  box-shadow: 0 -10px 0 -6px var(--focus);
+}
+.widget[data-size='12'].drop-after,
+.widget.drop-below {
+  box-shadow: 0 10px 0 -6px var(--focus);
+}
+.widget.drop-above {
+  box-shadow: 0 -10px 0 -6px var(--focus);
+}
+.widget-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  box-shadow: var(--shadow-card);
+}
+.widget-grip {
+  cursor: grab;
+  color: var(--gray-900);
+  display: inline-flex;
+  padding: 4px;
+  /* Dragging by it on a touch screen moves the widget, not the page. */
+  touch-action: none;
+}
+.widget-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  color: var(--gray-900);
+}
+.widget-sizes button {
+  height: 22px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+.widget-empty {
+  padding: 16px;
+}
+.widget-card {
+  padding: 4px 0;
+}
+.widget .metric-value {
+  font-size: 26px;
+  line-height: 32px;
+  white-space: normal;
+}
+.metric-of {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: var(--gray-900);
+}
+.widget-list {
+  display: flex;
+  flex-direction: column;
+}
+.widget-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.widget-row + .widget-row {
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+.widget-row:hover {
+  background: var(--gray-alpha-100);
+}
+.widget-row .item-icon {
+  width: 32px;
+  height: 32px;
+}
+.widget-row-name {
+  display: block;
+  font-weight: 600;
+}
+.widget-row-name.r6 {
+  color: var(--r6);
+}
+.widget-row-name.r5 {
+  color: var(--r5);
+}
+.widget-row > .min0 > span {
+  display: block;
+}
+.widget-note {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.widget-note p {
+  margin: 0;
+}
+/* Character card. The picture shows as a profile picture (round, beside the
+   text when the card is wide), a banner across the top, or the background
+   behind everything. Ambient: a glow of the operator's colour, inside the
+   card (its outline stays) or, with no outline, spreading past it. */
+.char-card-wrap {
+  position: relative;
+  isolation: isolate;
+}
+/* Drop shadow (not with an ambient glow): under the card, with its outline unless it has none. */
+.char-card-wrap.shadowed > .char-card {
+  box-shadow:
+    var(--shadow-card),
+    0 18px 36px -10px rgb(0 0 0 / 0.55),
+    0 6px 12px -4px rgb(0 0 0 / 0.4);
+}
+.char-card-wrap.shadowed.bare > .char-card {
+  box-shadow:
+    0 18px 36px -10px rgb(0 0 0 / 0.55),
+    0 6px 12px -4px rgb(0 0 0 / 0.4);
+}
+:root[data-theme='light'] .char-card-wrap.shadowed > .char-card {
+  box-shadow:
+    var(--shadow-card),
+    0 18px 36px -12px rgb(0 0 0 / 0.22),
+    0 6px 12px -6px rgb(0 0 0 / 0.16);
+}
+.char-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+}
+.char-card .wiki-hero-glow,
+.char-card-wrap > .wiki-hero-glow {
+  inset: -20%;
+  z-index: -1;
+  opacity: 0.9;
+  background: radial-gradient(ellipse 55% 55% at 50% 45%, var(--banner-tint, transparent) 0%, transparent 70%);
+}
+/* Ambient light from the picture's edges (tint.ts tintAmbients): each side's
+   colour glows from that edge of the card, inward while it has its outline,
+   outward past it without. */
+.char-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: var(--radius-lg);
+  opacity: 0.4;
+  box-shadow:
+    inset 0 64px 72px -40px var(--amb-t, transparent),
+    inset -64px 0 72px -40px var(--amb-r, transparent),
+    inset 0 -64px 72px -40px var(--amb-b, transparent),
+    inset 64px 0 72px -40px var(--amb-l, transparent);
+}
+.char-card-wrap.bare .char-ambient {
+  box-shadow:
+    0 -28px 80px 4px var(--amb-t, transparent),
+    28px 0 80px 4px var(--amb-r, transparent),
+    0 28px 80px 4px var(--amb-b, transparent),
+    -28px 0 80px 4px var(--amb-l, transparent);
+}
+/* Around the card: solid inside, the glow all round its edges, outside it. */
+.char-card-wrap.around .char-card {
+  background: var(--background-100);
+}
+/* Each piece of the card's border glows outward in its colour; together they blend round the card. */
+.char-ambient-card {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+}
+.char-ambient-card > i {
+  position: absolute;
+  box-shadow: 0 0 56px 14px var(--c);
+}
+/* A banner covers only the card's top: the glow comes from its edges (sized like it), not from below. */
+.char-ambient.banner {
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow:
+    inset 0 64px 72px -40px var(--amb-t, transparent),
+    inset -64px 0 72px -40px var(--amb-r, transparent),
+    inset 64px 0 72px -40px var(--amb-l, transparent);
+}
+.char-card-wrap.bare .char-ambient.banner {
+  box-shadow:
+    0 -28px 80px 4px var(--amb-t, transparent),
+    28px 0 80px 4px var(--amb-r, transparent),
+    -28px 0 80px 4px var(--amb-l, transparent);
+}
+.char-card-wrap.bare .char-card {
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+.char-card-art {
+  display: block;
+}
+.char-card-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Profile picture: round, at the top left beside the name. */
+.char-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.char-card-names {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.style-avatar .char-card-art {
+  flex: none;
+}
+/* Without the basic information the round picture stands above the rest. */
+.style-avatar > .char-card-art {
+  padding: 16px 16px 0;
+}
+.style-avatar .char-card-art img {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--gray-alpha-100);
+}
+/* Its height is set after layout to match the card as a Background (homeWidgets.ts fitBannerCards). */
+.style-banner .char-card-art {
+  aspect-ratio: 16 / 9;
+  background: var(--gray-alpha-100);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+/* Rounded on the picture itself and clipped round too: overflow alone left a corner square in some browsers. */
+.style-banner .char-card-art,
+.style-banner .char-card-art img {
+  border-radius: var(--radius-lg);
+  clip-path: inset(0 round var(--radius-lg));
+}
+.style-background {
+  min-height: 320px;
+  justify-content: flex-end;
+}
+/* Picture only: no details, so nothing to darken or leave room for. */
+.picture-only.style-background .char-card-art::after {
+  display: none;
+}
+.picture-only.style-avatar {
+  align-items: center;
+  padding: 16px;
+}
+.picture-only.style-avatar .char-card-art img {
+  width: 160px;
+  height: 160px;
+}
+.style-background .char-card-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+/* (tint.ts vignetteKeep copies these layers for the card's ambient glow: keep them in step.)
+   Text stays readable over the picture with a vignette on the picture itself
+   (darker toward the edges and the bottom), not a panel behind the text. */
+.style-background .char-card-text {
+  padding-top: 180px;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+  /* Only the left 60% holds text, so the picture shows on the right; what doesn't fit is cut off. */
+  width: 60%;
+  overflow: hidden;
+}
+.style-background .char-card-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, color-mix(in srgb, var(--background-100) 90%, transparent) 0%, color-mix(in srgb, var(--background-100) 60%, transparent) 50%, transparent 80%),
+    linear-gradient(to right, color-mix(in srgb, var(--background-100) 55%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 110% 85% at 55% 25%, transparent 45%, color-mix(in srgb, var(--background-100) 70%, transparent) 100%);
+}
+.char-card-wrap.bare .style-background .char-card-art {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.char-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+.char-card-name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.char-card-note {
+  color: var(--gray-1000);
+  white-space: pre-line;
+}
+.char-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  margin-top: 4px;
+}
+.char-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-900);
+}
+.char-fact b {
+  color: var(--gray-1000);
+  font-weight: 600;
+}
+.char-fact-icon {
+  width: 22px;
+  height: 22px;
+}
+.char-pic-img.wide {
+  width: 114px;
+}
+.char-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px 12px;
+  margin-top: 6px;
+}
+.char-stats > span {
+  display: flex;
+  flex-direction: column;
+}
+.char-stats b {
+  font: 600 16px/22px var(--font-sans);
+}
+.char-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 10px;
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+}
+/* Over a background picture, a short divider instead of a line across it. */
+.style-background .char-section {
+  position: relative;
+  box-shadow: none;
+}
+.style-background .char-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 1px;
+  background: var(--gray-alpha-500);
+}
+.card-gears {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.card-gear-img {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+  object-fit: contain;
+}
+.card-weapon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.card-weapon-img {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+  object-fit: contain;
+}
+.card-weapon .min0 {
+  display: flex;
+  flex-direction: column;
+}
+.card-weapon-name {
+  font-weight: 600;
+}
+/* Add-a-widget and edit dialogs. */
+.home-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.home-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.widget-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.widget-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+  color: var(--gray-1000);
+  font: 400 14px/20px var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.widget-pick:hover {
+  background: var(--gray-alpha-200);
+}
+.home-dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.home-dialog textarea.input {
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+  font: 400 14px/20px var(--font-sans);
+}
+.char-pics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.char-pic {
+  cursor: pointer;
+}
+.char-pic input {
+  position: absolute;
+  opacity: 0;
+}
+.char-pic-img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--gray-alpha-400);
+}
+.char-pic input:checked + .char-pic-img {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+.char-fact-picks {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  gap: 8px 16px !important;
+}
+.char-fact-picks > .label-13 {
+  width: 100%;
+}
+.char-fact-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 14px/20px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .widget[data-size='4'],
+  .widget-col[data-size='4'] {
+    grid-column: span 6;
+  }
+  .widget[data-size='8'],
+  .widget-col[data-size='8'] {
+    grid-column: span 12;
+  }
+}
+@media (max-width: 640px) {
+  .widget,
+  .widget-col {
+    grid-column: span 12 !important;
+  }
+  /* One column on phones: an empty space would only push things down. */
+  .home-grid:not(.editing) .widget[data-type='spacer'] {
+    display: none;
+  }
+}
+
+/* Home's game clip (ui/videoBackground.ts): behind everything,
+   dimmed and softened so the page stays readable, fading out toward the bottom. */
+.video-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(2px) saturate(0.85);
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
+  mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
+}
+/* Fades in on Home; gone at once on leaving it, so it never lingers behind the next page. */
+.video-bg.shown {
+  opacity: 0.35;
+  transition: opacity 1.2s var(--ease);
+}
+:root[data-theme='light'] .video-bg.shown {
+  opacity: 0.22;
+}
+
+/* An Arsenal Issue's art in layers (components.ts issueArt), stacked exactly. */
+.issue-art,
+.issue-float {
+  position: absolute;
+  inset: 0;
+}
+
+/* Parallax (Settings → Backgrounds; never with reduced motion or without a
+   mouse): a picture shifts a little the other way from the mouse over it
+   (--px/--py, eased in ui/parallax.ts), slightly enlarged so its edges never
+   show. Banner cards barely move; headers and the Character card more. On an
+   Issue the backdrop and dotted rule stay put, the ornaments move a little
+   and the weapon most, floating gently (on its wrapper, so the float and the
+   shift never animate the same element). */
+@keyframes weapon-float {
+  from {
+    transform: translateY(-0.9%);
+  }
+  to {
+    transform: translateY(0.9%);
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  :root[data-motion='on'] :is(.wiki-hero-art, .op-backdrop, .style-banner .char-card-art img, .style-background .char-card-art img) {
+    --shift: 2%;
+    scale: 1.06;
+  }
+  :root[data-motion='on'] .banner-art img {
+    --shift: 0.6%;
+    scale: 1.03;
+  }
+  :root[data-motion='on'] .banner-art .issue-back {
+    --shift: 0%;
+  }
+  :root[data-motion='on'] .banner-art .issue-front {
+    --shift: 1.2%;
+  }
+  :root[data-motion='on'] .banner-art .issue-weapon {
+    --shift: 2.5%;
+  }
+  :root[data-motion='on'] .issue-float {
+    animation: weapon-float 5s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  :root[data-motion='on'] :is(.wiki-hero-art, .op-backdrop, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
+    translate: calc(var(--px, 0) * -1 * var(--shift)) calc(var(--py, 0) * -1 * var(--shift));
+    /* Firefox puts a picture that's only moved (not tilted) on whole pixels,
+       so these shifts of a pixel or two would twitch. A 3D tilt too small to
+       see lets it move smoothly; a flat turn isn't enough on its GPU path. */
+    transform: perspective(600px) rotateY(0.02deg);
+    will-change: translate;
+    transition:
+      transform 0.4s var(--ease),
+      filter 0.4s var(--ease);
+  }
+  :root[data-motion='on'] .capturing .banner-art img {
+    scale: none;
+    translate: none;
+    transform: none;
+  }
+  :root[data-motion='on'] .capturing .issue-float {
+    animation: none;
+  }
+}

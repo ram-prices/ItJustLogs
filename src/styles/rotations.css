@@ -1,0 +1,1522 @@
+/* Rotations: simulator and Parser. */
+
+/* ---------- Rotations (pages/rotations.ts) ------------------------------- */
+.sim-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sim-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sim-team {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.sim-member {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-border);
+  min-width: 0;
+}
+/* An operator's portrait in a loadout box: square, its corners just rounded. */
+.sim-member .sim-portrait {
+  border-radius: var(--radius-sm);
+}
+/* The figures' Duration and Controlled while edited: fields in the figures' own type. */
+.sim-run-value-edit {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: inherit;
+  text-align: left;
+}
+input.sim-run-value-edit {
+  width: calc(var(--d, 4) * 1ch);
+  /* Left, as the figure's text is (sim-inl centres). */
+  text-align: left;
+}
+/* As wide as its text, growing as it's typed in (where the browser can). */
+@supports (field-sizing: content) {
+  input.sim-run-value-edit {
+    width: auto;
+    min-width: 2ch;
+    field-sizing: content;
+  }
+}
+/* A field and its label stay on one line ("P0", "Lv 90"). */
+.sim-op > .label-12,
+.sim-weapon-end {
+  white-space: nowrap;
+}
+/* While editing, an operator's box can be clicked to make them the controlled one. */
+.sim-member.pickable {
+  cursor: pointer;
+}
+.sim-member.pickable:not(.controlled):hover {
+  box-shadow: var(--shadow-border), 0 0 0 1px var(--gray-alpha-500);
+}
+/* While edited, the food line's choice: its text on a grey box, no arrow. */
+.sim-food-line > .sim-inl-sel {
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+/* A parsed run's food line under the gear: its icon in the slot marks' column. */
+.sim-food-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.sim-food-mark > .icon {
+  font-size: 16px;
+}
+.sim-member-head,
+.sim-op,
+.sim-weapon {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.sim-member-head {
+  justify-content: space-between;
+}
+.sim-move {
+  display: inline-flex;
+  gap: 2px;
+}
+.sim-op select {
+  flex: 1;
+  min-width: 0;
+}
+.sim-op-link {
+  display: inline-flex;
+  flex: none;
+  border-radius: 50%;
+  transition: opacity 0.15s var(--ease);
+}
+.sim-op-link:hover {
+  opacity: 0.8;
+}
+.sim-p {
+  width: 64px;
+  height: 32px;
+}
+.sim-food {
+  height: 32px;
+  max-width: 160px;
+}
+.sim-portrait {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--gray-alpha-100);
+}
+.sim-portrait.sm {
+  width: 28px;
+  height: 28px;
+}
+.sim-weapon-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex: none;
+}
+.sim-weapon > span {
+  flex: 1;
+}
+.sim-gear {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sim-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-start;
+}
+.sim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-num {
+  width: 96px;
+  height: 32px;
+}
+.sim-cores {
+  width: 112px;
+  height: 32px;
+}
+.sim-hp {
+  width: 140px;
+  height: 32px;
+}
+.sim-run {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.sim-error {
+  color: var(--red);
+}
+.sim-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.2s var(--ease);
+}
+.sim-results.stale {
+  opacity: 0.6;
+}
+/* Parsed runs' title row: a toggle that folds the list away (while a run is open) and brings it back. */
+.sim-runs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.sim-runs-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sim-runs-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin: -6px -8px;
+  padding: 6px 10px 6px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sim-runs-toggle:hover {
+  background: var(--gray-alpha-100);
+}
+.sim-runs-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.sim-runs-toggle .icon {
+  font-size: 20px;
+  color: var(--gray-900);
+  transition: transform 0.15s ease;
+}
+.sim-runs-toggle[aria-expanded='true'] .icon {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-runs-toggle .icon {
+    transition: none;
+  }
+}
+.sim-history {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow: auto;
+}
+.sim-past-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+.sim-past-row:hover {
+  background: var(--gray-alpha-100);
+}
+.sim-past-row.on {
+  background: var(--gray-alpha-200);
+}
+.sim-past {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.sim-past-tools {
+  display: flex;
+  gap: 2px;
+  padding-right: 6px;
+}
+.sim-past-tools .btn:not(.sim-fav):not(.error) {
+  color: var(--gray-900);
+}
+.sim-fav {
+  color: var(--amber);
+}
+.sim-run-edit,
+.sim-note-text {
+  grid-column: 1 / -1;
+  margin: 0 10px 8px;
+}
+.sim-run-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .sim-run-edit {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sim-run-edit > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+/* An open parsed run, on the page rather than in a card: its header, summary figures, then the loadouts' boxes. */
+.sim-run-head {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 0 4px;
+}
+.sim-run-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 48px;
+}
+.sim-run-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sim-run-fact .metric-label {
+  color: var(--gray-900);
+}
+.sim-run-value {
+  font: 600 20px/28px var(--font-sans);
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+}
+/* A parsed run's header: its name as the title, date and length under it, its buttons at the right. */
+.sim-run-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding-bottom: 16px;
+  box-shadow: inset 0 -1px 0 var(--gray-alpha-400);
+}
+.sim-run-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+.sim-run-title h2,
+.sim-run-title p {
+  margin: 0;
+}
+.sim-run-title h2 {
+  overflow-wrap: anywhere;
+}
+.sim-run-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sim-run-buttons .sim-past-tools {
+  padding-right: 0;
+  gap: 4px;
+}
+.sim-run-head .sim-run-edit,
+.sim-run-head .sim-note-text {
+  margin: 14px 0 0;
+}
+.sim-check {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+.sim-check li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 32px;
+  gap: 10px;
+  align-items: center;
+}
+.sim-note-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .sim-past {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sim-past > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+/* A parsed run's loadout box: its operator's share of the damage as a bar under their breakdown's Total. */
+.sim-member-share {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+/* Every teammate's share in team order, this box's operator's bright, the others dim. */
+.sim-member-share > i {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  /* The operator's portrait colour (tint.ts) at its hue only: vivid for the box's own operator, greyed and dark for
+     teammates. */
+  background: var(--gray-alpha-400);
+  background: hsl(from var(--banner-tint) h 30% 32%);
+}
+.sim-member-share > i.on {
+  background: var(--gray-1000);
+  background: hsl(from var(--banner-tint) h 92% 62%);
+}
+/* The operator's damage by source, under their gear: name, damage, share of the run's. */
+.sim-member-sources {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 10px;
+  box-shadow: inset 0 1px 0 var(--gray-alpha-400);
+}
+.sim-member-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 44px;
+  gap: 8px;
+  align-items: baseline;
+}
+.sim-member-source > .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* The operator controlled most: an outline in the link colour (no fill: that would read as clickable); others
+   controlled less, a fainter outline of it. */
+.sim-member.controlled {
+  box-shadow: 0 0 0 1.5px var(--link);
+}
+.sim-member.controlled-some {
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--link) calc(25% + 45% * var(--held, 0)), transparent);
+}
+/* "Controlled" at the end of the most controlled operator's name row, in the outline's colour. */
+.sim-member-controlled {
+  margin-left: auto;
+  padding-left: 6px;
+  flex: none;
+  color: var(--link);
+}
+/* A parsed run's portrait and name: one link to the operator's Database page. */
+.sim-op-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  transition: opacity 0.15s var(--ease);
+}
+.sim-op-name:hover {
+  opacity: 0.8;
+}
+.sim-op-name:hover > span {
+  text-decoration: underline;
+}
+.sim-member-source.total {
+  margin-top: auto;
+  padding-top: 6px;
+  box-shadow: inset 0 1px 0 var(--gray-alpha-200);
+  font-weight: 600;
+}
+.sim-member-source.total > .num {
+  color: inherit;
+}
+.sim-share {
+  display: grid;
+  grid-template-columns: 28px minmax(80px, 160px) 1fr 56px;
+  gap: 12px;
+  align-items: center;
+}
+.sim-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--gray-alpha-200);
+  overflow: hidden;
+}
+.sim-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--gray-1000);
+}
+.sim-order {
+  margin: 0;
+  padding-left: 20px;
+}
+.sim-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-lane {
+  display: grid;
+  grid-template-columns: var(--lane-label, 96px) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.sim-lane-track {
+  position: relative;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+}
+.sim-axis .sim-lane-track {
+  height: 16px;
+  background: none;
+}
+.sim-axis .sim-lane-track > span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+/* The timeline playing: a line across the lanes, the controls and the boss's bars under it. */
+.sim-timeline {
+  position: relative;
+}
+.sim-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 22px;
+  left: calc(var(--lane-label, 96px) + 8px);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--gray-1000);
+  pointer-events: none;
+}
+.sim-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px 4px;
+}
+/* The same columns as a lane (.sim-lane): play and time in the label's 96px, the scrubber across the track. */
+.sim-play {
+  display: grid;
+  grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  /* Room for the time's tip above the scrubber. */
+  padding-top: 16px;
+}
+.sim-play-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sim-seek-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+/* The playhead's time in a tip over the scrubber's dot. */
+.sim-play-time {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: calc(var(--p, 0) * 100%);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-1000);
+  color: var(--background-100);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.sim-play-time::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  border: 4px solid transparent;
+  border-top-color: var(--gray-1000);
+  transform: translateX(-50%);
+  content: '';
+}
+/* The thumb's centre goes from the track's left edge to its right (half a thumb past each side), like the playhead. */
+.sim-play-seek {
+  --thumb: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: calc(100% + var(--thumb));
+  height: 20px;
+  margin: 0 calc(var(--thumb) / -2);
+  background: transparent;
+  cursor: pointer;
+}
+.sim-play-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--gray-1000) calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--p, 0)), var(--gray-alpha-400) 0);
+}
+.sim-play-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((4px - var(--thumb)) / 2);
+  border-radius: 50%;
+  background: var(--gray-1000);
+}
+.sim-play-seek::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--gray-alpha-400);
+}
+.sim-play-seek::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--gray-1000);
+}
+.sim-play-seek::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  border: 0;
+  border-radius: 50%;
+  background: var(--gray-1000);
+}
+.sim-play-seek:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* The Timeline header's right side: playback speed, then Recording | Sim. */
+.sim-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sim-head-tools .sim-play-speed {
+  width: auto;
+}
+.sim-boss {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-boss-row {
+  display: grid;
+  grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
+  grid-template-rows: 10px 4px;
+  column-gap: 8px;
+  row-gap: 3px;
+  align-items: center;
+}
+.sim-boss-row > .sim-boss-label {
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.sim-boss-phase {
+  color: var(--gray-1000);
+}
+/* The team's SP bar under the boss's: three segments of 100, as the game's. */
+.sim-sp-row {
+  display: grid;
+  grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.sim-sp-value {
+  color: var(--gray-1000);
+}
+/* "SP" and its amount at the right of the label column, by the bar (as the boss's inflictions sit by its bars). */
+.sim-sp-row > .sim-sp-label {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sim-sp-label > .sim-sp-value {
+  min-width: 3ch;
+  font: 600 14px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sim-sp-bar {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+.sim-sp-seg {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--gray-alpha-200);
+  overflow: hidden;
+}
+.sim-sp-seg i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--gray-1000);
+  /* No transition: the player paints each frame (a transition chasing a moving width lags behind it). */
+}
+/* An action's SP change in the transcript: used in amber, gained as the text. */
+.sim-move-sp {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-900);
+  white-space: nowrap;
+}
+.sim-move-sp.used {
+  color: var(--amber);
+}
+/* The SP bar just after that action. */
+.sim-move-spafter {
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-1000);
+  white-space: nowrap;
+}
+/*
+ * The meter with its Stagger nodes marked as the game does: its boss bar's node sprite (deco_poise_knot_boss, from the
+ * game's UI bundle: a cap above the meter and one below), in the text's colour.
+ */
+.sim-boss-meter-wrap {
+  position: relative;
+  display: block;
+  height: 100%;
+}
+.sim-boss-node {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 17px;
+  transform: translate(-50%, -50%);
+  background: var(--gray-1000);
+  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/stagger/poise-node.png) center / contain no-repeat;
+  pointer-events: none;
+}
+.sim-boss-row.folded {
+  grid-template-rows: auto;
+}
+/* Hide/show buttons for the video's bars and the discrepancies, and the list under the bars. */
+.sim-fold-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sim-fold-btn .icon {
+  font-size: 16px;
+}
+.sim-fold {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 4px 4px;
+}
+.sim-fold-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sim-fold-head > .heading-16 {
+  margin: 0;
+}
+.sim-fold-head > .toggle {
+  margin-left: auto;
+}
+.sim-boss-hp,
+.sim-boss-meter {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gray-alpha-200);
+  overflow: hidden;
+}
+.sim-boss-hp i,
+.sim-boss-meter i {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+.sim-boss-hp i {
+  background: var(--red);
+}
+.sim-boss-meter i {
+  width: 0;
+  background: color-mix(in srgb, var(--red) 45%, var(--gray-1000));
+}
+.sim-boss-meter i.staggered {
+  background: var(--amber);
+}
+/* An ultimate form's stretch: a band from its press. */
+.sim-form {
+  position: absolute;
+  top: 8px;
+  height: 8px;
+  background: color-mix(in srgb, var(--amber) 35%, transparent);
+  border-radius: 4px;
+}
+/* Who's controlled: a band under that operator's presses. */
+.sim-control {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--gray-alpha-300);
+  border-radius: var(--radius-sm);
+}
+.sim-press {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  font: 600 11px/18px var(--font-sans);
+  font-style: normal;
+  text-align: center;
+  color: var(--background-100);
+  background: var(--gray-900);
+}
+.sim-press.combo {
+  background: var(--op);
+}
+.sim-press.ultimate {
+  background: var(--amber);
+}
+.sim-strike {
+  position: absolute;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--gray-700);
+}
+/* An enemy mechanic (the Foundite Weapon's blade): a mark in its lane. */
+.sim-mechanic {
+  position: absolute;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  color: var(--background-100);
+  background: var(--blue, #3b9eff);
+  z-index: 1;
+}
+.sim-mechanic .icon {
+  font-size: 14px;
+}
+/* The enemy Staggered: a band in its lane. */
+/* A buff's rows under its owner's lane: thin, its name smaller and indented. Buffs green, the enemy's debuffs red. */
+.sim-buff-lane .sim-lane-track {
+  height: 10px;
+  background: none;
+}
+.sim-timeline .sim-buff-lane {
+  margin-top: -3px;
+}
+.sim-buff-lane .sim-lane-name {
+  padding-left: 10px;
+  font-size: 11px;
+  color: var(--gray-900);
+}
+/* A parsed run's timeline: its lanes named by small portraits with the buffs at the playhead beside them. */
+.sim-faces {
+  --lane-label: 176px;
+}
+.sim-lane-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.sim-lane-face {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.sim-lane-who > .label-12 {
+  flex: none;
+}
+/* The run's title on one line beside the controls, trimmed if it must be. */
+.sim-run-title {
+  flex: 1;
+  min-width: 0;
+}
+.sim-run-title > h2,
+.sim-run-name-row > h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The title with, while the transcript is edited, the replay button right after it. */
+.sim-run-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sim-run-name-row > h2 {
+  min-width: 0;
+}
+/* The name field is as long as its text and grows as it's typed: field and a hidden copy of the text share one
+   grid cell, so the copy sets the width (any browser, any font). */
+.sim-run-name-wrap {
+  display: inline-grid;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0 -4px;
+}
+.sim-run-name-wrap::after {
+  content: attr(data-value) ' ';
+  grid-area: 1 / 1;
+  height: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  visibility: hidden;
+  white-space: pre;
+}
+.sim-run-name-wrap > .sim-run-name {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.sim-run-name-row > .btn {
+  flex: none;
+}
+.sim-buffs-now.lane {
+  flex-wrap: nowrap;
+  gap: 2px;
+  min-height: 0;
+  overflow: hidden;
+}
+.sim-buffs-now.lane .sim-buff-chip {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 1.5px;
+  border-radius: 3px;
+}
+.sim-buffs-now.lane .sim-buff-chip > b {
+  font-size: 9px;
+}
+/* The enemy's Arts Inflictions at the right of the boss bars' label column, centred on the two bars together. */
+.sim-boss-row {
+  position: relative;
+}
+.sim-boss-infl {
+  position: absolute;
+  top: 50%;
+  right: calc(100% - var(--lane-label, 96px));
+  transform: translateY(-50%);
+}
+.sim-boss:has(.sim-boss-infl) {
+  padding-block: 3px;
+}
+/* An Arts Infliction: a circle of four arcs, one lit per stack (set inline), a thin timer ring inside it, the icon in
+   the middle. */
+.sim-buff-chip.infl,
+.sim-buffs-now.lane .sim-buff-chip.infl {
+  border-radius: 50%;
+  padding: 2px;
+}
+.sim-buff-chip.infl > .infl-timer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 1.5px;
+  border-radius: 50%;
+  background: conic-gradient(var(--red) calc(var(--left) * 360deg), transparent 0);
+}
+.sim-buff-chip.infl .infl-face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--background-200);
+}
+/* The icon has room around it in its picture: scaled up to fill the face. */
+.sim-buff-chip.infl .infl-face > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.35);
+}
+.sim-buff-chip.infl .infl-face > i {
+  font: 600 9px/1 var(--font-sans);
+  font-style: normal;
+}
+/* By the boss's bars an infliction is bigger, its timer ring thin and close. */
+.sim-boss-infl .sim-buff-chip.infl {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+}
+.sim-boss-infl .sim-buff-chip.infl > .infl-timer {
+  padding: 1px;
+}
+/* A boss's face in the Enemy lane. */
+.sim-lane-face.sim-foe-face {
+  background-color: var(--background-200);
+  background-repeat: no-repeat;
+}
+/* An Arts Reaction's level, as in the game: a Roman numeral in a small dark box over the icon's corner. */
+.sim-buff-chip > b.lv {
+  right: -3px;
+  bottom: -3px;
+  min-width: 10px;
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--background-100);
+  box-shadow: 0 0 0 1px var(--gray-alpha-500);
+  font: 600 8px/11px var(--font-sans);
+  text-align: center;
+  text-shadow: none;
+}
+/* A buff row's icon before its name. */
+.sim-buff-row-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+/* The buffs at the playhead, as the game draws them: the icon in a square whose outline is its timer, running out
+   clockwise from the top; stacks in the corner. Debuffs on the enemy in red. */
+.sim-buffs-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 28px;
+  align-content: flex-start;
+}
+.sim-buff-chip {
+  --left: 1;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border-radius: 4px;
+  background: conic-gradient(var(--gray-1000) calc(var(--left) * 360deg), var(--gray-alpha-300) 0);
+}
+.sim-buff-chip.debuff {
+  background: conic-gradient(var(--red) calc(var(--left) * 360deg), var(--gray-alpha-300) 0);
+}
+.sim-buff-chip > img,
+.sim-buff-chip > i {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--background-200);
+  object-fit: contain;
+  font: 600 11px/1 var(--font-sans);
+  font-style: normal;
+  color: var(--gray-1000);
+}
+.sim-buff-chip > b {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font: 600 10px/1 var(--font-sans);
+  color: var(--gray-1000);
+  text-shadow: 0 0 2px var(--background-100), 0 0 2px var(--background-100);
+}
+/* The enemy's under the boss's bars, in the bars' column. */
+.sim-boss-buffs {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+.sim-buff {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--green) 55%, transparent);
+}
+.sim-buff.debuff {
+  background: color-mix(in srgb, var(--red) 55%, transparent);
+}
+.sim-stagger {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--red) 35%, transparent);
+  border-radius: var(--radius-sm);
+}
+/* Damage each second: bars from the lane's floor. */
+.sim-dmg i {
+  position: absolute;
+  bottom: 0;
+  background: color-mix(in srgb, var(--gray-1000) 55%, transparent);
+  border-radius: 1px 1px 0 0;
+}
+/* The boss taking no Stagger (the Foundite Weapon): a faint band. */
+.sim-guard {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(45deg, var(--gray-alpha-300) 0 3px, transparent 3px 7px);
+  border-radius: var(--radius-sm);
+}
+/* The enemy out of reach: hatched. */
+.sim-away {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, var(--gray-alpha-400) 0 4px, transparent 4px 8px);
+  border-radius: var(--radius-sm);
+}
+.sim-strike.finisher {
+  top: 7px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--red);
+}
+.sim-steps {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  max-height: 320px;
+  overflow: auto;
+  columns: 3 220px;
+}
+.sim-steps .num {
+  display: inline-block;
+  width: 48px;
+}
+/* The timeline's transcript: one move a line, its time a button that moves the playhead there. */
+/* Rotations → Parser's runs in the side column: compact rows (name, date and DPS), the open one marked. */
+.sim-runs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sim-runs-side > h2 {
+  padding: 0 12px 6px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+.sim-side-run {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sim-side-run:hover {
+  background: var(--gray-alpha-100);
+}
+.sim-side-run[aria-pressed='true'] {
+  background: var(--gray-alpha-200);
+}
+.sim-side-run > .label-14 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sim-side-run .material-symbols-rounded {
+  font-size: 14px;
+}
+.sim-side-run.draft > .label-14 {
+  color: var(--amber);
+}
+.sim-side-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+.sim-side-buttons > .btn {
+  justify-content: center;
+}
+/* The review of a read, as a page section instead of a dialog. */
+.reader-card .reader-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* Folded, the transcript shows only the moment at the playhead; its toggle beside it. */
+.sim-moves-wrap {
+  display: grid;
+  /* A fixed right column (Full transcript; while edited Add action / Add invulnerable), so the list keeps its width. */
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: 12px;
+  align-items: start;
+}
+.sim-moves-wrap > .sim-fold-btn {
+  white-space: nowrap;
+}
+/* The run's header: the timeline's view, play and speed with the run's own buttons; name and note edited in place. */
+.sim-play-extra {
+  margin-left: auto;
+}
+.sim-run-play {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+}
+/* A parsed run's name while edited: a field the size of the title it replaces, so nothing moves. */
+.sim-run-name {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% + 8px);
+  height: 32px;
+  margin: 0 -4px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--gray-alpha-100);
+  box-shadow: inset 0 -1px 0 var(--gray-alpha-500);
+  color: var(--gray-1000);
+}
+/* The boss's picture before the title, as tall as the title and the line under it. */
+.sim-run-foe {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  margin-right: -8px;
+  border-radius: var(--radius-md);
+  background-color: var(--background-200);
+  background-repeat: no-repeat;
+}
+/* The note: its own box at the right end of the figures, no label. */
+.sim-run-note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(420px, 40%);
+  margin-left: auto;
+}
+.sim-run-note-box > p,
+.sim-run-note-box > .sim-run-note {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-alpha-100);
+  box-shadow: inset 2px 0 0 var(--gray-alpha-500);
+  color: var(--gray-1000);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sim-run-note-box:has(> .sim-run-note) {
+  width: min(420px, 40%);
+}
+.sim-run-note-box > .sim-run-note {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  resize: vertical;
+}
+.sim-run-name:hover,
+.sim-run-note:hover {
+  background: var(--gray-alpha-200);
+}
+.sim-run-name:focus-visible,
+.sim-run-note:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--focus);
+}
+/* A parsed run while it's edited: numbers as fields in place of the text, each on a light grey box. */
+.sim-inl {
+  /* The box reaches out past the text (padding, and a margin taking it back), so the text sits where it does unedited. */
+  box-sizing: content-box;
+  width: calc(var(--d, 2) * 1ch);
+  /* Exactly one line of the text around it: Firefox otherwise gives fields its own, taller line, so editing
+     pushes everything under a field down a pixel or two. */
+  height: auto;
+  height: 1lh;
+  line-height: inherit;
+  margin: 0 -3px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--gray-alpha-200);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.sim-inl::-webkit-inner-spin-button,
+.sim-inl::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+.sim-inl:hover {
+  background: var(--gray-alpha-300);
+}
+.sim-inl:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--focus);
+}
+/* A choice in place of text (the transcript's operator and action while edited). */
+.sim-inl-sel {
+  max-width: 100%;
+  /* One line of the text around it, as .sim-inl. */
+  height: auto;
+  height: 1lh;
+  line-height: inherit;
+  margin: 0 -3px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--gray-alpha-200);
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  cursor: pointer;
+}
+.sim-inl-sel:hover {
+  background: var(--gray-alpha-300);
+}
+.sim-inl-sel:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--focus);
+}
+.sim-inl-sel option {
+  background: var(--background-100);
+  color: var(--gray-1000);
+}
+/* The transcript while edited: the same lines and columns, remove and interrupt in their own. */
+.sim-moves.sim-moves-edit li {
+  align-items: center;
+}
+.sim-move-time {
+  /* As the unedited time (sim-seek): its padding, its colour. */
+  justify-self: start;
+  width: 6ch;
+  margin: -1px 0;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--gray-900);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+/* Where Full transcript is: Add action, Add invulnerable. */
+.sim-moves-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.sim-line-del {
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--gray-900);
+  cursor: pointer;
+}
+.sim-line-del:hover {
+  background: var(--gray-alpha-200);
+  color: var(--gray-1000);
+}
+/* Its Artifice marks: buttons that step the level. */
+.sim-art-btn {
+  display: inline-flex;
+  flex: none;
+  /* Its padding reaches out, so the mark stays where it is when not edited. */
+  margin: -2px -4px -2px auto;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--gray-alpha-100);
+  color: inherit;
+  cursor: pointer;
+}
+.sim-art-btn:hover {
+  background: var(--gray-alpha-200);
+}
+.sim-art-btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--focus);
+}
+/* The note at the end of the subtitle. */
+.sim-run-sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sim-moves.one {
+  max-height: none;
+  overflow: hidden;
+}
+.sim-moves.one > li:not(.cur) {
+  display: none;
+}
+.sim-moves {
+  /* One set of columns for every line (each line a subgrid), the same unedited and edited: remove (edited only), time,
+     operator, the dot, the action, interrupt (edited only), SP, the bar after, damage. The scrollbar's room is kept
+     whether the full transcript scrolls or not, so nothing moves. */
+  display: grid;
+  grid-template-columns: 16px 64px max-content 8px max-content max-content 16px minmax(0, 1fr) 64px 48px 72px;
+  column-gap: 8px;
+  align-content: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 360px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.sim-moves li {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  padding: 3px 8px 3px 4px;
+  border-radius: var(--radius-sm);
+}
+.sim-move-op,
+.sim-move-act {
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+}
+.sim-move-size {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+.sim-move-op > .sim-inl-sel,
+.sim-move-act > .sim-inl-sel {
+  box-sizing: border-box;
+  width: calc(100% + 6px);
+  max-width: none;
+}
+.sim-move-dot {
+  text-align: center;
+}
+.sim-move-int {
+  display: inline-flex;
+  justify-content: center;
+}
+.sim-move-int > input {
+  margin: 0;
+}
+/* An action's damage, at the right of its line. */
+.sim-move-dmg {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-1000);
+}
+.sim-moves li.secondary .sim-move-dmg {
+  color: var(--gray-900);
+}
+.sim-moves li.now {
+  background: var(--gray-alpha-200);
+}
+.sim-seek {
+  justify-self: start;
+  padding: 1px 6px;
+  margin: -1px 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--gray-900);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+.sim-seek:hover {
+  background: var(--gray-alpha-200);
+  color: var(--gray-1000);
+}
+.sim-seek:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+@media (max-width: 640px) {
+  .sim-team {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sim-share {
+    grid-template-columns: 28px minmax(60px, 120px) 1fr 52px;
+  }
+  .sim-lane {
+    grid-template-columns: 64px 1fr;
+  }
+}
+.sim-pots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.sim-pots label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.sim-card > .toggle,
+.sim-field > .toggle {
+  align-self: flex-start;
+}
