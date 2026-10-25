@@ -463,7 +463,10 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   playhead, and the playback speed sits in the Timeline header; each box's bar shows every teammate's share in team
   order with a gap between, each in its portrait's hue (the hero tint, `data-hero-tint`; CSS relative colour): the box's own operator vivid, the others greyed and dark. Each action's damage (ReplayResult `actionDamage`, `damageByAction` in team.ts: a
   press gets its operator's hits of that kind until their next such press, a Final Strike their basic attacks up to
-  it; scaled per second as `fitToRecording` scales, its `scaleAt`) shows at the right of the transcript and on the
+  it; an ultimate form's attacks, its closing one too, are its Ultimate's (`sourceOf`: _ult_attack, _attack#_ult),
+  and each form's stretch (`World.forms`, while `attacksUnseen`: from after its cut-in to its closing attack; Yvonne's
+  ends at 12 s or when its shots run out) is a band in its lane with its length in the transcript (`formOf`,
+  `.sim-form`), the Recording view's moved with its press; scaled per second as `fitToRecording` scales, its `scaleAt`) shows at the right of the transcript and on the
   timeline markers' hover, the recording's actions matched to the sim's (same operator and kind, nearest within
   3 s); runs replayed before it show none until replayed again. The boss bars: a Staggered meter drains from full
   to empty over its stretch, Stagger nodes (`Enemy.nodes`) are marked with the game's node sprite (`public/icons/poise-node.png`, deco_poise_knot_boss from its

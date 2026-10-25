@@ -237,6 +237,13 @@ export interface Stagger {
   end: number;
 }
 
+/** An ultimate form's stretch: while an operator's basic attacks are its ultimate's (Yvonne's), frames. */
+export interface Form {
+  slot: number;
+  frame: number;
+  end: number;
+}
+
 /** A Final Strike or Finisher the controlled operator landed. */
 export interface Strike {
   frame: number;
@@ -486,6 +493,9 @@ export class World {
   staggers: Stagger[] = [];
   /** The enemy's own mechanics as they happen (the Foundite Weapon's blade), for the timeline. */
   mechanics: { frame: number; label: string }[] = [];
+  /** Each ultimate form's stretch, to its closing attack (`attacksUnseen`), for the timeline. */
+  forms: Form[] = [];
+  private formOpen: (number | undefined)[] = [];
   private strikeRun: Run | null = null;
   sp = 200;
   /** Action types met but not simulated, with how often. */
@@ -2522,6 +2532,14 @@ export class World {
       return;
     }
     this.frame++;
+    for (const op of this.team) {
+      const open = this.formOpen[op.slot];
+      if (open === undefined && !this.modes.get(op)?.length) continue;
+      const on = this.attacksUnseen(op.slot);
+      if (on && open === undefined) this.formOpen[op.slot] = this.forms.push({ slot: op.slot, frame: this.frame, end: this.frame }) - 1;
+      else if (on) this.forms[open!].end = this.frame;
+      else this.formOpen[op.slot] = undefined;
+    }
     // An Imprisoned enemy's own clock runs slow: each whole frame it loses, its timers wait a frame.
     if (this.seals.length) {
       this.sealDebt += 1 - this.foeScale();

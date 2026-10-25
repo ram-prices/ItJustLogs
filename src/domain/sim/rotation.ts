@@ -19,7 +19,7 @@
  * fastest to defeat it is the best; within the time limit (`seconds`) a fight
  * that doesn't is judged by its damage, below any that does.
  */
-import { FPS, World, type Bundle, type Enemy, type Hit, type Input, type Stagger, type Stats, type Strike } from './engine';
+import { FPS, World, type Bundle, type Enemy, type Form, type Hit, type Input, type Stagger, type Stats, type Strike } from './engine';
 
 export interface Team {
   bundles: Bundle[];
@@ -111,6 +111,8 @@ export interface Fight {
   mechanics?: { frame: number; label: string }[];
   /** When the enemy couldn't be hit (World.away). */
   away?: [number, number][];
+  /** Ultimate forms (World.forms). */
+  forms?: Form[];
 }
 
 /** Above any damage: a defeat scores this less its time. */
@@ -189,6 +191,7 @@ export function play(team: Team, policy: Policy, seconds: number, script: Step[]
     strikes: w.strikes.filter((s) => s.frame <= last),
     staggers: w.staggers.filter((s) => s.frame <= last).map((s) => ({ ...s, end: Math.min(s.end, last) })),
     mechanics: w.mechanics.filter((m) => m.frame <= last),
+    forms: w.forms.filter((x) => x.frame <= last).map((x) => ({ ...x, end: Math.min(x.end, last) })),
   };
 }
 

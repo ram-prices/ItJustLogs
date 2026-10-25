@@ -508,6 +508,12 @@ function fitRecording(r: NonNullable<typeof replay>): RecordingCard {
   m.presses.forEach((j, i) => j !== undefined && (shift.presses[j] = (rec.presses[i].frame - sim.presses[j].frame) / FPS));
   m.strikes.forEach((j, i) => j !== undefined && (shift.strikes[j] = (rec.strikes[i].frame - sim.strikes[j].frame) / FPS));
   const fit = fitToRecording(r.result, reading.boss, reading.pauses ?? [], phaseHp, shift);
+  // The recording's ultimate forms: the sim's, moved with their press (the reader can't see one end).
+  const forms = (sim.forms ?? []).flatMap((f) => {
+    const j = sim.presses.findIndex((p) => formOf(sim, p) === f);
+    const d = j < 0 ? undefined : shift.presses[j];
+    return d === undefined ? [] : [{ ...f, frame: f.frame + Math.round(d * FPS), end: f.end + Math.round(d * FPS) }];
+  });
   // Each action's damage, every second of it scaled as the fit scales that second.
   const ad = fit.actionDamage;
   const sum = (pairs: ActionHits) => Math.round(pairs.reduce((n, [s, d]) => n + d * fit.scaleAt(s), 0));
@@ -528,7 +534,8 @@ function fitRecording(r: NonNullable<typeof replay>): RecordingCard {
       series.push(run);
     }
   }
-  const recWith = withExactSp(ad ? withDamage(rec, sim, press, strike, false) : rec, simWith);
+  const recF = forms.length ? { ...rec, forms } : rec;
+  const recWith = withExactSp(ad ? withDamage(recF, sim, press, strike, false) : recF, simWith);
   return { recording: recWith, simTrack: simWith, dpsMax: Math.max(...rec.dps, ...sim.dps, 0), unattributed: fit.unattributed, afterKill: fit.afterKill, shown: fit.result, live };
 }
 
@@ -1248,6 +1255,8 @@ interface Track {
   presses: { frame: number; slot: number; input: Input }[];
   strikes: { frame: number; slot: number; finisher: boolean }[];
   staggers: { frame: number; end: number }[];
+  /** Each ultimate form's stretch (Yvonne's), its attacks the ultimate's damage. */
+  forms?: { slot: number; frame: number; end: number }[];
   mechanics: { frame: number; label: string }[];
   away: [number, number][];
   guard: [number, number][];
@@ -1274,8 +1283,21 @@ function simTrack(r: SimResult): Track {
     dps[k] += dealt - last;
     last = dealt;
   }
-  return { seconds: r.seconds, main: r.main, presses: r.presses, strikes: r.strikes ?? [], staggers: r.staggers ?? [], mechanics: r.mechanics ?? [], away: r.away ?? [], guard: [], dps };
+  return { seconds: r.seconds, main: r.main, presses: r.presses, strikes: r.strikes ?? [], staggers: r.staggers ?? [], ...(r.forms ? { forms: r.forms } : {}), mechanics: r.mechanics ?? [], away: r.away ?? [], guard: [], dps };
 }
+
+/**
+ * An ultimate press's form, if it has one: the first that starts after it and before that operator's next ultimate
+ * (after its cut-in, or two: one shared with another ultimate waits for both).
+ */
+const formOf = (r: Pick<Track, 'forms' | 'presses'>, p: { frame: number; slot: number; input?: Input }) => {
+  if (p.input !== 'ultimate' || !r.forms) return undefined;
+  const next = r.presses.find((q) => q.slot === p.slot && q.input === 'ultimate' && q.frame > p.frame)?.frame ?? Infinity;
+  return r.forms.find((f) => f.slot === p.slot && f.frame >= p.frame - FPS && f.frame < next);
+};
+
+/** A form's length for the transcript and hover text ("10.0 s"). */
+const formLength = (f: { frame: number; end: number } | undefined) => (f ? `${((f.end - f.frame) / FPS).toFixed(1)} s` : '');
 
 /**
  * A recording as a track, 1:1 with the video: its presses, Final Strikes and interrupts as read, the boss Staggered
@@ -1400,9 +1422,10 @@ function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], id
         ${who(name, slot)}
         <span class="sim-lane-track">
           ${spans.filter((s) => s.slot === slot).map((s) => html`<i class="sim-control" style="left:${at(s.from)};width:${at(s.to - s.from)}"></i>`)}
+          ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${at(f.end - f.frame)}" title="${secs(f.frame)} · Ultimate ${formLength(f)}"></i>`)}
           ${r.presses
             .filter((p) => p.slot === slot && p.input !== 'swap')
-            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}${dmgOf(r.pressDmg, r.presses, p)}${spOf(r.pressSp, r.presses, p)}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : 'U'}</i>`)}
+            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}${formOf(r, p) ? ` ${formLength(formOf(r, p))}` : ''}${dmgOf(r.pressDmg, r.presses, p)}${spOf(r.pressSp, r.presses, p)}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : 'U'}</i>`)}
           ${r.strikes
             .filter((s) => s.slot === slot)
             .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" title="${secs(s.frame)} · ${s.finisher ? 'Finisher' : 'Final Strike'}${dmgOf(r.strikeDmg, r.strikes, s)}${spOf(r.strikeSp, r.strikes, s)}"></i>`)}
@@ -2106,9 +2129,9 @@ function runPlay(): void {
 }
 
 /** The presses, with the controlled operator's Final Strikes and Finishers between them (how long to keep attacking). */
-function steps(r: Track): { frame: number; slot: number; label: string; strike: boolean; dmg?: number; sp?: number; spAfter?: number }[] {
+function steps(r: Track): { frame: number; slot: number; label: string; strike: boolean; dmg?: number; sp?: number; spAfter?: number; length?: string }[] {
   const out = [
-    ...r.presses.flatMap((p, i) => (p.input === 'swap' ? [] : [{ frame: p.frame, slot: p.slot, label: INPUT_NAME[p.input], strike: false, dmg: r.pressDmg?.[i], sp: r.pressSp?.[i], spAfter: r.pressSpAfter?.[i] }])),
+    ...r.presses.flatMap((p, i) => (p.input === 'swap' ? [] : [{ frame: p.frame, slot: p.slot, label: INPUT_NAME[p.input], strike: false, dmg: r.pressDmg?.[i], sp: r.pressSp?.[i], spAfter: r.pressSpAfter?.[i], length: formLength(formOf(r, p)) }])),
     ...r.strikes.map((s, i) => ({ frame: s.frame, slot: s.slot, label: s.finisher ? 'Finisher' : 'Final Strike', strike: true, dmg: r.strikeDmg?.[i], sp: r.strikeSp?.[i], spAfter: r.strikeSpAfter?.[i] })),
     ...r.staggers.map((s) => ({ frame: s.frame, slot: -1, label: 'Staggered', strike: true })),
     ...r.mechanics.map((m) => ({ frame: m.frame, slot: -1, label: m.label, strike: true })),
@@ -2204,7 +2227,10 @@ function transcriptLines(x: SavedSim<SimResult>, track: Track): Html {
           </select>${actSizers(labels)}</span>
           <span>${s.input === 'battle' ? html`<input class="sim-inl num" type="number" min="0" max="300" value="${spGained(s.back, x.ids[s.slot] ?? undefined) ?? ''}" placeholder="+0" style="--d:3" data-sim="step-back" data-k="${k}" title="SP gained (blank: unknown)" aria-label="SP gained" />` : ''}</span>
           <span class="sim-move-int">${s.input === 'battle' || s.input === 'combo' || s.input === 'ultimate' ? html`<input type="checkbox" data-sim="step-int" data-k="${k}" ${s.interrupt ? 'checked' : ''} title="It interrupted the boss's attack" aria-label="Interrupt" />` : ''}</span>
-          <span></span>
+          ${(() => {
+            const p = shownOf(s);
+            return html`<span class="num secondary sim-move-len">${p?.length ?? ''}</span>`;
+          })()}
           ${(() => {
             const p = shownOf(s);
             return html`<span class="num sim-move-sp${p?.sp && p.sp < 0 ? ' used' : ''}">${spText(p?.sp)}</span><span class="num sim-move-spafter">${p?.sp !== undefined && p.spAfter !== undefined ? `→ ${p.spAfter}` : ''}</span><span class="num sim-move-dmg">${p?.dmg ? big(p.dmg) : ''}</span>`;
@@ -2360,7 +2386,7 @@ function resultsView(r: SimResult, names: string[], ids: string[], stale: boolea
         ? extra.editor(shown ?? simTrack(r))
         : html`<div class="sim-moves-wrap">
       <ol class="sim-moves copy-14${fold.moves ? '' : ' one'}">
-        ${((actLabels = moveLabels(shown ?? simTrack(r))), '')}${steps(shown ?? simTrack(r)).map((p) => html`<li class="${p.strike ? 'secondary' : ''}" data-t="${p.frame / FPS}"><span></span><button type="button" class="sim-seek num" data-action="sim-seek" data-value="${String(p.frame / FPS)}" title="Go to ${secs(p.frame)}">${secs(p.frame)}</button><span class="sim-move-op">${p.slot < 0 ? 'Enemy' : names[p.slot]}${opSizers(names)}</span><span class="sim-move-dot">·</span><span class="sim-move-act">${p.label}${actSizers(actLabels)}</span><span></span><span></span><span></span><span class="num sim-move-sp${p.sp && p.sp < 0 ? ' used' : ''}" title="${p.sp ? `${p.sp > 0 ? 'Gained' : 'Used'} ${Math.abs(p.sp)} SP${p.spAfter !== undefined ? `, ${p.spAfter} after` : ''}` : ''}">${spText(p.sp)}</span><span class="num sim-move-spafter">${p.sp !== undefined && p.spAfter !== undefined ? `→ ${p.spAfter}` : ''}</span><span class="num sim-move-dmg">${p.dmg ? big(p.dmg) : ''}</span></li>`)}
+        ${((actLabels = moveLabels(shown ?? simTrack(r))), '')}${steps(shown ?? simTrack(r)).map((p) => html`<li class="${p.strike ? 'secondary' : ''}" data-t="${p.frame / FPS}"><span></span><button type="button" class="sim-seek num" data-action="sim-seek" data-value="${String(p.frame / FPS)}" title="Go to ${secs(p.frame)}">${secs(p.frame)}</button><span class="sim-move-op">${p.slot < 0 ? 'Enemy' : names[p.slot]}${opSizers(names)}</span><span class="sim-move-dot">·</span><span class="sim-move-act">${p.label}${actSizers(actLabels)}</span><span></span><span></span><span class="num secondary sim-move-len" title="${p.length ? 'How long the ultimate lasted' : ''}">${p.length ?? ''}</span><span class="num sim-move-sp${p.sp && p.sp < 0 ? ' used' : ''}" title="${p.sp ? `${p.sp > 0 ? 'Gained' : 'Used'} ${Math.abs(p.sp)} SP${p.spAfter !== undefined ? `, ${p.spAfter} after` : ''}` : ''}">${spText(p.sp)}</span><span class="num sim-move-spafter">${p.sp !== undefined && p.spAfter !== undefined ? `→ ${p.spAfter}` : ''}</span><span class="num sim-move-dmg">${p.dmg ? big(p.dmg) : ''}</span></li>`)}
       </ol>
       ${foldButton('moves', 'Full transcript')}
       </div>`}

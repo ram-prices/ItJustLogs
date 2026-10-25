@@ -7,7 +7,7 @@
  */
 import { equip, type Base, type Build, type GearData, type WeaponData } from './build';
 import { optimizeBuilds, type Optimize } from './gearSearch';
-import { ELEMENTS, FPS, INFLICTION_NAME, World, buffShown, effectsShown, kindOf, type Bundle, type Enemy, type Input, type Mod, type Stagger, type Strike } from './engine';
+import { ELEMENTS, FPS, INFLICTION_NAME, World, buffShown, effectsShown, kindOf, type Bundle, type Enemy, type Form, type Input, type Mod, type Stagger, type Strike } from './engine';
 import { beam, fightOf, localRunner, scoreOf, search, searchCycle, type Fight, type Press, type Rules, type Runner, type Team } from './rotation';
 
 /** One team position: the operator and, when set, Potentials other than the player's own. */
@@ -164,6 +164,8 @@ export interface SimResult {
   strikes?: Strike[];
   /** When the enemy was Staggered. */
   staggers?: Stagger[];
+  /** Each ultimate form's stretch (Yvonne's), frames on the fight's clock. */
+  forms?: Form[];
   mechanics?: { frame: number; label: string }[];
   /** When the enemy couldn't be hit (a recording's `away` stretches), frames on the fight's clock. */
   away?: [number, number][];
@@ -299,6 +301,8 @@ export function sourceOf(skillId: string, skillKind?: string): string {
   if (reaction && ELEMENT[reaction[1]]) return reaction[1] === reaction[2] && !/frozen/.test(skillId) ? `${ELEMENT[reaction[1]]} Burst` : (REACTION[reaction[1]] ?? 'Reaction');
   if (/^(buff_)?(sk_)?wpn_|equipsuit/.test(skillId)) return 'Weapon and gear';
   if (/_power_attack/.test(skillId)) return 'Finisher';
+  // An ultimate form's basic attacks are the ultimate's (Yvonne's _ult_attack1_1, Zhuang Fangyi's _attack1_ult).
+  if (/_ult_attack|_attack\d+_ult/.test(skillId)) return 'Ultimate';
   // By its id, else by the kind of skill the hit counts as (Zhuang Fangyi's Thunder Strikes come from a buff).
   const named = kindOf(skillId.replace(/^buff_/, ''));
   const kind = named === 'other' && skillKind ? skillKind : named;
@@ -504,6 +508,7 @@ function summary(f: Fight, req: SimRequest, start: number): SimResult {
     presses: f.presses,
     strikes: f.strikes,
     staggers: f.staggers,
+    ...(f.forms?.length ? { forms: f.forms } : {}),
     mechanics: f.mechanics,
     ...(f.away?.length ? { away: f.away } : {}),
     track: trackOf(f),
@@ -925,6 +930,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     main: firstHit?.slot ?? 0,
     strikes: w.strikes.map((x) => ({ ...x, frame: toClock(x.frame) })),
     staggers: w.staggers.map((x) => ({ frame: toClock(x.frame), end: Math.min(game(end), toClock(x.end)) })),
+    forms: w.forms.map((x) => ({ slot: x.slot, frame: toClock(x.frame), end: Math.min(game(end), toClock(x.end)) })),
     mechanics: w.mechanics.map((m) => ({ ...m, frame: toClock(m.frame) })),
     away: w.away.map(([a, b]) => [game(a), game(b)] as [number, number]),
   };
@@ -1058,7 +1064,8 @@ function damageByAction(
   for (const h of hits) {
     const slot = slotOf.get(h.operator);
     if (!h.amount || slot === undefined) continue;
-    const input = INPUT[h.skillKind ?? ''];
+    // An ultimate form's attacks count for its ultimate, not the Final Strike that closes it.
+    const input = sourceOf(h.skill, h.skillKind) === 'Ultimate' ? 'ultimate' : INPUT[h.skillKind ?? ''];
     if (input) {
       let i = -1;
       for (let k = 0; k < presses.length && presses[k].frame <= h.frame; k++) if (presses[k].slot === slot && presses[k].input === input) i = k;

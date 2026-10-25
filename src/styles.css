@@ -8339,6 +8339,14 @@ input.sim-run-value-edit {
 .sim-boss-meter i.staggered {
   background: var(--amber);
 }
+/* An ultimate form's stretch: a band from its press. */
+.sim-form {
+  position: absolute;
+  top: 8px;
+  height: 8px;
+  background: color-mix(in srgb, var(--amber) 35%, transparent);
+  border-radius: 4px;
+}
 /* Who's controlled: a band under that operator's presses. */
 .sim-control {
   position: absolute;
