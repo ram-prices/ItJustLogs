@@ -36,6 +36,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
 
 - `npm run dev` (or `preview_start` name `itjustlogs-dev`, port 5173)
 - `npm test` (Vitest), `npm run typecheck`, `npm run build`
+- Keep output short (it stays in the conversation): `npx vitest run --reporter=dot`
+  (dots, failures, summary), `npm run typecheck` (silent when clean),
+  `npm run build 2>&1 | tail -4`. Scratch sim tests (`src/domain/sim/dbg*`,
+  gitignored, excluded from both) run only on purpose:
+  `DBG=1 npx vitest run src/domain/sim/dbg81.test.ts`.
 
 ## Layout
 

@@ -349,5 +349,5 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   UseItemTable and BuffData: Jakub's Legacy ATK +27%) buffs one operator the whole fight. `replaySim` (team.ts) plays a gameplay video's read
   steps in the sim for its timeline and DPS (worker message `replay`; combos and ultimates the video shows are allowed:
   `strictCombos`/`strictUltimates` off). The page keeps the last reading (`simVideo` in IndexedDB) for runs saved without one, and
-  each replay goes in History as a Recording. Scratch tests `src/domain/sim/dbg*.test.ts` and `dbgTeam.ts`
+  each replay goes in History as a Recording. Scratch tests `src/domain/sim/dbg*.test.ts` and `dbgTeam.ts` (gitignored, run with `DBG=1 npx vitest run <file>`)
   read a local ef-assets clone: never commit them.

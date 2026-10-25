@@ -1,6 +1,8 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
+import { configDefaults } from 'vitest/config';
 import { EF_ASSETS, EF_ASSETS_CDN } from './src/domain/banners.ts';
 import {
   embedBytes,
@@ -268,5 +270,9 @@ export default defineConfig({
     strictPort: true,
     // fixtures/ holds real pull history; never serve it (the dev server may be reachable from the LAN).
     fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/fixtures/**'] },
+  },
+  test: {
+    // Scratch tests (src/domain/sim/dbg*, gitignored) read a local ef-assets clone: run them on purpose with DBG=1.
+    exclude: [...configDefaults.exclude, ...(process.env.DBG ? [] : ['src/**/dbg*'])],
   },
 });
