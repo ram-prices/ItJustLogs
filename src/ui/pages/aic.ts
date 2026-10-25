@@ -375,9 +375,9 @@ export function aicPage(redraw: () => void): Html {
   const input = searchLonger === key ? { ...base, seconds: LONGER } : base;
   solve(data, input, searchLonger === key ? `${key}+` : key, redraw);
   const shownKey = searchLonger === key ? `${key}+` : key;
-  return html`${header}
-    <main class="container fade-in">
+  return html`<main class="container fade-in">
       <div class="collection-layout">
+        ${header}
         ${subTabs('aic-view', VIEWS, view, (v) => (v === 'Multi-site' ? String(Object.keys(s.sites ?? {}).length || '') : ''))}
         <div class="min0 collection-panes aic-panes">
           ${targetsCard(data, s, input)}

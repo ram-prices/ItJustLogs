@@ -9,7 +9,7 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, heroGlow, icon, itemImg, stars, tileArt, trait, withStars } from '../components';
+import { badge, heroGlow, icon, itemImg, pageHeader, stars, tileArt, trait, withStars } from '../components';
 import { html, type Html } from '../html';
 import finalStrikes from '../../data/final-strikes.json';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
@@ -104,12 +104,9 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
     ...soon.map(([id, p]) => ({ id, name: p.name, rarity: p.rarity, class: p.class, element: p.element, weapon: p.weapon, soon: true })),
   ];
   const groups = sortGroups('char', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), element: r.element, weapon: r.weapon, class: r.class, unreleased: r.soon }));
-  return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
-      <h1 class="heading-32">Operators</h1>
-      <p class="copy-16">${owned ? `${have}/${ops.length}` : `${ops.length} operators`}</p>
-    </div></div></div>
-    <main class="container fade-in">${databaseTabs(
+  return html`<main class="container fade-in">${databaseTabs(
       'char',
+      pageHeader('Operators', owned ? `${have}/${ops.length}` : `${ops.length} operators`),
       html`<div class="section-head wiki-sort-head">${searchBox('char')}${sortBar('char')}</div>
       ${groups.map(
         (g) => html`<section class="section wiki-type">
@@ -514,7 +511,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
       ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined)}
       <div class="wiki-cols even">
         <div class="wiki-col">${statsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
-        <div class="wiki-col">${loadoutSection(id, a, redraw)}</div>
+        <div class="wiki-col">${loadoutSection(id, a, redraw, o.weapon)}</div>
       </div>
       ${owned?.copies
         ? html`<div class="wiki-cols even">

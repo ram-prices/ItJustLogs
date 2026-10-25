@@ -3,7 +3,7 @@ import { gearIconUrl } from '../../domain/banners';
 import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, weaponBaseRanks, weaponRankCaps, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { badge, essenceIcon, icon, itemImg, rarityArt, tileArt } from '../components';
+import { artificeIcon, badge, essenceIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
 
@@ -47,12 +47,13 @@ function slotTile(
   slot: LoadoutSlot,
   label: string,
   filled: { img: Html; name: string; sub: Html | string; href?: string; extra?: Html } | null,
+  mark?: Html,
 ): Html {
   return html`<div class="loadout-slot${filled ? '' : ' vacant'}${filled?.extra ? ' has-extra' : ''}">
     <button type="button" class="loadout-pick" data-action="loadout-pick" data-op="${opId}" data-slot="${slot}" aria-label="${filled ? `${label}: ${filled.name}. Change` : `Choose ${label.toLowerCase()}`}">
-      <span class="loadout-icon">${filled ? filled.img : icon('add')}</span>
+      <span class="loadout-icon">${filled ? filled.img : (mark ?? icon('add'))}</span>
       <span class="loadout-text min0">
-        <span class="loadout-label">${label}</span>
+        <span class="loadout-label">${mark ?? ''}${label}</span>
         <span class="loadout-name ellipsis">${filled ? filled.name : 'Empty'}</span>
         ${filled ? html`<span class="loadout-sub ellipsis">${filled.sub}</span>` : ''}
       </span>
@@ -122,9 +123,10 @@ function artificePicker(opId: string, slot: GearSlot, l: Loadout, g: WikiGear): 
   const top = Math.max(0, ...g.stats.map((s) => s.values.length - 1));
   if (!top) return html``;
   const at = artificeOf(l, slot, g);
-  return html`<select class="loadout-artifice" data-artifice-op="${opId}" data-artifice-slot="${slot}" aria-label="${g.name} Artifice level" title="Artifice level: its stats count at this level">
+  // The game's mark shows the level; the select over it picks one.
+  return html`<span class="loadout-artifice" title="Artifice level: its stats count at this level">${artificeIcon(at)}<select data-artifice-op="${opId}" data-artifice-slot="${slot}" aria-label="${g.name} Artifice level">
     ${Array.from({ length: top + 1 }, (_, i) => html`<option value="${i}" ${raw(i === at ? 'selected' : '')}>Artifice ${i}</option>`)}
-  </select>`;
+  </select></span>`;
 }
 
 /** Sets (or, with null, resets to the highest) a gear slot's Artifice level. */
@@ -138,7 +140,7 @@ export function setArtifice(opId: string, slot: string, level: number | null): v
 }
 
 /** The Loadout section of an operator's page. */
-export function loadoutSection(opId: string, a: Analysis | null, redraw: () => void): Html {
+export function loadoutSection(opId: string, a: Analysis | null, redraw: () => void, weaponType?: string): Html {
   const weps = wikiFile<WikiWeaponFile>('weapons.json', redraw).data;
   const gear = wikiFile<WikiGearFile>('gear.json', redraw).data;
   const l = loadoutOf(opId) ?? {};
@@ -159,11 +161,12 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
           href: infoHref('weap', l.weapon),
         }
       : null,
+    weaponType ? weaponTypeIcon(weaponType) : undefined,
   );
-  const gearTiles = GEAR_SLOTS.map(({ slot, label }) => {
+  const gearTiles = GEAR_SLOTS.map(({ slot, type, label }) => {
     const id = l[slot];
     const g = id ? gear?.gear.items[id] : undefined;
-    return slotTile(opId, slot, label, id ? { img: g ? rarityArt(gearImg(id), g.rarity) : gearImg(id), name: g?.name ?? id, sub: g?.set ?? (g ? `Lv ${g.level}` : ''), extra: g ? artificePicker(opId, slot, l, g) : undefined } : null);
+    return slotTile(opId, slot, label, id ? { img: g ? rarityArt(gearImg(id), g.rarity) : gearImg(id), name: g?.name ?? id, sub: g?.set ?? (g ? `Lv ${g.level}` : ''), extra: g ? artificePicker(opId, slot, l, g) : undefined } : null, slotIcon(type));
   });
 
   // Set effects that are on (3 pieces of one set).

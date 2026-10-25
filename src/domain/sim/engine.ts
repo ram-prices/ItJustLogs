@@ -22,6 +22,29 @@ export type Data = any;
 
 export const FPS = 30;
 
+/**
+ * The guard AI's Attacker roles (GroupAIConfig Default_GroupAITargetNotMain, Character): per mode, how many of the
+ * three teammates get one and how often it's dealt; each lasts 5 s. How the game picks a mode isn't in the data:
+ * the four weigh the same here. Each teammate's share of the time attacking: (3 + 2·5/6 + 2 + 1·5/12) / 4 / 3 ≈ 0.59.
+ */
+const GUARD_MODES = [
+  { count: 3, tick: 3.2 }, // Radical
+  { count: 2, tick: 6 }, // Moderate
+  { count: 2, tick: 4.2 }, // Steady
+  { count: 1, tick: 12 }, // SingleOne
+];
+const GUARD_LIFE = 5;
+export const GUARD_DATA_SHARE = GUARD_MODES.reduce((n, m) => n + m.count * Math.min(1, GUARD_LIFE / m.tick), 0) / GUARD_MODES.length / 3;
+/**
+ * The share used: two thirds of the data's, fitted to the owner's two recordings by when the boss dies (the
+ * stopwatch's end; damage sums can't be compared, a phase's is capped at its HP): at 0.4 the sim kills the
+ * Skydrummer at 2:27.4 (the game: 2:27.4) and Alleikhreos at 2:20.6 (2:21), at 0.59 at 2:24.5 and 2:20.1, at 0.2
+ * neither in time. Moving, dodging and repositioning take the rest of an Attacker role.
+ */
+export const GUARD_SHARE = 0.4;
+/** The span (s) each teammate's attacking window repeats over: the Moderate mode's tick. */
+const GUARD_PERIOD = 6;
+
 export interface Bundle {
   operator: string;
   skills: Record<string, Data>;
@@ -283,6 +306,8 @@ const short = (t: string | undefined) => (t ?? '').split(',')[0].split('.').pop(
 
 /** Element names the data uses for damage and inflictions. */
 export const ELEMENTS = ['Fire', 'Cryst', 'Pulse', 'Natural'] as const;
+/** How long an Arts Infliction lasts from its last application (seconds): `inflictUntil`. */
+const INFLICTION_SECONDS = 20;
 
 /**
  * Arts Infliction's tags (hashed; inflictions aren't buffs here, so checks for these look at the target's
@@ -312,6 +337,33 @@ const VULNERABLE = 'buff_physical_no_guard';
 const PHYSICAL_MASK: Record<PhysicalStatus, string> = { Lift: 'Airborne', KnockDown: 'KnockDown', Crush: 'Crush', Breach: 'Fracture' };
 /** A status a combo trigger watches for, by its buff's tag: Combustion, Corrosion. */
 const STATUS_TAG: Record<number, string> = { [-1110095722]: 'Combustion', [-421286163]: 'Corrosion', 1466867135: 'Electrification', 1535684437: 'Solidification' };
+/** An element's infliction as the game names it (HyperlinkTextTable's ba.*onchar terms). */
+export const INFLICTION_NAME: Record<(typeof ELEMENTS)[number], string> = { Fire: 'Heat Infliction', Cryst: 'Cryo Infliction', Pulse: 'Electric Infliction', Natural: 'Nature Infliction' };
+/** A Susceptibility's or Amp's kind as the game's terms name it (ba.crystvul "Cryo Susceptibility", ba.spellenhance "Arts Amp"). */
+export const EFFECT_KIND: Record<string, string> = { Spell: 'Arts', Fire: 'Heat', Cryst: 'Cryo', Crystal: 'Cryo', Pulse: 'Electric', Natural: 'Nature', Physical: 'Physical' };
+
+/** The Susceptibility, Amp and Haste effects on an entity now (as `deal` counts them), each with the game's name. */
+export function effectsShown(e: Entity, frame: number): { id: string; name: string }[] {
+  const on = (x: Effect) => x.until > frame && (!x.parent || x.parent.owner.buffs.includes(x.parent));
+  const out: { id: string; name: string }[] = [];
+  for (const x of e.vulnerable ?? []) if (on(x)) out.push({ id: `vul_${x.kind}`, name: `${EFFECT_KIND[x.kind] ?? x.kind} Susceptibility` });
+  for (const x of e.amp ?? []) if (on(x)) out.push({ id: `amp_${x.kind}`, name: `${EFFECT_KIND[x.kind] ?? x.kind} Amp` });
+  for (const x of e.haste ?? []) if (on(x)) out.push({ id: 'haste', name: 'Haste' });
+  return out;
+}
+
+/**
+ * A buff the game shows in its buff bar (its data has an icon: `hasIcon`), with a status's name where it is one;
+ * null for the hidden bookkeeping buffs.
+ */
+export function buffShown(b: Buff): { id: string; status?: string; level?: number } | null {
+  if (b.def.hasIcon !== true && b.def.hasIcon !== 'True') return null;
+  const reaction = (b.def.applyTags ?? []).map((t: Data) => STATUS_TAG[t.tagId]).find(Boolean);
+  const status = reaction ?? (b.id === VULNERABLE ? 'Vulnerable' : undefined);
+  // An Arts Reaction's level (1–4: the stacks it was made from) is its buff's `count`, not its stacks.
+  const level = reaction ? Math.max(1, Math.round(b.bb.get('count') ?? 1)) : undefined;
+  return { id: b.id, ...(status ? { status } : {}), ...(level ? { level } : {}) };
+}
 /**
  * Summons by a tag the data never sets (it's on the summon's model in the game), so a tag search would otherwise
  * count every summon the operator has: Zhuang Fangyi's Sunderblades (her battle skill strikes once per blade, up to 9).
@@ -397,6 +449,15 @@ export interface Enemy {
   /** Each phase's HP, and how low a phase before the last can take it (a share of it). */
   phaseHp?: number;
   phaseFloor?: number;
+  /**
+   * The stage's rules. `food`: a buff placed on each operator before the fight, allowed unless false (Re-Crisis only,
+   * of the game's hard content; healing items used during a fight are another thing). `fullUltimate`: every
+   * operator's ultimate full at the start (Re-Crisis). `prep`: the fight waits for a start button, so the team can set
+   * up first while SP regenerates (Echoes of War). Every stage starts at 200 SP of 300 (START_SP).
+   */
+  food?: boolean;
+  fullUltimate?: boolean;
+  prep?: boolean;
   /**
    * A guard stance it takes when its HP falls below each share in `below` (needs phaseHp): for `seconds`, damage
    * taken changes by `damageTaken` (-0.9: a tenth), its DEF by `def`, and its Stagger meter heals faster than hits
@@ -519,16 +580,18 @@ export class World {
   constructor(bundles: Bundle[], stats: Stats[], enemy: Enemy = {}, settings: Record<string, { values: number[]; kind?: string }> = {}) {
     this.bundles = bundles;
     this.settings = settings;
-    for (const b of bundles) {
+    bundles.forEach((b, i) => {
       for (const [k, v] of Object.entries(b.skills)) this.skillOf.set(k, v);
       for (const [k, v] of Object.entries(b.buffs)) {
         this.buffOf.set(k, v);
         for (const t of (v as Data).applyTags ?? []) this.buffTags.add(t.tagId);
       }
       for (const [k, v] of Object.entries(b.patch)) this.patchOf.set(k, v);
-      for (const [k, v] of Object.entries(b.levels ?? {})) this.skillLevel.set(k, v);
+      // By team position: operators share skill ids (weapons' attribute skills, gear sets', other operators' skills
+      // in a bundle), each at its own level (Arcane's wpn_attr_wisd_high at 5 had set Yvonne's to 5).
+      for (const [k, v] of Object.entries(b.levels ?? {})) this.skillLevel.set(`${i}|${k}`, v);
       Object.assign(this.composites, b.composites);
-    }
+    });
     this.team = bundles.map((b, i) => this.entity(b.operator, 'team', null, i, stats[i]));
     this.enemy = this.entity('enemy', 'enemy', null, -1);
     this.enemy.attr.Def = enemy.def ?? 100;
@@ -548,11 +611,11 @@ export class World {
   // -------------------------------------------------------------------------
 
   /** A skill's blackboard at the world's rank: its own defaults, then the skill table's values. */
-  skillBlackboard(skillId: string): Map<string, number> {
+  skillBlackboard(skillId: string, slot = -1): Map<string, number> {
     const bb = new Map<string, number>();
     const skill = this.skillOf.get(skillId);
     for (const b of skill?.blackboard ?? []) bb.set(b.key, Number(b.valueDouble ?? b.value ?? 0));
-    const level = this.patchAt(skillId);
+    const level = this.patchAt(skillId, slot);
     for (const [k, v] of Object.entries(level?.values ?? {})) if (typeof v === 'number' || !Number.isNaN(Number(v))) bb.set(k, Number(v));
     return bb;
   }
@@ -1055,9 +1118,10 @@ export class World {
           for (const spec of a.buffInput ?? []) {
             const assigned = new Map<string, number>();
             if (spec.assignBlackboard) for (const it of spec.assignItems ?? []) assigned.set(it.targetKey, it.useDirectValue ? Number(it.numericValue) : (ctx.bb.get(it.inputValueKey) ?? 0));
-            // From the action's source, as CreateBuffAction's are: an entity's aura gives its spawner's buffs (Arcane's
-            // array marks check the ultimate's listener on him).
-            if (spec.buffId) this.addBuff(e, spec.buffId, ctx.source, assigned);
+            // From the action's source (ActionSource), as CreateBuffAction's are: an entity's aura gives its spawner's
+            // buffs (Arcane's array marks check the ultimate's listener on him). ActionOwner: from the entity running it
+            // (Xaihi's crystal, whose heal checks the crystal for finishball_04 after its second heal).
+            if (spec.buffId) this.addBuff(e, spec.buffId, a.buffSource === 'ActionOwner' ? ctx.owner : ctx.source, assigned);
           }
           this.exec(list, { ...ctx, target: e });
         }
@@ -1501,7 +1565,14 @@ export class World {
         return;
       // A forced Arts Reaction (wiki: Arts Reaction): no infliction consumed, no initial hit, at Status Level `count` (I by default).
       case 'ForceSpellStatusAction':
-        for (const e of this.targets(a.target, ctx)) this.forceReaction(e, a.spellStatusType, Math.max(1, Math.min(4, Math.round(this.val(a.count, ctx.bb)) || 1)), ctx);
+        for (const e of this.targets(a.target, ctx)) {
+          // It consumes `consumedLayer` stacks of the infliction `consumedType` names first (1–4 as consumed_type:
+          // Heat, Cryo, Electric, Nature): Yvonne's bomb takes the Cryo it freezes with.
+          const kind = Math.round(this.val(a.consumedType, ctx.bb));
+          const layers = Math.round(this.val(a.consumedLayer, ctx.bb));
+          if (kind > 0 && layers > 0 && ELEMENTS[kind - 1]) this.consume(e, ELEMENTS[kind - 1], ctx.source.owner ?? ctx.source, ctx, layers);
+          this.forceReaction(e, a.spellStatusType, Math.max(1, Math.min(4, Math.round(this.val(a.count, ctx.bb)) || 1)), ctx);
+        }
         return;
       // The SP the last gain brought (Pogranichnik).
       case 'SaveAtbObtainValue':
@@ -1611,12 +1682,20 @@ export class World {
       case 'ForceTargetInFightAction':
       case 'TagQueryListenerAction':
       case 'DispelAction':
-      case 'SealAction':
+      case 'SealAction': {
+        const secs = this.val(a.duration, ctx.bb);
+        const keys = (a.directCurve?.keys ?? []).map((k: Data) => [Number(k.time), Number(k.value)] as [number, number]);
+        if (secs > 0 && keys.length) this.seals.push({ from: this.frame, frames: Math.round(secs * FPS), keys });
+        return;
+      }
       case 'AddTagAction':
       case 'MarkCanInterrupt':
         return;
       // Presentation, movement and input handling: no effect on damage.
       case 'PlayAnimationAction+PlayAnimationAction':
+      // A voice line cut off.
+      case 'VoiceInterruptAction+VoiceInterruptAction':
+      case 'VoiceInterruptAction':
       case 'PlayAnimationWithStep+PlayAnimationWithStep':
       case 'ComboCacheAction':
       case 'AllowNextSkillAction':
@@ -1631,7 +1710,13 @@ export class World {
         return;
       // Time stops for everyone but the caster while its timeline entry lasts (the ultimate's cut-in).
       case 'UltimateTimeAction':
-        if (ctx.run && Number(a.timeScale ?? 1) === 0 && ctx.span) this.freeze = { owner: ctx.run.owner, from: this.frame, left: ctx.span };
+        if (ctx.run && Number(a.timeScale ?? 1) === 0 && ctx.span) {
+          const next = { owner: ctx.run.owner, from: this.frame, left: ctx.span };
+          // A second ultimate in the first's cut-in plays its own after it: the game stays frozen for both (the
+          // Skydrummer recording: 3.38 s for Xaihi's and Arcane's, not one cut-in's 1.57).
+          if (this.freeze && this.freeze.left > 0 && this.freeze.owner !== next.owner) this.freezeQueue.push(next);
+          else this.freeze = next;
+        }
         return;
       default:
         this.note(t);
@@ -1653,7 +1738,7 @@ export class World {
     const bb = this.launching ? new BB((this.launching.projBB ??= new Map()), owner.bb) : new BB(owner.bb);
     for (const b of skill.blackboard ?? []) bb.set(b.key, Number(b.valueDouble ?? b.value ?? 0));
     for (const [k, v] of inherit ?? []) bb.set(k, v);
-    if (this.patchOf.has(skillId)) for (const [k, v] of this.skillBlackboard(skillId)) if (this.patchOf.get(skillId)!.some((l) => k in l.values)) bb.set(k, v);
+    if (this.patchOf.has(skillId)) for (const [k, v] of this.skillBlackboard(skillId, (owner.owner ?? owner).slot)) if (this.patchOf.get(skillId)!.some((l) => k in l.values)) bb.set(k, v);
     for (const m of this.skillMods.get(skillId) ?? []) bb.set(m.key, m.how === 1 ? (bb.get(m.key) ?? 0) + m.value : m.how === 2 ? (bb.get(m.key) ?? 0) * m.value : m.value);
     // The combo's trigger target (and any skill's chosen target): the enemy.
     const run: Run = { skillId, skill, owner, source, start: this.frame, castAt: this.frame, bb, groups: new Map([['smart_target', [target ?? this.enemy]]]), target: target ?? this.enemy, done: new Set(), ended: false, ...(this.launching ? { origin: this.launching } : {}) };
@@ -1953,6 +2038,9 @@ export class World {
         if (u.onlyEnableForMainChar && !(attacker.side === 'team' && attacker.slot === this.controlled)) continue;
         if (u.damageAttributeType === 'Poise') {
           if (immune) continue;
+          // Only the controlled operator's basic attacks build Stagger (wiki: "the controlled operator's Final Strike
+          // and most skills"): a teammate's chain under the guard AI adds none, whatever its units say.
+          if (attacker.side === 'team' && attacker.slot !== this.controlled && this.kindOfSkill(ctx.skillId) === 'basic') continue;
           // A Final Strike's Stagger counts once per strike, however many of its projectiles carry it (Gilberta's
           // fourth attack fires three, each with the full 16: the wiki's 16 per Final Strike).
           const strike = u.onlyEnableForMainChar ? (ctx.run?.origin ?? ctx.run) : undefined;
@@ -2198,6 +2286,15 @@ export class World {
   // Inflictions, SP, Ultimate Energy
   // -------------------------------------------------------------------------
 
+  /**
+   * An Arts Infliction lasts INFLICTION_SECONDS from its last application: another of the same element resets it for
+   * every stack (endfield.wiki.gg Arts Infliction; the game's infliction buffs, buff_common_<x>_triggered, carry the
+   * same 20 as their duration). Its end, in sim frames (a cut-in stops it, as it stops time).
+   */
+  private inflictUntil(e: Entity, element: string): void {
+    e.bb.set(`inflict_until_${element}`, this.frame + Math.round(INFLICTION_SECONDS * FPS));
+  }
+
   /** Arts Infliction on an enemy: the same element adds a stack (max 4) and bursts; a different one reacts (wiki: Arts Infliction). */
   inflict(e: Entity, element: string, ctx: Ctx): void {
     const cur = ELEMENTS.find((x) => (e.bb.get(`inflict_${x}`) ?? 0) > 0);
@@ -2212,7 +2309,10 @@ export class World {
     const n = cur ? (e.bb.get(`inflict_${cur}`) ?? 0) : 0;
     const buffId = !cur ? null : cur === element ? `buff_common_${name(element)}_${name(element)}_triggered` : element === 'Cryst' ? 'buff_common_cryst_cryst_frozen_triggered' : `buff_common_try_${name(element)}_cryst_triggered`;
     if (buffId && this.buffOf.has(buffId)) {
-      if (cur === element) e.bb.set(`inflict_${element}`, Math.min(4, n + 1));
+      if (cur === element) {
+        e.bb.set(`inflict_${element}`, Math.min(4, n + 1));
+        this.inflictUntil(e, element);
+      }
       else {
         this.consume(e, cur!, attacker, { ...ctx, bb: new Map() });
         e.bb.set('reaction', (ELEMENTS as readonly string[]).indexOf(element));
@@ -2228,6 +2328,7 @@ export class World {
       const n = e.bb.get(`inflict_${element}`) ?? 0;
       if (n > 0) this.deal(attacker, e, element, 1.6 * this.hidden(attacker, 196), 0, ctx, 'burst');
       e.bb.set(`inflict_${element}`, Math.min(4, n + 1));
+      this.inflictUntil(e, element);
     } else {
       // The stacked element sets the reaction's level; the applied one its kind.
       const level = e.bb.get(`inflict_${cur}`) ?? 1;
@@ -2351,6 +2452,18 @@ export class World {
 
   /** Time stopped by an ultimate: only its caster's runs started since go on. */
   freeze: { owner: Entity; from: number; left: number } | null = null;
+  /** No SP regeneration this frame: a replay's stopwatch stood still (replaySim), so the game's timer did too. */
+  holdSp = false;
+  /** Cut-ins waiting for the one playing (ultimates pressed in it). */
+  freezeQueue: { owner: Entity; from: number; left: number }[] = [];
+  /**
+   * Imprisonment (SealAction, Arcane's combo): the enemy's own time scale over each one's span, a curve (its
+   * directCurve: 0.3, 0.2 at 5%, rising to 1 at the end). The enemy then loses time: its debuffs, inflictions, Breach
+   * and Staggered time wait (buffs run on their owner's time, ignoreOwnerTimeScale false). Found against the
+   * Skydrummer recording: Corrosion III lasted 28.15 s, not its 25, and each Stagger ~11.2 s, not 9, with one inside.
+   */
+  seals: { from: number; frames: number; keys: [number, number][] }[] = [];
+  private sealDebt = 0;
   /** Frames passed with time stopped (they don't count as fight time). */
   frozenFrames = 0;
 
@@ -2358,7 +2471,7 @@ export class World {
   /** The Ultimate Energy an operator's ultimate (as the button has it now) costs. */
   ultCost(op: Entity): number {
     const ult = this.skillIdOf(op, 'ultimate');
-    return this.param(ult, 1, this.patchAt(ult)?.cost ?? 100);
+    return this.param(ult, 1, this.patchAt(ult, op.slot)?.cost ?? 100);
   }
 
   /** Whether an operator can't gain Ultimate Energy now (RefrainObtainUsp), a gain with this tag excepted. */
@@ -2372,6 +2485,11 @@ export class World {
   }
 
   tick(): void {
+    // Arts Inflictions run out.
+    for (const x of ELEMENTS) {
+      const until = this.enemy.bb.get(`inflict_until_${x}`);
+      if (until !== undefined && this.frame >= until && (this.enemy.bb.get(`inflict_${x}`) ?? 0) > 0) this.enemy.bb.set(`inflict_${x}`, 0);
+    }
     if (this.refrains.length) {
       // clearUspOnEnd empties the bar once no block is left on that operator (Arcane's ultimate hands one listener on
       // to the next with the bar full: that keeps it).
@@ -2379,6 +2497,8 @@ export class World {
       this.refrains = this.refrains.filter((r) => this.refrainOn(r));
       for (const r of ended) if (r.clear && !this.refrains.some((x) => x.op === r.op)) r.op.energy = 0;
     }
+    // A cut-in stops the fight's clock: no SP regenerates, no buff, cooldown or Stagger time passes (the game's SP bar
+    // stands still through one: 58 → 61 over 3.4 s, 57 → 60 over 5.0 s; the stage timer runs on, the clock doesn't).
     if (this.freeze && this.freeze.left > 0) {
       const { owner, from } = this.freeze;
       this.freeze.left--;
@@ -2389,10 +2509,18 @@ export class World {
           this.stepRun(r);
         }
       this.runs = this.runs.filter((r) => !r.ended);
-      if (this.freeze.left <= 0) this.freeze = null;
+      if (this.freeze.left <= 0) this.freeze = this.freezeQueue.shift() ?? null;
       return;
     }
     this.frame++;
+    // An Imprisoned enemy's own clock runs slow: each whole frame it loses, its timers wait a frame.
+    if (this.seals.length) {
+      this.sealDebt += 1 - this.foeScale();
+      while (this.sealDebt >= 1) {
+        this.sealDebt -= 1;
+        this.foeLoseFrame();
+      }
+    }
     this.guards();
     // Jumps whose condition is watched (JumpToAction over a span).
     if (this.jumpWatch.length) {
@@ -2403,7 +2531,7 @@ export class World {
           this.jumpTo(j.run, Number(j.a.destFrame));
         }
     }
-    this.sp = Math.min(300, this.sp + 8 / FPS);
+    if (!this.holdSp) this.sp = Math.min(300, this.sp + 8 / FPS);
     // Summons whose time is up.
     for (const e of this.entities) if (e.alive && e.until !== undefined && e.until <= this.frame) this.finishEntity(e);
     // Channels: their next hits, while their skill runs.
@@ -2519,6 +2647,8 @@ export class World {
       this.abilityEvent(op, 'OnEnterFight', this.enemy);
       this.abilityEvent(op, 'OnCharDeckAttrChanged', op);
     }
+    // A stage that fills every ultimate at the start (Re-Crisis).
+    if (this.foe.fullUltimate) for (const op of this.team) op.energy = this.ultCost(op);
   }
 
   /** A SkillConditionTable condition: an attribute against another (condType 14010). */
@@ -2546,12 +2676,16 @@ export class World {
   /** Each operator's basic attack chain; `held` while a skill kept it (dontInterruptCombo): the next attack goes on from it. */
   private chains: ({ id: string; of: string; nextFrom: number; nextTo: number; held?: boolean; run?: Run } | null)[] = [null, null, null, null];
   /**
-   * Operators not controlled attacking on their own (the game's guard AI), a random 0–1 s late
-   * (AIGlobalSetting characterAttackRandomDelay): here its mean, 0.5 s, before each chain. Off: in the game they
-   * mostly stand around (owner's observation), so only the controlled operator's basic attacks count.
+   * Operators not controlled attacking on their own (the game's guard AI), as an estimate of its averages: a teammate
+   * attacks only while it holds an Attacker role (GroupAIConfig Default_GroupAITargetNotMain, Character: 3 tokens,
+   * each role 5 s, dealt by mode), so each attacks GUARD_SHARE of the time, in a window of each GUARD_PERIOD (the
+   * teammates' windows staggered); before each chain a delay of AIGlobalSetting characterAttackRandomDelay (0–1 s,
+   * mean 0.5) and randomStopAttackTime (0–0.5 s, mean 0.25). Their hits deal damage and their own effects; Final
+   * Strikes' SP and combo triggers are the controlled operator's only (the data's main-character checks).
    */
-  guardAttacks = false;
-  guardDelay = 0.5;
+  guardAttacks = true;
+  guardDelay = 0.75;
+  guardShare = GUARD_SHARE;
   private guardNext: number[] = [0, 0, 0, 0];
   /** Each operator's skill or attack running now (a new press cuts it short). */
   private main: (Run | null)[] = [null, null, null, null];
@@ -2599,10 +2733,10 @@ export class World {
   swapCooldown = 1;
   private lastSwap = -Infinity;
 
-  /** A skill's value from the skill table at the world's rank. */
-  private patchAt(skillId: string): Bundle['patch'][string][number] | undefined {
+  /** A skill's value from the skill table at its level for the operator in `slot` (its build's), else the world's rank. */
+  private patchAt(skillId: string, slot = -1): Bundle['patch'][string][number] | undefined {
     const levels = this.patchOf.get(skillId);
-    const rank = this.skillLevel.get(skillId) ?? this.rank;
+    const rank = this.skillLevel.get(`${slot}|${skillId}`) ?? this.rank;
     return levels?.find((l) => l.level === rank) ?? levels?.at(-1);
   }
 
@@ -2867,9 +3001,11 @@ export class World {
     // A busy operator: only what its skill's window lets in (a cancel; a stance's own list always), or an ultimate
     // ending a stance.
     const run = this.main[slot];
-    if (this.freeze) return false;
+    // While an ultimate stops time only another ultimate, and only where a recording shows one (two in one cut-in:
+    // the Skydrummer video's Tangtang and Yvonne at 1:07, both dots emptied before the HUD hid).
+    if (this.freeze && !(input === 'ultimate' && !this.strictUltimates)) return false;
     if (this.busy(run) && !((this.cancels || this.stance(run!)) && this.allowsNext(run!, id)) && !(input === 'ultimate' && this.stance(run!))) return false;
-    const p = this.patchAt(id);
+    const p = this.patchAt(id, slot);
     if (input === 'battle') return this.sp >= this.param(id, 1, p?.cost ?? 100);
     if (input === 'ultimate') return !this.strictUltimates || op.energy >= this.param(id, 1, p?.cost ?? 100) - 1e-6;
     if (input === 'combo' && this.strictCombos) return (this.comboReady.get(slot) ?? -1) >= this.frame;
@@ -2901,7 +3037,7 @@ export class World {
       return true;
     }
     const id = this.skillIdOf(op, input);
-    const p = this.patchAt(id);
+    const p = this.patchAt(id, slot);
     if (input === 'battle') {
       const cost = this.param(id, 1, p?.cost ?? 100);
       this.sp -= cost;
@@ -3011,11 +3147,20 @@ export class World {
     this.guardNext[slot] = this.frame + from + (last ? Math.round(this.guardDelay * FPS) : 0);
   }
 
-  /** Operators not controlled attack when they're free. */
+  /** Operators not controlled attack when they're free and hold an Attacker role (guardAttacks). */
   private guards(): void {
     if (!this.guardAttacks) return;
+    // Only while the controlled operator is attacking or in a skill: teammates follow the player's lead (AIGlobalSetting
+    // playerStopAtkTime: the AI stops when the player does; assumed to be at once here, not after its 10 s).
+    const lead = this.main[this.controlled];
+    if (!lead || lead.ended) return;
+    const period = GUARD_PERIOD * FPS;
+    let k = 0;
     this.team.forEach((_, slot) => {
-      if (slot !== this.controlled && this.frame >= this.guardNext[slot] && this.canAttack(slot)) this.attack(slot);
+      if (slot === this.controlled) return;
+      // Each teammate's window in the period, the three spread evenly over it.
+      const at = (this.frame + this.frozenFrames + Math.round((k++ * period) / 3)) % period;
+      if (at < this.guardShare * period && this.frame >= this.guardNext[slot] && this.canAttack(slot)) this.attack(slot);
     });
   }
 
@@ -3152,6 +3297,46 @@ export class World {
       return out;
     };
     return copy(this) as World;
+  }
+
+  /** The enemy's time scale now: the slowest Imprisonment's curve at its progress (linear between keys). */
+  private foeScale(): number {
+    let scale = 1;
+    this.seals = this.seals.filter((x) => this.frame - x.from < x.frames);
+    for (const x of this.seals) {
+      const p = (this.frame - x.from) / x.frames;
+      const k = x.keys;
+      let v = k[k.length - 1][1];
+      for (let i = 1; i < k.length; i++)
+        if (p <= k[i][0]) {
+          const [t0, v0] = k[i - 1];
+          const [t1, v1] = k[i];
+          v = v0 + ((v1 - v0) * (p - t0)) / Math.max(1e-9, t1 - t0);
+          break;
+        }
+      scale = Math.min(scale, Math.max(0, v));
+    }
+    return scale;
+  }
+
+  /** The enemy's own clock loses a frame: its debuffs, inflictions, Breach and Stagger wait one frame longer. */
+  private foeLoseFrame(): void {
+    const e = this.enemy;
+    for (const b of e.buffs) {
+      // The Imprisonment's own buffs run on their caster's time.
+      if (b.paused || /combo_skill_seal/.test(b.id)) continue;
+      b.start++;
+      if (b.end !== Infinity) b.end++;
+      if (b.stackEnds) b.stackEnds = b.stackEnds.map((x) => x + 1);
+      if (b.nextTrigger !== Infinity) b.nextTrigger++;
+    }
+    for (const k of [...e.bb.keys()]) if (/^inflict_until_|^breachUntil$/.test(k)) e.bb.set(k, e.bb.get(k)! + 1);
+    if (this.staggered(e)) {
+      e.bb.set('staggeredUntil', e.bb.get('staggeredUntil')! + 1);
+      const last = this.staggers.at(-1);
+      if (last) last.end = e.bb.get('staggeredUntil')!;
+    }
+    for (const v of e.vulnerable ?? []) if (v.until !== Infinity) v.until++;
   }
 
   /** The bundle an operator's skills come from. */

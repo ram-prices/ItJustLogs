@@ -55,6 +55,28 @@ export interface MetricOpts {
  */
 export const STAR_SVG = '<svg class="rarity-star" viewBox="0 0 24 24" aria-hidden="true"><path class="t1" d="m5.845 17.424 6.369-3.667L9.605 9.25.87 14.28zm17.249.69-6.37-3.678-2.608 4.519 8.736 5.043zM20.417 0 15.2 2.686v7.07h5.217z"/><path class="t2" d="m8.298 16.03 3.765-2.174-2.609-4.518-1.957 1.13s2.051 4.325.8 5.562m12.343.668-3.765-2.174-2.61 4.518 1.959 1.13s2.72-3.939 4.416-3.474m-.224-9.202S15.49 7.266 15.2 5.41v4.348h5.217z"/><path d="m13.922 9.77-.136-6.147L9.42 6.145l.008 6.622c.29 2.125-1.28 3.35-1.28 3.35l4.519-2.61c1.53-1.238 1.256-3.737 1.256-3.737m3.887 3.639 5.391 2.957v-5.044l-5.74-3.304c-2.141-.655-2.26-2.783-2.26-2.783v5.217c.15 2.103 2.609 2.957 2.609 2.957m-5.4 1.547-5.257 3.191 4.368 2.522 5.731-3.318c1.695-1.314 3.54-.567 3.54-.567l-4.518-2.608c-1.839-.707-3.865.78-3.865.78"/></svg>';
 export const stars = (n: number): Html => raw(STAR_SVG.repeat(n));
+
+/** The game's gear slot mark (endfield.wiki.gg's Armor/Glove/Kit Gear Icon), in the text's colour. */
+export const slotIcon = (type: 'Armor' | 'Gloves' | 'Kit' | string): Html =>
+  html`<span class="slot-icon ${type.toLowerCase()}" aria-hidden="true"></span>`;
+
+/** The game's Artifice level mark (endfield.wiki.gg's Artifice_<n>_icon.svg): a gear and three bars. */
+const ARTIFICE_GEAR = 'm25.33,3.96H8.44L0,18.59l8.44,14.63h16.89l8.45-14.63-4.22-7.31-4.23-7.32Zm-8.44,20.41c-3.19,0-5.78-2.59-5.78-5.78s2.59-5.78,5.78-5.78,5.78,2.59,5.78,5.78-2.59,5.78-5.78,5.78Zm25.69-13.09h-13.02L36.07,0l6.51,11.28Z';
+const ARTIFICE_LIT = 'm39.33,5.64l-9.77,5.64h13.02l-3.25-5.64Zm-9.77,5.64l-7.66,4.43c.49.85.77,1.83.77,2.88,0,3.19-2.59,5.78-5.78,5.78-2.14,0-4.01-1.16-5-2.89l-7.66,4.43,4.21,7.31h16.89l8.45-14.63-4.22-7.31Z';
+const ARTIFICE_BARS: [number, string][] = [
+  [27.43, 'translate(-3.84 45.5) rotate(-60)'],
+  [38.71, 'translate(1.79 55.26) rotate(-60)'],
+  [49.98, 'translate(7.43 65.03) rotate(-60)'],
+];
+/** Artifice level 0–3 as the game draws it: the first `level` bars lit, and all of it at the top. */
+export const artificeIcon = (level: number): Html => {
+  const on = (lit: boolean) => (lit ? ' class="on"' : '');
+  const full = level >= ARTIFICE_BARS.length;
+  return html`<svg class="artifice-icon" viewBox="0 0 66.83 35.25" role="img" aria-label="Artifice ${level}"><title>Artifice ${level}</title>${raw(
+    `<path${on(full)} d="${ARTIFICE_GEAR}"/>${level > 0 && !full ? `<path class="on" d="${ARTIFICE_LIT}"/>` : ''}` +
+      ARTIFICE_BARS.map(([x, t], i) => `<rect${on(i < level)} x="${x}" y="22.54" width="20.1" height="7.08" rx="3.54" transform="${t}"/>`).join(''),
+  )}</svg>`;
+};
 /** Text with each ★ drawn as the game's rarity emblem ("6★ history"). */
 export const withStars = (text: string): Html => html`${text.split('★').map((part, i) => html`${i ? raw(STAR_SVG) : ''}${part}`)}`;
 
@@ -118,6 +140,12 @@ export function itemName(name: string): Html {
 export function elementIcon(name: string): Html {
   const src = iconOf('elements', name);
   return src ? html`<span class="trait-icon trait-mask wk-${name.toLowerCase().replace(/\W/g, '')}" style="--icon:url('${src}')" aria-hidden="true"></span>` : html``;
+}
+
+/** A weapon type's game icon (Sword, Polearm...) in the text's colour; nothing until icons load. */
+export function weaponTypeIcon(type: string): Html {
+  const src = iconOf('weapon-types', type);
+  return src ? html`<span class="slot-icon trait-mask" style="--icon:url('${src}')" aria-hidden="true"></span>` : html``;
 }
 
 export function trait(kind: Exclude<IconKind, 'items'>, name: string): Html {

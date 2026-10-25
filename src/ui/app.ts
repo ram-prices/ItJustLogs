@@ -618,6 +618,7 @@ function installImport(): void {
     overlay.classList.toggle('medals', parseRoute().page === 'achievements');
     overlay.classList.toggle('findings', parseRoute().page === 'archives');
     overlay.classList.toggle('essences', parseRoute().page === 'essences');
+    overlay.classList.toggle('parser', onParser());
     overlay.classList.add('on');
   });
   addEventListener('dragleave', () => {
@@ -635,11 +636,13 @@ function installImport(): void {
     depth = 0;
     overlay.classList.remove('on');
     const files = [...(e.dataTransfer?.files ?? [])];
+    if (onParser() && (await rotations.mod?.parserFiles(files))) return;
     if (mediaToReader(files)) return;
     if (files[0]) await runImport(await files[0].text(), files[0].name);
   });
   addEventListener('paste', async (e) => {
     if ((e.target as HTMLElement).closest('input, textarea, [contenteditable]')) return;
+    if (onParser() && (await rotations.mod?.parserFiles([...(e.clipboardData?.files ?? [])], e.clipboardData?.getData('text') ?? ''))) return e.preventDefault();
     if (mediaToReader([...(e.clipboardData?.files ?? [])])) return e.preventDefault();
     const file = e.clipboardData?.files[0];
     const text = (e.clipboardData?.getData('text') ?? '').trim();
@@ -656,6 +659,12 @@ function installImport(): void {
     if (file) await runImport(await file.text(), file.name);
   });
 }
+
+/** Rotations → Parser, where a pasted or dropped recording is parsed and an exported run opened. */
+const onParser = (): boolean => {
+  const r = parseRoute();
+  return r.page === 'rotations' && r.id === 'parser';
+};
 
 /**
  * Videos and pictures pasted or dropped on the page: on Achievements they're

@@ -365,9 +365,9 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
   const list = bannerCards(kind, banners, opts);
 
   return html`
-    ${pageHeader(k.title, `${banners.length} banners · ${s.uniqueItems} unique ${k.items}`)}
     <main class="container fade-in">${pullsTabs(
       kind,
+      pageHeader(k.title, `${banners.length} banners · ${s.uniqueItems} unique ${k.items}`),
       html`${metrics(
         [
           metric({ label: 'Pulls', value: fmtInt(s.pulls), sub: s.freePulls ? `+${fmtInt(s.freePulls)} free` : undefined }),

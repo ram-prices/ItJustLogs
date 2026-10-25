@@ -215,13 +215,13 @@ export function achievementsPage(redraw: () => void): Html {
     const inCat = all.filter((m) => m.category === cat);
     return `${inCat.filter((m) => owned[m.id]).length}/${inCat.length}`;
   };
-  return html`${pageHeader(
+  return html`<main class="container fade-in">
+      <div class="collection-layout">
+        ${pageHeader(
       'Achievements',
       `${got}/${all.length} medals`,
       html`<button type="button" class="btn secondary sm" data-action="medal-read" title="Read acquired medals and their dates from a recording or screenshots of the Medal Album. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
     )}
-    <main class="container fade-in">
-      <div class="collection-layout">
         ${subTabs('medal-tab', cats, tab.medals, count)}
         <div class="min0 collection-panes">
           <div class="section-head wiki-sort-head">${searchBox('medals', 'Search medals')}${showToggle('medal-show', show.medals, 'Acquired', 'Not yet')}</div>
@@ -297,13 +297,13 @@ export function archivesPage(redraw: () => void): Html {
     const inCat = all.filter((f) => f.category === cat);
     return `${inCat.filter((f) => owned.has(f.id)).length}/${inCat.length}`;
   };
-  return html`${pageHeader(
+  return html`<main class="container fade-in">
+      <div class="collection-layout">
+        ${pageHeader(
       'Archive',
       `${got}/${all.length} collected`,
       html`<button type="button" class="btn secondary sm" data-action="finding-read" title="Read collected findings from a recording or screenshots of Intel Archives → Findings. You can also paste (Ctrl+V) or drop them on this page">${icon('document_scanner')}Read from video or screenshots</button>`,
     )}
-    <main class="container fade-in">
-      <div class="collection-layout">
         ${subTabs('finding-tab', ARCHIVE_CATEGORIES, tab.findings, count)}
         <div class="min0 collection-panes">
           <div class="section-head wiki-sort-head">${searchBox('findings', 'Search the archive')}${showToggle('finding-show', show.findings, 'Collected', 'Not yet')}</div>

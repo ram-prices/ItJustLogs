@@ -461,9 +461,9 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
   };
 
   return html`
-    ${pageHeader('Stats', `${fmtDate(a.firstTs)} – ${fmtDate(a.lastTs)}`)}
     <main class="container fade-in">${pullsTabs(
       'stats',
+      pageHeader('Stats', `${fmtDate(a.firstTs)} – ${fmtDate(a.lastTs)}`),
       html`${metrics([
         metric({ label: 'Operator pulls', value: fmtInt(a.char.pulls), sub: `${a.char.sixStars} × 6★` }),
         metric({ label: 'Arsenal pulls', value: fmtInt(a.weap.pulls), sub: `${a.weap.sixStars} × 6★` }),

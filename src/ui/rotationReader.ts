@@ -1,8 +1,10 @@
-import { CONTROLLER, MOBILE, READ_HEIGHT, READ_NAME, areas, clockAnchors, clockInk, enemyName, hudIn, measure, readRotation, whiteInk, type Area, type ClockReading, type Layout, type Px, type Read, type Reading, type Sample, type Slot, type Step } from '../domain/rotationReader';
+import { CONTROLLER, MOBILE, READ_HEIGHT, READ_NAME, areas, clockAnchors, clockInk, clockProfile, clockSeconds, enemyName, hudIn, measure, readRotation, whiteInk, type Area, type ClockReading, type Layout, type Px, type Read, type Reading, type Sample, type Slot, type Step } from '../domain/rotationReader';
+import { FOODS, enemySeen, spGained } from '../domain/sim/team';
 import { toast } from './common';
 import { icon } from './components';
 import { html, raw, render } from './html';
 import { recognize } from './screenReader';
+import { clearReaderDraft, loadReaderDraft, saveReaderDraft } from '../store';
 
 /**
  * "Read a gameplay video" on the Rotations page: the player picks a
@@ -38,8 +40,10 @@ const SP_BACK_OPERATORS = ['Tangtang', 'Last Rite', 'Snowshine', 'Catcher', 'Pur
 export interface VideoRotation {
   /** Who's in each HUD slot. */
   names: string[];
+  /** The food each operator had (by name, FOODS ids), as picked before simulating; none where the stage allows none. */
+  food?: Record<string, string>;
   /** Seconds from the fight's start; whose (HUD slot); what. Final Strikes and Finishers by the controlled operator. */
-  steps: { t: number; slot: Slot; input: Read; interrupt?: boolean; back?: number }[];
+  steps: { t: number; slot: Slot; input: Read; interrupt?: boolean; back?: number; sp?: number; spAfter?: number }[];
   /** The fight's length: what the stopwatch showed when it stopped, else how long the HUD showed. */
   seconds: number;
   /** When the stopwatch stopped (seconds from the fight's start; else when the HUD last showed). */
@@ -52,6 +56,8 @@ export interface VideoRotation {
   guard?: [number, number][];
   /** The boss's bars as the video shows them: seconds from the fight's start, HP left (0–1), Stagger meter (0–1, -1 Staggered). */
   boss?: [number, number, number][];
+  /** The SP bar (0–300) as read: [seconds from the fight's start, SP]. */
+  sp?: [number, number][];
   /** The boss's name, as shown above its HP bar. */
   enemy?: string;
 }
@@ -60,15 +66,49 @@ export interface VideoRotation {
  * Opens the file picker, reads the chosen video, then shows the transcript. `operators`: every operator's name, to
  * pick from; `simulate`: plays the rotation in the sim.
  */
-export function readGameplay(operators: string[], simulate?: (v: VideoRotation) => void): void {
+export function readGameplay(operators: string[], simulate?: (v: VideoRotation) => void, onDraft?: (el: HTMLElement | null) => void): void {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'video/*';
   input.onchange = () => {
     const file = input.files?.[0];
-    if (file) void readGameplayFile(file, operators, simulate);
+    if (file) void readGameplayFile(file, operators, simulate, onDraft);
   };
   input.click();
+}
+
+/** A read waiting for the player's picks, as saved (store.ts `readerDraft`): reopened after a reload. */
+interface ReaderDraft {
+  reading: Reading;
+  portraits: string[];
+  enemy?: string;
+  layout: Layout['name'];
+  seconds: number;
+}
+
+/**
+ * The review of a read, as a section for the Parser page (`onDraft` hands it over; null once it's simulated or
+ * discarded). The read is saved as a draft first, so leaving the page or reloading keeps it.
+ */
+function reviewPage(draft: ReaderDraft, operators: string[], simulate: ((v: VideoRotation) => void) | undefined, onDraft: ((el: HTMLElement | null) => void) | undefined): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'reader-page';
+  const layout = draft.layout === MOBILE.name ? MOBILE : CONTROLLER;
+  const done = () => {
+    page.remove();
+    void clearReaderDraft();
+    onDraft?.(null);
+  };
+  review(page, draft.reading, draft.portraits, operators, simulate, draft.seconds, draft.enemy, layout, done);
+  return page;
+}
+
+/** The saved draft's review again (after a reload), if there is one. */
+export async function openReaderDraft(operators: string[], simulate: (v: VideoRotation) => void, onDraft: (el: HTMLElement | null) => void): Promise<boolean> {
+  const draft = await loadReaderDraft<ReaderDraft>();
+  if (!draft) return false;
+  onDraft(reviewPage(draft, operators, simulate, onDraft));
+  return true;
 }
 
 const canvasFor = (a: Area) => {
@@ -88,7 +128,7 @@ const stay = (e: BeforeUnloadEvent) => e.preventDefault();
  * Reads a video in the background: a small panel (bottom left) shows the video and how far it got, and the rest of
  * the site stays usable meanwhile. When it's done the panel offers the transcript.
  */
-export async function readGameplayFile(file: File, operators: string[], simulate?: (v: VideoRotation) => void): Promise<void> {
+export async function readGameplayFile(file: File, operators: string[], simulate?: (v: VideoRotation) => void, onDraft?: (el: HTMLElement | null) => void): Promise<void> {
   if (busy) return toast('A video is being read already.');
   busy = true;
   addEventListener('beforeunload', stay);
@@ -139,34 +179,22 @@ export async function readGameplayFile(file: File, operators: string[], simulate
       bar.style.width = `${Math.round(done * 100)}%`;
     });
     if (cancelled) return;
+    if (import.meta.env.DEV) void keepForDebug(got, layout);
     status.textContent = 'Reading the stopwatch and the boss’s name…';
     const words = await readWords(got, layout);
     if (cancelled) return;
     const result = readRotation(got.samples, words.clock, layout);
     finish();
-    // The transcript, in a dialog the panel opens (again, if closed: picks made in it stay).
-    const dlg = document.createElement('dialog');
-    dlg.className = 'card reader-dialog';
-    document.body.append(dlg);
-    dlg.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('[data-reader-cancel]')) dlg.close();
-    });
-    const done = () => {
-      dlg.remove();
-      panel.remove();
-    };
-    review(dlg, result, got.portraits, operators, simulate, Math.round((Date.now() - started) / 1000), words.enemy, layout, done);
-    const presses = result.steps.filter((x) => x.input !== 'strike' && x.input !== 'finisher').length;
-    render(
-      panel,
-      html`<div class="gameplay-progress-head">
-          <span class="label-14">${result.start === null ? 'No fight found' : `Read ${presses} actions`}</span>
-          <button type="button" class="btn tertiary sm icon-btn" data-gameplay-dismiss title="Close" aria-label="Close">${icon('close')}</button>
-        </div>
-        <button type="button" class="btn primary sm" data-gameplay-open>Open the transcript</button>`,
-    );
-    panel.querySelector('[data-gameplay-dismiss]')!.addEventListener('click', done);
-    panel.querySelector('[data-gameplay-open]')!.addEventListener('click', () => dlg.showModal());
+    panel.remove();
+    // The review: a section of the Parser page, saved as a draft first (leaving or reloading keeps it).
+    const draft: ReaderDraft = { reading: result, portraits: got.portraits, ...(words.enemy ? { enemy: words.enemy } : {}), layout: layout.name, seconds: Math.round((Date.now() - started) / 1000) };
+    await saveReaderDraft(draft);
+    onDraft?.(reviewPage(draft, operators, simulate, onDraft));
+    // It shows on the Parser page.
+    if (!location.pathname.startsWith('/rotations/parser')) {
+      history.pushState(null, '', '/rotations/parser');
+      dispatchEvent(new PopStateEvent('popstate'));
+    }
   } catch (e) {
     if (!cancelled) {
       close();
@@ -181,6 +209,8 @@ interface Sampled {
   portraits: string[];
   /** The stopwatch every CLOCK_EVERY seconds: time (seconds into the video) and picture. */
   clocks: [number, Px][];
+  /** The layout's other timer places (`clockAlt`): each frame's profile there and its pictures, as `clocks`. */
+  alts: { profiles: (number[] | undefined)[]; clocks: [number, Px][] }[];
   /** The boss's name at a few moments. */
   enemies: Px[];
 }
@@ -218,18 +248,64 @@ async function layoutOf(video: HTMLVideoElement): Promise<Layout> {
 }
 
 /** The stopwatch at the ticks the domain asks for, and the boss's name; nothing if the text reader can't load. */
-async function readWords(got: Sampled, layout: Layout): Promise<{ clock: ClockReading[]; enemy?: string }> {
-  // The stopwatch's picture nearest each time asked for.
-  const near = (t: number) => got.clocks.reduce<[number, Px] | undefined>((a, b) => (Math.abs(b[0] - t) < Math.abs((a?.[0] ?? Infinity) - t) ? b : a), undefined);
-  const picks = clockAnchors(got.samples).flatMap((t) => {
-    const c = near(t);
-    return c && Math.abs(c[0] - t) <= CLOCK_EVERY ? [c] : [];
+/**
+ * Development only: the last read's frames kept in IndexedDB (`itjustlogs-debug`), so `window.__reread()` redoes the
+ * stopwatch and the reading with the current code without playing the video again.
+ */
+function debugDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open('itjustlogs-debug', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kept');
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
   });
+}
+async function keepForDebug(got: Sampled, layout: Layout): Promise<void> {
+  const db = await debugDb();
+  db.transaction('kept', 'readwrite').objectStore('kept').put({ got, layout: layout.name }, 'last');
+}
+if (import.meta.env.DEV && typeof window !== 'undefined')
+  (window as unknown as { __reread: (asDraft?: boolean) => Promise<unknown> }).__reread = async (asDraft = false) => {
+    const db = await debugDb();
+    const kept = await new Promise<{ got: Sampled; layout: string } | undefined>((resolve) => {
+      const r = db.transaction('kept').objectStore('kept').get('last');
+      r.onsuccess = () => resolve(r.result);
+    });
+    if (!kept) return 'nothing kept';
+    const layout = kept.layout === MOBILE.name ? MOBILE : CONTROLLER;
+    const words = await readWords(kept.got, layout);
+    const result = readRotation(kept.got.samples, words.clock, layout);
+    // As a draft (the Parser's "Not simulated yet" after a reload), to review without reading the video again.
+    if (asDraft) await saveReaderDraft({ reading: result, portraits: kept.got.portraits, ...(words.enemy ? { enemy: words.enemy } : {}), layout: layout.name, seconds: 0 } satisfies ReaderDraft);
+    return { clock: result.clock, start: result.start, end: result.end, words: words.clock.filter((w) => w.t > 140).sort((a, b) => a.t - b.t) };
+  };
+
+async function readWords(got: Sampled, layout: Layout): Promise<{ clock: ClockReading[]; enemy?: string }> {
+  // Each place the stage may put its timer: the layout's own first, then its others (`clockAlt`).
+  const own = got.samples.map((s) => s.clock);
+  const places = [{ profiles: own, clocks: got.clocks, layout }, ...got.alts.map((x, k) => ({ ...x, layout: { ...layout, ink: layout.clockAlt![k].ink } }))];
+  const use = (k: number) => got.samples.forEach((s, i) => (s.clock = places[k].profiles[i]));
   try {
-    const texts = await recognize(picks.map(([, px]) => canvasOf(clockInk(px, layout))), '0123456789:');
+    let best: { k: number; read: number; clock: ClockReading[] } | null = null;
+    for (let k = 0; k < places.length; k++) {
+      use(k);
+      // The stopwatch's picture nearest each time asked for.
+      const near = (t: number) => places[k].clocks.reduce<[number, Px] | undefined>((a, b) => (Math.abs(b[0] - t) < Math.abs((a?.[0] ?? Infinity) - t) ? b : a), undefined);
+      const picks = clockAnchors(got.samples).flatMap((t) => {
+        const c = near(t);
+        return c && Math.abs(c[0] - t) <= CLOCK_EVERY ? [c] : [];
+      });
+      const texts = await recognize(picks.map(([, px]) => canvasOf(clockInk(px, places[k].layout))), '0123456789:');
+      const clock = picks.map(([t], i) => ({ t, text: texts[i] }));
+      // The place whose pictures read as times most often (ties: the layout's own).
+      const read = texts.filter((x) => clockSeconds(x) !== null).length;
+      if (!best || read > best.read) best = { k, read, clock };
+    }
+    use(best!.k);
     const names = got.enemies.length ? await recognize(got.enemies.map((p) => canvasOf(whiteInk(p)))) : [];
-    return { clock: picks.map(([t], k) => ({ t, text: texts[k] })), enemy: enemyName(names) };
+    return { clock: best!.clock, enemy: enemyName(names) };
   } catch {
+    use(0);
     return { clock: [] };
   }
 }
@@ -254,20 +330,29 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
   const banner = cut(a.banner);
   const portraits = cut(a.portraits);
   const clock = cut(a.clock);
+  const alts = a.clocks.slice(1).map(cut);
+  // Each other place's digits in its own ink.
+  const altLayouts = (layout.clockAlt ?? []).map((x) => ({ ...layout, ink: x.ink }));
   const enemy = a.enemy && cut(a.enemy);
   const meter = a.stagger && cut(a.stagger);
   const hpBar = a.bossHp && cut(a.bossHp);
   // The boss's bars change slowly: every third frame, so reading them costs few frames.
   let frames = 0;
-  const out: Sampled = { samples: [], portraits: [], clocks: [], enemies: [] };
+  const out: Sampled = { samples: [], portraits: [], clocks: [], alts: alts.map(() => ({ profiles: [], clocks: [] })), enemies: [] };
   let seenOn = 0;
   const take = (t: number) => {
     const px = clock.read();
     const bars = frames++ % 3 === 0;
     const s = measure(t, right.read(), centre.read(), banner.read(), px, layout, bars ? meter?.read() : undefined, bars ? hpBar?.read() : undefined);
     out.samples.push(s);
-    // The stopwatch now and then (the domain picks a few moments to read).
-    if (t - (out.clocks[out.clocks.length - 1]?.[0] ?? -Infinity) >= CLOCK_EVERY) out.clocks.push([t, px]);
+    // The stopwatch now and then (the domain picks a few moments to read), at each place a stage may put it.
+    const due = t - (out.clocks[out.clocks.length - 1]?.[0] ?? -Infinity) >= CLOCK_EVERY;
+    if (due) out.clocks.push([t, px]);
+    alts.forEach((c, k) => {
+      const p = c.read();
+      out.alts[k].profiles.push(clockProfile(p, altLayouts[k]));
+      if (due) out.alts[k].clocks.push([t, p]);
+    });
     // Several times, since a bright sky behind the white name spoils some reads (the Skydrummer's arena).
     if (enemy && s.hud > 0.5 && [60, 300, 600, 1200, 1800, 2700, 3600, 5400].includes(seenOn + 1)) out.enemies.push(enemy.read());
     // Each slot's picture (portraits, or the phone's skill buttons), once the HUD has been up a moment.
@@ -341,9 +426,10 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
 const secs = (t: number) => `${t < 0 ? '-' : ''}${Math.floor(Math.abs(t) / 60)}:${(Math.abs(t) % 60).toFixed(1).padStart(4, '0')}`;
 
 /** The transcript, for the player to name the operators and fix guesses. */
-function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], operators: string[], simulate: ((v: VideoRotation) => void) | undefined, seconds: number, enemy: string | undefined, layout: Layout, done: () => void): void {
+function review(dlg: HTMLElement, reading: Reading, portraits: string[], operators: string[], simulate: ((v: VideoRotation) => void) | undefined, seconds: number, enemy: string | undefined, layout: Layout, done: () => void): void {
   const SLOTS = layout.slots;
-  const start = reading.start ?? 0;
+  // Times from the fight's start: when the HUD first shows, less what a countdown ran before it (`clock.lead`).
+  const start = (reading.start ?? 0) - (reading.clock?.lead ?? 0);
   const clock = reading.clock;
   const mmss = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
   const steps = reading.steps;
@@ -352,6 +438,10 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
   // The slots in team position order (position 01 matters to some kits), for the review and the sim.
   const order = SLOTS.map((_, i) => i).sort((a, b) => (layout.positions?.[a] ?? a + 1) - (layout.positions?.[b] ?? b + 1));
   const picked: boolean[] = SLOTS.map(() => false);
+  // Before the fight: the stage the boss's name matches, its rules, and each operator's food where it allows food.
+  const stage = enemySeen(enemy);
+  const foodAllowed = (stage?.enemy.food ?? true) !== false;
+  const food: (string | undefined)[] = SLOTS.map(() => undefined);
   const groups = [...new Set(steps.filter((s) => s.group !== undefined).map((s) => s.group!))].sort((a, b) => a - b);
   const groupSlot = new Map<number, Slot | null>(groups.map((g) => [g, steps.find((s) => s.group === g)!.slot]));
   const groupArt = new Map<number, string>();
@@ -412,6 +502,23 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
                 )}
                 <label class="gameplay-slot"><span class="label-12 secondary">Controlled</span>${slotSelect(controlled, 'data-gameplay-controlled')}</label>
               </div>
+              <p class="label-12 secondary">Before the fight</p>
+              <p class="copy-13 gameplay-stage">${stage ? stage.name : enemy ? `${enemy}: not in the sim yet, fought as the training dummy` : 'No boss read: fought as the training dummy'}${stage
+                ? html`<span class="secondary"> · ${foodAllowed ? 'Food allowed' : 'No food in this stage'}${stage.enemy.fullUltimate ? ' · Every ultimate full at the start' : ''}${stage.enemy.prep ? ' · Starts on a button' : ''} · 200 SP</span>`
+                : ''}</p>
+              ${foodAllowed
+                ? html`<div class="gameplay-slots">
+                    ${order.map(
+                      (i) => html`<label class="gameplay-slot">
+                        <span class="label-12 secondary">${picked[i] ? slotName[i] : SLOTS[i]} · Food</span>
+                        <select class="input gameplay-select" data-gameplay-food="${i}">
+                          <option value="" ${food[i] ? '' : 'selected'}>None</option>
+                          ${Object.entries(FOODS).map(([id, f]) => html`<option value="${id}" ${id === food[i] ? 'selected' : ''}>${f.name}</option>`)}
+                        </select>
+                      </label>`,
+                    )}
+                  </div>`
+                : ''}
               ${groups.length
                 ? html`<p class="label-12 secondary">Combo banners</p>
                     <div class="gameplay-slots">
@@ -429,13 +536,13 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
                   const pick = guessed.has(k);
                   return html`<li class="${strike ? 'secondary' : ''}">
                     <span class="num secondary">${secs(s.t - start)}</span>
-                    ${strike ? '' : pick ? slotSelect(slotOf(s), `data-gameplay-step="${k}"`) : nameOf(s)}${strike ? '' : ' · '}${READ_NAME[s.input]}${s.interrupt ? ' · Interrupt' : ''}${s.back ? ` · ${s.back} SP back` : ''}
+                    ${strike ? '' : pick ? slotSelect(slotOf(s), `data-gameplay-step="${k}"`) : nameOf(s)}${strike ? '' : ' · '}${READ_NAME[s.input]}${s.interrupt ? ' · Interrupt' : ''}${s.back ? ` · ${spGained(s.back)} SP gained` : ''}
                   </li>`;
                 })}
               </ol>
             </div>`}
         <div class="reader-foot">
-          <button type="button" class="btn secondary sm" data-reader-cancel>Close</button>
+          <button type="button" class="btn secondary sm" data-reader-cancel title="Discard this read">Discard</button>
           ${steps.length
             ? html`<div class="row">
                 <button type="button" class="btn secondary sm" data-gameplay-copy>${icon('content_copy')}Copy transcript</button>
@@ -454,6 +561,7 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
       picked[i] = !!el.value;
       slotName[i] = el.value || SLOTS[i];
     }
+    else if (el.dataset.gameplayFood) food[Number(el.dataset.gameplayFood)] = el.value || undefined;
     else if (el.dataset.gameplayGroup) groupSlot.set(Number(el.dataset.gameplayGroup), v);
     else if (el.dataset.gameplayStep) chosen.set(steps[Number(el.dataset.gameplayStep)], v);
     else if ('gameplayControlled' in el.dataset) controlled = v;
@@ -461,16 +569,20 @@ function review(dlg: HTMLDialogElement, reading: Reading, portraits: string[], o
     draw();
   });
   dlg.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).closest('[data-reader-cancel]')) return done();
     if ((e.target as HTMLElement).closest('[data-gameplay-sim]') && simulate && ready()) {
       const end = reading.end ?? start;
+      const eaten = foodAllowed ? Object.fromEntries(order.flatMap((i) => (food[i] ? [[slotName[i], food[i]!]] : []))) : {};
       simulate({
         names: order.map((i) => slotName[i]),
-        steps: steps.map((s) => ({ t: s.t - start, slot: order.indexOf(slotOf(s)!) as Slot, input: s.input, ...(s.interrupt ? { interrupt: true } : {}), ...(s.back ? { back: s.back } : {}) })),
+        ...(Object.keys(eaten).length ? { food: eaten } : {}),
+        steps: steps.map((s) => ({ t: s.t - start, slot: order.indexOf(slotOf(s)!) as Slot, input: s.input, ...(s.interrupt ? { interrupt: true } : {}), ...(s.back ? { back: s.back } : {}), ...(s.sp !== undefined ? { sp: s.sp } : {}), ...(s.spAfter !== undefined ? { spAfter: s.spAfter } : {}) })),
         seconds: clock ? clock.seconds : Math.ceil(end - start),
         end: (clock?.end ?? end) - start,
         pauses: (clock?.pauses ?? []).map(([a, b]) => [a - start, b - start]),
         ...(reading.guards ? { guard: reading.guards.map(([a, b]) => [a - start, b - start] as [number, number]) } : {}),
         ...(reading.boss ? { boss: reading.boss.map(([t, hp, st]) => [Math.round((t - start) * 1000) / 1000, hp, st] as [number, number, number]) } : {}),
+        ...(reading.sp ? { sp: reading.sp.map(([t, v]) => [Math.round((t - start) * 1000) / 1000, v] as [number, number]) } : {}),
         enemy,
       });
       done();

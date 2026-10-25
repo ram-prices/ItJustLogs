@@ -173,6 +173,8 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     type classes (`heading-48..14`, `copy-16..13`, `label-14..12`), then
     components. Light theme is the `:root[data-theme='light']` token block.
     Phone tweaks live in the `max-width: 640px` blocks.
+    Pages are up to 1600px wide (`.container`); text that is read, not scanned,
+    keeps a readable width (story dialogue 960px, Settings 1000px, event details 80ch).
   - Vercel rules: borders are shadows (`--shadow-border`, `--shadow-card`,
     never CSS `border` on cards); tracking in px shrinking with size (-2.4px
     at 48, -1.28px at 32, -0.96px at 24, -0.32px at 16, 0 at 14); weights
@@ -204,6 +206,11 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     Star.svg, in the text's colour). Keep "★" only in attributes and
     `<option>` text. Potential is written "P3"; the game's Potential star
     (`potentialStar`) only beside that text or as decoration.
+    Artifice levels show the game's mark (`artificeIcon`, endfield.wiki.gg
+    Artifice_<n>_icon.svg: a gear and three bars, lit per level, in the game's
+    blue #26bbfd, its gear widgets' COLOR_ENHANCED); gear slots show the game's slot
+    marks (`slotIcon`, public/icons/gear-armor|gloves|kit.png, the wiki's Gear Icons),
+    the weapon slot the operator's weapon type (`weaponTypeIcon`, ef-assets weapon-types).
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
     `/database/operators[/<name>]`, `/database/arsenals[/<name>]`,
@@ -220,6 +227,9 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
     Settings. Database (`/database/...`) and Pulls (`/banner/...`) are
     sections picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/banner` open the page last used there.
+    Side-tab pages show no title or summary line (the top and side tabs say
+    where you are): `pageHeader` goes inside `.collection-layout` (`sideTabs`
+    `head`), its title for screen readers only, its buttons above the side tabs.
     Home is widgets (`ui/pages/homeWidgets.ts`, settings `home`: type, width
     4/6/8/12 of a 12-column grid, own settings; unset = the schedule as
     before): the schedule's four sections, Pity, 6★ history, Latest pulls,
@@ -367,9 +377,25 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   Si and Xaihi only (`CHECKED`); others show "Not checked yet". Assumptions the
   data doesn't give are marked in the code (1 s swap cooldown, Si's combo
   stack count, swapping out of Liino's stance and cutting it with her
-  ultimate; End Stance is never pressed; Liino's beats reach every teammate). Teammates the AI controls
-  don't basic attack (`guardAttacks` off: the owner sees them mostly stand around), so only the controlled
-  operator's Final Strikes give SP and trigger combos. A mode's own basic attacks replace the chain while it's on
+  ultimate; End Stance is never pressed; Liino's beats reach every teammate). Teammates the AI controls basic attack on an estimate of the game's guard AI (`guardAttacks`, on;
+  `GUARD_SHARE` 0.4 of the time each, in staggered windows of 6 s, and only while the controlled operator is attacking or in a skill; 0.75 s before
+  each chain): GroupAIConfig
+  Default_GroupAITargetNotMain deals 5 s Attacker roles by mode (Radical/Moderate/Steady/SingleOne, weighed the same:
+  the data doesn't say how a mode is picked), AIGlobalSetting the delays. Only the controlled operator's Final Strikes
+  give SP and trigger combos. The data's share is ≈ 0.59 (`GUARD_DATA_SHARE`, a ceiling: they also move and dodge);
+  0.4 is fitted to the owner's two recordings at the owner's request, by kill time (damage sums mislead: a phase's
+  damage is capped at its HP, so Alleikhreos's phase 1 says nothing): at 0.4 the sim killed the Skydrummer at 2:27.4
+  (the game 2:27.4) and Alleikhreos at 2:20.6 (2:21). That fit used the Skydrummer's HUD blackouts as stopwatch pauses
+  (free sim time); read from its countdown (2:35, no pauses) and with inflictions expiring and Yvonne's bomb consuming
+  Cryo (2026-10-24), no share in the data's range kills either in time (0.4: Skydrummer 79% by 2:35, Alleikhreos 92%;
+  0.59: 83%, 95%; Alleikhreos needs ~0.8, the Skydrummer more than 1.0): the missing damage is elsewhere, so 0.4 stays
+  until it's found. Checked
+  for inflation (2026-10-24): their basic attacks add no Stagger (enforced in `deal`; the data flags only some Final
+  Strike units main-only), give no SP, and their per-hit sizes match the recording's small numbers; the Stagger they
+  add is their skills' the player pressed. `reduceDamageForGuard` is set only on Laevatain's battle-skill entity. A few
+  skills have an `aiExclusiveFrame` (Arcane's attack5 80 vs 41; Liino, Si, Purrchena), not applied. The Attacker role
+  needs the target inside the teammate's slot range (`TargetInsideMaxSlotRange`, offset 5) and the sim has no
+  positions; the character AI itself is a Unity asset (the dump's `AIConfig` has only global and group settings). A mode's own basic attacks replace the chain while it's on
   (`chainOf`: <id>_<mode>_attack#, Typhoeus's hover "floating"); an attack with no next-attack window opens the next
   one when it ends itself, or by a ComboCacheAction for Attack. A skill an operator's current skill casts of its own
   (Character* spec) takes over (`Run.follow`: one skill at a time, so Typhoeus's AI hover fires 5 shots, not a
@@ -381,10 +407,20 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   `GEN=1 npx vitest run scripts/final-strikes.test.ts` (COMBAT_DIR for a local ef-assets combat/; rerun for new
   operators): a sortable table under the Operators list (`finalStrikeTable`) and rows in each page's Attributes. Ultimate Energy blocks (RefrainObtainUsp) last only
   while their buff or skill does and let their tags through (Last Rite's own skills, Arcane's array); a
-  DoOnceAction runs once per cast.
+  DoOnceAction runs once per cast. An AuraAction's buffs come from its source (`buffSource` ActionSource: an entity's
+  spawner) or, with ActionOwner, from the entity running it: Xaihi's crystal heals twice, as its heal checks the crystal
+  for finishball_04 (checked against the Skydrummer recording).
   The enemy is the training dummy (`DUMMY` in team.ts) unless a request sets `enemy`: `ALLEIKHREOS`
   (Crisis Calamity boss) is defined from EnemyAttributeTemplateTable and its wiki page (Resistance 20,
   Stagger 320 / 11 s, Finisher ×1.75 via `Enemy.finisherMul`), picked with Enemy (`ENEMIES`, setting `enemy`);
+  Each boss entry carries its stage's rules (`Enemy.food`, `fullUltimate`, `prep`): Crisis Calamity (Alleikhreos) is
+  the Re-Crisis kind, food allowed and every ultimate full at the start; every other fight forbids food (a buff placed
+  on each operator before it; healing items used during a fight are another thing); Echoes of War waits for a start
+  button (`prep`, not simulated); every stage starts at 200 SP. Food pickers show only where allowed (`foodPicker`;
+  `teamFromSpec` drops food elsewhere), and the parser's review asks for it before simulating (Before the fight:
+  the stage and its rules, each operator's food → `VideoRotation.food`). The Parser outlines the box of whoever made
+  the most Final Strikes and Finishers (controlled most) and "Controlled" at the end of its name row (no tab or fill: the boxes aren't selectable), others who
+  made some fainter. A box's portrait and name link to the operator's Database page.
   `SKYDRUMMER` is Echoes of War's "Howling of Undying Beasts" boss (eny_0082_hsbear_race007: DEF 100, Resistance 50,
   Stagger 320 / 9 s, Finisher ×1.5 / 50 SP, no node, interrupt +20; one entry per difficulty, Brutal/Hard/Normal
   = Lv 90/75/60, each entry's HP as `phaseHp`, which the Parser's fit and bars need). Its HP is the
@@ -409,7 +445,40 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   timeline has an Enemy lane with its Staggered stretches (`World.staggers`). Cooldowns run through ultimate cut-ins
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
   Simulator and Parser (`/rotations/parser`; the old `/rotations/transcript` redirects): a read video's team, enemy
-  (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only. History
+  (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only and comes
+  first, with Parse gameplay recording and Import run at its bottom; an opened run shows below it on the page, not in
+  a card (its name as a header, date and length under it, its buttons at the right; then Damage per second, Total
+  damage, Duration, Actions, Controlled and Not attributed as laid-out figures; then the loadouts' boxes, from the
+  run's own reading, each with its operator's share (the percentage by the name, a bar under the breakdown's Total) and its damage
+  by source with a Total pinned to the box's bottom; a loadout's weapon is a line like its gear's (`weaponLine`: its
+  picture, its name in the text's colour, at the right its level when not 90 and the essence icon: green when maxed,
+  dim with the skill ranks before it otherwise, none with no essence; its picture centred on the gear marks' column,
+  its name a link to its Database page), every gear line's Artifice mark at the right edge (unlit at 0); the
+  operator's level and skill ranks when not maxed at the box's top right (`levelsLine`); the timeline's play controls share the lanes' columns (play in the 96px
+  label column, the scrubber across the track, its thumb's centre edge to edge) so the scrubber lines up with the
+  playhead, and the playback speed sits in the Timeline header; each box's bar shows every teammate's share in team
+  order with a gap between, each in its portrait's hue (the hero tint, `data-hero-tint`; CSS relative colour): the box's own operator vivid, the others greyed and dark. Each action's damage (ReplayResult `actionDamage`, `damageByAction` in team.ts: a
+  press gets its operator's hits of that kind until their next such press, a Final Strike their basic attacks up to
+  it; scaled per second as `fitToRecording` scales, its `scaleAt`) shows at the right of the transcript and on the
+  timeline markers' hover, the recording's actions matched to the sim's (same operator and kind, nearest within
+  3 s); runs replayed before it show none until replayed again. The boss bars: a Staggered meter drains from full
+  to empty over its stretch, Stagger nodes (`Enemy.nodes`) are marked with the game's node sprite (`public/icons/poise-node.png`, deco_poise_knot_boss from its
+  UI bundle, a mask in the text's colour), and a boss with phases shows
+  which one under the row's name; the sim's bars refill only at `phaseChanges`. The player keeps the run's fit
+  (`fitted`): handing it a new object each redraw had stopped Play; `resultsView` `noMetrics` drops Damage by operator and Where the
+  damage comes from there). The timeline's transcript (`.sim-moves`) is one move a line, each time a button
+  (`sim-seek`) that moves the playhead there, the move at the playhead marked; Recording-sim discrepancies show only
+  under the Sim view,
+  then its results; clicking it again closes it. No Play again. A parsed run's boxes show its own saved builds and food (its request); "Play edited transcript"
+  replays that request, and changing a run's food (`runfood`) replays it with the new food. Timeline playback is 4×
+  unless picked. While it plays, the transcript keeps the current move in view (its own list, instantly: smooth scrolling
+  didn't move it), and once played or sought the loadout boxes show the damage so far (`paintLive`, from the card's
+  `live`: each `<operator>|<source>` per second, scaled by the fit), the whole fight again at 0:00. SP: an SP bar row
+  under the boss's (three segments of 100, the amount beside it), the video's in Recording (`Reading.sp`, every
+  0.25 s; new parses only) and the sim's in Sim (`ReplayResult.spTrack`), and each transcript line's SP change (the
+  step's `sp`: a battle skill's drop as the bar shows it, less what comes straight back; a Final Strike's gain; the
+  sim's `actionSp`) with the bar just after it (`spAfter`; `actionSp.pressesAfter`/`strikesAfter`), also on the markers' hover. While a run is open, Parsed runs folds to its title row
+  (count, Parse, Import; `runsShown`), its chevron toggle bringing the list back. History
   rows and an open parsed run can be starred (kept on top and never trimmed), named, noted and deleted
   (`runTools`/`runEdit`; `updateSim`, `deleteSim` in store.ts). Controlled (setting `controlled`, request `main`, Team
   `main`): the operator controlled the whole fight, no swaps; "Auto (Best)" lets the search try each (Advanced
@@ -429,7 +498,8 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   changing one (a lone change is the HUD fading out). Enemies can have mechanics (`Enemy.nodeStagger`/`nodeMechanic`:
   Alleikhreos's Foundite Weapon, 20 Stagger when his meter passes its node, from his interrupt buff), drawn in the
   Enemy lane (`World.mechanics`). Times show as m:ss.s (`clockTime`). A parsed run can be exported as a file and
-  imported elsewhere (Export, Import run: `RUN_FILE`). The transcript editor also takes Dive attack (`dive`: the
+  imported elsewhere (Export, Import run: `RUN_FILE`); on the Parser a pasted or dropped recording is parsed and
+  an exported run opened (`parserFiles`; other JSON goes to the pull import). The transcript editor also takes Dive attack (`dive`: the
   controlled operator's `_plunging_attack_end`; the parser can't see one) and Invulnerable stretches
   (`VideoRotation.away` → `World.away`: the team's hits do nothing then, hatched in the Enemy lane; Alleikhreos's
   phantoms). A dive ends Tangtang's ultimate early with its bigger wave only while her stare runs: her aura hears it
@@ -483,7 +553,8 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   follows (others open at once for a talent's Final Strike or an ultimate's closing attack), and the attack that
   follows is the ComboCacheAction's mapping first (`nextAttack`: Yvonne's ult_attack3_2 maps to itself and repeats,
   eight shots every 16 frames; her ultimate's three spawned entities are decoration, their skill empty).
-  A battle skill's SP back (`Step.back`, the parser's `spBack` amount less regeneration; the editor's SP box) says
+  A battle skill's SP gained (`Step.back`, the parser's `spBack` amount less regeneration, shown and edited as the game's
+  amount: `spGained` snaps a reading's 19 to 20; the editor's SP gained box) says
   how many of the operator's summons it reached (`SP_BACK_REACH` in team.ts: Tangtang 20 SP a Whirlpool;
   `World.reachOnly` caps the newest n her next skill finds), since the sim has no positions and the boss walks away
   from Whirlpools (the owner's video: 1 at 0:26, 0:36, 1:12, 1:46, 2:00; none at 0:03, 0:56, 1:25, 2:14). A
@@ -501,19 +572,113 @@ Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
   The Parser's numbers are the recording's: `fitToRecording` (videoCheck.ts) takes each second's damage from the
   boss's HP bar and splits it among that second's hits as the sim split them (`ReplayResult.perSecond`,
   operator|source), so a crit shows at its real size and totals match the video; damage in a second the sim made no
-  hit in is a "Not attributed" row (an action the transcript lacks). The discrepancies list still compares the raw
+  hit in is a "Not attributed" row (an action the transcript lacks), unless the sim hits nothing more until the fight's end or
+  the next phase: then its boss died sooner (`afterKill`, not counted there). The summary always compares the two clear
+  times: "VS Sim" under Recording, "VS Run" under Sim, as "13.2 s slower" (`versus`). The discrepancies list still compares the raw
   sim track with the video, which is how transcript mistakes are found; the Simulator tab stays expected-value.
+  Under the Sim view the summary's Duration is the sim's clear time (`ReplayResult.clear`, `clearOn` in team.ts): the
+  hit that empties the last phase's HP, or, short of that by the recording's end, a copy of the fight going on the
+  Basic way (combos and ultimates as they come, battle skills in team order) until it does; no time limit. That fight is kept
+  (`ReplayResult.runOn`: presses, Final Strikes, Staggers, track, SP), and the Sim view's timeline plays on through it to
+  the sim's clear (`simLong`, `withRunOn`; the player keeps its place switching views, `baseOf`), with the sim's own
+  bars.
   The HUD leaving as the stopwatch stops is the kill, and a phase ending in a pause (the bar full again after it)
-  reached zero in the cut-in: the parser adds a zero-HP reading at each (`endsAtZero`; the kill within 5 s of the stop).
+  reached zero in the cut-in: the parser adds a zero-HP reading at each (`endsAtZero`; the kill at the stop, however early the bar stopped being read), and every saved recording gets the same when shown (`killed` in videoOf), its last readings clamped to the timeline's end.
   The boss's name is read on eight frames with the band's own ink threshold and scraps voted down (`whiteInk`,
   `enemyName`): the Skydrummer's bright sky spoiled single reads.
+  Stages put their timer in different places: the controller layout's own (top left, yellow, counting up: Crisis
+  Calamity) and `clockAlt` (Echoes of War: white, counting down from 10:00, centred under the boss's bar). Each place
+  is cut every frame; `readWords` keeps the one whose pictures read as times most often. Both timers run through
+  ultimate cut-ins (the Skydrummer's read a second a second across them), so only a phase change is a pause; reading
+  no digits falls back on HUD blackouts of 3 s or more (`PHASE`), which take double-ultimate cut-ins for pauses.
+  The HP series is the lowest reading so far, so readings while the bar fills in (the fight's start, after a refill)
+  are skipped while one in the next `SETTLE_HP` seconds is higher: one such frame once held the Skydrummer at 35%.
+  Buffs (a replay's `ReplayResult.buffs`, `BuffSpan`: every 8 frames with the bars): the buffs the game shows an icon
+  for (`buffShown`: the data's `hasIcon`), the enemy's elemental inflictions and the Susceptibility, Amp and Haste
+  effects (`effectsShown`), as rows under each operator's lane and the Enemy lane (Buffs folds them, `fold.buffs`).
+  Names: statuses and effects in the game's terms (the dump's HyperlinkTextTable ba.* names: Vulnerable, Cryo
+  Infliction, Cryo Susceptibility; `INFLICTION_NAME`, `EFFECT_KIND`); the dump has none for operators' own buffs
+  (BuffTable is empty in this build), so those are their ids in words with the operator's or weapon's name, and a
+  gear set's buff by the set whose piece ids start as it does (`buffName`). The boss and SP rows draw their playhead
+  values in their first markup (`barsNow`, `spNow`): playback's end redraws the page, which had flashed full HP.
+  Each buff's game icon: ef-assets icons/buffs/index.json (buff id → sprite, BuffData `iconConfig._spritePath`, buffs
+  with `hasIcon`; `loadBuffIcons`), Susceptibility/Amp/Haste as icon_battle_affix_<kind>_vulnerable|enhance|speedup,
+  inflictions as their element's orb; the images are ef-assets icons/buffs/<sprite>.webp on jsDelivr (its
+  scripts/buff-icons.py exports them from the dump's ui/sprites/bufficon bundle; a letter shows until they load).
+  At the playhead each lane of a parsed run's timeline (named by the operator's small portrait; the enemy's lane too)
+  shows its buffs as the game does, the icon in a square whose outline is the timer, stacks as a number and an Arts
+  Reaction's level (its buff's `count`, `BuffSpan.level`) as a Roman numeral in a corner box, an Arts Infliction as the
+  game draws it (its icon in a circle of four arcs, one lit per stack) with a thin timer ring inside, to the left of the
+  boss's bars rather than in the enemy's lane (`data-buffs-kind`) (`paintBuffs`, `--left`; the label
+  column widens for them, `--lane-label` 176px on `.sim-faces`); timeline buff rows start folded (`fold.buffs`). The
+  run's header holds the timeline's Recording | Sim switch, then Edit, Export, Star and Delete as labelled buttons
+  (`headTools`; a starred run can't be deleted); play, speed and the Buffs eye sit by the scrubber, the time in a tip over its dot; dragging it moves the playhead as it goes (an `input` listener). The recording's Stagger meter never falls between resets
+  (a Stagger, a phase change: each reading is the lowest read after it in its stretch, so a hit's flash misread as fill
+  drops out). The boss's bars hold each reading
+  (`barAt`) and, while playing, slide to the next over 180 ms (`barSlide`; a Staggered meter's drain is drawn as
+  it is, the slide set to it each frame, or it lagged and jumped up when the Stagger ended); between readings the SP bar regenerates at 8 a second (`spNow`, `SP_REGEN`; the video's bar animates its drains and fills over a few readings,
+  folded into one jump by `spSeries`); costs and
+  gains stay jumps. Edit turns the title and note into fields in place. No "Controlled" label (the box's outline says
+  it) and no label by the boss's bars (the switch says which). The boss's face leads the run's title (its picture zoomed on the face, ENEMIES `face`, `foeFace`; the Enemy lane's too); the note is its own box at the right end of the figures (a field there
+  while edited); the Enemy lane is named by that face (`laneFoe`). Enemy pictures are ef-assets icons/enemies/<template id>.webp (its scripts/enemy-icons.py, from the
+  dump's monstericonbig bundle), named by `ENEMIES[].icon`. An infliction by the boss's bars is 30px, centred on both bars, its icon on a
+  round face scaled to fill it. The summary's DPS and total are the recording's, or
+  under Sim the sim's own.
+  Layout: Parsed runs are in the side column under Simulator/Parser (`runsAside`, `sideTabs`' `aside`); a read's review
+  is a section of the Parser page, not a dialog (`reviewPage` in ui/rotationReader.ts), saved first as a draft
+  (store.ts `readerDraft`; "Not simulated yet" in the list; Discard drops it); one Edit (the edit view kept as literally like the normal one as it can be: the owner's rule) opens a run's name, note, duration (the Duration figure, m:ss.s or seconds), who's controlled (click an operator's box: the outline moves, `sim-main`),
+  loadouts, length (`step-len`, the stopwatch's stop moves with it) and transcript, each edited in place where it's
+  shown (numbers as `sim-inl` fields, choices as `sim-inl-sel`: grey boxes reaching 3px past their text with a margin
+  taking it back, so the text sits at the same pixel as unedited; Artifice marks as buttons; the transcript's own lines
+  under the timeline, `transcriptLines`: one grid for both views, each line a subgrid: remove, time, operator (as wide as the
+  team's widest name, `opSizers`), the dot, action (as wide as its widest label, `actSizers`), SP gained, interrupt,
+  the stretch, SP, bar after, damage; remove, interrupt and SP gained empty unedited; the scrollbar's room always kept; times as m:ss.s on the fight's clock, `videoTimeOf` adding the pauses back, Add action / Add invulnerable where Full transcript is), all kept in `draft` (no replay or redraw per change) until Play edited
+  transcript (in the header, with Cancel, in place of Edit) replays it once; the transcript under the timeline
+  shows only the moment at the playhead (and actions at the same moment together) unless Full transcript
+  (`fold.moves`); contribution bars ease to the playhead's shares (`aimBars`), even before any damage (a second's
+  average damage spread over everyone as a start).
+  The stopwatch: the timer's places (`clockAlt`), a countdown's start rounded up to its minute within 2 s (the HUD fades
+  in a moment after it starts: `clock.lead`, from its ticks: the tick to a value comes that many seconds after the
+  minute, the Skydrummer's 10:00 at 0.65 s of video), and its last value read from `lateAnchors`
+  (every 0.25 s over the HUD's last 4 s, just after each stretch's last tick; they never vote, a stopwatch that stopped
+  would miscount): the Skydrummer's last 7:25 showed for half a second, 3 s before the HUD left. A read in a hidden tab
+  gets few frames (the browser slows it: 4 a second for the Skydrummer's first 100 s in testing), which loses Final
+  Strikes and HP readings; the HP series takes a second's window then (`bossBars`), and the fill-in skip lasts only
+  `SETTLE_FOR` (2 s) after the start or a refill. An SP gain is measured to its peak within `RISE` (0.4 s): the bar
+  fills in steps, and a Finisher's +52 first seen at +20 was taken for a Final Strike. In dev builds a read's frames are kept (IndexedDB
+  `itjustlogs-debug`) and `window.__reread(asDraft)` redoes the stopwatch and the reading from them.
+  Arts Inflictions on the enemy last 20 s from their last application, a new one of the element resetting every
+  stack's (`INFLICTION_SECONDS`, `inflictUntil`; endfield.wiki.gg Arts Infliction, and the game's infliction buffs'
+  duration 20); ForceSpellStatusAction consumes `consumedLayer` stacks of the infliction `consumedType` names (1–4 as
+  consumed_type: Yvonne's bomb takes the Cryo it freezes with). A cut-in stops the fight's clock (`freeze`): no SP regenerates and no buff or Stagger time passes; the stage
+  timer runs on (the game's SP bar stands still through one: 58 → 61 over 3.4 s, 57 → 60 over 5.0 s, only the fade).
+  SP also holds while a recording's stopwatch stands still (`World.holdSp`, set by replaySim). A second ultimate in
+  another's cut-in plays its own cut-in after it (`freezeQueue`: the game stays frozen for both, 3.38 s for a pair where
+  one cut-in is 1.57). Imprisonment
+  (SealAction, Arcane's combo) slows the enemy's own clock by its curve (0.3, 0.2 at 5%, rising to 1): each whole frame
+  it loses, its buffs, inflictions, Breach and Staggered time wait a frame (`seals`, `foeScale`, `foeLoseFrame`;
+  Corrosion III lasted 28.15 s in the Skydrummer recording, each Stagger ~11.2 s). Found by the AI parser session; with
+  both the Skydrummer replay went from 79% to 98% of its HP (full loadouts), Alleikhreos 92% to 96%.
+  A build (`SimBuild`) can carry operator `level`, `ranks` (basic, normal, combo, ultimate: each of the
+  operator's skills by `kindOf`, only its own: bundles carry other operators' skills and levels are one map for the
+  team; a passive that levels with a skill follows its rank, `rankKind`: Tangtang's passive_0 holds Waterspout's tick;
+  the World keeps skill levels by team position, `<slot>|<skill id>`, since weapons share attribute skills)
+  and `weapon.level`; `teamFromSpec` passes them on (90 / 12 / 90 unless set), with the promotion they imply (`promotionOf`: the lowest stage whose level and skill-rank caps hold them, CharBreakStageTable; a level at a cap, 80, takes the lower stage). A
+  parsed run keeps the loadouts it ran with in its request; while it's edited each box has fields for them plus
+  Potential, each gear piece's Artifice (0–3) and each weapon skill's rank (its level, the data's caps 9/9/4, plus
+  the weapon's Potential on the last: `essenceCaps`, `skillRanks`) (`levelsEdit` in the top row, where the name gives way; `weaponLine`; `editBuild`),
+  portraits square in the boxes, a box's food as a sixth line under its gear (`foodLine`: item icon and name, a choice in
+  place while edited; only where the stage allows food),
+  otherwise a line for what isn't the default. Two ultimates can share a cut-in in a replay (`can`:
+  only an ultimate, only with `strictUltimates` off). The Recording view's SP amounts are the game's (the sim's for the
+  same action; a battle skill's 100 otherwise): the bar's pixels read 101 or 102 (`withExactSp`); a reading without the SP bar takes the sim's amounts, with no bar after. Every action shows its SP (`spText`, a combo's 0 too: the sim's same action's where none was read) and the bar after it (an action that moved none: the bar as read at it). The transcript keeps its SP and damage columns while edited.
   Uptime (setting `uptime`, %; `World.uptime`): the share of the fight the enemy can be hit, the rest a
   stretch at the end of every 10 s with no presses or basic attacks (100% unless set). The owner's gameplay
   videos only confirm game mechanics (energy, combo triggers, cooldowns), never a target for the sim's pace or
   DPS. Food (member `food`, `FOODS` in team.ts, from the game's
   UseItemTable and BuffData: Jakub's Legacy ATK +27%) buffs one operator the whole fight. `replaySim` (team.ts) plays a gameplay video's read
   steps in the sim for its timeline and DPS (worker message `replay`; combos and ultimates the video shows are allowed:
-  `strictCombos`/`strictUltimates` off). The page keeps the last reading (`simVideo` in IndexedDB) to play again, and
+  `strictCombos`/`strictUltimates` off). The page keeps the last reading (`simVideo` in IndexedDB) for runs saved without one, and
   each replay goes in History as a Recording. Scratch tests `src/domain/sim/dbg*.test.ts` and `dbgTeam.ts`
   read a local ef-assets clone: never commit them.
 - Essences tab (`ui/pages/essences.ts`, `domain/essences.ts`): the player's

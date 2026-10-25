@@ -1,7 +1,7 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, heroGlow, icon, itemImg, stars, tileArt, trait, withStars } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, pageHeader, stars, tileArt, trait, withStars } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { weaponBaseRanks, weaponRankCaps } from '../../domain/loadout';
 import { essenceTag, isMaxEssence, weaponRanksOf, wieldersSection } from './loadout';
@@ -37,12 +37,9 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
     ...soon.map(([id, p]) => ({ id, name: p.name, rarity: p.rarity, type: p.type })),
   ];
   const groups = sortGroups('weap', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), weapon: r.type, source: r.source, unreleased: !r.w }));
-  return html`<div class="page-header"><div class="container page-header-inner"><div class="min0">
-      <h1 class="heading-32">Arsenals</h1>
-      <p class="copy-16">${owned ? `${have}/${all.length}` : `${all.length} weapons`}</p>
-    </div></div></div>
-    <main class="container fade-in">${databaseTabs(
+  return html`<main class="container fade-in">${databaseTabs(
       'weap',
+      pageHeader('Arsenals', owned ? `${have}/${all.length}` : `${all.length} weapons`),
       html`<div class="section-head wiki-sort-head">${searchBox('weap')}${sortBar('weap')}</div>
       ${groups.map((g) => {
         return html`<section class="section wiki-type">

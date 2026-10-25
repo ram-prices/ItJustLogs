@@ -7,7 +7,7 @@
  */
 import { equip, type Base, type Build, type GearData, type WeaponData } from './build';
 import { optimizeBuilds, type Optimize } from './gearSearch';
-import { FPS, World, kindOf, type Bundle, type Enemy, type Input, type Mod, type Stagger, type Strike } from './engine';
+import { ELEMENTS, FPS, INFLICTION_NAME, World, buffShown, effectsShown, kindOf, type Bundle, type Enemy, type Input, type Mod, type Stagger, type Strike } from './engine';
 import { beam, fightOf, localRunner, scoreOf, search, searchCycle, type Fight, type Press, type Rules, type Runner, type Team } from './rotation';
 
 /** One team position: the operator and, when set, Potentials other than the player's own. */
@@ -95,7 +95,11 @@ export const BUILD_MODES: [BuildMode, string][] = [
 export interface SimBuild {
   op: string;
   potential: number;
-  weapon?: { id: string; potential: number; skillLevels?: number[] };
+  /** Operator level (90 unless set); its promotion follows from it (`promotionOf`). */
+  level?: number;
+  /** Skill ranks (1–12, 12 unless set): basic attack, battle skill, combo, ultimate. */
+  ranks?: { basic?: number; normal?: number; combo?: number; ultimate?: number };
+  weapon?: { id: string; potential: number; skillLevels?: number[]; level?: number };
   gear: { id: string; artifice: number }[];
   /** A food eaten before the fight (FOODS). */
   food?: string;
@@ -203,6 +207,10 @@ export const DUMMY: Enemy = { def: 100, poise: 280, staggerSeconds: 12, finisher
  * time it can't be hit (a recording's Invulnerable stretches stand in).
  */
 export const ALLEIKHREOS: Enemy = {
+  // Crisis Calamity, the Re-Crisis-style stage: food allowed and every ultimate full at the start (the owner's
+  // account; their recording had Jakub's Legacy on all four and Arcane's ultimate at 0:08.8).
+  food: true,
+  fullUltimate: true,
   def: 100,
   resist: { Physical: 20, Fire: 20, Pulse: 20, Cryst: 20, Natural: 20 },
   poise: 320,
@@ -234,6 +242,9 @@ export const ALLEIKHREOS_HP = 2_476_341 * 2;
  * elements on entering battle, better stats, HP Treatment tacticals only; the bonus goal is a clear within 3 minutes).
  */
 export const SKYDRUMMER: Enemy = {
+  // Echoes of War: no food (only HP Treatment tacticals and consumables), a start button before the fight.
+  food: false,
+  prep: true,
   def: 100,
   resist: { Physical: 50, Fire: 50, Pulse: 50, Cryst: 50, Natural: 50 },
   poise: 320,
@@ -256,13 +267,17 @@ export const SKYDRUMMER: Enemy = {
 export const SKYDRUMMER_HP = { brutal: 3_962_146, hard: 2_196_709, normal: 1_069_218 };
 
 /** The enemies a fight can be against: the name shown, its numbers, its HP for an HP goal, and how a video names it. */
-export const ENEMIES: { id: string; name: string; enemy: Enemy; hp: number; seen: RegExp }[] = [
-  { id: 'dummy', name: 'Training dummy', enemy: DUMMY, hp: DEFAULT_HP, seen: /dummy/i },
-  { id: 'alleikhreos', name: 'Alleikhreos (Crisis Calamity)', enemy: ALLEIKHREOS, hp: ALLEIKHREOS_HP, seen: /alleikhreos/i },
+/**
+ * The enemies the sim has; `icon` is the game's template id, its picture ef-assets icons/enemies/<icon>.webp, and `face`
+ * where its face is in that picture (x, y as shares of it) and how far to zoom in on it.
+ */
+export const ENEMIES: { id: string; name: string; enemy: Enemy; hp: number; seen: RegExp; icon: string; face: [number, number, number] }[] = [
+  { id: 'dummy', name: 'Training dummy', enemy: DUMMY, hp: DEFAULT_HP, seen: /dummy/i, icon: 'eny_0051_rodin', face: [0.45, 0.28, 2.5] },
+  { id: 'alleikhreos', name: 'Alleikhreos (Crisis Calamity)', enemy: ALLEIKHREOS, hp: ALLEIKHREOS_HP, seen: /alleikhreos/i, icon: 'eny_0125_fdcentur', face: [0.42, 0.4, 2.6] },
   // One phase: its HP as phaseHp, so a recording's bar and the Parser's fit know the boss's size.
-  { id: 'skydrummer', name: 'Skydrummer (Echoes of War, Brutal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.brutal }, hp: SKYDRUMMER_HP.brutal, seen: /skydrummer/i },
-  { id: 'skydrummer-hard', name: 'Skydrummer (Echoes of War, Hard)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.hard }, hp: SKYDRUMMER_HP.hard, seen: /skydrummer.*hard/i },
-  { id: 'skydrummer-normal', name: 'Skydrummer (Echoes of War, Normal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.normal }, hp: SKYDRUMMER_HP.normal, seen: /skydrummer.*normal/i },
+  { id: 'skydrummer', name: 'Skydrummer (Echoes of War, Brutal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.brutal }, hp: SKYDRUMMER_HP.brutal, seen: /skydrummer/i, icon: 'eny_0082_hsbear', face: [0.21, 0.52, 2.4] },
+  { id: 'skydrummer-hard', name: 'Skydrummer (Echoes of War, Hard)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.hard }, hp: SKYDRUMMER_HP.hard, seen: /skydrummer.*hard/i, icon: 'eny_0082_hsbear', face: [0.21, 0.52, 2.4] },
+  { id: 'skydrummer-normal', name: 'Skydrummer (Echoes of War, Normal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.normal }, hp: SKYDRUMMER_HP.normal, seen: /skydrummer.*normal/i, icon: 'eny_0082_hsbear', face: [0.21, 0.52, 2.4] },
 ];
 export const enemyById = (id?: string) => ENEMIES.find((e) => e.id === id) ?? ENEMIES[0];
 /** The enemy a video's boss bar names, if it's one the sim has. */
@@ -309,10 +324,23 @@ export interface TeamSpec {
 /** A fight's team from what it's made of and the combat data. */
 export function teamFromSpec(spec: TeamSpec, data: SimData): Team {
   const built = spec.builds.map((b, i) => {
-    const build: Build = { weapon: b.weapon && { id: b.weapon.id, potential: b.weapon.potential, skillLevels: b.weapon.skillLevels }, gear: b.gear };
+    const build: Build = { level: b.level, promotion: promotionOf(b), weapon: b.weapon && { id: b.weapon.id, level: b.weapon.level, potential: b.weapon.potential, skillLevels: b.weapon.skillLevels }, gear: b.gear };
     const r = equip(data.ops[b.op], build, b.weapon ? data.weapons[b.weapon.id] : undefined, data.gear);
+    // Its skill ranks: each of the operator's skills by kind (kindOf), its sub-skills with it. Only its own: a bundle
+    // can carry other operators' skills (Tangtang's has Yvonne's attacks), and skill levels are one map for the team.
+    // By name, not number: the data misnumbers some (chr_032_lizhiyan_combo_skill_abilityentity_seal).
+    if (b.ranks) {
+      const levels = { ...(r.bundle.levels ?? {}) };
+      const own = `_${b.op.replace(/^chr_\d+_/, '')}_`;
+      for (const id of Object.keys(r.bundle.skills).filter((x) => x.includes(own))) {
+        const rank = b.ranks[rankKind(id, r.bundle) as keyof NonNullable<SimBuild['ranks']>];
+        if (rank) levels[id] = rank;
+      }
+      r.bundle = { ...r.bundle, levels };
+    }
     const extra = spec.extra?.[i];
-    const food = b.food ? FOODS[b.food]?.mod : undefined;
+    // Food only where the stage allows it (Enemy.food).
+    const food = b.food && spec.enemy?.food !== false ? FOODS[b.food]?.mod : undefined;
     if (extra || food) r.stats = { ...r.stats, mods: [...(r.stats.mods ?? []), ...(extra ? [extra] : []), ...(food ? [food] : [])] };
     return r;
   });
@@ -507,11 +535,68 @@ const SP_BACK_REACH: Record<string, number[]> = {
   chr_0027_tangtang: [20, 40],
 };
 
+/**
+ * A battle skill's SP gained as the game gives it: a recording's reading (the bar's rise less regeneration, a point
+ * or two off) to the nearest amount the skill can give (SP_BACK_REACH: Tangtang 20 a Whirlpool), 0 if none was in
+ * reach. Without an operator, any operator's amounts.
+ */
+export function spGained(back: number | undefined, op?: string): number | undefined {
+  if (back === undefined) return undefined;
+  const tiers = op ? SP_BACK_REACH[op] : [...new Set(Object.values(SP_BACK_REACH).flat())].sort((a, b) => a - b);
+  if (!tiers?.length) return back;
+  const reach = tiers.filter((sp) => back >= sp - 6).length;
+  return reach ? tiers[reach - 1] : 0;
+}
+
 /** A video's rotation played in the sim: the fight, and the presses the sim couldn't make near their time. */
 export interface ReplayResult extends SimResult {
   missed: { t: number; slot: number; input: Input | 'strike' }[];
+  /**
+   * The damage each action made, by second of the fight ([second, damage] pairs, so a recording's fit can scale it as
+   * it scales that second), in the order of `presses` and `strikes`: a battle skill, combo or ultimate gets its
+   * operator's hits of that kind until their next press of it; a Final Strike or Finisher gets their basic attacks'
+   * hits up to it (and its own projectiles just after).
+   */
+  actionDamage?: { presses: [number, number][][]; strikes: [number, number][][] };
+  /**
+   * How SP moved with each action, in the order of `presses` and `strikes`: a battle skill's cost (and anything else
+   * the press's first frame changed), a Final Strike's or Finisher's gain. The SP bar itself is `spTrack`.
+   */
+  actionSp?: { presses: number[]; strikes: number[]; pressesAfter?: number[]; strikesAfter?: number[] };
+  /** SP (0–300) every 8 frames on the fight's clock: [seconds, SP]. */
+  spTrack?: [number, number][];
+  /** The buffs the game would show on each operator and the enemy, as stretches on the fight's clock: `BuffSpan`. */
+  buffs?: BuffSpan[];
   /** Damage each second of the fight by `<operator>|<source>`, so the recording's own damage can be split the same way. */
   perSecond?: Record<string, number>[];
+  /**
+   * The sim's clear time (seconds on the fight's clock): when its damage emptied the last phase's HP, within the
+   * recording or, short of that, fighting on after its end (`clearOn`). No time limit.
+   */
+  clear?: number;
+  /** The sim's damage by then: `total`, plus what the fight after the recording's end dealt (the last phase's rest). */
+  clearTotal?: number;
+  /**
+   * The sim's fight after the recording's end, to its clear (`clearOn`), on the fight's clock: its presses, Final
+   * Strikes, Staggers, its track (as `track`: damage so far, meter) and SP (as `spTrack`). The Sim view's timeline
+   * runs on through it.
+   */
+  runOn?: { presses: Press[]; strikes: Strike[]; staggers: Stagger[]; track: [number, number, number][]; sp: [number, number][]; lastEnd?: number };
+}
+
+/**
+ * A buff (or the enemy's elemental infliction) held from `from` to `to` (seconds on the fight's clock) by an operator
+ * (`slot`) or the enemy (-1): its id, its status's name if it is one, and its stacks then (a change starts a new one).
+ */
+export interface BuffSpan {
+  slot: number;
+  id: string;
+  status?: string;
+  from: number;
+  to: number;
+  stacks: number;
+  /** An Arts Reaction's level (1–4) in place of stacks. */
+  level?: boolean;
 }
 
 /** A video's stopwatch: when it stopped and the stretches it stood still (a phase change), seconds into the fight. */
@@ -542,6 +627,33 @@ const REPLAY_SLACK = 2;
  * from the press before it. Combos don't wait for the sim to see their trigger, nor ultimates for their energy (the
  * video shows the game allowed them: a fight can start with them charged); cooldowns and SP still apply. Times and the length are the video's, cut-ins included.
  */
+/**
+ * An operator's promotion from their level and skill ranks: the lowest stage whose level range and skill-rank cap hold
+ * them (CharBreakStageTable: stage 0–4 up to level 20/40/60/80/90, skill ranks up to 1/3/6/9/12). A level at a stage's
+ * cap (80) takes the lower stage: promoting and not levelling is rare.
+ */
+export function promotionOf(b: SimBuild): number {
+  const level = b.level ?? 90;
+  const rank = Math.max(0, ...Object.values(b.ranks ?? {}).map((x) => x ?? 0));
+  const stages: [number, number][] = [[20, 1], [40, 3], [60, 6], [80, 9], [90, 12]];
+  const k = stages.findIndex(([maxLevel, maxRank]) => level <= maxLevel && rank <= maxRank);
+  return k < 0 ? 4 : k;
+}
+
+/**
+ * Which skill rank a skill's level follows: its kind (kindOf), or for a passive that levels with a skill, that skill's.
+ * Tangtang's passive_0 holds her Waterspout's tick (normalskill_atk_scale01: 0.25 at rank 12, 0.2 at 9) and levels
+ * with her battle skill, which its keys name; found against the Skydrummer recording's numbers.
+ */
+function rankKind(id: string, bundle: Bundle): string {
+  const kind = kindOf(id);
+  if (kind !== 'other') return kind;
+  const keys = Object.keys(bundle.patch[id]?.[0]?.values ?? {});
+  const named = { normalskill_: 'normal', comboskill_: 'combo', ultimateskill_: 'ultimate' } as Record<string, string>;
+  for (const [prefix, k] of Object.entries(named)) if (keys.some((x) => x.startsWith(prefix))) return k;
+  return kind;
+}
+
 export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], stopwatch?: ReplayClock): ReplayResult {
   const start = Date.now();
   const team = teamOf({ ...req, style: 'advanced', uptime: undefined }, data);
@@ -637,8 +749,62 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   // Strikes the video can't show (attacksUnseen).
   let free = 0;
   const track: [number, number, number][] = [];
+  const spTrack: [number, number][] = [];
+  // Each action's SP change: a press's over its first frame, a strike's over the frame it landed in.
+  const pressSp: number[] = [];
+  const strikeSp: number[] = [];
+  const pressAfter: number[] = [];
+  const strikeAfter: number[] = [];
+  let pendingSp: { i: number; before: number } | null = null;
+  // The buffs shown on each operator and the enemy, sampled with the bars: stretches still open by key.
+  const buffs: BuffSpan[] = [];
+  const holding = new Map<string, BuffSpan>();
+  const noteBuffs = (t: number) => {
+    const now = new Set<string>();
+    const hold = (slot: number, id: string, stacks: number, status?: string, level?: boolean) => {
+      const key = `${slot}|${id}`;
+      now.add(key);
+      const o = holding.get(key);
+      // A new stretch each time its stacks change, so the stacks shown are the ones at that moment.
+      if (o && o.stacks === stacks) o.to = t;
+      else {
+        if (o) o.to = t;
+        const s: BuffSpan = { slot, id, ...(status ? { status } : {}), from: t, to: t, stacks, ...(level ? { level } : {}) };
+        holding.set(key, s);
+        buffs.push(s);
+      }
+    };
+    w.team.forEach((e, slot) => {
+      for (const b of e.buffs) {
+        const s = buffShown(b);
+        if (s) hold(slot, s.id, b.stacks, s.status);
+      }
+    });
+    for (const b of w.enemy.buffs) {
+      const s = buffShown(b);
+      if (s) hold(-1, s.id, s.level ?? b.stacks, s.status, s.level !== undefined);
+    }
+    for (const x of ELEMENTS) {
+      const n = w.enemy.bb.get(`inflict_${x}`) ?? 0;
+      if (n > 0) hold(-1, `inflict_${x}`, n, INFLICTION_NAME[x]);
+    }
+    // Susceptibility, Amp and Haste: effects, not buffs, but the game shows each as an icon too.
+    w.team.forEach((e, slot) => {
+      for (const x of effectsShown(e, w.frame)) hold(slot, x.id, 1, x.name);
+    });
+    for (const x of effectsShown(w.enemy, w.frame)) hold(-1, x.id, 1, x.name);
+    for (const [key, o] of holding)
+      if (!now.has(key)) {
+        o.to = t;
+        holding.delete(key);
+      }
+  };
   while (clock() < end) {
-    if (clock() % 8 === 0 && !paused(clock())) track.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
+    if (clock() % 8 === 0 && !paused(clock())) {
+      track.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
+      spTrack.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.sp)]);
+      noteBuffs(Math.round((game(clock()) / FPS) * 100) / 100);
+    }
     clockAt[w.frame] ??= clock();
     while (resumed < pauses.length && clock() >= pauses[resumed][1]) {
       const [from, to] = pauses[resumed];
@@ -653,9 +819,13 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     while (k < todo.length && todo[k].at <= clock()) {
       const p = todo[k];
       if (p.reach !== undefined) w.reachOnly(p.slot, p.reach);
+      const spBefore = w.sp;
       if (w.press(p.slot, p.input)) {
         if (p.interrupt) w.interrupt(p.slot);
         presses.push({ frame: game(clock()), slot: p.slot, input: p.input, at: game(clock()) });
+        pressSp.push(w.sp - spBefore);
+        pressAfter.push(w.sp);
+        pendingSp = { i: pressSp.length - 1, before: spBefore };
         pressed = true;
         k++;
       } else if (clock() - p.at > REPLAY_SLACK * FPS) {
@@ -672,12 +842,26 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     if (!pressed && !paused(clock()) && (unseen || finisher || w.strikes.length - free < due)) w.press(w.controlled, 'attack');
     const before = w.strikes.length;
     const stood = paused(clock());
+    // While the recording's stopwatch stands still the game's timer does, and no SP regenerates.
+    w.holdSp = stood;
     const f0 = w.frame;
+    const spTick = w.sp;
     w.tick();
+    // A press's cost can land in the frame after it.
+    if (pendingSp) {
+      pressSp[pendingSp.i] = Math.round(w.sp - pendingSp.before);
+      pressAfter[pendingSp.i] = w.sp;
+      pendingSp = null;
+    }
+    for (let k = before; k < w.strikes.length; k++) {
+      strikeSp[k] = Math.round(w.sp - spTick);
+      strikeAfter[k] = w.sp;
+    }
     // The stopwatch stood still (a cut-in) while the sim ran on: the boss's Staggered time stands still too.
     if (stood) w.holdStagger(w.frame - f0);
     for (const x of w.strikes.slice(before)) if (x.unseen || w.attacksUnseen(x.slot)) free++;
   }
+  const { at: clear, runOn } = clearOn(w, team.enemy?.phaseHp ?? team.hp, pauses, clockAt, end, game);
   for (; k < todo.length; k++) missed.push({ t: game(todo[k].at) / FPS, slot: todo[k].slot, input: todo[k].input });
   // A video Final Strike with none of the sim's near it, in fight frames: a cut-in between the two (the video's
   // strike landing as an ultimate stops time) doesn't count.
@@ -725,6 +909,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     mechanics: w.mechanics.map((m) => ({ ...m, frame: toClock(m.frame) })),
     away: w.away.map(([a, b]) => [game(a), game(b)] as [number, number]),
   };
+  const actionDamage = damageByAction(hits, f.presses, f.strikes ?? [], req.builds.map((b) => b.op));
   const perSecond: Record<string, number>[] = [];
   for (const h of hits) {
     if (!h.amount) continue;
@@ -733,5 +918,112 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     const key = `${h.operator}|${sourceOf(h.skill, h.skillKind)}`;
     perSecond[k][key] = (perSecond[k][key] ?? 0) + h.amount;
   }
-  return { ...summary(f, req, start), missed, track, perSecond };
+  const actionSp = {
+    presses: pressSp.map(Math.round),
+    strikes: (f.strikes ?? []).map((_, k) => strikeSp[k] ?? 0),
+    pressesAfter: pressAfter.map(Math.round),
+    strikesAfter: (f.strikes ?? []).map((_, k) => Math.round(strikeAfter[k] ?? 0)),
+  };
+  const lastHp = team.enemy?.phaseHp ?? team.hp ?? 0;
+  const clearTotal = clear !== undefined ? Math.round(total + Math.max(0, lastHp - (foe.phaseHp ? dealt[dealt.length - 1] : total))) : undefined;
+  return { ...summary(f, req, start), missed, track, perSecond, actionDamage, actionSp, spTrack, buffs, ...(clear !== undefined ? { clear, clearTotal } : {}), ...(runOn ? { runOn } : {}) };
+}
+
+/**
+ * The sim's clear time in a replay (ReplayResult.clear): the hit that empties the last phase's HP (counted from the
+ * recording's last phase change), or, if the recording ended first, a copy of the fight going on from there the
+ * Basic way (combos and ultimates as they come, battle skills in team order in turn, the controlled operator
+ * attacking) until it does. Up to 10 minutes more; the clock runs through cut-ins, as the game timer does.
+ */
+function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: number[], end: number, game: (c: number) => number): { at?: number; runOn?: ReplayResult['runOn'] } {
+  if (!hp) return {};
+  const last = pauses.filter(([a, b]) => b - a >= PHASE_CHANGE * FPS).at(-1)?.[0] ?? 0;
+  const at = (frame: number) => clockAt[frame] ?? frame + w.frozenFrames;
+  let base = 0;
+  let dealt = 0;
+  for (const h of w.hits) {
+    if (at(h.frame) < last) base += h.amount;
+    else if ((dealt += h.amount) >= hp) return { at: Math.round((game(at(h.frame)) / FPS) * 100) / 100 };
+  }
+  const c = w.clone();
+  c.strictCombos = true;
+  c.strictUltimates = true;
+  c.away = [];
+  c.noStagger = [];
+  c.holdSp = false;
+  const n = c.team.length;
+  let turn = 0;
+  const from = c.frame + c.frozenFrames;
+  // On the fight's clock: the recording's end, then this copy's frames (its stopped time too, as the game timer runs).
+  const fight = (cf: number) => game(end) + cf - from;
+  const secs = (cf: number) => Math.round((fight(cf) / FPS) * 100) / 100;
+  const clockOf: number[] = [];
+  const runOn: NonNullable<ReplayResult['runOn']> = { presses: [], strikes: [], staggers: [], track: [], sp: [] };
+  const strikes0 = c.strikes.length;
+  const staggers0 = c.staggers.length;
+  const press = (slot: number, input: Input) => {
+    if (!c.press(slot, input)) return false;
+    runOn.presses.push({ frame: fight(c.frame + c.frozenFrames), slot, input, at: fight(c.frame + c.frozenFrames) });
+    return true;
+  };
+  while (c.dealt - base < hp && c.frame + c.frozenFrames - from < 600 * FPS) {
+    const cf = c.frame + c.frozenFrames;
+    clockOf[c.frame] ??= cf;
+    if ((cf - from) % 8 === 0) {
+      runOn.track.push([secs(cf), Math.round(c.dealt), Math.round(c.meterNow() * 1000) / 1000]);
+      runOn.sp.push([secs(cf), Math.round(c.sp)]);
+    }
+    let pressed = false;
+    for (const input of ['combo', 'ultimate'] as Input[]) for (let s = 0; s < n && !pressed; s++) pressed = press(s, input);
+    for (let k = 0; k < n && !pressed && !c.can(turn % n, 'battle', true); k++) turn++;
+    if (!pressed && (pressed = press(turn % n, 'battle'))) turn++;
+    if (!pressed) c.press(c.controlled, 'attack');
+    c.tick();
+  }
+  if (c.dealt - base < hp) return {};
+  const cf = c.frame + c.frozenFrames;
+  runOn.track.push([secs(cf), Math.round(c.dealt), Math.round(c.meterNow() * 1000) / 1000]);
+  runOn.sp.push([secs(cf), Math.round(c.sp)]);
+  const onClock = (f: number) => fight(clockOf[f] ?? f + c.frozenFrames);
+  runOn.strikes = c.strikes.slice(strikes0).map((x) => ({ ...x, frame: onClock(x.frame) }));
+  runOn.staggers = c.staggers.slice(staggers0).map((x) => ({ ...x, frame: onClock(x.frame), end: Math.min(cf - from + game(end), onClock(x.end)) }));
+  // A Stagger running when the recording ended: where it really ends.
+  const open = c.staggers[staggers0 - 1];
+  if (open && open.end > (clockOf.findIndex((x) => x !== undefined) || c.frame)) runOn.lastEnd = Math.min(cf - from + game(end), onClock(open.end));
+  return { at: secs(cf), runOn };
+}
+
+/** Which action each hit belongs to (ReplayResult.actionDamage): by its operator and skill kind, on the fight's clock. */
+function damageByAction(
+  hits: { frame: number; operator: string; amount: number; skillKind?: string }[],
+  presses: { frame: number; slot: number; input: Input }[],
+  strikes: { frame: number; slot: number }[],
+  ops: string[],
+): NonNullable<ReplayResult['actionDamage']> {
+  const INPUT: Record<string, Input> = { normal: 'battle', combo: 'combo', ultimate: 'ultimate' };
+  const slotOf = new Map(ops.map((op, i) => [op, i]));
+  const byPress = presses.map(() => new Map<number, number>());
+  const byStrike = strikes.map(() => new Map<number, number>());
+  const add = (m: Map<number, number>, frame: number, amount: number) => {
+    const s = Math.floor(frame / FPS);
+    m.set(s, (m.get(s) ?? 0) + amount);
+  };
+  const late = Math.round(0.5 * FPS);
+  for (const h of hits) {
+    const slot = slotOf.get(h.operator);
+    if (!h.amount || slot === undefined) continue;
+    const input = INPUT[h.skillKind ?? ''];
+    if (input) {
+      let i = -1;
+      for (let k = 0; k < presses.length && presses[k].frame <= h.frame; k++) if (presses[k].slot === slot && presses[k].input === input) i = k;
+      if (i >= 0) add(byPress[i], h.frame, h.amount);
+    } else if (h.skillKind === 'basic') {
+      // Its own Final Strike's projectiles land a moment after it; any other basic hit belongs to the next one.
+      let j = strikes.findIndex((s) => s.slot === slot && s.frame <= h.frame && h.frame - s.frame <= late);
+      if (j < 0) j = strikes.findIndex((s) => s.slot === slot && s.frame >= h.frame);
+      if (j >= 0) add(byStrike[j], h.frame, h.amount);
+    }
+  }
+  const pairs = (m: Map<number, number>) => [...m.entries()].sort((a, b) => a[0] - b[0]).map(([s, d]) => [s, Math.round(d)] as [number, number]);
+  return { presses: byPress.map(pairs), strikes: byStrike.map(pairs) };
 }

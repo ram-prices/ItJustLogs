@@ -168,9 +168,9 @@ export function essencesPage(redraw: () => void): Html {
       <p class="copy-14 secondary list-search-empty" hidden>No essences match your search.</p>`;
   };
 
-  return html`${header}
-    <main class="container fade-in">
+  return html`<main class="container fade-in">
       <div class="collection-layout">
+        ${header}
         ${subTabs('essence-view', VIEWS, view, (v) => (v === 'By weapon' ? String(pool.length) : String(kinds.length)))}
         <div class="min0 collection-panes">${view === 'By weapon' ? byWeapon() : byEssence()}</div>
       </div>

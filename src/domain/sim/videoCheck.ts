@@ -14,9 +14,9 @@ const FIT_BIN = 2;
  * keep the sim's damage; damage where the sim made no hit goes to the nearest stretch it did, else is
  * `unattributed` (an action the transcript lacks).
  */
-export function fitToRecording(r: ReplayResult, boss: [number, number, number][], pauses: [number, number][], phaseHp: number): { result: ReplayResult; unattributed: number } {
+export function fitToRecording(r: ReplayResult, boss: [number, number, number][], pauses: [number, number][], phaseHp: number): { result: ReplayResult; unattributed: number; afterKill: number; scaleAt: (second: number) => number } {
   const per = r.perSecond;
-  if (!per || !boss.length || !phaseHp) return { result: r, unattributed: 0 };
+  if (!per || !boss.length || !phaseHp) return { result: r, unattributed: 0, afterKill: 0, scaleAt: () => 1 };
   const clock = (t: number) => t - pauses.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, t) - a), 0);
   // The game's damage each second of the fight's clock, phases refilling the bar.
   const game: number[] = [];
@@ -54,31 +54,46 @@ export function fitToRecording(r: ReplayResult, boss: [number, number, number][]
     gameBin.push(g);
     readBin.push(rd);
   }
-  // Game damage where the sim hit nothing: to the nearest bin with hits (the one before, else after).
+  // Game damage where the sim hit nothing: to the nearest bin with hits (the one before, else after). Left over: damage
+  // after the sim's boss died (it hits nothing more until the fight's end or the next phase), else an action the
+  // transcript lacks.
   const want = gameBin.slice();
   let unattributed = 0;
+  let afterKill = 0;
+  const phaseBins = pauses.map(([a]) => Math.floor(clock(a) / FIT_BIN)).sort((x, y) => x - y);
+  const hits = (b: number) => Object.keys(simBin[b] ?? {}).length > 0;
+  const quietFrom = (b: number) => {
+    const stop = phaseBins.find((p) => p > b) ?? bins;
+    for (let x = b; x < stop; x++) if (hits(x)) return false;
+    return true;
+  };
   for (let b = 0; b < bins; b++) {
-    if (!readBin[b] || Object.keys(simBin[b]).length || !want[b]) continue;
-    const to = [b - 1, b + 1, b - 2, b + 2].find((x) => x >= 0 && x < bins && readBin[x] && Object.keys(simBin[x]).length);
+    if (!readBin[b] || hits(b) || !want[b]) continue;
+    const to = [b - 1, b + 1, b - 2, b + 2].find((x) => x >= 0 && x < bins && readBin[x] && hits(x));
     if (to !== undefined) want[to] += want[b];
+    else if (quietFrom(b)) afterKill += want[b];
     else unattributed += want[b];
     want[b] = 0;
   }
   const fitted: Record<string, number>[] = [];
+  // Each bin's one factor (every hit in it scaled alike), for scaling one action's damage as the totals are.
+  const scales: number[] = [];
   for (let b = 0; b < bins; b++) {
     const sim = simBin[b];
     const simSum = Object.values(sim).reduce((n, v) => n + v, 0);
     if (!readBin[b] || !simSum) {
       fitted.push({ ...sim });
+      scales.push(1);
       continue;
     }
     const scale = want[b] / simSum;
+    scales.push(scale);
     fitted.push(Object.fromEntries(Object.entries(sim).map(([key, v]) => [key, v * scale])));
   }
   const byOperator: Record<string, number> = {};
   const sources = new Map<string, { op: string; source: string; hits: number; total: number }>();
   const hitsOf = new Map(r.sources.map((x) => [`${x.op}|${x.source}`, x.hits]));
-  let total = unattributed;
+  let total = unattributed + afterKill;
   const track: [number, number, number][] = [];
   let dealt = 0;
   fitted.forEach((bin, k) => {
@@ -93,7 +108,7 @@ export function fitToRecording(r: ReplayResult, boss: [number, number, number][]
     }
     track.push([(k + 1) * FIT_BIN, Math.round(dealt), r.track?.find(([t]) => t >= (k + 1) * FIT_BIN)?.[2] ?? -2]);
   });
-  return { result: { ...r, total, byOperator, sources: [...sources.values()].sort((a, b) => b.total - a.total), track }, unattributed };
+  return { result: { ...r, total, byOperator, sources: [...sources.values()].sort((a, b) => b.total - a.total), track }, unattributed, afterKill, scaleAt: (s) => scales[Math.floor(s / FIT_BIN)] ?? 1 };
 }
 
 /** A moment the replay stops matching the video. */

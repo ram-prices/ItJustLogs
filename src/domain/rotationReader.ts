@@ -59,6 +59,9 @@ export interface Layout {
   banner: Area;
   /** The stopwatch's digits: from the left edge (x) or the centre (dx). */
   clock: { x?: number; dx?: number; y: number; w: number; h: number };
+  /** Other places a stage puts its timer (Echoes of War: counting down, centred under the boss's bar); the one the
+   * text reader reads is used. */
+  clockAlt?: { x?: number; dx?: number; y: number; w: number; h: number; ink: Test }[];
   /** The boss's name, centred. */
   enemy?: { w: number; h: number; y: number };
   /** The boss's Stagger meter under its HP bar: from the centre (dx), its full width. */
@@ -106,6 +109,8 @@ export const CONTROLLER: Layout = (() => {
     centre,
     banner,
     clock: { x: 214, y: 30, w: 88, h: 40 },
+    // The Skydrummer's stage: its digits at x −24…+50 of the centre, rows 132–160 of a 1080-tall frame.
+    clockAlt: [{ dx: -30, y: 126, w: 88, h: 40, ink: (r, g, b) => Math.min(r, g, b) > 215 && Math.max(r, g, b) - Math.min(r, g, b) < 40 }],
     enemy: { w: 400, h: 36, y: 18 },
     // At 2560×1600: rows 106–110, x 963–1600.
     stagger: { dx: Math.round((963 - 1280) * S), y: Math.round(106 * S), w: Math.round(637 * S), h: 3 },
@@ -185,9 +190,11 @@ export const LAYOUTS = { controller: CONTROLLER, mobile: MOBILE };
 export const SLOTS = CONTROLLER.slots;
 
 /** Where to cut the areas from a frame `width` wide and READ_HEIGHT tall. */
-export function areas(width: number, layout: Layout = CONTROLLER): { right: Area; centre: Area; banner: Area; portraits: Area; clock: Area; enemy?: Area; stagger?: Area; bossHp?: Area } {
+export function areas(width: number, layout: Layout = CONTROLLER): { right: Area; centre: Area; banner: Area; portraits: Area; clock: Area; clocks: Area[]; enemy?: Area; stagger?: Area; bossHp?: Area } {
   const { right, centre, clock, enemy, stagger, bossHp } = layout;
+  const clockArea = (c: Layout['clock']): Area => ({ x: c.x ?? Math.round(width / 2) + c.dx!, y: c.y, w: c.w, h: c.h });
   return {
+    clocks: [clock, ...(layout.clockAlt ?? [])].map(clockArea),
     right: { x: width - right.w, y: right.y, w: right.w, h: right.h },
     centre: { x: Math.round(width / 2) - centre.w / 2, y: centre.y, w: centre.w, h: centre.h },
     banner: layout.banner,
@@ -463,6 +470,10 @@ export interface Step {
   group?: number;
   /** Battle skills and combos: it interrupted the boss's attack (its Stagger meter jumped more than a skill's). */
   interrupt?: boolean;
+  /** How the SP bar moved with it: a battle skill's cost (negative, SP back not counted), a Final Strike's gain. */
+  sp?: number;
+  /** The SP bar just after it (where it settled). */
+  spAfter?: number;
 }
 
 export interface Reading {
@@ -473,11 +484,14 @@ export interface Reading {
   /** Each combo group's banner art (24×9 RGB cells), by group. */
   arts: number[][];
   /** From the stopwatch, when its digits were read: when it stopped (seconds into the video), what it showed then (the fight's length, seconds), and the stretches it stood still (seconds into the video). */
-  clock?: { end: number; seconds: number; pauses: [number, number][] };
+  /** `lead`: seconds the fight started before the HUD showed (a countdown already running from its minute). */
+  clock?: { end: number; seconds: number; pauses: [number, number][]; lead?: number };
   /** Stretches the boss took no Stagger after its meter's node (seconds into the video): `guards`. */
   guards?: [number, number][];
   /** The boss's bars every BOSS_EVERY seconds: time (seconds into the video), HP left, Stagger meter (-1 Staggered). */
   boss?: [number, number, number][];
+  /** The SP bar (0–300) every BOSS_EVERY seconds while the HUD shows: [seconds into the video, SP]. */
+  sp?: [number, number][];
 }
 
 /** What the stopwatch showed at a tick (text recognition's words, "01:05"). */
@@ -497,6 +511,8 @@ const HELD = 0.2;
 const DROP = 12;
 const GAIN = 8;
 const FINISHER = 40;
+/** How long an SP gain can keep climbing (seconds): the bar fills in steps. */
+const RISE = 0.4;
 /** SP coming back from a battle skill: a step within this long after it. */
 const SP_BACK = 0.8;
 /** How much SP coming back counts. */
@@ -616,12 +632,25 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = [], layo
       lastDrop = t[i];
       const caster = phone ? buttonOf(samples, t[i]) : casterOf(samples, i);
       const back = spBack(samples, on, i);
-      steps.push({ t: t[i], input: 'battle', ...caster, ...(back ? { spBack: true, back } : {}) });
+      // Its cost: from the bar's level before the drop (the bar animates down, so the last frames can be partway) to
+      // the lowest it settles at in the next 0.3 s.
+      let low = sp;
+      for (let k = i + 1; k < n && t[k] <= t[i] + 0.3; k++) if (on[k]) low = Math.min(low, samples[k].sp);
+      const from = Math.max(hi, level(samples, on, i));
+      steps.push({ t: t[i], input: 'battle', ...caster, ...(back ? { spBack: true, back } : {}), sp: -Math.round(from - low), spAfter: Math.round(low) });
     } else if (sp - lo >= GAIN && sp - level(samples, on, i) >= GAIN && t[i] - lastGain > CHAIN && t[i] - lastDrop > SP_BACK && !gapEnds.some((e) => t[i] - e >= 0 && t[i] - e < 0.6) && holds(samples, on, i)) {
       lastGain = t[i];
+      // To where it peaks in the next RISE seconds: the bar climbs in steps (a Finisher's +52 over 0.35 s was first
+      // seen at +20 and taken for a Final Strike).
+      let peak = sp;
+      for (let k = i + 1; k < n && t[k] <= t[i] + RISE; k++) {
+        if (!on[k]) continue;
+        if (samples[k].sp < peak - 4) break;
+        peak = Math.max(peak, samples[k].sp);
+      }
       // How much it rose: from just before, or from the level before if the bar blinked in between.
-      const gain = Math.min(sp - lo, sp - level(samples, on, i));
-      gains.push({ step: { t: t[i], input: gain >= FINISHER ? 'finisher' : 'strike', slot: null }, gain });
+      const gain = Math.min(peak - lo, peak - level(samples, on, i));
+      gains.push({ step: { t: t[i], input: gain >= FINISHER ? 'finisher' : 'strike', slot: null, sp: Math.round(gain), spAfter: Math.round(peak) }, gain });
     }
   }
   const usual = median(gains.filter((g) => g.step.input === 'strike').map((g) => g.gain));
@@ -645,13 +674,16 @@ export function readRotation(samples: Sample[], clock: ClockReading[] = [], layo
   if (!c && black.length) reading.clock = { end: t[end], seconds: Math.round(t[end] - t[first] - black.reduce((a, [x, y]) => a + (y - x), 0)), pauses: black };
   endsAtZero(bars, reading.clock);
   if (bars.length) reading.boss = bars;
+  const sp = spSeries(samples, on);
+  if (sp.length) reading.sp = sp;
   return reading;
 }
 
 /**
  * The bar reaching zero where the frames don't show it: a phase ending in a pause (the bar full again after it: the
- * cut-in or black screen hid the last of it) and the HUD leaving as the stopwatch stops (the kill). Each gets a
- * zero-HP reading, at the last reading before the pause and at the stop.
+ * cut-in or black screen hid the last of it) and the stopwatch's stop (the kill: a recording ends with the boss
+ * dead, however early its bar stopped being read). Each gets a zero-HP reading, at the last reading before the
+ * pause and at the stop.
  */
 export function endsAtZero(bars: [number, number, number][], clock: Reading['clock']): void {
   if (!clock) return;
@@ -662,7 +694,7 @@ export function endsAtZero(bars: [number, number, number][], clock: Reading['clo
     if (before && after && before[1] > 0 && after[1] > before[1] + 0.3) bars.splice(bars.indexOf(before) + 1, 0, [before[0], 0, before[2]]);
   }
   const last = bars[bars.length - 1];
-  if (last && last[1] > 0 && Math.abs(clock.end - last[0]) <= 5) bars.push([Math.round(Math.max(clock.end, last[0]) * 1000) / 1000, 0, last[2]]);
+  if (last && last[1] > 0) bars.push([Math.round(Math.max(clock.end, last[0]) * 1000) / 1000, 0, last[2]]);
 }
 
 /**
@@ -699,20 +731,44 @@ const BOSS_EVERY = 0.25;
  * frames around it (effects flash over the bars), HP never rising within a stretch the HUD shows (a phase change
  * refills it), the meter -1 while Staggered.
  */
+/** How far ahead a filling-in bar is checked against (seconds): `bossBars`. */
+const SETTLE_HP = 3;
+/** How long after the fight's start or a refill the bar can still be filling in (seconds). */
+const SETTLE_FOR = 2;
 function bossBars(samples: Sample[]): [number, number, number][] {
   const seen = samples.filter((x) => x.bossHp !== undefined && x.stagger !== undefined);
   if (seen.length < 20) return [];
   const out: [number, number, number][] = [];
+  // Each moment's median reading first.
+  const reads: { t: number; hp: number; near: Sample[] }[] = [];
+  for (let t = seen[0].t; t <= seen[seen.length - 1].t; t += BOSS_EVERY) {
+    // Two readings at least; where frames came few and far apart (a browser slows a tab it hides), within a second.
+    let near = seen.filter((x) => Math.abs(x.t - t) <= BOSS_EVERY);
+    if (near.length < 2) near = seen.filter((x) => Math.abs(x.t - t) <= 1);
+    if (near.length >= 2) reads.push({ t, hp: median(near.map((x) => x.bossHp!)), near });
+  }
   let low = 1;
   let lastT = -Infinity;
-  for (let t = seen[0].t; t <= seen[seen.length - 1].t; t += BOSS_EVERY) {
-    const near = seen.filter((x) => Math.abs(x.t - t) <= BOSS_EVERY);
-    if (near.length < 2) continue;
+  // The bar fills in as the fight starts and after a refill: while a reading in the next SETTLE_HP seconds is higher,
+  // it's still filling (a frame of it once held the Skydrummer at 35% until its next refill).
+  // Only for its first SETTLE_FOR seconds: a later read could keep finding a higher one (frames where effects cover
+  // the bar), and one did, dropping the Skydrummer's first 22 s.
+  let settling = true;
+  let from = reads[0]?.t ?? 0;
+  for (const { t, hp, near } of reads) {
     // A refill (a new phase) after the HUD was away.
-    const hp = median(near.map((x) => x.bossHp!));
-    if (t - lastT > 2 && hp > low + 0.3) low = 1;
-    low = Math.min(low, hp);
+    if (t - lastT > 2 && hp > low + 0.3) {
+      low = 1;
+      settling = true;
+      from = t;
+    }
     lastT = t;
+    if (settling && t - from > SETTLE_FOR) settling = false;
+    if (settling) {
+      if (reads.some((x) => x.t > t && x.t <= t + SETTLE_HP && x.hp > hp + 0.05)) continue;
+      settling = false;
+    }
+    low = Math.min(low, hp);
     const yellow = near.filter((x) => x.staggered).length > near.length / 2;
     const r3 = (x: number) => Math.round(x * 1000) / 1000;
     out.push([r3(t), r3(low), yellow ? -1 : r3(median(near.map((x) => x.stagger!)))]);
@@ -837,9 +893,28 @@ function stretches(samples: Sample[], on: boolean[]): Stretch[] {
  */
 export function clockAnchors(samples: Sample[]): number[] {
   const { on } = shown(samples);
-  const out = stretches(samples, on).flatMap(({ ticks: x }) => [...new Set([x[Math.min(1, x.length - 1)], x[Math.floor(x.length / 2)], x[x.length - 2] ?? x[0]])].map((v) => v + SETTLE));
+  // Near each stretch's start, middle and end, and the HUD's last moment.
+  const runs = stretches(samples, on);
+  const out = runs.flatMap(({ ticks: x }) => [...new Set([x[Math.min(1, x.length - 1)], x[Math.floor(x.length / 2)], x[x.length - 2] ?? x[0]])].map((v) => v + SETTLE));
   const last = on.lastIndexOf(true);
   if (last >= 0) out.push(samples[last].t);
+  // Then (after those, so readings matched to them in order stay put) the moments only for its last value.
+  return [...out, ...lateAnchors(samples, on, runs)];
+}
+
+/**
+ * Moments read only for the stopwatch's last value, not its count: just after each stretch's last tick, and around
+ * the HUD's last moment. A countdown's timer can be gone seconds before the rest of the HUD (the Skydrummer's last
+ * 7:25 showed only after its last tick), and the very last frame is often mid-fade; a stopwatch that stopped would
+ * miscount if these voted (Alleikhreos's 2:21 while the HUD stays).
+ */
+function lateAnchors(samples: Sample[], on: boolean[], runs: Stretch[]): number[] {
+  const out = runs.flatMap(({ ticks: x }) => (x.length ? [x[x.length - 1] + SETTLE] : []));
+  const last = on.lastIndexOf(true);
+  const end = samples[samples.length - 1]?.t ?? 0;
+  // Every quarter second over the HUD's last 4 s (the Skydrummer's 7:25 showed for half a second, 3 s before the HUD
+  // went), and just after it.
+  if (last >= 0) for (let d = -4; d <= 0.9; d += 0.25) if (Math.abs(d) > 1e-6 && samples[last].t + d <= end) out.push(samples[last].t + d);
   return out;
 }
 
@@ -856,7 +931,7 @@ export function enemyName(texts: string[]): string | undefined {
 }
 
 /** "01:05" as seconds, or null. */
-function clockSeconds(text: string): number | null {
+export function clockSeconds(text: string): number | null {
   const m = /(\d{1,2})\s*[:.;]?\s*(\d{2})(?!\d)/.exec(text.replace(/[oO]/g, '0'));
   return m && Number(m[2]) < 60 ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
@@ -864,11 +939,15 @@ function clockSeconds(text: string): number | null {
 function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], readings: ClockReading[], start: number): Reading['clock'] {
   const runs = stretches(samples, on);
   if (!runs.length || !readings.length) return undefined;
+  // The late moments count only for the last value.
+  const lateAt = lateAnchors(samples, on, runs);
+  // A reading's time is its picture's, kept every 0.2 s: the nearest to the moment asked for.
+  const late = (x: ClockReading) => lateAt.some((t) => Math.abs(t - x.t) <= 0.12);
   const within = (x: ClockReading, r: number[]) => x.t >= r[0] && x.t <= r[r.length - 1] + 2 * SETTLE;
   // Up, or down (a timed stage): which way its readings go within a stretch.
   let down = 0;
   for (const { ticks: r } of runs) {
-    const read = readings.filter((x) => within(x, r)).map((x) => ({ t: x.t, g: clockSeconds(x.text) })).filter((x) => x.g !== null);
+    const read = readings.filter((x) => within(x, r) && !late(x)).map((x) => ({ t: x.t, g: clockSeconds(x.text) })).filter((x) => x.g !== null);
     if (read.length >= 2) down += Math.sign(read[0].g! - read[read.length - 1].g!);
   }
   const dir = down > 0 ? -1 : 1;
@@ -877,7 +956,7 @@ function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], rea
     const votes = new Map<number, number>();
     for (const x of readings) {
       const g = clockSeconds(x.text);
-      if (g === null || !within(x, r)) continue;
+      if (g === null || !within(x, r) || late(x)) continue;
       const g0 = g - dir * Math.round(x.t - SETTLE - r[0]);
       // A clean "00:00" counts twice: a misread usually loses its colon or a digit.
       votes.set(g0, (votes.get(g0) ?? 0) + (/^\d\d:\d\d$/.test(x.text.trim()) ? 2 : 1));
@@ -911,21 +990,39 @@ function clockOf(samples: Sample[], on: boolean[], gaps: [number, number][], rea
   const last = runs[prev].ticks;
   const g = (x: number) => zero[prev]! + dir * Math.round(x - last[0]);
   // The fight's length: how far it moved from what it showed when the HUD first did.
-  const atStart = zero[first]! - dir * Math.round(runs[first].ticks[0] - start);
+  const shownAtStart = zero[first]! - dir * Math.round(runs[first].ticks[0] - start);
+  // A countdown starts from a whole minute (Echoes of War's 10:00), a moment before its HUD has faded in enough to
+  // read: within 2 s of one, it started there (the Skydrummer's first read was 9:59; its fight 10:00 to 7:25).
+  const minute = Math.ceil(shownAtStart / 60) * 60;
+  const atStart = dir < 0 && minute - shownAtStart <= 2 ? minute : shownAtStart;
   const length = (v: number) => dir * (v - atStart);
   // Where it stopped: the tick at what it shows at the last moment the HUD does, else the last tick it changed at.
-  const [lo, hi] = [g(last[0]), g(last[last.length - 1])].sort((x, y) => x - y);
-  const final = readings
-    .filter((x) => x.t > last[last.length - 1])
-    .map((x) => clockSeconds(x.text))
-    .find((v): v is number => v !== null && v >= lo && v <= hi);
-  if (final !== undefined) return { end: last[0] + dir * (final - zero[prev]!), seconds: length(final), pauses };
+  // Up to two ticks further in its direction too: a tick just before the HUD fades out can go unseen (the
+  // Skydrummer's 7:26 to 7:25, its last value).
+  const [lo0, hi0] = [g(last[0]), g(last[last.length - 1])].sort((x, y) => x - y);
+  const [lo, hi] = dir < 0 ? [lo0 - 2, hi0] : [lo0, hi0 + 2];
+  // The latest of the readings after its last tick (the HUD's last moments and just after are read several times).
+  // After its last tick, or at the late moments read for this (a stretch's ticks can go on after a countdown's timer
+  // has gone: blank frames still change), each fitting its last ticks' range or what a clock still running would show
+  // by then; the latest wins.
+  const finals = readings
+    .filter((x) => x.t > last[last.length - 1] || (late(x) && x.t >= last[0]))
+    .sort((a, b) => a.t - b.t)
+    .map((x) => ({ x, v: clockSeconds(x.text) }))
+    .filter((y): y is { x: ClockReading; v: number } => y.v !== null && ((y.v >= lo && y.v <= hi) || Math.abs(y.v - g(y.x.t)) <= 1))
+    .map((y) => y.v);
+  const final = finals.length ? finals[finals.length - 1] : undefined;
+  // A countdown from its minute starts exactly where its ticks say: the tick to a value comes that many seconds after
+  // it (the Skydrummer's 10:00 at 0.65 s, a third of a second before its HUD showed).
+  const begun = dir < 0 && atStart === minute ? runs[first].ticks[0] - (minute - zero[first]!) : start;
+  const lead = start - begun > 0.01 ? { lead: Math.round((start - begun) * 1000) / 1000 } : {};
+  if (final !== undefined) return { end: last[0] + dir * (final - zero[prev]!), seconds: length(final), pauses, ...lead };
   // While it runs, every tick changes it; a lone change after a still tick is the HUD fading out (the owner's
   // ef-alleikhreos.mp4: its 2:21 read as 2:23 that way).
   const ch = runs[prev].change;
   const moved = last.filter((_, i) => ch[i] > 25 && (i === 0 || ch[i - 1] > 25));
   const end = moved[moved.length - 1] ?? last[0];
-  return { end, seconds: length(g(end)), pauses };
+  return { end, seconds: length(g(end)), pauses, ...lead };
 }
 
 /**
@@ -954,6 +1051,21 @@ function spBack(samples: Sample[], on: boolean[], i: number): number {
 }
 
 /** SP over the half second before sample i (its middle value: a frame the bar blinks doesn't count). */
+/** The SP bar over the fight: every BOSS_EVERY seconds the median of the shown frames around it. */
+function spSeries(samples: Sample[], on: boolean[]): [number, number][] {
+  const out: [number, number][] = [];
+  const shown = samples.filter((_, i) => on[i]);
+  if (shown.length < 20) return out;
+  let k = 0;
+  for (let t = shown[0].t; t <= shown[shown.length - 1].t; t += BOSS_EVERY) {
+    while (k < shown.length && shown[k].t < t - BOSS_EVERY / 2) k++;
+    const near: number[] = [];
+    for (let j = k; j < shown.length && shown[j].t <= t + BOSS_EVERY / 2; j++) near.push(shown[j].sp);
+    if (near.length) out.push([Math.round(t * 1000) / 1000, Math.round(median(near))]);
+  }
+  return out;
+}
+
 function level(samples: Sample[], on: boolean[], i: number): number {
   const t = samples[i].t;
   const sp: number[] = [];

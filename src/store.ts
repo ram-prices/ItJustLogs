@@ -345,6 +345,11 @@ export async function deleteSim(at: number): Promise<void> {
   await idb('data', 'readwrite', (s) => s.put(list.filter((e) => e.at !== at), 'sims'));
 }
 
+/** A read video waiting for the player's picks (Rotations → Parser), until it's simulated or discarded. */
+export const loadReaderDraft = <V>(): Promise<V | undefined> => idb<V | undefined>('data', 'readonly', (s) => s.get('readerDraft')).catch(() => undefined);
+export const saveReaderDraft = (v: unknown): Promise<void> => idb<unknown>('data', 'readwrite', (s) => s.put(v, 'readerDraft')).then(() => undefined, () => undefined);
+export const clearReaderDraft = (): Promise<void> => idb<unknown>('data', 'readwrite', (s) => s.delete('readerDraft')).then(() => undefined, () => undefined);
+
 /** The last gameplay video's reading (Rotations), so it can be played again without reading the video again. */
 export const loadSimVideo = <V>(): Promise<V | undefined> => idb<V | undefined>('data', 'readonly', (s) => s.get('simVideo')).catch(() => undefined);
 export const saveSimVideo = (v: unknown): Promise<void> => idb<unknown>('data', 'readwrite', (s) => s.put(v, 'simVideo')).then(() => undefined, () => undefined);

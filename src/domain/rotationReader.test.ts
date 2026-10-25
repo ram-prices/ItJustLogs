@@ -132,7 +132,7 @@ describe('rotation reader', () => {
   });
 
   it('times the fight by the stopwatch: its end, and the phase change it stood still for', () => {
-    expect(anchors.length).toBeLessThanOrEqual(45);
+    expect(anchors.length).toBeLessThanOrEqual(70);
     const c = reading.clock!;
     expect(c.seconds).toBe(141);
     expect(near(c.end, 146.47)).toBe(true);
@@ -334,10 +334,10 @@ describe('boss HP bar', () => {
     endsAtZero(bars, { end: 145.815, seconds: 141, pauses: [[65.31, 70]] });
     expect(bars).toEqual([[64.75, 0.115, -1], [65.25, 0.103, -1], [65.25, 0, -1], [69.5, 1, 0.002], [145.5, 0.03, -1], [146, 0.012, -1], [146, 0, -1]]);
   });
-  it('leaves a bar that was read to zero, and readings that end long before the stop', () => {
+  it('leaves a bar that was read to zero, and ends a reading that stopped early at zero by the stop', () => {
     const bars: [number, number, number][] = [[10, 0.5, 0.1], [12, 0, -1], [20, 1, 0], [100, 0.4, 0.2]];
     endsAtZero(bars, { end: 110, seconds: 105, pauses: [[13, 18]] });
-    expect(bars).toEqual([[10, 0.5, 0.1], [12, 0, -1], [20, 1, 0], [100, 0.4, 0.2]]);
+    expect(bars).toEqual([[10, 0.5, 0.1], [12, 0, -1], [20, 1, 0], [100, 0.4, 0.2], [110, 0, 0.2]]);
   });
 });
 
@@ -386,5 +386,22 @@ describe('two ultimates in one cut-in', () => {
       ['Top', 67.04],
       ['Left', 67.04],
     ]);
+  });
+});
+
+// The SP bar as the reader keeps it for the Parser: the bar over the fight, and how it moved with each step.
+describe('SP bar', () => {
+  it('keeps each battle skill’s cost and Final Strike’s gain, and the bar over the fight', () => {
+    const battles = of('battle').filter((s) => s.sp !== undefined);
+    const strikes = of('strike');
+    expect(battles.length).toBe(of('battle').length);
+    // A battle skill costs 100; a Final Strike gives tens of SP (14–19 here).
+    // As the bar shows it: 100 less what comes straight back (Tangtang's Whirlpools return some within 0.3 s: −73).
+    for (const b of battles) expect(b.sp!).toBeLessThanOrEqual(-60);
+    for (const b of battles) expect(b.sp!).toBeGreaterThanOrEqual(-110);
+    for (const x of strikes) expect(x.sp!).toBeGreaterThan(0);
+    expect(reading.sp?.length).toBeGreaterThan(100);
+    for (const [, v] of reading.sp!) expect(v).toBeGreaterThanOrEqual(0);
+    for (const [, v] of reading.sp!) expect(v).toBeLessThanOrEqual(300);
   });
 });

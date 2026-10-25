@@ -530,26 +530,30 @@ export function ownedTag(owned: Owned | undefined): Html {
 
 /**
  * A section's views as side tabs (a row on phones), like Essences': links,
- * with a count where there is one. `body` is the view itself.
+ * with a count where there is one. `body` is the view itself; `head`, the
+ * page's header, sits above the tabs so the view starts at the top.
  */
-export function sideTabs(label: string, views: [href: string, name: string, count: string][], current: string, body: Html): Html {
-  return html`<div class="collection-layout">
-    <nav class="collection-tabs" aria-label="${label}">
+export function sideTabs(label: string, views: [href: string, name: string, count: string][], current: string, body: Html, head?: Html, aside?: Html): Html {
+  const nav = html`<nav class="collection-tabs" aria-label="${label}">
       ${views.map(
         ([href, name, count]) =>
           html`<a class="collection-tab" href="${href}" ${raw(href === current ? 'aria-current="true"' : '')}><span>${name}</span><span class="label-12 secondary num">${count}</span></a>`,
       )}
-    </nav>
+    </nav>`;
+  // `aside`: more in the side column, under the tabs (Rotations → Parser's runs).
+  return html`<div class="collection-layout">
+    ${head ?? ''}
+    ${aside ? html`<div class="collection-side">${nav}${aside}</div>` : nav}
     <div class="min0">${body}</div>
   </div>`;
 }
 
 /** Database: every operator and weapon (wiki data, with the player's copies). */
-export const databaseTabs = (kind: Kind, body: Html): Html =>
-  sideTabs('Database', [[infoHref('char'), 'Operators', ''], [infoHref('weap'), 'Arsenals', '']], infoHref(kind), body);
+export const databaseTabs = (kind: Kind, head: Html, body: Html): Html =>
+  sideTabs('Database', [[infoHref('char'), 'Operators', ''], [infoHref('weap'), 'Arsenals', '']], infoHref(kind), body, head);
 
 /** Pulls: the player's banners of each kind (with how many they pulled on), and Stats. */
-export function pullsTabs(current: 'char' | 'weap' | 'stats', body: Html): Html {
+export function pullsTabs(current: 'char' | 'weap' | 'stats', head: Html, body: Html): Html {
   const pulled = (kind: Kind) => String(state.analysis?.banners.filter((b) => b.kind === kind && b.paidPulls > 0).length ?? '');
   return sideTabs(
     'Pulls',
@@ -560,5 +564,6 @@ export function pullsTabs(current: 'char' | 'weap' | 'stats', body: Html): Html 
     ],
     current === 'stats' ? '/banner/stats' : bannerHref(current),
     body,
+    head,
   );
 }
