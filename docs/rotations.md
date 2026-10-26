@@ -187,7 +187,16 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   cooldown by her talent's 20 s on its frame 62 (SetSkillCdAtOnce); frozen through her own cut-in (video 23.93–25.85),
   it counts on through Arcane's (26.6–28.25) and the cut lands at ~27.9, after Arcane's combo at 26.10, which is back
   at 28.37. The data's UltimateTimeAction ignoreTargets (Si's `dazhao`, Zhuang Fangyi's models) would have kept the Ink
-  Lung running through Si's own cut-in (cut at ~26.0, before that combo); the footage says otherwise, so it isn't used.
+  Lung running through Si's own cut-in (cut at ~26.0, before that combo); the footage says otherwise, so it isn't used:
+  the Ink Lung's hits (frames 63–100, right after the cut) show as one climbing Cryo number at video 28.4–29.1 (…36,410,
+  46,015), not at 26.0–26.6, where only a fixed 136,267 shows.
+  What a cut-in stops, from the recordings: SP regeneration (Skydrummer: +3 over 3.4–5 s cut-ins), Staggered time and
+  Corrosion (Skydrummer), the caster's own summons (Si's Ink Lung); what runs on: the stopwatch, cooldowns (Last Rite's
+  8 s combo at video 19.45 and 28.47 s with three cut-ins between), the caster's own casts, other operators' summons.
+  Also held, from the Last Rite recording: Arcane's own Imprisonment and Tactical Doubles through her own cut-in (her
+  second Imprisonment, combo at video 26.10, still on the boss at the 35.1 clear with no explosion, where running
+  through would end it ~33.75), and, at low confidence, teammates' buff timers (Perfusion's outline lost ~0.9 s over
+  Si's 1.9 s cut-in). Tangtang's Whirlpools through her own cut-in: not settled (the footage can't follow them).
   The current Last Rite run (tools/ai-parser/out/lastrite.parsed-run.json) replays with nothing missed: 4,076,698 by
   31 s, clear 32.0 s.
   A search's ExcludeOwnerValidator leaves out the ability's owner: Eternal Xiranite's +16% goes to the other
