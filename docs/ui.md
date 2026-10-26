@@ -14,7 +14,8 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     status, `--r6/5/4/3` rarity, `--radius-sm/md/lg` 6/8/12), then the Geist
     type classes (`heading-48..14`, `copy-16..13`, `label-14..12`), then
     components. Light theme is the `:root[data-theme='light']` token block.
-    Phone tweaks live in the `max-width: 640px` blocks.
+    Phone tweaks live in the `max-width: 640px` blocks. Wide content scrolls sideways
+    in its own box (the Rotations timeline, tables), never the page.
     Pages are up to 1600px wide (`.container`); text that is read, not scanned,
     keeps a readable width (story dialogue 960px, Settings 1000px, event details 80ch).
   - Vercel rules: borders are shadows (`--shadow-border`, `--shadow-card`,

@@ -3,7 +3,7 @@ import type { BuffSpan } from '../../../domain/sim/team';
 import { EF_ASSETS, EF_ASSETS_CDN, mirrorUrl } from '../../../domain/banners';
 import { html, type Html } from '../../html';
 import { page } from './state';
-import { secs } from './text';
+import { clockTime, secs } from './text';
 
 /** A buff's name: its status's, else from its id (an operator's or weapon's by its name, the rest in words). */
 function buffName(b: BuffSpan): string {
@@ -89,7 +89,7 @@ function buffIcon(b: BuffSpan): string | undefined {
  * Under a lane, a row for each buff its owner held (the sim's, played from the recording's presses): its stretches on
  * the lane's clock, its name at the left (less the owner's own name), stacks and times on hover.
  */
-export function buffRows(buffs: BuffSpan[] | undefined, slot: number, owner: string, at: (f: number) => string): Html {
+export function buffRows(buffs: BuffSpan[] | undefined, slot: number, owner: string, at: (f: number) => string, len: (f: number) => string): Html {
   if (!page.fold.buffs || !buffs?.length) return html``;
   const rows = new Map<string, BuffSpan[]>();
   for (const b of buffs) if (b.slot === slot) rows.set(b.id, [...(rows.get(b.id) ?? []), b]);
@@ -100,11 +100,40 @@ export function buffRows(buffs: BuffSpan[] | undefined, slot: number, owner: str
     return html`<div class="sim-lane sim-buff-lane">
       <span class="sim-lane-name label-12 ellipsis" title="${full}">${src ? html`<img class="sim-buff-row-icon" src="${src}" alt="" onerror="this.remove()" />` : ''}${name}</span>
       <span class="sim-lane-track">${spans.map(
-        (s) => html`<i class="sim-buff${slot < 0 ? ' debuff' : ''}" style="left:${at(s.from * FPS)};width:${at(Math.max(s.to - s.from, 0.15) * FPS)}" title="${full} · ${secs(s.from * FPS)}–${secs(s.to * FPS)}${s.level ? ` · Level ${s.stacks}` : s.stacks > 1 ? ` · ${s.stacks} stacks` : ''}"></i>`,
+        (s) => html`<i class="sim-buff${slot < 0 ? ' debuff' : ''}" style="left:${at(s.from * FPS)};width:${len(Math.max(s.to - s.from, 0.15) * FPS)}" title="${full} · ${secs(s.from * FPS)}–${secs(s.to * FPS)}${s.level ? ` · Level ${s.stacks}` : s.stacks > 1 ? ` · ${s.stacks} stacks` : ''}"></i>`,
       )}</span>
     </div>`;
   })}`;
 }
+
+/**
+ * Under the timeline, the buffs at the playhead: a row for each operator and the boss (its face, its chips on one line
+ * that scrolls sideways, how many), the playhead's time in the heading, a tapped chip's name and stacks under it.
+ * paintBuffs fills it. The boss's Arts Inflictions stay by its bars.
+ */
+export function buffsPanel(buffs: BuffSpan[] | undefined, rows: { slot: number; name: string; face: Html }[]): Html {
+  if (!buffs?.length) return html``;
+  return html`<div class="sim-buffs-panel">
+    <p class="label-12 secondary">Buffs at <span class="num sim-buffs-time">${clockTime(page.play.t)}</span></p>
+    ${rows.map(
+      (r) => html`<div class="sim-buffs-row">
+        <span class="sim-buffs-who" title="${r.name}">${r.face}</span>
+        <span class="sim-buffs-now" data-buffs-slot="${r.slot}" ${r.slot < 0 ? html`data-buffs-kind="other"` : ''} aria-label="${r.slot < 0 ? 'The enemy’s debuffs' : `${r.name}’s buffs`}"></span>
+        <span class="num label-12 secondary sim-buffs-count"></span>
+      </div>`,
+    )}
+    <p class="label-12 sim-buffs-tip" aria-live="polite">${page.buffTip}</p>
+  </div>`;
+}
+
+// A tapped chip says what it is (a hover does too, by its title).
+if (typeof document !== 'undefined')
+  document.addEventListener('click', (e) => {
+    const chip = (e.target as HTMLElement | null)?.closest?.<HTMLElement>('.sim-buffs-panel .sim-buff-chip');
+    if (!chip) return;
+    page.buffTip = chip.title;
+    for (const el of document.querySelectorAll<HTMLElement>('.sim-buffs-tip')) el.textContent = page.buffTip;
+  });
 
 /**
  * The buffs on someone at the playhead, as the game shows them: each icon in a square whose outline is its timer
@@ -179,6 +208,8 @@ export function paintBuffs(): void {
         }),
       );
     }
+    const count = el.parentElement?.querySelector<HTMLElement>('.sim-buffs-count');
+    if (count) count.textContent = on.length ? String(on.length) : '';
     on.forEach((b, k) => (el.children[k] as HTMLElement | undefined)?.style.setProperty('--left', String(Math.max(0, Math.min(1, (b.to - page.play.t) / Math.max(0.01, b.to - b.from))))));
   }
 }

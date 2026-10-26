@@ -2,7 +2,7 @@ import { type Enemy, FPS } from '../../../domain/sim/engine';
 import { enemyById, type ReplayResult, type SimResult } from '../../../domain/sim/team';
 import { icon } from '../../components';
 import { html, type Html } from '../../html';
-import { page, settings } from './state';
+import { page, settings, TL_ZOOMS } from './state';
 import { big, clockTime, pct } from './text';
 import { baseOf, phaseChanges } from './track';
 import { soFar } from './fit';
@@ -187,19 +187,40 @@ const speedSelect = (): Html => html`<select class="input sim-play-speed" data-s
     ${[1, 2, 4].map((s) => html`<option value="${s}" ${s === page.play.speed ? 'selected' : ''}>${s}×</option>`)}
   </select>`;
 
-/**
- * Play and time in the lanes' label column, the scrubber across exactly the lanes' track (its thumb's centre going
- * edge to edge, as the playhead does), so the two line up.
- */
 const playButton = (): Html =>
   html`<button type="button" class="btn secondary sm icon-only" data-action="sim-play" title="${page.play.running ? 'Pause' : 'Play'}" aria-label="${page.play.running ? 'Pause' : 'Play'}">${icon(page.play.running ? 'pause' : 'play_arrow')}</button>`;
 
-/** Play in the label column, by the scrubber (its time in a tip above its dot); `extra` after them (a parsed run's Buffs toggle). */
-export function playControls(r: SimResult, extra?: Html): Html {
+/** Zoom the timeline out or in (`dir` -1 or 1). */
+const zoomButton = (dir: -1 | 1): Html => {
+  const k = TL_ZOOMS.indexOf(page.tlZoom);
+  // Wider than a phone the timeline fits the card at 1×: no narrower.
+  const fits = typeof matchMedia !== 'undefined' && !matchMedia('(max-width: 640px)').matches;
+  const off = dir < 0 ? k <= 0 || (fits && page.tlZoom <= 1) : k >= TL_ZOOMS.length - 1;
+  return html`<button type="button" class="btn secondary sm icon-only" data-action="sim-zoom" data-value="${dir}" title="${dir < 0 ? 'Zoom out' : 'Zoom in'}" aria-label="${dir < 0 ? 'Zoom out' : 'Zoom in'}" ${off ? 'disabled' : ''}>${icon(dir < 0 ? 'remove' : 'add')}</button>`;
+};
+
+/** Play, speed and zoom over the timeline (its scrubber is the timeline's first row); `extra` after them (a parsed run's Buffs toggle). */
+export function playControls(extra?: Html): Html {
   return html`<div class="sim-play">
-    <div class="sim-play-left">${playButton()}${speedSelect()}${extra ?? ''}</div>
-    <span class="sim-seek-wrap" style="--p:${r.seconds ? page.play.t / r.seconds : 0}"><span class="num label-12 sim-play-time" aria-hidden="true">${clockTime(page.play.t)}</span><input class="sim-play-seek" type="range" min="0" max="${r.seconds}" step="any" value="${page.play.t}" data-sim="play-seek" aria-label="Time" style="--p:${r.seconds ? page.play.t / r.seconds : 0}" /></span>
+    <div class="sim-play-left">${playButton()}${speedSelect()}${zoomButton(-1)}${zoomButton(1)}${extra ?? ''}</div>
   </div>`;
+}
+
+/** Scrolls the timeline so the playhead is in view (`center`: in the middle; else a quarter in, once it nears the edge). */
+export function showPlayhead(center = false): void {
+  const d = page.playBars;
+  if (!d) return;
+  const frac = Math.max(0, Math.min(1, (page.play.t - page.tlStart) / (d.seconds - page.tlStart)));
+  for (const box of document.querySelectorAll<HTMLElement>('.sim-tl-scroll')) {
+    const tl = box.firstElementChild as HTMLElement | null;
+    if (!tl || box.scrollWidth <= box.clientWidth) continue;
+    const label = parseFloat(getComputedStyle(tl).getPropertyValue('--lane-label')) || 56;
+    const x = label + 8 + (tl.clientWidth - label - 16) * frac;
+    const room = box.clientWidth - label - 8;
+    const left = box.scrollLeft;
+    if (center) box.scrollLeft = x - label - 8 - room / 2;
+    else if (x < left + label + 8 || x > left + label + 8 + room * 0.8) box.scrollLeft = x - label - 8 - room / 4;
+  }
 }
 
 /**
@@ -353,12 +374,6 @@ export function spRow(kind: 'sim' | 'video'): Html {
   </div>`;
 }
 
-/** Under a lone timeline: the controls and the boss's bars. */
-export function player(r: SimResult): Html {
-  preparePlay(r);
-  return html`<div class="sim-player">${playControls(r)}${bossRow('Boss', 'sim')}</div>`;
-}
-
 // The transcript's scroll, kept for the next draw (page.movesTop).
 if (typeof document !== 'undefined')
   document.addEventListener(
@@ -378,9 +393,11 @@ export function paintPlay(): void {
     list.dataset.kept = '1';
     list.scrollTop = page.movesTop;
   }
-  const frac = Math.min(1, page.play.t / d.seconds);
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-playhead')) el.style.left = `calc(var(--lane-label, 96px) + 8px + (100% - var(--lane-label, 96px) - 8px) * ${frac})`;
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-play-time')) el.textContent = clockTime(page.play.t);
+  // On the timeline's clock, from its start (a press before the stopwatch's 0) to its end.
+  const frac = Math.max(0, Math.min(1, (page.play.t - page.tlStart) / (d.seconds - page.tlStart)));
+  for (const el of document.querySelectorAll<HTMLElement>('.sim-playhead')) el.style.setProperty('--p', String(frac));
+  for (const el of document.querySelectorAll<HTMLElement>('.sim-play-time, .sim-buffs-time')) el.textContent = clockTime(page.play.t);
+  if (page.play.running) showPlayhead();
   for (const el of document.querySelectorAll<HTMLInputElement>('.sim-play-seek')) {
     // Not while it's being dragged; a click leaves it focused, so focus alone isn't that.
     if (!el.matches(':active')) el.value = String(page.play.t);

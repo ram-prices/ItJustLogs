@@ -229,9 +229,16 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   picture, its name in the text's colour, at the right its level when not 90 and the essence icon: green when maxed,
   dim with the skill ranks before it otherwise, none with no essence; its picture centred on the gear marks' column,
   its name a link to its Database page), every gear line's Artifice mark at the right edge (unlit at 0); the
-  operator's level and skill ranks when not maxed at the box's top right (`levelsLine`); the timeline's play controls share the lanes' columns (play in the 96px
-  label column, the scrubber across the track, its thumb's centre edge to edge) so the scrubber lines up with the
-  playhead, and the playback speed sits in the Timeline header; each box's bar shows every teammate's share in team
+  operator's level and skill ranks when not maxed at the box's top right (`levelsLine`); the timeline (`lanes` in results.ts) is
+  one area that scrolls sideways (`.sim-tl-scroll`), every row on one clock from `page.tlStart` (a whole second at
+  least half a second before a press cast before the stopwatch's 0, `startOf`; else 0) to the player's end: the
+  scrubber (its first row, the thumb's centre edge to edge over the track), the lanes, damage, the enemy's lane, the
+  axis and one playhead line (`--p`). Its width is the fight's seconds × at least 24 px a second on a phone (CSS
+  `--tl-pps`; wider screens fit the card) × the zoom (−/+ by play and speed, `TL_ZOOMS`, this viewer's in
+  localStorage `ijl.timelineZoom`); the names column is sticky (portraits, 56px). Markers that would overlap go to a
+  second tier, and that lane is taller for good (`tiers`), so nothing moves while scrubbing; playback scrolls to
+  keep the playhead in view (`showPlayhead`). The boss's HP/Stagger and SP bars show the playhead's values, not a
+  time axis, so they stay under it, their track as wide as the visible one; each box's bar shows every teammate's share in team
   order with a gap between, each in its portrait's hue (the hero tint, `data-hero-tint`; CSS relative colour): the box's own operator vivid, the others greyed and dark. Each action's damage (ReplayResult `actionDamage`, `damageByAction` in team.ts: a
   press gets its operator's hits of that kind until their next such press, a Final Strike their basic attacks up to
   it; an ultimate form's attacks, its closing one too, are its Ultimate's (`sourceOf`: _ult_attack, _attack#_ult),
@@ -286,9 +293,12 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   explosion is 5, the wiki's and the owner's count; each still deals its 120%). Arcane's ultimate ends only its own
   entities (`SUMMON_TAGS` 464088014), so a combo's doubles still explode after it.
   Checked against the owner's Alleikhreos video by tracing its boss bar (HP and the Stagger meter under it, which
-  turns yellow while Staggered): no Finisher in an ultimate form or with an attack a buff has waiting; a replay
-  makes a Finisher only where the video shows one (`finisherWaiting`; the parser can't see one cut off by a phase
-  change, so it's added by hand); a video Final Strike's chain starts earlier by the operator's own battle and combo
+  turns yellow while Staggered): no Finisher in an ultimate form or with its closing attack waiting; another attack
+  a buff has waiting comes after the Finisher (Skydrummer video: Yvonne's bomb 131.6, Finisher 137.3, her talent's
+  Final Strike 139.0). A replay makes a Finisher only where the video shows one (`World.finishers` false otherwise,
+  so a due attack on a Staggered enemy the video leaves alone stays an attack; the parser can't see one cut off by a
+  phase change, so it's added by hand), pressed as long before the video's as it takes to land (`finisherFrames`,
+  measured at the first Stagger: Yvonne's 23 frames); a video Final Strike's chain starts earlier by the operator's own battle and combo
   skills' exclusiveFrame in between (`holdOf`); strikes from unseen attacks are marked (`Strike.unseen`) so they
   aren't counted against the video; critical-hit events are counted per skill kind (`critSum`), so battle and combo
   skills crit at their own rate (Artzy Tyrannical). Alleikhreos: no Stagger at his node; the Foundite Weapon about
@@ -396,19 +406,19 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   with `hasIcon`; `loadBuffIcons`), Susceptibility/Amp/Haste as icon_battle_affix_<kind>_vulnerable|enhance|speedup,
   inflictions as their element's orb; the images are ef-assets icons/buffs/<sprite>.webp on jsDelivr (its
   scripts/buff-icons.py exports them from the dump's ui/sprites/bufficon bundle; a letter shows until they load).
-  At the playhead each lane of a parsed run's timeline (named by the operator's small portrait; the enemy's lane too)
-  shows its buffs as the game does, the icon in a square whose outline is the timer, stacks as a number and an Arts
+  Under a parsed run's timeline, "Buffs at <time>" (`buffsPanel`) has a fixed row per operator and the boss: its
+  face, its chips on one line that scrolls sideways, how many; a tapped chip's name and stacks show under it (a hover
+  by its title). The chips are as the game draws them, the icon in a square whose outline is the timer, stacks as a number and an Arts
   Reaction's level (its buff's `count`, `BuffSpan.level`) as a Roman numeral in a corner box, an Arts Infliction as the
   game draws it (its icon in a circle of four arcs, one lit per stack) with a thin timer ring inside, to the left of the
-  boss's bars rather than in the enemy's lane (`data-buffs-kind`) (`paintBuffs`, `--left`; the label
-  column widens for them, `--lane-label` 176px on `.sim-faces`; a long row wraps and the lane grows); timeline buff
-  rows start folded (`fold.buffs`). As the game: no chip for a buff the icon index has no sprite for (Si's
+  boss's bars rather than in the boss's row (`data-buffs-kind`) (`paintBuffs`, `--left`); timeline buff rows start
+  folded (`fold.buffs`), and with them the names column widens (`.sim-buff-names`). As the game: no chip for a buff the icon index has no sprite for (Si's
   soul_timedisplay_jsspsiself: `hasIcon` with an empty sprite); one chip per Amp or Susceptibility source
   (`effectsShown` ids `amp_<kind>@<operator>`: Xaihi's and Si's ultimates each give a Cryo Amp); a buff the game draws
   only on the controlled operator's row (iconConfig.onlyShowForMainCharacter, ef-assets icons/buffs/main-only.json from
   buff-icons.py; Last Rite's Perfusion, which the whole team holds) only on that lane (`playBars.controlled`). The
   run's header holds the timeline's Recording | Sim switch, then Edit, Export, Star and Delete as labelled buttons
-  (`headTools`; a starred run can't be deleted); play, speed and the Buffs eye sit by the scrubber, the time in a tip over its dot; dragging it moves the playhead as it goes (an `input` listener). The recording's Stagger meter never falls between resets
+  (`headTools`; a starred run can't be deleted); play, speed, zoom and the Buffs eye sit over the timeline, the time in a tip over the scrubber's dot; dragging it moves the playhead as it goes (an `input` listener). The recording's Stagger meter never falls between resets
   (a Stagger, a phase change: each reading is the lowest read after it in its stretch, so a hit's flash misread as fill
   drops out). The boss's bars hold each reading
   (`barAt`) and, while playing, slide to the next over 180 ms (`barSlide`; a Staggered meter's drain is drawn as
@@ -431,7 +441,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   the stretch, SP, bar after, damage; remove, interrupt and SP gained empty unedited; the scrollbar's room always kept; times as m:ss.s on the fight's clock, `videoTimeOf` adding the pauses back, Add action / Add invulnerable where Full transcript is), all kept in `draft` (no replay or redraw per change) until Play edited
   transcript (in the header, with Cancel, in place of Edit) replays it once; the transcript under the timeline
   shows only the moment at the playhead (and actions at the same moment together) unless Full transcript
-  (`fold.moves`); contribution bars ease to the playhead's shares (`aimBars`), even before any damage (a second's
+  (`fold.moves`); on a phone each line is two at a fixed height (the numbers on the second) and the toggle goes under it; contribution bars ease to the playhead's shares (`aimBars`), even before any damage (a second's
   average damage spread over everyone as a start).
   The stopwatch: the timer's places (`clockAlt`), a countdown's start rounded up to its minute within 2 s (the HUD fades
   in a moment after it starts: `clock.lead`, from its ticks: the tick to a value comes that many seconds after the
@@ -498,9 +508,13 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
     Tangtang's battle skill gives 10 in the sim and ~8 on the video (0:03.5, 0:21.8), the interrupt at 0:48.4 20
     against ~17, and single points elsewhere. Alleikhreos's meter matches the video within 2 with the same skills,
     and the Skydrummer's spawners add no Stagger (only buff_dung_maxhp_01), so it isn't the meter's size.
-  - Skydrummer: the second Finisher lands 0.8 s late (measured with the Stagger on time at 132.9 s, before the Haste
-    fix); fitted 306k against the bar's ~235k.
-  - Yvonne's second Skydrummer Finisher is ~27% low in the sim itself (no "taken" bonus found).
+  - Skydrummer Finishers land on the video's (2026-10-26): 63.17 / 137.30 against 63.18 / 137.3 (were 62.97 /
+    138.13: her talent's Final Strike took the second's place, and the 1 s press lead put the first 0.2 s early).
+    The second's damage: 135k in the sim against ~238k on the bar (0.199 → 0.139 of 3.96M at 137.1–137.35); a crit
+    accounts for ×1.38 of it (the sim's expected crit), and its ATK is 4,725 against 6,266 at the first Finisher
+    (63.17): the crit set's ATK stacks lapsed (last crit refresh 127.0) and Li Zhiyan's weapon buff (last 112.7) is
+    gone, both down to rolls the expected-value sim can't follow; Resistance 0.5 against 0.72 and no Li Zhiyan seal
+    Susceptibility at 137.3 likewise follow the replay's own timing. The fit's 306k was that second scaled.
   - Arts Amp from Xaihi's crystal heal is given even at full HP (the sim's team takes no damage).
 - Engine gaps from the audit (multipliers 189 exact, 95 rounding, 77 conditional untested, 35 off; costs all match):
   Purrchena's ultimate ticks (ExecuteIntervalAction), counter skills never fire (TakeDownAction: no enemy attacks),
@@ -509,6 +523,6 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   stacks, weapons and gear.
 - Next, in order:
   1. The Skydrummer's meter filling ~3.4% faster than the video's (the gap above).
-  2. The second Finisher's 0.8 s delay (`finisherWaiting`, `busy`, the 1 s press lead in replaySim).
+  2. Done: the second Finisher's delay (a talent's waiting attack took the Finisher's place).
   3. Rule tests that run for every operator (skill levels per operator, aura sources, SP regen, durations).
   4. The audit's engine gaps above, then audit conditional rows, buffs, weapons and gear.

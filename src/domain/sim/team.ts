@@ -712,6 +712,23 @@ export function chainFrames(w: World, slot: number, haste = 0): number {
 }
 
 /**
+ * Frames an operator's Finisher takes to land from the press that makes it, on `w`'s Staggered enemy (a copy plays
+ * it: presses until one is taken, then counts).
+ */
+function finisherFrames(w: World, slot: number): number {
+  const c = w.clone();
+  c.controlled = slot;
+  c.finishers = true;
+  const limit = c.frame + 5 * FPS;
+  let from = -1;
+  while (!c.strikes.some((x) => x.finisher && x.frame >= from && from >= 0) && c.frame < limit) {
+    if (from < 0 && c.press(slot, 'attack')) from = c.frame;
+    c.tick();
+  }
+  return from < 0 ? FPS : c.frame - from;
+}
+
+/**
  * A gameplay video's rotation played in the sim, so its damage and DPS can be worked out: each press at its time (or
  * as soon after as it can be, within REPLAY_SLACK), the operator who lands each Final Strike or Finisher controlled
  * from the press before it. Combos don't wait for the sim to see their trigger, nor ultimates for their energy (the
@@ -776,6 +793,8 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   // shows one: a Staggered enemy the player leaves alone (Yvonne's ultimate instead) takes none.
   const todo: { at: number; slot: number; input: Input; interrupt?: boolean; reach?: number }[] = [];
   const finishers = order.filter((x) => x.input === 'finisher').map((x) => Math.round(x.t * FPS));
+  // Each operator's Finisher's frames from press to landing (finisherFrames), measured at the first Stagger.
+  const landing = new Map<number, number>();
   // Each Final Strike the video shows: when the sim starts its chain, a chain's length before it plus however long
   // the operator's own battle and combo skills in between hold it (Yvonne's bomb, 1.1 s, mid-chain) and anyone's
   // ultimate cut-ins stop it while the video's clock runs on (Arcane's before 0:23.9 in the owner's video).
@@ -952,8 +971,11 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     });
     const due = shown.filter((from, k) => (quick ? shownAt[k] - QUICK_STRIKE * FPS : from + sooner[shownBy[k]]) <= clock()).length;
     const unseen = w.attacksUnseen(w.controlled);
-    // A Finisher only when the video shows one by about now (its SP refill: the parser reads them).
-    const finisher = w.finisherWaiting() && w.strikes.filter((x) => x.finisher).length < finishers.filter((at) => at <= clock() + FPS).length;
+    // A Finisher only when the video shows one by then (its SP refill: the parser reads them), pressed as long before
+    // it as it takes to land; no other press makes one (an attack due on a Staggered enemy the video leaves alone).
+    if (w.finisherWaiting() && !landing.has(w.controlled)) landing.set(w.controlled, finisherFrames(w, w.controlled));
+    const finisher = w.finisherWaiting() && w.strikes.filter((x) => x.finisher).length < finishers.filter((at) => at <= clock() + (landing.get(w.controlled) ?? FPS)).length;
+    w.finishers = finisher;
     if (!pressed && !paused(clock()) && (unseen || finisher || w.strikes.length - free < due)) w.press(w.controlled, 'attack');
     const before = w.strikes.length;
     const stood = paused(clock());
@@ -979,6 +1001,8 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     if (stood) w.holdStagger(w.frame - f0);
     for (const x of w.strikes.slice(before)) if (x.unseen || w.attacksUnseen(x.slot)) free++;
   }
+  // Past the recording the sim fights on its own: Finishers whenever it Staggers.
+  w.finishers = true;
   const { at: clear, runOn } = clearOn(w, team.enemy?.phaseHp ?? team.hp, pauses, clockAt, end, game);
   for (const i of waiting) missed.push({ t: game(todo[i].at) / FPS, slot: todo[i].slot, input: todo[i].input });
   for (; k < todo.length; k++) missed.push({ t: game(todo[k].at) / FPS, slot: todo[k].slot, input: todo[k].input });

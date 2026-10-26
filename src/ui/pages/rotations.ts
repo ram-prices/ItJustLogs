@@ -4,10 +4,10 @@ import { deleteSim, updateSim } from '../../store';
 import { artificeIcon, icon, pageHeader, toggleGroup } from '../components';
 import { html, type Html } from '../html';
 import { sideTabs, wikiFile } from './info';
-import { AUTO_CORES, type CombatIndex, CORES, EFFORTS, page, save, settings, teamKey, teamOf, type VideoStep, type Wiki } from './rotations/state';
+import { AUTO_CORES, type CombatIndex, CORES, EFFORTS, page, save, saveZoom, settings, teamKey, teamOf, TL_ZOOMS, type VideoStep, type Wiki } from './rotations/state';
 import { big, clockTime } from './rotations/text';
 import { loadBuffIcons } from './rotations/buffs';
-import { paintPlay, runPlay } from './rotations/player';
+import { paintPlay, runPlay, showPlayhead } from './rotations/player';
 import { CREDIT, resultsView } from './rotations/results';
 import { buildOf, editBuild, limitedWeapons, memberCard, optimalBuildOf, signatureWeapons, weaponsFor } from './rotations/builds';
 import { exportRun, historyView, importRun, isRecording, loadSaved, openRun, playDraft, run, runReplay, runsAside, stop, videoOf } from './rotations/runs';
@@ -146,11 +146,21 @@ export function simAction(action: string, el: HTMLElement): boolean {
       return true;
     case 'sim-seek': {
       if (!page.playBars) return false;
-      page.play.t = Math.max(0, Math.min(page.playBars.seconds, Number(v)));
+      page.play.t = Math.max(page.tlStart, Math.min(page.playBars.seconds, Number(v)));
       if (page.play.running) page.play.last = performance.now();
       paintPlay();
+      showPlayhead();
       document.querySelector('.sim-play')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       return false;
+    }
+    // The timeline's zoom: a step out or in, kept for this viewer, the playhead kept in view.
+    case 'sim-zoom': {
+      const k = TL_ZOOMS.indexOf(page.tlZoom) + Number(v);
+      if (k < 0 || k >= TL_ZOOMS.length) return false;
+      page.tlZoom = TL_ZOOMS[k];
+      saveZoom(page.tlZoom);
+      setTimeout(() => showPlayhead(true));
+      return true;
     }
     case 'sim-play':
       if (!page.playBars) return false;
@@ -261,7 +271,7 @@ document.addEventListener('input', (e) => {
   // The run's name field grows with its text (its box sizes to a copy of it).
   if (el?.dataset?.sim === 'runname' && el.parentElement) el.parentElement.dataset.value = el.value || el.placeholder;
   if (el?.dataset?.sim !== 'play-seek') return;
-  page.play.t = Math.max(0, Number(el.value) || 0);
+  page.play.t = Math.max(page.tlStart, Number(el.value) || 0);
   paintPlay();
 });
 
@@ -311,7 +321,7 @@ export function simChange(el: HTMLInputElement | HTMLSelectElement): boolean {
   }
   // The timeline player: where, how fast.
   else if (f === 'play-seek') {
-    page.play.t = Math.max(0, Number(el.value) || 0);
+    page.play.t = Math.max(page.tlStart, Number(el.value) || 0);
     paintPlay();
   } else if (f === 'play-speed') page.play.speed = Number(el.value) || 1;
   // A battle skill's SP gained (blank: unknown), as the game gives it (spGained: Tangtang's 0, 20, 40).

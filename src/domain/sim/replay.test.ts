@@ -203,3 +203,48 @@ describe('ultimate cut-ins', () => {
     expect(w.frame - runs[1].start - at[1]).toBeGreaterThanOrEqual(9);
   });
 });
+
+describe('Finishers', () => {
+  // The test operator with a power attack (landing on frame 20) and two buffs that map its next basic attack: a
+  // talent's (Yvonne's after her bomb) and an ultimate's closing attack.
+  const hit = (frame: number) => ({ _startFrame: frame, _endFrame: frame + 1, _sequenceActionData: { actionData: [bundle.skills.chr_test_attack1.actionGroupData.timelineActions[0]._sequenceActionData.actionData[0]] } });
+  const mapping = (skillId: string) => ({ lifeType: 'Limited', duration: { value: 15 }, buffEventAction: [{ buffEvent: 'DuringBuffEnable', actions: [{ actionData: [{ $type: `${T}.ComboCacheAction+Data, Gameplay.Beyond`, mappingDataList: [{ cmdType: 'Attack', skillId }] }] }] }] });
+  const fin: Bundle = {
+    ...bundle,
+    skills: {
+      ...bundle.skills,
+      chr_test_power_attack: { skillId: 'chr_test_power_attack', durationFrame: 45, actionGroupData: { timelineActions: [hit(20)] } },
+      chr_test_attack5: { skillId: 'chr_test_attack5', durationFrame: 30, actionGroupData: { timelineActions: [hit(10)] } },
+      chr_test_ult_attack_end: { skillId: 'chr_test_ult_attack_end', durationFrame: 30, actionGroupData: { timelineActions: [hit(10)] } },
+    },
+    buffs: { buff_talent: { id: 'buff_talent', ...mapping('chr_test_attack5') }, buff_ult_end: { id: 'buff_ult_end', ...mapping('chr_test_ult_attack_end') } },
+  };
+  const staggered = (buff: string) => {
+    const w = new World([fin], [stats]);
+    w.addBuff(w.team[0], buff, w.team[0], new Map());
+    w.enemy.bb.set('staggeredUntil', w.frame + 300);
+    w.enemy.bb.set('finisherReady', 1);
+    return w;
+  };
+  const firstStrike = (w: World) => {
+    expect(w.press(0, 'attack')).toBe(true);
+    for (let i = 0; i < 30 && !w.strikes.length; i++) w.tick();
+    return w.strikes[0];
+  };
+
+  it("comes before a talent's waiting attack, which stays for after it (Skydrummer video: Finisher 137.3, Final Strike 139.0)", () => {
+    const w = staggered('buff_talent');
+    expect(firstStrike(w)?.finisher).toBe(true);
+    expect(w.strikeWaiting(0)).toBe(true);
+  });
+
+  it("gives way to an ultimate's closing attack (Alleikhreos video: no Finisher in Yvonne's ultimate)", () => {
+    expect(firstStrike(staggered('buff_ult_end'))?.finisher).toBe(false);
+  });
+
+  it('is never made while the replay holds it (World.finishers: the video shows none)', () => {
+    const w = staggered('buff_talent');
+    w.finishers = false;
+    expect(firstStrike(w)?.finisher).toBe(false);
+  });
+});

@@ -530,6 +530,8 @@ export class World {
   strictCombos = true;
   /** Ultimates need their energy (false: a video's replay, which shows they were charged). */
   strictUltimates = true;
+  /** Finishers can be made (false: a video's replay where the video shows none by then). */
+  finishers = true;
   /** Stances are never ended early (Liino's End Stance isn't pressed). */
   keepStances = true;
   /**
@@ -3211,12 +3213,13 @@ export class World {
   private attack(slot: number): void {
     const op = this.team[slot];
     // The controlled operator's first attack on a Staggered enemy is a Finisher (its power attack), except in an
-    // ultimate form or with an attack a buff has waiting, which take the basic attack's place (the owner's video:
-    // Yvonne's ultimate on a Staggered Alleikhreos, twice, and no Finisher).
+    // ultimate form or with its closing attack waiting (the owner's video: Yvonne's ultimate on a Staggered
+    // Alleikhreos, twice, and no Finisher). Another attack a buff has waiting comes after the Finisher (Skydrummer
+    // video: her bomb at 131.6, the Finisher at 137.3, her talent's Final Strike at 139.0).
     const power = this.ownSkill(op, 'PowerAttack');
     const unseen = this.attacksUnseen(slot);
     const waiting = this.attackMapping(op);
-    const finisher = slot === this.controlled && !waiting && !!this.enemy.bb.get('finisherReady') && this.staggered(this.enemy) && this.skillOf.has(power) && !/_ult/.test(this.chainOf(op));
+    const finisher = this.finishers && slot === this.controlled && !unseen && !!this.enemy.bb.get('finisherReady') && this.staggered(this.enemy) && this.skillOf.has(power);
     const mapped = finisher ? null : waiting;
     if (mapped) mapped.buff.mapUsed = true;
     const id = finisher ? power : (mapped?.id ?? this.skillIdOf(op, 'attack'));

@@ -6,8 +6,8 @@ import { html, type Html } from '../../html';
 import { page, type VideoStep } from './state';
 import { big, clockTime, pct, secs, spText } from './text';
 import { dmgOf, formLength, formOf, simTrack, spOf, steps, type Track } from './track';
-import { buffRows } from './buffs';
-import { bossRow, playControls, player, preparePlay, spRow } from './player';
+import { buffRows, buffsPanel } from './buffs';
+import { bossRow, playControls, preparePlay, spRow } from './player';
 
 const foeIcon = (foe: (typeof ENEMIES)[number]) => `${EF_ASSETS_CDN}/icons/enemies/${foe.icon}.webp`;
 /**
@@ -22,19 +22,55 @@ export const foeFace = (foe: (typeof ENEMIES)[number], cls: string) => {
 /** The boss's short name: its entry's without the stage ("Skydrummer"). */
 const foeName = (foe: (typeof ENEMIES)[number]) => foe.name.replace(/\s*\(.*$/, '');
 
-function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], ids?: string[]): Html {
-  // With the operators' ids (a parsed run's), each lane is named by a small portrait, the buffs on them at the playhead
-  // beside it (paintBuffs), the enemy's by its lane: the timeline shows what's happening, so they're here.
+/** Seconds from the timeline's start (0, or a press cast before the stopwatch's 0) to its end. */
+const spanOf = (seconds: number) => seconds - page.tlStart;
+/** Where the timeline starts for these tracks: a whole second at least half a second before the earliest press. */
+export function startOf(...tracks: ({ presses: { frame: number }[]; strikes?: { frame: number }[] } | undefined)[]): number {
+  const first = Math.min(0, ...tracks.flatMap((t) => [...(t?.presses ?? []), ...(t?.strikes ?? [])].map((x) => x.frame)));
+  return first < 0 ? Math.floor(first / FPS - 0.5) : 0;
+}
+/** The fewest px a second gets on a phone (rotations.css --tl-pps: it scrolls sideways beyond it); a wider screen fits the fight. */
+const PHONE_PPS = 24;
+const PHONE = typeof matchMedia !== 'undefined' ? matchMedia('(max-width: 640px)') : null;
+const phone = () => !!PHONE?.matches;
+// Markers are spaced for the width they're drawn at: drawn again when the screen turns phone-sized or back.
+PHONE?.addEventListener('change', () => page.redrawPage());
+/** The track's width in px as rotations.css draws it (.sim-timeline), for spacing the markers. */
+function trackPx(seconds: number): number {
+  const shown = document.querySelector<HTMLElement>('.sim-tl-scroll')?.clientWidth ?? innerWidth - 120;
+  return Math.max(shown - LABEL - 16, spanOf(seconds) * (phone() ? PHONE_PPS : 0)) * page.tlZoom;
+}
+/** The lanes' name column (px): a portrait or a short name; wider with the buffs' rows, which are named. */
+const LABEL = 56;
+/** Each marker's tier in its lane: the second where it would overlap the last one on the first. */
+function tiers(frames: number[], pxPerFrame: number): number[] {
+  let last = -Infinity;
+  return frames.map((f) => {
+    if ((f - last) * pxPerFrame >= 20) {
+      last = f;
+      return 0;
+    }
+    return 1;
+  });
+}
+
+function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], ids?: string[], seek?: SimResult): Html {
+  // With the operators' ids (a parsed run's), each lane is named by a small portrait (the buffs at the playhead are in
+  // the panel under the timeline). Every row is on one clock (`at`), from the timeline's start to its end, in one
+  // area that scrolls sideways: the scrubber, the lanes, the axis and the playhead.
   const faces = !!ids?.length;
   const who = (name: string, slot: number) =>
     faces && ids![slot]
-      ? html`<span class="sim-lane-name sim-lane-who" title="${name}">${itemImg('char', ids![slot], 'sim-lane-face')}${buffs?.length ? html`<span class="sim-buffs-now lane" data-buffs-slot="${slot}" aria-label="${name}’s buffs"></span>` : ''}</span>`
+      ? html`<span class="sim-lane-name sim-lane-who" title="${name}">${itemImg('char', ids![slot], 'sim-lane-face')}</span>`
       : html`<span class="sim-lane-name label-12 ellipsis">${name}</span>`;
-  const end = r.seconds * FPS;
+  // On the player's clock (its result's length: the Sim view's runs on past the recording's).
+  const seconds = seek?.seconds ?? r.seconds;
+  const end = seconds * FPS;
+  const f0 = page.tlStart * FPS;
   // Who's controlled when: the swaps.
   const spans: { slot: number; from: number; to: number }[] = [];
   let cur = r.main;
-  let from = 0;
+  let from = f0;
   for (const p of r.presses)
     if (p.input === 'swap') {
       spans.push({ slot: cur, from, to: p.frame });
@@ -42,58 +78,59 @@ function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], id
       from = p.frame;
     }
   spans.push({ slot: cur, from, to: end });
-  const at = (f: number) => `${Math.min(100, (f / end) * 100).toFixed(2)}%`;
-  const ticks = Array.from({ length: Math.floor(r.seconds / 10) + 1 }, (_, k) => k * 10);
+  const at = (f: number) => `${Math.max(0, Math.min(100, ((f - f0) / (end - f0)) * 100)).toFixed(3)}%`;
+  const len = (f: number) => `${Math.max(0, Math.min(100, (f / (end - f0)) * 100)).toFixed(3)}%`;
+  const px = trackPx(seconds) / Math.max(1, end - f0);
+  const step = px * FPS >= 40 ? 5 : 10;
+  const ticks = Array.from({ length: Math.floor(seconds / step) + 1 }, (_, k) => k * step);
   // A parsed run's lane is named by the boss's picture in a red ring, as operators' by their portraits.
   const foe = faces ? page.laneFoe : undefined;
-  const foeWho = foe ? foeFace(foe, 'sim-lane-face sim-foe-face') : html`<span class="label-12">Enemy</span>`;
-  const enemyName = () =>
-    faces && buffs?.some((b) => b.slot < 0)
-      ? html`<span class="sim-lane-name sim-lane-who">${foeWho}<span class="sim-buffs-now lane" data-buffs-slot="-1" data-buffs-kind="other" aria-label="The enemy's debuffs"></span></span>`
-      : foe
-        ? html`<span class="sim-lane-name sim-lane-who">${foeWho}</span>`
-        : html`<span class="sim-lane-name label-12 ellipsis">Enemy</span>`;
-  return html`<div class="sim-timeline" role="img" aria-label="Actions over the fight">
-    ${names.map(
-      (name, slot) => html`<div class="sim-lane">
+  const enemyName = () => (foe ? html`<span class="sim-lane-name sim-lane-who">${foeFace(foe, 'sim-lane-face sim-foe-face')}</span>` : html`<span class="sim-lane-name label-12 ellipsis">Enemy</span>`);
+  const p = (page.play.t - page.tlStart) / spanOf(seconds);
+  return html`<div class="sim-tl-scroll"><div class="sim-timeline" role="img" aria-label="Actions over the fight" style="--tl-span:${spanOf(seconds).toFixed(2)};--tl-zoom:${page.tlZoom}">
+    <div class="sim-lane sim-seek-lane"><span class="sim-lane-name"></span><span class="sim-seek-wrap" style="--p:${p}"><span class="num label-12 sim-play-time" aria-hidden="true">${clockTime(page.play.t)}</span><input class="sim-play-seek" type="range" min="${page.tlStart}" max="${seconds}" step="any" value="${page.play.t}" data-sim="play-seek" aria-label="Time" style="--p:${p}" /></span></div>
+    ${names.map((name, slot) => {
+      const presses = r.presses.filter((x) => x.slot === slot && x.input !== 'swap');
+      const tier = tiers(presses.map((x) => x.frame), px);
+      return html`<div class="sim-lane${tier.some((k) => k > 0) ? ' two' : ''}">
         ${who(name, slot)}
         <span class="sim-lane-track">
-          ${spans.filter((s) => s.slot === slot).map((s) => html`<i class="sim-control" style="left:${at(s.from)};width:${at(s.to - s.from)}"></i>`)}
-          ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${at(f.end - f.frame)}" title="${secs(f.frame)} · Ultimate ${formLength(f)}"></i>`)}
-          ${r.presses
-            .filter((p) => p.slot === slot && p.input !== 'swap')
-            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}${formOf(r, p) ? ` ${formLength(formOf(r, p))}` : ''}${dmgOf(r.pressDmg, r.presses, p)}${spOf(r.pressSp, r.presses, p)}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : p.input === 'swap' ? 'S' : 'U'}</i>`)}
+          ${spans.filter((s) => s.slot === slot).map((s) => html`<i class="sim-control" style="left:${at(s.from)};width:${len(s.to - s.from)}"></i>`)}
+          ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${len(f.end - f.frame)}" title="${secs(f.frame)} · Ultimate ${formLength(f)}"></i>`)}
           ${r.strikes
             .filter((s) => s.slot === slot)
             .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" title="${secs(s.frame)} · ${s.finisher ? 'Finisher' : 'Final Strike'}${dmgOf(r.strikeDmg, r.strikes, s)}${spOf(r.strikeSp, r.strikes, s)}"></i>`)}
+          ${presses.map((x, k) => html`<i class="sim-press ${x.input}${tier[k] ? ' t1' : ''}" style="left:${at(x.frame)}" title="${secs(x.frame)} · ${INPUT_NAME[x.input]}${formOf(r, x) ? ` ${formLength(formOf(r, x))}` : ''}${dmgOf(r.pressDmg, r.presses, x)}${spOf(r.pressSp, r.presses, x)}">${x.input === 'battle' ? 'B' : x.input === 'combo' ? 'C' : x.input === 'dive' ? 'D' : 'U'}</i>`)}
         </span>
-      </div>${buffRows(buffs, slot, name, at)}`,
-    )}
+      </div>${buffRows(buffs, slot, name, at, len)}`;
+    })}
     ${r.dps.length && dpsMax > 0
       ? html`<div class="sim-lane">
           <span class="sim-lane-name label-12 ellipsis">Damage</span>
-          <span class="sim-lane-track sim-dmg">${r.dps.map((d, k) => (d > 0 ? html`<i style="left:${at(k * FPS)};width:${at(FPS)};height:${Math.max(4, Math.round((d / dpsMax) * 100))}%" title="${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')} · ${big(d)}"></i>` : ''))}</span>
+          <span class="sim-lane-track sim-dmg">${r.dps.map((d, k) => (d > 0 ? html`<i style="left:${at(k * FPS)};width:${len(FPS)};height:${Math.max(4, Math.round((d / dpsMax) * 100))}%" title="${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')} · ${big(d)}"></i>` : ''))}</span>
         </div>`
       : ''}
     ${r.staggers.length || r.mechanics.length || r.away.length || r.guard.length
       ? html`<div class="sim-lane">
           ${enemyName()}
-          <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · Invulnerable ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · No Stagger ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${at(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" title="${secs(m.frame)} · ${m.label}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
+          <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${len(b - a)}" title="${secs(a)} · Invulnerable ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${len(b - a)}" title="${secs(a)} · No Stagger ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${len(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" title="${secs(m.frame)} · ${m.label}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
         </div>`
       : faces || (page.fold.buffs && buffs?.some((b) => b.slot < 0))
         ? html`<div class="sim-lane">${enemyName()}<span class="sim-lane-track"></span></div>`
         : ''}
-    ${buffRows(buffs, -1, 'Enemy', at)}
-    <div class="sim-lane sim-axis"><span></span><span class="sim-lane-track">${ticks.map((t) => html`<span class="label-12 secondary" style="left:${at(t * FPS)}">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`)}</span></div>
+    ${buffRows(buffs, -1, 'Enemy', at, len)}
+    <div class="sim-lane sim-axis"><span class="sim-lane-name"></span><span class="sim-lane-track">${ticks.map((t) => html`<span class="label-12 secondary${t * FPS <= f0 ? ' first' : t === seconds ? ' last' : ''}" style="left:${at(t * FPS)}">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`)}</span></div>
     <i class="sim-playhead" aria-hidden="true"></i>
-  </div>`;
+  </div></div>`;
 }
 
-/** The sim's timeline with the player under it (a run that isn't a recording's: one timeline). */
+/** The sim's timeline with the player around it (a run that isn't a recording's: one timeline). */
 function timeline(r: SimResult, names: string[]): Html {
   const t = simTrack(r);
-  return html`${lanes(t, names, Math.max(...t.dps, 0))}${player(r)}`;
+  page.tlStart = startOf(t, r);
+  return html`${(preparePlay(r), '')}${playControls()}${lanes(t, names, Math.max(...t.dps, 0), undefined, undefined, r)}<div class="sim-player">${bossRow('Boss', 'sim')}</div>`;
 }
+
 export const foldButton = (what: keyof typeof page.fold, label: string, iconOnly = false) =>
   html`<button type="button" class="sim-fold-btn label-12 secondary" data-action="sim-fold" data-value="${what}" title="${page.fold[what] ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}" aria-label="${label}" aria-expanded="${page.fold[what] ? 'true' : 'false'}">${iconOnly ? '' : `${label} `}${icon(page.fold[what] ? 'visibility_off' : 'visibility')}</button>`;
 
@@ -137,14 +174,14 @@ export function resultsView(r: SimResult, names: string[], ids: string[], stale:
         </div>`,
       )}
     </div></section>`}
-    <section class="card"><div class="card-body sim-card${rec ? ' sim-faces' : ''}">
+    <section class="card"><div class="card-body sim-card${rec ? ' sim-faces' : ''}${rec && page.fold.buffs ? ' sim-buff-names' : ''}">
       ${rec ? '' : html`<div class="sim-fold-head"><h2 class="heading-16">Timeline</h2></div>`}
       ${r.order
         ? html`<p class="copy-14">Control ${names[r.main]}. Combo skills as they come up, ultimates when charged, and these battle skills in turn, over and over:</p>
             <ol class="sim-order copy-14">${r.order.map(([slot, input]) => html`<li>${names[slot]} · ${INPUT_NAME[input]}</li>`)}</ol>`
         : ''}
       ${shown
-        ? html`${(preparePlay(extra.timeline ?? r), '')}${playControls(extra.timeline ?? r, rec && (r as ReplayResult).buffs?.length ? html`<span class="sim-play-extra">${foldButton('buffs', 'Buffs', true)}</span>` : undefined)}${lanes(shown, names, extra.dpsMax ?? Math.max(...shown.dps, 0), (r as ReplayResult).buffs, rec ? ids : undefined)}${page.view === 'recording' ? html`${bossRow('', 'video')}${spRow('video')}` : html`${bossRow('', 'sim')}${spRow('sim')}`}`
+        ? html`${((page.tlStart = startOf(rec, extra.simTrack, extra.timeline ?? r)), preparePlay(extra.timeline ?? r), '')}${playControls(rec && (r as ReplayResult).buffs?.length ? html`<span class="sim-play-extra">${foldButton('buffs', 'Buffs', true)}</span>` : undefined)}${lanes(shown, names, extra.dpsMax ?? Math.max(...shown.dps, 0), (r as ReplayResult).buffs, rec ? ids : undefined, extra.timeline ?? r)}${page.view === 'recording' ? html`${bossRow('', 'video')}${spRow('video')}` : html`${bossRow('', 'sim')}${spRow('sim')}`}${rec ? buffsPanel((r as ReplayResult).buffs, [...names.map((name, slot) => ({ slot, name, face: itemImg('char', ids[slot], 'sim-lane-face') })), { slot: -1, name: page.laneFoe ? foeName(page.laneFoe) : 'Enemy', face: page.laneFoe ? foeFace(page.laneFoe, 'sim-lane-face sim-foe-face') : html`<span class="label-12">Enemy</span>` }]) : ''}`
         : timeline(r, names)}
       ${rec && page.view !== 'sim' ? '' : (extra.underTimeline ?? '')}
       ${extra.editor

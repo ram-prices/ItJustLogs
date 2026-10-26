@@ -486,16 +486,53 @@ input.sim-run-value-edit {
   margin: 0;
   padding-left: 20px;
 }
+/*
+ * The timeline: every row on one clock, in an area that scrolls sideways. Its width is the fight's seconds at a least
+ * px per second (--tl-pps: a phone's; 0 fits the card) times the zoom, and the card's width at least; the names stay
+ * put at the left (sticky) over the rows scrolling under them.
+ */
+.sim-tl-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
 .sim-timeline {
+  --tl-pps: 0px;
+  --tl-zoom: 1;
+  --tl-span: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  box-sizing: border-box;
+  /* Room for the scrubber's thumb past the track's end. */
+  padding-right: 8px;
+  width: max(100%, calc(var(--lane-label, 96px) + 16px + max(100% - var(--lane-label, 96px) - 16px, var(--tl-span) * var(--tl-pps)) * var(--tl-zoom)));
 }
 .sim-lane {
   display: grid;
-  grid-template-columns: var(--lane-label, 96px) 1fr;
+  grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+  padding: 3px 0;
+}
+/* A lane's name covers its row's height and the gap after it, so what scrolls under it doesn't show. */
+.sim-tl-scroll .sim-lane > .sim-lane-name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  align-self: stretch;
+  align-content: center;
+  margin: -3px 0;
+  padding: 3px 0;
+  background: var(--background-100);
+  box-shadow: 8px 0 0 var(--background-100);
+}
+/* Markers that would overlap go to a second tier: such a lane is taller, always (its height never changes). */
+.sim-lane.two .sim-lane-track {
+  height: 44px;
+}
+.sim-press.t1 {
+  top: 23px;
 }
 .sim-lane-track {
   position: relative;
@@ -510,20 +547,33 @@ input.sim-run-value-edit {
 .sim-axis .sim-lane-track > span {
   position: absolute;
   transform: translateX(-50%);
+  white-space: nowrap;
 }
-/* The timeline playing: a line across the lanes, the controls and the boss's bars under it. */
+/* The first and last times inside the track, not half under the names. */
+.sim-axis .sim-lane-track > span.first {
+  transform: none;
+}
+.sim-axis .sim-lane-track > span.last {
+  transform: translateX(-100%);
+}
+/* The timeline playing: a line across the lanes from under the scrubber to the axis, at --p of the track. */
 .sim-timeline {
   position: relative;
 }
 .sim-playhead {
   position: absolute;
-  top: 0;
+  top: 44px;
   bottom: 22px;
-  left: calc(var(--lane-label, 96px) + 8px);
+  left: calc(var(--lane-label, 96px) + 8px + (100% - var(--lane-label, 96px) - 16px) * var(--p, 0));
+  z-index: 2;
   width: 2px;
   margin-left: -1px;
   background: var(--gray-1000);
   pointer-events: none;
+}
+/* The scrubber: the timeline's first row, across exactly its track; its time in a tip above. */
+.sim-seek-lane {
+  padding-top: 21px;
 }
 .sim-player {
   display: flex;
@@ -531,17 +581,14 @@ input.sim-run-value-edit {
   gap: 10px;
   padding: 8px 4px 4px;
 }
-/* The same columns as a lane (.sim-lane): play and time in the label's 96px, the scrubber across the track. */
+/* Play, speed, zoom (and a parsed run's Buffs toggle) over the timeline. */
 .sim-play {
-  display: grid;
-  grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
-  gap: 8px;
+  display: flex;
   align-items: center;
-  /* Room for the time's tip above the scrubber. */
-  padding-top: 16px;
 }
 .sim-play-left {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -635,6 +682,7 @@ input.sim-run-value-edit {
 .sim-boss-row {
   display: grid;
   grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
+  padding-right: 8px;
   grid-template-rows: 10px 4px;
   column-gap: 8px;
   row-gap: 3px;
@@ -654,6 +702,7 @@ input.sim-run-value-edit {
 .sim-sp-row {
   display: grid;
   grid-template-columns: var(--lane-label, 96px) minmax(0, 1fr);
+  padding-right: 8px;
   column-gap: 8px;
   align-items: center;
   margin-top: 6px;
@@ -865,9 +914,57 @@ input.sim-run-value-edit {
   font-size: 11px;
   color: var(--gray-900);
 }
-/* A parsed run's timeline: its lanes named by small portraits with the buffs at the playhead beside them. */
+/* A parsed run's timeline: its lanes named by small portraits; with the buffs' rows, by their names too. */
 .sim-faces {
-  --lane-label: 176px;
+  --lane-label: 56px;
+}
+.sim-faces.sim-buff-names {
+  --lane-label: 140px;
+}
+/* Under the timeline, the buffs at the playhead: a row each, its chips on one line that scrolls sideways. */
+.sim-buffs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+}
+.sim-buffs-panel > p {
+  margin: 0;
+}
+.sim-buffs-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 2ch;
+  gap: 10px;
+  align-items: center;
+  height: 32px;
+}
+.sim-buffs-who {
+  display: flex;
+}
+.sim-buffs-row > .sim-buffs-now {
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 32px;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.sim-buffs-row .sim-buff-chip {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+}
+.sim-buffs-count {
+  text-align: right;
+}
+.sim-buffs-tip {
+  min-height: 16px;
+  color: var(--gray-900);
 }
 .sim-lane-who {
   display: flex;
@@ -1502,8 +1599,47 @@ input.sim-run-value-edit {
   .sim-share {
     grid-template-columns: 28px minmax(60px, 120px) 1fr 52px;
   }
-  .sim-lane {
-    grid-template-columns: 64px 1fr;
+  .sim-card {
+    --lane-label: 64px;
+  }
+  /* A phone's timeline gets at least 24 px a second (results.ts PHONE_PPS) and scrolls sideways. */
+  .sim-timeline {
+    --tl-pps: 24px;
+  }
+  .sim-card.sim-faces {
+    --lane-label: 56px;
+  }
+  .sim-card.sim-faces.sim-buff-names {
+    --lane-label: 96px;
+  }
+  .sim-buffs-panel {
+    padding: 10px 12px;
+  }
+  /* The transcript: its toggle under it, and each line on two (the numbers on the second), at a fixed height. */
+  .sim-moves-wrap {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sim-moves {
+    grid-template-columns: 16px 56px max-content 8px max-content max-content minmax(0, 1fr);
+    column-gap: 6px;
+  }
+  .sim-moves li {
+    grid-template-rows: 20px 20px;
+  }
+  .sim-moves li > :nth-child(8) {
+    grid-area: 2 / 2;
+    justify-self: start;
+  }
+  .sim-moves li > :nth-child(9) {
+    grid-area: 2 / 3;
+    justify-self: start;
+  }
+  .sim-moves li > :nth-child(10) {
+    grid-area: 2 / 4 / 3 / 6;
+  }
+  .sim-moves li > :nth-child(11) {
+    grid-area: 2 / 6 / 3 / 8;
+    justify-self: end;
   }
 }
 .sim-pots {

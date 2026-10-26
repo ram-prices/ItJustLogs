@@ -28,6 +28,25 @@ export const AUTO_CORES = Math.max(1, CORES - 1);
 /** A parsed run's transcript step (ui/rotationReader.ts). */
 export type VideoStep = VideoRotation['steps'][number];
 
+/** The timeline's zoom steps (1: its own width, or the phone's minimum px per second). */
+export const TL_ZOOMS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+const ZOOM_KEY = 'ijl.timelineZoom';
+function readZoom(): number {
+  try {
+    const z = Number(localStorage.getItem(ZOOM_KEY));
+    return TL_ZOOMS.includes(z) ? z : 1;
+  } catch {
+    return 1;
+  }
+}
+export function saveZoom(z: number): void {
+  try {
+    localStorage.setItem(ZOOM_KEY, String(z));
+  } catch {
+    // Kept for this visit only.
+  }
+}
+
 /**
  * The page's state, all of it in one object: the search and what it last gave, the saved runs, the Parser's open run
  * and its editor, the timeline player, and what the page drew with. (One object, so the page's modules can share it.)
@@ -85,6 +104,12 @@ interface PageState {
   play: { t: number; speed: number; running: boolean; of: SimResult | null; raf: number; last: number };
   /** The player's bars, plus the boss's Stagger nodes (shares of its meter) and where its later phases begin (seconds). */
   playBars: { sim: Bars; video?: Bars; seconds: number; nodes: number[]; phases: number[]; sp: { sim?: [number, number][]; video?: [number, number][] }; spMax?: number; spRegen?: number; buffs?: BuffSpan[]; controlled?: { slot: number; from: number; to: number }[] } | null;
+  /** Where the timeline starts (seconds, 0 or before: a press cast before the stopwatch's 0). */
+  tlStart: number;
+  /** The timeline's zoom (TL_ZOOMS), this viewer's (localStorage). */
+  tlZoom: number;
+  /** A buff tapped in the buffs panel: its name and stacks, shown under it. */
+  buffTip: string;
   /** What's shown under the timeline: the discrepancies list, the buffs, the full transcript. */
   fold: { video: boolean; checks: boolean; buffs: boolean; moves: boolean };
   /**
@@ -148,6 +173,9 @@ export const page: PageState = {
   play: { t: 0, speed: 4, running: false, of: null, raf: 0, last: 0 },
   playBars: null,
   fold: { video: true, checks: true, buffs: false, moves: false },
+  tlStart: 0,
+  tlZoom: readZoom(),
+  buffTip: '',
   barShown: new Map(),
   barTarget: null,
   barRaf: 0,
