@@ -57,7 +57,7 @@ const BATTLE_COST = 100;
  * pixel-sized read (a 101 or 102) takes the sim's amount for the same action (or a battle skill's usual cost when the
  * sim has none and the read is near it); the bar after it is then the bar read just before plus that amount.
  */
-function withExactSp(track: Track, sim: Track): Track {
+function withExactSp(track: Track, sim: Track, spMax: number): Track {
   if (!sim.pressSp) return track;
   const m = matchActions(track, sim);
   // A reading without the SP bar (read before it was, or elsewhere): each action's amount from the sim's same action,
@@ -76,13 +76,13 @@ function withExactSp(track: Track, sim: Track): Track {
       if (t) return t;
       return usual !== undefined && Math.abs(x - usual) <= 15 ? usual : x;
     });
-    const spAfter = after?.map((a, i) => (a === undefined || read[i] === undefined || sp[i] === undefined ? a : Math.max(0, Math.min(300, Math.round(a - read[i]! + sp[i]!)))));
+    const spAfter = after?.map((a, i) => (a === undefined || read[i] === undefined || sp[i] === undefined ? a : Math.max(0, Math.min(spMax, Math.round(a - read[i]! + sp[i]!)))));
     return { sp, spAfter };
   };
   // A press's usual amount by kind: only a battle skill's is known without the sim.
   const presses = exact(track.pressSp, track.pressSpAfter, sim.pressSp, m.presses, undefined);
   const battle = track.presses.map((p, i) => (p.input === 'battle' && presses.sp[i] !== undefined && presses.sp[i] === track.pressSp![i] && Math.abs(track.pressSp![i]! + BATTLE_COST) <= 15 ? -BATTLE_COST : presses.sp[i]));
-  const spAfterP = presses.spAfter?.map((a, i) => (a === undefined || battle[i] === presses.sp[i] ? a : Math.max(0, Math.min(300, Math.round(a - presses.sp[i]! + battle[i]!)))));
+  const spAfterP = presses.spAfter?.map((a, i) => (a === undefined || battle[i] === presses.sp[i] ? a : Math.max(0, Math.min(spMax, Math.round(a - presses.sp[i]! + battle[i]!)))));
   const strikes = exact(track.strikeSp ?? [], track.strikeSpAfter, sim.strikeSp, m.strikes);
   return { ...track, pressSp: battle, pressSpAfter: spAfterP, strikeSp: strikes.sp, strikeSpAfter: strikes.spAfter };
 }
@@ -137,7 +137,7 @@ function fitRecording(r: NonNullable<typeof page.replay>): RecordingCard {
     }
   }
   const recF = forms.length ? { ...rec, forms } : rec;
-  const recWith = withExactSp(ad ? withDamage(recF, sim, press, strike, false) : recF, simWith);
+  const recWith = withExactSp(ad ? withDamage(recF, sim, press, strike, false) : recF, simWith, enemy?.sp?.max ?? 300);
   return { recording: recWith, simTrack: simWith, dpsMax: Math.max(...rec.dps, ...sim.dps, 0), unattributed: fit.unattributed, afterKill: fit.afterKill, shown: fit.result, live };
 }
 

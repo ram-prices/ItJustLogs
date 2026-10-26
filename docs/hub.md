@@ -29,33 +29,25 @@ Name the area's doc (`docs/rotations.md`, `docs/ui.md`, `docs/sync.md`, `docs/ta
 when behaviour changes, and a short report (the hub forwards it). Workers use the test dev server
 on 5175 or 5176, never 5173/5174 (real data).
 
-## State at handoff (2026-10-25)
+## State (2026-10-25)
 
-- Live: eb7cd4a (CLAUDE.md split into docs/, scratch tests ignored). Earlier site changes: 41db3bf.
-- Local and not committed:
-  - the styles split (`src/styles.css` now imports `src/styles/*.css`; built CSS identical),
-  - CLAUDE.md "Deploying" section, this file, `docs/ui.md` styles note, the DPS handoff section at
-    the end of `docs/rotations.md`,
-  - an icon move by another session: `public/icons/` deleted (gear slot icons, `poise-node.png`,
-    `arsenal.svg`, `oroberyl.webp`), now loaded from ef-assets via jsDelivr, with edits in
-    `src/ui/components.ts`, `src/ui/pages/rotations.ts`, `src/ui/pages/stats.ts`. Before the first
-    deploy: check which session made it, that it's finished, and that every icon renders on the
-    test server (Oroberyl, Arsenal tab icon, gear slots, Stagger node).
-  - more changes from sessions running after this file was written: `src/domain/sim/engine.ts`,
-    `team.ts`, `src/store.ts`, `src/ui/sync.ts`, and a new `src/ui/pages/rotations/` folder (a
-    rotations.ts split under way?). Find out which sessions made them and whether they're finished
-    before deploying any of it.
-- Sessions still open: "[IJL] DPS Sim" (handoff written, archive once idle) and "[IJL] Android
-  Development" (idle; archive). Both can be archived from the sidebar.
+- Live: 2948d26: styles split, icons from ef-assets (all six checked on both mirrors),
+  `ui/pages/rotations.ts` split into `ui/pages/rotations/` (page state is `page.<field>` in
+  `rotations/state.ts`; keep the one-way import order), and `Enemy.sp` (a stage's own SP
+  start/cap/regen; the SP bar draws a segment per 100).
+- Local: only this file's update.
+- Sessions to archive: "[IJL] DPS Sim", "[IJL] Android Development", "Refactor rotations.ts module
+  state", "Pre-deploy icon check", "Gear slot and poise-node icons migration".
 
 ## Next tasks (one worker each, in order)
 
-1. Deploy the local changes above (after the icon check).
-2. Sim: the Skydrummer's late Stagger at 1:02 (`docs/rotations.md`, current state section).
-3. Sim: the second Skydrummer Finisher lands 0.8 s late.
-4. Refactor: split `ui/pages/rotations.ts`, gathering its ~36 module-level `let`s into one state
-   module first; no behaviour change.
-5. Sim: rule tests that run for every operator.
+1. Sim: the Skydrummer's late Stagger at 1:02 (`docs/rotations.md`, current state section).
+2. Sim: the second Skydrummer Finisher lands 0.8 s late.
+3. Sim: rule tests that run for every operator.
+4. Sim: a Glaiver File / YSTF Captain Blightshade entry in `ENEMIES` with its `sp` (~620 of 700,
+   ~4/s, holds during combo banners); parsed runs stand in the training dummy for now.
+5. Rotations page: the "SP at the start" field still caps at 300; follow the stage's `spMax`.
+6. Open: Last Rite's battle skill gave 17–27 SP in footage vs the sim's 30 (check, don't tune).
 
 Reading a recording: start a worker with "/parse-recording <path>" (a personal skill; it follows
 `tools/ai-parser/README.md`). It can run alongside a Rotations worker: it only touches `tools/ai-parser/`.

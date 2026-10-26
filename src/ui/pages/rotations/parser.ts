@@ -1,6 +1,6 @@
 import { type Enemy, FPS } from '../../../domain/sim/engine';
 import { compareWithVideo } from '../../../domain/sim/videoCheck';
-import { enemyById, enemySeen, INPUT_NAME, type ReplayResult, type SimRequest, type SimResult, type SimSettings, spGained } from '../../../domain/sim/team';
+import { enemyById, enemySeen, knownEnemy, INPUT_NAME, type ReplayResult, type SimRequest, type SimResult, type SimSettings, spGained } from '../../../domain/sim/team';
 import { type SavedSim, saveSimVideo } from '../../../store';
 import { icon, itemImg, toggleGroup } from '../../components';
 import { itemIconUrl } from '../../../domain/banners';
@@ -228,9 +228,10 @@ export function parseView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw
   const open = page.replay?.at === undefined ? undefined : page.runs.find((x) => x.at === page.replay!.at);
   const v = page.video ?? (open && videoOf(open)) ?? page.lastVideo;
   const idOf = new Map(pickable(wiki, index, []).map((id) => [wiki.ops[id].name, id]));
-  // The boss bar's name.
+  // The boss bar's name; an open run's own enemy when it's one of ENEMIES (the bar doesn't name the difficulty).
   const seen = v?.enemy;
-  const foe = enemySeen(seen);
+  const asked = open && (JSON.parse(open.key) as { enemy?: string | Enemy }).enemy;
+  const foe = (typeof asked === 'object' ? knownEnemy(asked) : undefined) ?? enemySeen(seen);
   page.laneFoe = foe;
   const ops = v ? v.names.map((n) => idOf.get(n)) : [];
   // A new reading's food is what was picked before simulating it.

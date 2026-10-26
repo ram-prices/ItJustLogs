@@ -268,6 +268,38 @@ export const SKYDRUMMER: Enemy = {
  */
 export const SKYDRUMMER_HP = { brutal: 3_962_146, hard: 2_196_709, normal: 1_069_218 };
 
+/**
+ * YSTF Captain Blightshade in Echoes of War's "Glaiver File: Yinglung" (eny_0124_kltdcap_tower016: DungeonTable
+ * indie_battletower016, _s, _ex), from EnemyAttributeTemplateTable (eny_0124_kltdcap) and the stage's spawners
+ * (SpawnerConfig sc_indie_tower001_43000030003/04/05): DEF 100, Resistance 20 Physical and 35 Electric (none to the
+ * rest), a 340 Stagger meter (the template's 320 + buff_common_maxpoiseadd's 20 at birth) with a node at half, 9 s
+ * Staggered, Finishers ×1.5 and 50 SP, one phase. Its interrupt buff (buff_eny_0124_kltdcap_interrupt) gives
+ * poise_value 20. Not simulated: its fake death (buff_eny_0124_kltdcap_fakedead: heals back to full and refills the
+ * meter), which the 31 s recording doesn't show.
+ */
+export const BLIGHTSHADE: Enemy = {
+  // Echoes of War: no food, a start button before the fight.
+  food: false,
+  prep: true,
+  def: 100,
+  resist: { Physical: 20, Pulse: 35 },
+  poise: 340,
+  staggerSeconds: 9,
+  finisherSp: 50,
+  finisherMul: 1.5,
+  nodes: [0.5],
+  nodeBuff: 'buff_common_mini_poise_break',
+  interrupt: { stagger: 20 },
+  // The stage (DungeonTable paramList): SP starts at and caps at atb_max 700, and every SP gain and regeneration is
+  // halved (get_atb_reduce -0.5): 4 a second, half of each Final Strike, Finisher and return.
+  sp: { start: 700, max: 700, regen: 4, gain: 0.5 },
+};
+/**
+ * Each difficulty's HP: the template's at its level (60/75/90) × 5.5, as the spawners give it buff_common_maxhpup at
+ * birth with ratio 4.5 (a MaxHp Multiplier, +450%).
+ */
+export const BLIGHTSHADE_HP = { brutal: 4_539_959, hard: 2_517_064, normal: 1_225_142 };
+
 /** The enemies a fight can be against: the name shown, its numbers, its HP for an HP goal, and how a video names it. */
 /**
  * The enemies the sim has; `icon` is the game's template id, its picture ef-assets icons/enemies/<icon>.webp, and `face`
@@ -280,8 +312,19 @@ export const ENEMIES: { id: string; name: string; enemy: Enemy; hp: number; seen
   { id: 'skydrummer', name: 'Skydrummer (Echoes of War, Brutal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.brutal }, hp: SKYDRUMMER_HP.brutal, seen: /skydrummer/i, icon: 'eny_0082_hsbear', face: [0.21, 0.52, 2.4] },
   { id: 'skydrummer-hard', name: 'Skydrummer (Echoes of War, Hard)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.hard }, hp: SKYDRUMMER_HP.hard, seen: /skydrummer.*hard/i, icon: 'eny_0082_hsbear', face: [0.21, 0.52, 2.4] },
   { id: 'skydrummer-normal', name: 'Skydrummer (Echoes of War, Normal)', enemy: { ...SKYDRUMMER, phaseHp: SKYDRUMMER_HP.normal }, hp: SKYDRUMMER_HP.normal, seen: /skydrummer.*normal/i, icon: 'eny_0082_hsbear', face: [0.21, 0.52, 2.4] },
+  { id: 'blightshade', name: 'YSTF Captain Blightshade (Echoes of War, Brutal)', enemy: { ...BLIGHTSHADE, phaseHp: BLIGHTSHADE_HP.brutal }, hp: BLIGHTSHADE_HP.brutal, seen: /captain blightshade/i, icon: 'eny_0124_kltdcap', face: [0.47, 0.2, 2.6] },
+  { id: 'blightshade-hard', name: 'YSTF Captain Blightshade (Echoes of War, Hard)', enemy: { ...BLIGHTSHADE, phaseHp: BLIGHTSHADE_HP.hard }, hp: BLIGHTSHADE_HP.hard, seen: /captain blightshade.*hard/i, icon: 'eny_0124_kltdcap', face: [0.47, 0.2, 2.6] },
+  { id: 'blightshade-normal', name: 'YSTF Captain Blightshade (Echoes of War, Normal)', enemy: { ...BLIGHTSHADE, phaseHp: BLIGHTSHADE_HP.normal }, hp: BLIGHTSHADE_HP.normal, seen: /captain blightshade.*normal/i, icon: 'eny_0124_kltdcap', face: [0.47, 0.2, 2.6] },
 ];
 export const enemyById = (id?: string) => ENEMIES.find((e) => e.id === id) ?? ENEMIES[0];
+/**
+ * The entry a request's saved enemy is, its stage's SP rules aside (a run saved before they changed still names the
+ * same boss), so a replay plays today's rules.
+ */
+export const knownEnemy = (e: Enemy) => {
+  const bare = (x: Enemy) => JSON.stringify({ ...x, sp: undefined });
+  return ENEMIES.find((x) => bare(x.enemy) === bare(e));
+};
 /** The enemy a video's boss bar names, if it's one the sim has. */
 export const enemySeen = (name?: string) => (name ? ENEMIES.find((e) => e.seen.test(name)) : undefined);
 
@@ -373,7 +416,7 @@ export const teamOf = (req: SimRequest, data: SimData): Team =>
       // An operator picked to be controlled stays so: no swaps.
       rules: req.main != null ? { ...STYLE_RULES[styleOf(req.style)], swaps: false } : STYLE_RULES[styleOf(req.style)],
       ...(req.main != null ? { main: req.main } : {}),
-      ...(req.enemy ? { enemy: req.enemy } : {}),
+      ...(req.enemy ? { enemy: knownEnemy(req.enemy)?.enemy ?? req.enemy } : {}),
       ...(req.uptime != null && req.uptime < 1 ? { uptime: req.uptime } : {}),
     },
     data,
@@ -524,7 +567,8 @@ function summary(f: Fight, req: SimRequest, start: number): SimResult {
 export interface ReplayStep {
   t: number;
   slot: number;
-  input: 'battle' | 'combo' | 'ultimate' | 'strike' | 'finisher' | 'dive';
+  /** `swap`: the player took control of the operator (who then makes no Final Strike the transcript shows). */
+  input: 'battle' | 'combo' | 'ultimate' | 'strike' | 'finisher' | 'dive' | 'swap';
   /** It interrupted the enemy's attack (Enemy.interrupt). */
   interrupt?: boolean;
   /** A battle skill: the SP it gave back in the recording (what it reached: Tangtang's Whirlpools, 20 each). */
@@ -586,7 +630,23 @@ export interface ReplayResult extends SimResult {
    * Strikes, Staggers, its track (as `track`: damage so far, meter) and SP (as `spTrack`). The Sim view's timeline
    * runs on through it.
    */
-  runOn?: { presses: Press[]; strikes: Strike[]; staggers: Stagger[]; track: [number, number, number][]; sp: [number, number][]; lastEnd?: number; freezes?: [number, number][]; staggerLeft?: [number, number][] };
+  runOn?: {
+    presses: Press[];
+    strikes: Strike[];
+    staggers: Stagger[];
+    track: [number, number, number][];
+    sp: [number, number][];
+    lastEnd?: number;
+    freezes?: [number, number][];
+    staggerLeft?: [number, number][];
+    /** Each press's and strike's damage (the sim's own: no recording to fit) and SP change and bar after, as actionSp. */
+    pressDmg?: number[];
+    strikeDmg?: number[];
+    pressSp?: number[];
+    strikeSp?: number[];
+    pressSpAfter?: number[];
+    strikeSpAfter?: number[];
+  };
   /** Where the fight's clock stood still for a cut-in (seconds on the fight's clock): no Stagger time passed. */
   freezes?: [number, number][];
   /** The Staggered meter's fill while Staggered, with the bars: [seconds on the fight's clock, 0–1] (World.staggerLeft). */
@@ -638,6 +698,19 @@ const QUICK_STRIKE = 0.5;
 /** How late (seconds) a video's press may be made before it counts as missed. */
 const REPLAY_SLACK = 2;
 
+/** Frames an operator's basic attacks take to land their Final Strike from `w` (a copy plays them), at a Haste rate. */
+export function chainFrames(w: World, slot: number, haste = 0): number {
+  const c = w.clone();
+  c.controlled = slot;
+  if (haste) c.team[slot].haste = [{ kind: 'Spell', rate: haste, until: Infinity, key: 'chain' }];
+  const from = c.frame;
+  while (!c.strikes.length && c.frame - from < 10 * FPS) {
+    c.press(slot, 'attack');
+    c.tick();
+  }
+  return c.frame - from;
+}
+
 /**
  * A gameplay video's rotation played in the sim, so its damage and DPS can be worked out: each press at its time (or
  * as soon after as it can be, within REPLAY_SLACK), the operator who lands each Final Strike or Finisher controlled
@@ -685,16 +758,17 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   const firstHit = order.find((x) => x.input === 'strike' || x.input === 'finisher');
   w.controlled = firstHit?.slot ?? 0;
   const clock = () => w.frame + w.frozenFrames;
-  // How long each operator's basic attacks take to reach their Final Strike.
-  const chain = w.team.map((_, slot) => {
-    const c = w.clone();
-    c.controlled = slot;
-    while (!c.strikes.length && c.frame < 10 * FPS) {
-      c.press(slot, 'attack');
-      c.tick();
-    }
-    return c.frame;
-  });
+  // How long each operator's basic attacks take to reach their Final Strike, at a Haste (SpeedupAction: Tangtang's
+  // combo buff takes Yvonne's from 95 frames to 80), measured from the fight's start once per rate.
+  const fresh = w.clone();
+  const chains = new Map<string, number>();
+  const chainAt = (slot: number, haste = 0): number => {
+    const key = `${slot}|${haste}`;
+    let n = chains.get(key);
+    if (n === undefined) chains.set(key, (n = chainFrames(fresh, slot, haste)));
+    return n;
+  };
+  const chain = w.team.map((_, slot) => chainAt(slot));
   // The presses to make, and a swap before each Final Strike or Finisher by someone not controlled then. Basic attacks
   // go on only while the sim has landed fewer Final Strikes than the video by then (the player attacks only so much:
   // dodging, moving, waiting), so it never gets ahead of the recording; and always for what the video's SP bar can't
@@ -707,6 +781,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   // ultimate cut-ins stop it while the video's clock runs on (Arcane's before 0:23.9 in the owner's video).
   const shown: number[] = [];
   const shownAt: number[] = [];
+  const shownBy: number[] = [];
   let who = w.controlled;
   let prev = 0;
   for (const x of order) {
@@ -731,7 +806,12 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
         }
         shown.push(from);
         shownAt.push(at);
+        shownBy.push(x.slot);
       }
+    } else if (x.input === 'swap') {
+      // Control taken where the recording shows it (Last Rite's battle skill then goes on her own weapon).
+      if (x.slot !== who) todo.push({ at, slot: x.slot, input: 'swap' });
+      who = x.slot;
     } else if (x.input === 'dive') {
       // A dive is the controlled operator's: someone else's needs a swap first.
       if (x.slot !== who) todo.push({ at: Math.max(prev, at - FPS), slot: x.slot, input: 'swap' });
@@ -760,6 +840,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   const clockAt: number[] = [];
   const toClock = (frame: number) => game(clockAt[frame] ?? frame + w.frozenFrames);
   let k = 0;
+  const waiting: number[] = [];
   // A pause is a phase change: the fight goes on with the SP it starts with (the owner's Alleikhreos video: 64 SP
   // before the black screen, 200 after; a refill, assumed: never down).
   let resumed = 0;
@@ -837,26 +918,39 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
       resumed++;
     }
     let pressed = false;
-    while (k < todo.length && todo[k].at <= clock()) {
-      const p = todo[k];
+    // Each due press, in order per operator: one that can't be made yet (a combo still on cooldown) holds up only its
+    // own operator's later presses, not a teammate's (Arcane's second combo waiting must not hold Last Rite's).
+    while (k < todo.length && todo[k].at <= clock()) waiting.push(k++);
+    const held = new Set<number>();
+    for (const i of [...waiting]) {
+      const p = todo[i];
+      if (held.has(p.slot)) continue;
       if (p.reach !== undefined) w.reachOnly(p.slot, p.reach);
       const spBefore = w.sp;
       if (w.press(p.slot, p.input)) {
         if (p.interrupt) w.interrupt(p.slot);
-        presses.push({ frame: game(clock()), slot: p.slot, input: p.input, at: game(clock()) });
+        // A press before the stopwatch's 0 (cast as the stage starts) is made at 0:00 but shown at its own time.
+        const when = p.at < 0 ? p.at : game(clock());
+        presses.push({ frame: when, slot: p.slot, input: p.input, at: when });
         pressSp.push(w.sp - spBefore);
         pressAfter.push(w.sp);
         pendingSp = { i: pressSp.length - 1, before: spBefore };
         pressed = true;
-        k++;
+        waiting.splice(waiting.indexOf(i), 1);
       } else if (clock() - p.at > REPLAY_SLACK * FPS) {
         missed.push({ t: game(p.at) / FPS, slot: p.slot, input: p.input });
-        k++;
-      } else break;
+        waiting.splice(waiting.indexOf(i), 1);
+      } else held.add(p.slot);
     }
     // An attack a buff has waiting (Yvonne's talent: the Final Strike at once) goes just before the video's.
     const quick = w.strikeWaiting(w.controlled);
-    const due = shown.filter((from, k) => (quick ? shownAt[k] - QUICK_STRIKE * FPS : from) <= clock()).length;
+    // A chain started under Haste reaches its Final Strike sooner: it starts that much later (a Haste ending first
+    // gains it only its rate × the frames it has left).
+    const sooner = w.team.map((e, slot) => {
+      const haste = w.hasteOf(e);
+      return haste ? Math.min(chain[slot] - chainAt(slot, haste), Math.round(haste * w.hasteLeft(e))) : 0;
+    });
+    const due = shown.filter((from, k) => (quick ? shownAt[k] - QUICK_STRIKE * FPS : from + sooner[shownBy[k]]) <= clock()).length;
     const unseen = w.attacksUnseen(w.controlled);
     // A Finisher only when the video shows one by about now (its SP refill: the parser reads them).
     const finisher = w.finisherWaiting() && w.strikes.filter((x) => x.finisher).length < finishers.filter((at) => at <= clock() + FPS).length;
@@ -886,6 +980,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     for (const x of w.strikes.slice(before)) if (x.unseen || w.attacksUnseen(x.slot)) free++;
   }
   const { at: clear, runOn } = clearOn(w, team.enemy?.phaseHp ?? team.hp, pauses, clockAt, end, game);
+  for (const i of waiting) missed.push({ t: game(todo[i].at) / FPS, slot: todo[i].slot, input: todo[i].input });
   for (; k < todo.length; k++) missed.push({ t: game(todo[k].at) / FPS, slot: todo[k].slot, input: todo[k].input });
   // A video Final Strike with none of the sim's near it, in fight frames: a cut-in between the two (the video's
   // strike landing as an ultimate stops time) doesn't count.
@@ -989,9 +1084,21 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
   const runOn: NonNullable<ReplayResult['runOn']> = { presses: [], strikes: [], staggers: [], track: [], sp: [], freezes: [], staggerLeft: [] };
   const strikes0 = c.strikes.length;
   const staggers0 = c.staggers.length;
+  const hits0 = c.hits.length;
+  // Each action's SP as the replay measures it: a press's over its first frame (its cost can land in the next), a
+  // strike's over the frame it landed in.
+  const pressSp: number[] = [];
+  const pressAfter: number[] = [];
+  const strikeSp: number[] = [];
+  const strikeAfter: number[] = [];
+  let pending = null as { i: number; before: number } | null;
   const press = (slot: number, input: Input) => {
+    const before = c.sp;
     if (!c.press(slot, input)) return false;
     runOn.presses.push({ frame: fight(c.frame + c.frozenFrames), slot, input, at: fight(c.frame + c.frozenFrames) });
+    pressSp.push(c.sp - before);
+    pressAfter.push(c.sp);
+    pending = { i: pressSp.length - 1, before };
     return true;
   };
   while (c.dealt - base < hp && c.frame + c.frozenFrames - from < 600 * FPS) {
@@ -1009,8 +1116,19 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
     if (!pressed && (pressed = press(turn % n, 'battle'))) turn++;
     if (!pressed) c.press(c.controlled, 'attack');
     const z0 = c.frozenFrames;
+    const spTick = c.sp;
+    const before = c.strikes.length;
     c.tick();
     if (c.frozenFrames > z0) addFreeze(runOn.freezes!, fight(cf) / FPS);
+    if (pending) {
+      pressSp[pending.i] = c.sp - pending.before;
+      pressAfter[pending.i] = c.sp;
+      pending = null;
+    }
+    for (let k = before; k < c.strikes.length; k++) {
+      strikeSp[k - strikes0] = c.sp - spTick;
+      strikeAfter[k - strikes0] = c.sp;
+    }
   }
   if (c.dealt - base < hp) return {};
   const cf = c.frame + c.frozenFrames;
@@ -1022,6 +1140,15 @@ function clearOn(w: World, hp: number | undefined, pauses: number[][], clockAt: 
   // A Stagger running when the recording ended: where it really ends.
   const open = c.staggers[staggers0 - 1];
   if (open && open.end > (clockOf.findIndex((x) => x !== undefined) || c.frame)) runOn.lastEnd = Math.min(cf - from + game(end), onClock(open.end));
+  // Each action's damage, split as the recording's are (damageByAction).
+  const ad = damageByAction(c.hits.slice(hits0).map((h) => ({ ...h, frame: onClock(h.frame) })), runOn.presses, runOn.strikes, c.team.map((e) => e.id));
+  const sum = (pairs: ActionHits) => pairs.reduce((n, [, d]) => n + d, 0);
+  runOn.pressDmg = ad.presses.map(sum);
+  runOn.strikeDmg = ad.strikes.map(sum);
+  runOn.pressSp = pressSp.map(Math.round);
+  runOn.pressSpAfter = pressAfter.map(Math.round);
+  runOn.strikeSp = runOn.strikes.map((_, k) => Math.round(strikeSp[k] ?? 0));
+  runOn.strikeSpAfter = runOn.strikes.map((_, k) => Math.round(strikeAfter[k] ?? 0));
   return { at: secs(cf), runOn };
 }
 

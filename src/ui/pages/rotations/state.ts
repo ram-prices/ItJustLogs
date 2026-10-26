@@ -82,7 +82,7 @@ interface PageState {
   /** The timeline playing: where it is (seconds on the fight's clock), how fast, whether it runs, and for which result. */
   play: { t: number; speed: number; running: boolean; of: SimResult | null; raf: number; last: number };
   /** The player's bars, plus the boss's Stagger nodes (shares of its meter) and where its later phases begin (seconds). */
-  playBars: { sim: Bars; video?: Bars; seconds: number; nodes: number[]; phases: number[]; sp: { sim?: [number, number][]; video?: [number, number][] }; spMax?: number; spRegen?: number; buffs?: BuffSpan[] } | null;
+  playBars: { sim: Bars; video?: Bars; seconds: number; nodes: number[]; phases: number[]; sp: { sim?: [number, number][]; video?: [number, number][] }; spMax?: number; spRegen?: number; buffs?: BuffSpan[]; controlled?: { slot: number; from: number; to: number }[] } | null;
   /** What's shown under the timeline: the discrepancies list, the buffs, the full transcript. */
   fold: { video: boolean; checks: boolean; buffs: boolean; moves: boolean };
   /**
@@ -106,6 +106,8 @@ interface PageState {
    * BuffData), fetched once; until then a letter shows.
    */
   buffIcons: Record<string, string> | null;
+  /** Buffs the game draws only on the controlled operator's row (ef-assets icons/buffs/main-only.json). */
+  buffMainOnly: Set<string> | null;
   buffIconsAsked: boolean;
   /** Every operator's name, for the gameplay reader (ui/rotationReader.ts). */
   allNames: string[];
@@ -151,6 +153,7 @@ export const page: PageState = {
   actLabels: [],
   wikiNow: null,
   buffIcons: null,
+  buffMainOnly: null,
   buffIconsAsked: false,
   allNames: [],
   redrawPage: () => {},

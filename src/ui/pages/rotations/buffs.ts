@@ -50,6 +50,16 @@ const INFLICT_SPRITE: Record<string, string> = { Fire: 'icon_energy_fusion_fire'
 export function loadBuffIcons(redraw: () => void): void {
   if (page.buffIconsAsked) return;
   page.buffIconsAsked = true;
+  const only = `${EF_ASSETS}/icons/buffs/main-only.json`;
+  fetch(only)
+    .then((r) => (r.ok ? r : fetch(mirrorUrl(only)!)))
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d: string[] | null) => {
+      if (!d) return;
+      page.buffMainOnly = new Set(d);
+      redraw();
+    })
+    .catch(() => {});
   const url = `${EF_ASSETS}/icons/buffs/index.json`;
   fetch(url)
     .then((r) => (r.ok ? r : fetch(mirrorUrl(url)!)))
@@ -64,7 +74,7 @@ export function loadBuffIcons(redraw: () => void): void {
 
 /** A buff's icon in the game (ef-assets icons/buffs/<sprite>.webp, from its UI bundle), if it has one. */
 function buffIcon(b: BuffSpan): string | undefined {
-  const fx = /^(vul|amp)_(.+)$/.exec(b.id);
+  const fx = /^(vul|amp)_([^@]+)/.exec(b.id);
   const sprite = fx
     ? `icon_battle_affix_${AFFIX_SPRITE[fx[2]] ?? 'spell'}_${fx[1] === 'vul' ? 'vulnerable' : 'enhance'}`
     : b.id === 'haste'
@@ -108,7 +118,12 @@ export function paintBuffs(): void {
     // `data-buffs-kind`: only the enemy's inflictions (by the boss's bars), or all but them (its lane).
     const kind = el.dataset.buffsKind;
     const fits = (b: BuffSpan) => !kind || (kind === 'infl') === b.id.startsWith('inflict_');
-    const on = page.play.t > 0 ? list.filter((b) => b.slot === slot && fits(b) && b.from <= page.play.t && page.play.t < b.to) : [];
+    // Only what the game draws: a buff whose icon it lacks (an empty sprite: Si's soul_timedisplay_jsspsiself) has none.
+    // And one the game draws only for the controlled operator (Last Rite's Perfusion, on the whole team) on that row only.
+    const t = page.play.t;
+    const ctl = page.playBars?.controlled?.find((c) => c.from <= t && t < c.to)?.slot;
+    const drawn = (b: BuffSpan) => (!page.buffIcons || !!buffIcon(b) || !!b.status) && !(page.buffMainOnly?.has(b.id) && ctl !== undefined && slot !== ctl);
+    const on = page.play.t > 0 ? list.filter((b) => b.slot === slot && fits(b) && drawn(b) && b.from <= page.play.t && page.play.t < b.to) : [];
     const key = on.map((b) => `${b.id}@${b.from}`).join('|');
     if (el.dataset.key !== key) {
       el.dataset.key = key;

@@ -62,7 +62,7 @@ function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], id
           ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${at(f.end - f.frame)}" title="${secs(f.frame)} · Ultimate ${formLength(f)}"></i>`)}
           ${r.presses
             .filter((p) => p.slot === slot && p.input !== 'swap')
-            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}${formOf(r, p) ? ` ${formLength(formOf(r, p))}` : ''}${dmgOf(r.pressDmg, r.presses, p)}${spOf(r.pressSp, r.presses, p)}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : 'U'}</i>`)}
+            .map((p) => html`<i class="sim-press ${p.input}" style="left:${at(p.frame)}" title="${secs(p.frame)} · ${INPUT_NAME[p.input]}${formOf(r, p) ? ` ${formLength(formOf(r, p))}` : ''}${dmgOf(r.pressDmg, r.presses, p)}${spOf(r.pressSp, r.presses, p)}">${p.input === 'battle' ? 'B' : p.input === 'combo' ? 'C' : p.input === 'dive' ? 'D' : p.input === 'swap' ? 'S' : 'U'}</i>`)}
           ${r.strikes
             .filter((s) => s.slot === slot)
             .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" title="${secs(s.frame)} · ${s.finisher ? 'Finisher' : 'Final Strike'}${dmgOf(r.strikeDmg, r.strikes, s)}${spOf(r.strikeSp, r.strikes, s)}"></i>`)}
@@ -80,7 +80,7 @@ function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], id
           ${enemyName()}
           <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · Invulnerable ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${at(b - a)}" title="${secs(a)} · No Stagger ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${at(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" title="${secs(m.frame)} · ${m.label}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
         </div>`
-      : page.fold.buffs && buffs?.some((b) => b.slot < 0)
+      : faces || (page.fold.buffs && buffs?.some((b) => b.slot < 0))
         ? html`<div class="sim-lane">${enemyName()}<span class="sim-lane-track"></span></div>`
         : ''}
     ${buffRows(buffs, -1, 'Enemy', at)}
@@ -97,7 +97,7 @@ function timeline(r: SimResult, names: string[]): Html {
 export const foldButton = (what: keyof typeof page.fold, label: string, iconOnly = false) =>
   html`<button type="button" class="sim-fold-btn label-12 secondary" data-action="sim-fold" data-value="${what}" title="${page.fold[what] ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}" aria-label="${label}" aria-expanded="${page.fold[what] ? 'true' : 'false'}">${iconOnly ? '' : `${label} `}${icon(page.fold[what] ? 'visibility_off' : 'visibility')}</button>`;
 
-export const STEP_NAME: Record<VideoStep['input'], string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher', dive: 'Dive attack' };
+export const STEP_NAME: Record<VideoStep['input'], string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher', dive: 'Dive attack', swap: 'Swap in' };
 
 /**
  * Every name the transcript's operator column can hold, invisible and flat: the column is as wide as the widest in both

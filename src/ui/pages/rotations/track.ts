@@ -177,10 +177,26 @@ export function simLong(shown: SimResult, replayed: ReplayResult | undefined): S
   return long;
 }
 
-/** A sim track run on to a longer timeline: its presses, strikes and Staggers after the recording's, damage each second. */
+/**
+ * A sim track run on to a longer timeline: its presses, strikes and Staggers after the recording's, damage each second,
+ * and each action's damage and SP, the recording's (fitted) then the run on's (the sim's own, `ReplayResult.runOn`).
+ */
 export function withRunOn(track: Track, long: SimResult): Track {
   const more = simTrack(long);
-  return { ...more, pressDmg: track.pressDmg, strikeDmg: track.strikeDmg, pressSp: track.pressSp, strikeSp: track.strikeSp, pressSpAfter: track.pressSpAfter, strikeSpAfter: track.strikeSpAfter };
+  const on = (long as ReplayResult).runOn;
+  const n = track.presses.length;
+  const m = track.strikes.length;
+  const join = (mine: (number | undefined)[] | undefined, len: number, theirs: number[] | undefined) =>
+    mine || theirs ? [...Array.from({ length: len }, (_, i) => mine?.[i]), ...(theirs ?? [])] : undefined;
+  return {
+    ...more,
+    pressDmg: join(track.pressDmg, n, on?.pressDmg),
+    strikeDmg: join(track.strikeDmg, m, on?.strikeDmg),
+    pressSp: join(track.pressSp, n, on?.pressSp),
+    strikeSp: join(track.strikeSp, m, on?.strikeSp),
+    pressSpAfter: join(track.pressSpAfter, n, on?.pressSpAfter),
+    strikeSpAfter: join(track.strikeSpAfter, m, on?.strikeSpAfter),
+  };
 }
 
 /** The presses, with the controlled operator's Final Strikes and Finishers between them (how long to keep attacking). */

@@ -2,8 +2,8 @@ import { FPS } from '../../../domain/sim/engine';
 
 export const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 export const big = (n: number) => Math.round(n).toLocaleString();
-/** A time as m:ss.s, as the game's stopwatch reads (with tenths). */
-export const clockTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+/** A time as m:ss.s, as the game's stopwatch reads (with tenths); before its 0 with a minus (−0:01.7). */
+export const clockTime = (s: number): string => (s < 0 ? `−${clockTime(-s)}` : `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`);
 export const secs = (frame: number) => clockTime(frame / FPS);
 
 /** An action's SP change, every action (a combo's or ultimate's 0 too): "−100 SP", "+17 SP", "0 SP". */

@@ -933,11 +933,11 @@ input.sim-run-value-edit {
 .sim-run-name-row > .btn {
   flex: none;
 }
+/* A lane's buffs now wrap onto more lines rather than hide past the label column (the lane grows with them). */
 .sim-buffs-now.lane {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 2px;
   min-height: 0;
-  overflow: hidden;
 }
 .sim-buffs-now.lane .sim-buff-chip {
   flex: none;

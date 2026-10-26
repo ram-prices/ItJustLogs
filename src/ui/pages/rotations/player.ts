@@ -166,7 +166,18 @@ export function preparePlay(r: SimResult): { video?: Bars } {
   // The SP bar: the sim's (a replay's), and the video's as read (seconds into the video, put on the fight's clock).
   const simSp = (r as ReplayResult).spTrack;
   const videoSp = reading?.sp?.filter(([t]) => !pauses.some(([a, b]) => t >= a && t < b)).map(([t, v]) => [clock(t), v] as [number, number]);
-  page.playBars = { sim, video, seconds: r.seconds, nodes: enemy?.nodes ?? [], phases: phaseStarts.map(clock), sp: { sim: simSp, video: videoSp }, spMax: enemy?.sp?.max ?? 300, spRegen: enemy?.sp?.regen, buffs: (r as ReplayResult).buffs };
+  // Who's controlled when (seconds): the run's swaps.
+  const controlled: { slot: number; from: number; to: number }[] = [];
+  let cur = r.main;
+  let since = -Infinity;
+  for (const p of r.presses)
+    if (p.input === 'swap') {
+      controlled.push({ slot: cur, from: since, to: p.frame / FPS });
+      cur = p.slot;
+      since = p.frame / FPS;
+    }
+  controlled.push({ slot: cur, from: since, to: Infinity });
+  page.playBars = { sim, video, seconds: r.seconds, nodes: enemy?.nodes ?? [], phases: phaseStarts.map(clock), sp: { sim: simSp, video: videoSp }, spMax: enemy?.sp?.max ?? 300, spRegen: enemy?.sp?.regen, buffs: (r as ReplayResult).buffs, controlled };
   queueMicrotask(paintPlay);
   return { video };
 }

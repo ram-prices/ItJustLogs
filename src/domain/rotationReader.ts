@@ -449,9 +449,12 @@ export function artOf(p: Px, layout: Layout = CONTROLLER): number[] {
   return out;
 }
 
-/** 'dive' only from the transcript editor (a dive attack: the reader can't see one). */
-export type Read = 'battle' | 'combo' | 'ultimate' | 'strike' | 'finisher' | 'dive';
-export const READ_NAME: Record<Read, string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher', dive: 'Dive attack' };
+/**
+ * 'dive' and 'swap' only from the transcript editor or a session's reading (a dive attack, or taking control of an
+ * operator who then makes no Final Strike: the reader can't see either).
+ */
+export type Read = 'battle' | 'combo' | 'ultimate' | 'strike' | 'finisher' | 'dive' | 'swap';
+export const READ_NAME: Record<Read, string> = { battle: 'Battle skill', combo: 'Combo skill', ultimate: 'Ultimate', strike: 'Final Strike', finisher: 'Finisher', dive: 'Dive attack', swap: 'Swap in' };
 
 /** A press read from the video (or a Final Strike / Finisher between them). */
 export interface Step {

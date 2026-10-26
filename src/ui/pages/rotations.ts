@@ -276,7 +276,7 @@ export function simChange(el: HTMLInputElement | HTMLSelectElement): boolean {
   else if (f === 'seconds') save({ seconds: Math.max(5, Math.min(300, num(el.value) ?? DEFAULT_SECONDS)) });
   else if (f === 'hp') save({ hp: Math.max(1000, Math.min(1e10, Math.round(num(el.value.replace(/[,\s]/g, '')) ?? DEFAULT_HP))) });
   else if (f === 'cores') save({ cores: el.value === '' ? undefined : Math.max(1, Math.min(CORES, Number(el.value))) });
-  else if (f === 'sp') save({ startSp: el.value.trim() === '' ? undefined : Math.max(0, Math.min(300, Number(el.value))) });
+  else if (f === 'sp') save({ startSp: el.value.trim() === '' ? undefined : Math.max(0, Math.min(enemyById(settings().enemy).enemy.sp?.max ?? 300, Number(el.value))) });
   // The enemy's own HP for the HP goal, until one is typed.
   else if (f === 'enemy') save({ enemy: el.value === 'dummy' ? undefined : el.value, hp: undefined });
   else if (f === 'controlled') save({ controlled: el.value || undefined });
@@ -423,6 +423,9 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   const foe = enemyById(s.enemy);
   const hp = goal === 'hp' ? (s.hp ?? foe.hp) : undefined;
   const enemy = foe.id === 'dummy' ? {} : { enemy: foe.enemy };
+  // The stage's SP: its cap bounds the start typed (one typed for another stage too).
+  const spMax = foe.enemy.sp?.max ?? 300;
+  const startSp = s.startSp != null ? Math.min(s.startSp, spMax) : undefined;
   // The share of the fight the enemy can be hit (unset or 100%: all of it).
   const uptime = s.uptime && s.uptime < 100 ? s.uptime / 100 : undefined;
   const at = s.controlled ? team.findIndex((m) => m.op === s.controlled) : -1;
@@ -432,7 +435,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         builds: team.map((m, i) => optimalBuildOf(m, built[i].build)),
         seconds,
         hp,
-        startSp: s.startSp,
+        startSp,
         uptime,
         ...enemy,
         ...main,
@@ -440,7 +443,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         effort,
         optimize: { weapons: team.map((m) => (m.weapon ? [m.weapon] : weaponsFor(m.op, wiki, index.data!))), limited: limitedWeapons(), signatures: signatureWeapons() },
       }
-    : { builds: built.map((b) => b.build), seconds, hp, startSp: s.startSp, uptime, ...enemy, ...main, style, effort };
+    : { builds: built.map((b) => b.build), seconds, hp, startSp, uptime, ...enemy, ...main, style, effort };
   const key = JSON.stringify(req);
   // A run picked from the history stays while the team's the same; else this setup's saved result, when there's one
   // and nothing newer for it is showing.
@@ -486,7 +489,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
             ? html`<label class="sim-field"><span class="label-12 secondary">Enemy HP</span><input class="input sim-hp" type="text" inputmode="numeric" data-sim="hp" value="${big(hp)}" /></label>`
             : ''}
           <label class="sim-field"><span class="label-12 secondary">${hp !== undefined ? 'Time limit (s)' : 'Fight length (s)'}</span><input class="input sim-num" type="number" min="5" max="300" data-sim="seconds" value="${seconds}" /></label>
-          <label class="sim-field"><span class="label-12 secondary">SP at the start</span><input class="input sim-num" type="number" min="0" max="300" data-sim="sp" value="${s.startSp ?? ''}" placeholder="${START_SP}" /></label>
+          <label class="sim-field"><span class="label-12 secondary">SP at the start</span><input class="input sim-num" type="number" min="0" max="${spMax}" data-sim="sp" value="${startSp ?? ''}" placeholder="${foe.enemy.sp?.start ?? START_SP}" /></label>
           <label class="sim-field"><span class="label-12 secondary">Uptime (%)</span><input class="input sim-num" type="number" min="10" max="100" data-sim="uptime" value="${s.uptime ?? ''}" placeholder="100" /></label>
           <label class="sim-field"><span class="label-12 secondary">Threads</span><select class="input sim-cores" data-sim="cores" aria-label="Threads">
             <option value="" ${s.cores ? '' : 'selected'}>Auto (${AUTO_CORES})</option>

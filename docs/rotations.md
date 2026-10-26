@@ -85,8 +85,8 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   the Re-Crisis kind, food allowed and every ultimate full at the start; every other fight forbids food (a buff placed
   on each operator before it; healing items used during a fight are another thing); Echoes of War waits for a start
   button (`prep`, not simulated); a stage starts at 200 SP of 300, regenerating 8 a second, unless its `Enemy.sp`
-  says otherwise (Glaiver File: 620 of 700, about 4 a second, read from a recording; the Recording view's SP bar then
-  shows a segment per 100). Food pickers show only where allowed (`foodPicker`;
+  says otherwise (Glaiver File: 700 of 700, 4 a second; the Recording view's SP bar then shows a segment per 100, and
+  the Simulator's SP at the start field caps at the stage's max). Food pickers show only where allowed (`foodPicker`;
   `teamFromSpec` drops food elsewhere), and the parser's review asks for it before simulating (Before the fight:
   the stage and its rules, each operator's food → `VideoRotation.food`). The Parser outlines the box of whoever made
   the most Final Strikes and Finishers (controlled most) and "Controlled" at the end of its name row (no tab or fill: the boxes aren't selectable), others who
@@ -99,11 +99,102 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   `bornBuffList`), found from SubGameInstanceDataTable's `bindScriptId` → the level script's EncounterData `spawnerId`;
   the local dump has those as binary, the EndfieldData repo as text. `Enemy.guard` (a stance below HP shares: damage
   taken ×(1+x), DEF, no Stagger, `World.checkGuard`, a Guard stance mechanic) is implemented but no enemy uses it:
-  the Skydrummer's skill06 stance proved short in the recording. The owner's recording replays to 86% (3.47M of
+  the Skydrummer's skill06 stance proved short in the recording.
+  `BLIGHTSHADE` is Echoes of War's "Glaiver File: Yinglung" boss, YSTF Captain Blightshade (eny_0124_kltdcap_tower016,
+  template eny_0124_kltdcap: DEF 100, Resistance 20 Physical / 35 Electric / 0 the rest, Stagger 320 + 20 / 9 s with a
+  node at half, Finisher ×1.5 / 50 SP, interrupt +20; Brutal/Hard/Normal = Lv 90/75/60). Its spawners
+  (sc_indie_tower001_43000030003/04/05) give it buff_common_maxhpup ratio 4.5 (HP × 5.5) and buff_common_maxpoiseadd 20.
+  The stage's DungeonTable paramList: atb_max 700 (SP starts at and caps at 700) and get_atb_reduce -0.5 ("All SP
+  recovery and regeneration -50%"): regeneration 4 a second and `Enemy.sp.gain` 0.5 on every other SP gain (Final
+  Strikes, Finishers, battle-skill returns; `obtain`). A request saves its enemy, so a replay takes today's entry for
+  it (`knownEnemy`: the same boss, its SP rules aside). The stage's level script adds no SP buff (other Echoes of War
+  stages use buff_dung_atb_recoverspeed_no_icon); the −50% is applied by the game's code from paramList, so 4 a second
+  is the data's figure. The Last Rite recording's quiet stretches read about 2.4–3.9 a second once combo holds are
+  taken out (its bar read 620 at the start, the data and the owner say 700: a request's `startSp` overrides the
+  stage's start). Its fake death (buff_eny_0124_kltdcap_fakedead: heals to full over ~4 s, refills the meter) isn't
+  simulated. The Last Rite 31 s recording (bluejay, yG8o5fgjd0o) is Brutal (the owner): with the re-read's four
+  Final Strikes and the owner's builds the sim reaches 2.06M of 4,539,959 (45%) by its 31 s clear (1.15M by 27 s,
+  where the recording shows ~2.55M); the per-hit gap is below. The Parser names an open run's enemy from
+  its request when it's one of ENEMIES (the boss bar has no difficulty). The owner's recording replays to 86% (3.47M of
   4.03M) once its transcript has a Final Strike the parser missed at 0:28.9 (the meter's +17) and Yvonne's and
   Tangtang's ultimates in the 5 s pause at 1:07. The parser now reads such pairs: a dot full for 0.2 s within the
   last second before a cut-in counts as used (`RECENT`/`HELD`; both dots emptied 0.35 s before the HUD hid),
   pinned by `rotationReader.ults.json`.
+  A combo skill's banner slows the game for all but its caster (TimeDilationAction, layer Global, curve "ComboSkill",
+  for its duration: Last Rite 0.6 s, Si 0.8, Xaihi 0.9, Tangtang 0.867, Yvonne 0.667; Arcane's 0.6 cut to 9 frames by
+  a RESETto1). The curve isn't in the dump; the recordings show SP regeneration and the Staggered meter at about a
+  sixth of their rate (`COMBO_SLOW`), so both stand still for the time lost (`World.slowLeft`: 15 frames for Last
+  Rite's). The team acts on: freezing everyone instead (tried) made Arcane's Final Strike after Last Rite's combo at
+  0:23.5 of the Last Rite run 0.5 s late, past the next cut-in, where the recording's kept its time.
+  A step before the stopwatch's 0 (negative `t`: Last Rite's battle skill cast as the stage starts, so Arcane begins
+  with Hypothermic Perfusion) is pressed at 0:00 but kept at its own time (the Press's frame), so both views draw it left
+  of 0:00 and the transcript reads it as −0:01.7 (`clockTime`); it's paid from the stage's SP (Glaiver File: 700 − 100 + its halved return, the
+  ~615 the recording's bar reads at the timer's start); its buffs run from 0:00, so they end that much later than the
+  game's. A loadout's weapon Potential (`weapon.potential`, the Parser loadout's Weapon picker) adds the weapon's
+  potentialLevels to its skills' levels (Khravengger P2: its third skill at level 6 of 9).
+  A transcript step `swap` (Swap in) takes control of an operator where the recording shows it, for one who then makes
+  no Final Strike (`ReplayStep`, the editor's Swap in; the controlled operator otherwise follows the strikes). The
+  Last Rite run has them from the team bar's ring (stopwatch 8.89 Last Rite, 13.29 Arcane, 28.99 Si;
+  `tools/ai-parser/out/lastrite2/vA`). A skill that jumps past its MarkCanInterrupt no longer holds its operator
+  (`jumpTo`): Last Rite's battle skill cast off-field jumps from frame 0 to 300, past its mark at 51, and the recording
+  swaps to her 0.75 s in (her exclusiveFrame 373 had held her for the whole 4.3 s path). The replay's chain timing
+  holds an operator for a press as `busy` does (`holdOf`: to the skill's MarkCanInterrupt where it has one, else its
+  exclusiveFrame): her 373 frames had started Last Rite's own 13.09 Final Strike 12 s early, which made Arcane's 8.19
+  one land at 6.1, before the Perfusion.
+  The Mirage (Last Rite's battle skill, Hypothermic Perfusion) follows its data: the battle skill halves atk_scale
+  (3.2 at rank 12) at frame 0, and the phantom buff's two Cryo hits each take the half (the wiki's 320% in all); both
+  are one coalesced number on screen (damageVisualCoalitionGroupKey 0026_normal). Every teammate gets the Perfusion
+  buff (normal_skill_self on the team), but only the controlled operator's fires, once per 0.1 s marker: one Mirage a
+  strike. Her ultimate's 400/400/800% and combo multipliers match the wiki. In the Last Rite run her basic attacks
+  match the screen (29,739 against the sim's 33,522) but the Mirages are 3-6× short (199K/327K/643K against
+  35K/74K/115K pairs) and the ultimate ~2× (~270K/411K/662K against 149K/149K/298K), with the same growth over the run.
+  Not found in the data (2026-10-25): the stage (featureDesc: SP rules, "Enemies have better stats", its HP), DEF 100
+  and Cryo Resistance 0, Khravengger (Skill DMG and Cryo DMG, additive), Tide Fall (skill +20%, battle +35% stacking,
+  additive), Xaihi (Amp, +10% Cryo DMG taken), Arcane (Susceptibility). Si's Inksoul is a real gap (all damage to it
+  is dealt to its host too; CheckDamageTransferredSource is false here) but it lives only 3-6 s and from 29 s in this
+  run, not at the Mirages. Left open.
+  Corrosion in that run (Arcane as Array Arcana: WILL, the owner's call): the data gives three Cryo stacks before her
+  battle skill's Nature (Si's battle skill, Arcane's WILL combo, Si's Brushwork), and Arcane's grid applies Nature on
+  its entity's frame 20 (0.67 s after the press), Si's Brushwork 15 frames after hers: Corrosion III, as the second
+  recording shows. It needs Si's Final Stroke read at 4.24 s, not 4.39 (her Brushwork comes on the Final Stroke's frame
+  9 window); at 4.39 her Cryo lands 0.03 s after Arcane's Nature and the reaction is level II. The first recording's
+  fourth stack has no source in the data: Artful Intent's extra infliction (buff_chr_0036_jsspsi_xianjing_inkhurteffect_1)
+  is switched off there (its SwitchAction isEnable false), and her text says the Inksoul and its host take one instance.
+  The Mirage on Last Rite's own Final Strike is phantom_main (both hits on its frame 21), on a teammate's the phantom
+  (frame 9): her Perfusion checks the striker for her own tag (CheckTagMatch 264623624), which an operator carries as
+  herself (`World.ownTags`: the tag her own skills' Ultimate Energy carries that her passive's RefrainObtainUsp lets
+  through). Every Mirage adds normal_skill_tag, which finishes the Perfusion on the whole team: one Mirage a cast, on
+  the first Final Strike by whoever is controlled. In the Last Rite run that makes the reading's 13.09 strike (hers,
+  after the 11.04 cast) take the Perfusion the game spends on Arcane's 18.44 strike; without it the sim's Mirages fall
+  on the game's three strikes (8.2, 18.43, 25.57), so 13.09 likely isn't a Final Strike.
+  The Mirage's Cryo Infliction on a boss already holding Cryo sets off a Cryo Arts Burst (buff_common_cryst_cryst_triggered:
+  1.6 × ATK × the level/Arts Intensity multiplier, mask 8388608, no skill bonus), which the sim fires (Last Rite run,
+  13.57 s: 36,672). An Arts Reaction consumes every stack (the game's text: "applying Nature Infliction consumes all
+  Arts Infliction ... triggers Corrosion"), so the boss holds no Cryo at the sim's first and third Mirages (Corrosion at
+  5.17, Last Rite's combo at 23.54) and no Burst follows; the recording shows one after each. The team's data has no
+  Burst-only or Arts Intensity buff (only the Spellburst set's, not worn), so the Burst's growth over that fight
+  (1.9× to 7.3× the Mirage) isn't in the data either.
+  Last Rite's combo consumes the Cryo stacks on its frame 63 (2.1 s after the press): a 1.6 slash and a hit of atk_scale3
+  2.4 × the stacks (9.6 at four), then FinishBuffByTag on the Cryo. Her ultimate's cut-in starts on its frame 0, so
+  it doesn't cut the combo short when pressed later. In the Last Rite run the combo pressed at 0:28.3 lands those
+  hits at 0:30.40: the recording's 89,079 at 30.417 and 649,793 at 30.467 are they (sim 67,466 and 404,794), not a
+  Mirage and its Burst; the Mirage from Arcane's 30.45 strike lands after the cut-in on no Cryo.
+  A replay makes due presses in order per operator: one that can't be made yet (a combo on cooldown) holds up only its
+  own operator's later presses, up to REPLAY_SLACK, not a teammate's (`waiting` in replaySim; Arcane's second combo
+  waiting had held Last Rite's combo and lost her ultimate).
+  An ultimate's cut-in stops the caster's own summons with everything else, but other operators' summons run on
+  through it (`summonOfOther`), as the owner's Last Rite recording shows: Si's Ink Lung cuts Team Position 01's combo
+  cooldown by her talent's 20 s on its frame 62 (SetSkillCdAtOnce); frozen through her own cut-in (video 23.93–25.85),
+  it counts on through Arcane's (26.6–28.25) and the cut lands at ~27.9, after Arcane's combo at 26.10, which is back
+  at 28.37. The data's UltimateTimeAction ignoreTargets (Si's `dazhao`, Zhuang Fangyi's models) would have kept the Ink
+  Lung running through Si's own cut-in (cut at ~26.0, before that combo); the footage says otherwise, so it isn't used.
+  The current Last Rite run (tools/ai-parser/out/lastrite.parsed-run.json) replays with nothing missed: 4,076,698 by
+  31 s, clear 32.0 s.
+  A search's ExcludeOwnerValidator leaves out the ability's owner: Eternal Xiranite's +16% goes to the other
+  teammates only, never its wearer (Xaihi in the Last Rite run, Arcane in the owner's).
+  Si's Artful Intent burst is Fixed damage equal to 13% of the real damage the marked enemy took from the team
+  (inkhurteffect OnTakeDamage: SaveDamageContext RealValue × ink_damage_rate; the burst's DefiniteValueCalculation, no
+  processors): no ATK, bonus, Amp, Susceptibility, resistance or DEF on it. It's short wherever the hits it records are.
   The enemy's Staggered time stands still while the stopwatch does and the sim isn't frozen itself
   (`World.holdStagger`, from replaySim): the game's Stagger lasted 9 s of stopwatch with that 5 s pause inside.
   Arcane's Cluster Strike lasers deal 0.45 each in the sim (four per strike, 1.8); the wiki's "Cluster Strike Total
@@ -112,7 +203,8 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   without bars, any pause of 2 s or more. A stage's own rules (DungeonTable `featureDesc`/`paramList`, the enemy variant's template and
   skills) go in the entry, not the base enemy's: the dump's raw Json/SkillData and BuffData are binary, read them
   from the EndfieldData repo (text). The
-  timeline has an Enemy lane with its Staggered stretches (`World.staggers`). Cooldowns run through ultimate cut-ins
+  timeline has an Enemy lane with its Staggered stretches (`World.staggers`); a parsed run always has it, its boss's face
+  as its name, in both views, even with nothing on it (a recording with no Stagger or mechanic). Cooldowns run through ultimate cut-ins
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
   Simulator and Parser (`/rotations/parser`; the old `/rotations/transcript` redirects): a read video's team, enemy
   (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only and comes
@@ -197,7 +289,9 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   battle skill or combo near a rise of 16+ that no Final Strike explains (`interrupts`), pinned by
   `rotationReader.stagger.json` (real crops and the traced meter).
   A video Final Strike's chain also starts earlier by any ultimate cut-in over it (`cutInOf`: the video's clock runs
-  through it, the sim's frames don't); with an attack a buff has waiting that the video shows (`strikeWaiting`:
+  through it, the sim's frames don't), and later by what Haste saves it (`chainFrames` at the operator's Haste now,
+  at most its rate × the frames it has left, `World.hasteLeft`: Tangtang's combo buff takes Yvonne's chain from 95
+  frames to 80; measured without it, her strikes landed 0.5 s before the video's); with an attack a buff has waiting that the video shows (`strikeWaiting`:
   Yvonne's talent after her bomb makes her next basic attack the Final Strike) it's pressed just before the video's
   strike (`QUICK_STRIKE`). Only an ultimate's own waiting attack is unseen. CheckSkillCastId compares the kind of
   skill whose cast gives a buff (`Buff.castKind`, `creating`) with the listener's, and OnBeforeOutputBuff carries a
@@ -262,7 +356,10 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   (`ReplayResult.runOn`: presses, Final Strikes, Staggers, track, SP), and the Sim view's timeline plays on through it to
   the sim's clear (`simLong`, `withRunOn`; the player keeps its place switching views, `baseOf`, and the run's
   phases and nodes, `preparePlay` taking the base result; the engine marks each Stagger node it reaches), with the sim's own
-  bars.
+  bars. Its actions carry their damage and SP in the transcript and on the markers (`runOn.pressDmg`/`strikeDmg`, split
+  by `damageByAction` over its own hits, the sim's values with no recording to fit; `pressSp`/`strikeSp` and the bar
+  after, measured as in the replay), after the recording's fitted ones. Hits after the recording's end from actions
+  pressed before it stay unattributed, as Bursts and reactions are. Runs replayed before this show none until replayed.
   The HUD leaving as the stopwatch stops is the kill, and a phase ending in a pause (the bar full again after it)
   reached zero in the cut-in: the parser adds a zero-HP reading at each (`endsAtZero`; the kill at the stop, however early the bar stopped being read), and every saved recording gets the same when shown (`killed` in videoOf), its last readings clamped to the timeline's end.
   The boss's name is read on eight frames with the band's own ink threshold and scraps voted down (`whiteInk`,
@@ -291,7 +388,12 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   Reaction's level (its buff's `count`, `BuffSpan.level`) as a Roman numeral in a corner box, an Arts Infliction as the
   game draws it (its icon in a circle of four arcs, one lit per stack) with a thin timer ring inside, to the left of the
   boss's bars rather than in the enemy's lane (`data-buffs-kind`) (`paintBuffs`, `--left`; the label
-  column widens for them, `--lane-label` 176px on `.sim-faces`); timeline buff rows start folded (`fold.buffs`). The
+  column widens for them, `--lane-label` 176px on `.sim-faces`; a long row wraps and the lane grows); timeline buff
+  rows start folded (`fold.buffs`). As the game: no chip for a buff the icon index has no sprite for (Si's
+  soul_timedisplay_jsspsiself: `hasIcon` with an empty sprite); one chip per Amp or Susceptibility source
+  (`effectsShown` ids `amp_<kind>@<operator>`: Xaihi's and Si's ultimates each give a Cryo Amp); a buff the game draws
+  only on the controlled operator's row (iconConfig.onlyShowForMainCharacter, ef-assets icons/buffs/main-only.json from
+  buff-icons.py; Last Rite's Perfusion, which the whole team holds) only on that lane (`playBars.controlled`). The
   run's header holds the timeline's Recording | Sim switch, then Edit, Export, Star and Delete as labelled buttons
   (`headTools`; a starred run can't be deleted); play, speed and the Buffs eye sit by the scrubber, the time in a tip over its dot; dragging it moves the playhead as it goes (an `input` listener). The recording's Stagger meter never falls between resets
   (a Stagger, a phase change: each reading is the lowest read after it in its stretch, so a hit's flash misread as fill
@@ -376,10 +478,15 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   transcript). The owner's two runs on 5175 (Alleikhreos 2:45 AM, Skydrummer 11:55 PM, Oct 24) are replayed.
 - Waiting on the owner: whether the site parser should emit `staggerLeft` (offered, not answered).
 - Gaps against the recordings:
-  - Skydrummer: the sim's Stagger starts 1.1 s after the video's at 1:02 (63.2 s against 62.1 s), so its first
-    Finisher lands late; the fit now moves it (`alignActions`), but the Stagger is still missing something before it.
-  - Skydrummer: the second Finisher lands 0.8 s late although the Stagger starts on time (132.9 s); fitted 306k
-    against the bar's ~235k.
+  - Skydrummer: Yvonne's Final Strikes now land on the video's frames (the Haste fix above); before it the one at
+    0:33.3 landed in the parsed no-Stagger stretch (to 33.02) and lost its 17, which hid the next gap and made the
+    Stagger late (63.2 s against 62.1 s). Now the sim's meter runs ~11 (3.4%) above the video's by 0:57.8 (320
+    against 309), so both Staggers come early: 57.8 s against 62.1 s, 129.6 s against 133.0 s. Where the meters part:
+    Tangtang's battle skill gives 10 in the sim and ~8 on the video (0:03.5, 0:21.8), the interrupt at 0:48.4 20
+    against ~17, and single points elsewhere. Alleikhreos's meter matches the video within 2 with the same skills,
+    and the Skydrummer's spawners add no Stagger (only buff_dung_maxhp_01), so it isn't the meter's size.
+  - Skydrummer: the second Finisher lands 0.8 s late (measured with the Stagger on time at 132.9 s, before the Haste
+    fix); fitted 306k against the bar's ~235k.
   - Yvonne's second Skydrummer Finisher is ~27% low in the sim itself (no "taken" bonus found).
   - Arts Amp from Xaihi's crystal heal is given even at full HP (the sim's team takes no damage).
 - Engine gaps from the audit (multipliers 189 exact, 95 rounding, 77 conditional untested, 35 off; costs all match):
@@ -388,7 +495,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   CheckSkillCameraMotionFree, CheckSkillHasHit, Typhoeus's three. Not audited: conditional rows, buff durations and
   stacks, weapons and gear.
 - Next, in order:
-  1. The Skydrummer's late Stagger at 1:02 (Sim view's discrepancies list, the meter's step hints).
+  1. The Skydrummer's meter filling ~3.4% faster than the video's (the gap above).
   2. The second Finisher's 0.8 s delay (`finisherWaiting`, `busy`, the 1 s press lead in replaySim).
   3. Rule tests that run for every operator (skill levels per operator, aura sources, SP regen, durations).
   4. The audit's engine gaps above, then audit conditional rows, buffs, weapons and gear.

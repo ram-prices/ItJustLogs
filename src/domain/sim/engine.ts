@@ -353,8 +353,11 @@ export const EFFECT_KIND: Record<string, string> = { Spell: 'Arts', Fire: 'Heat'
 export function effectsShown(e: Entity, frame: number): { id: string; name: string }[] {
   const on = (x: Effect) => x.until > frame && (!x.parent || x.parent.owner.buffs.includes(x.parent));
   const out: { id: string; name: string }[] = [];
-  for (const x of e.vulnerable ?? []) if (on(x)) out.push({ id: `vul_${x.kind}`, name: `${EFFECT_KIND[x.kind] ?? x.kind} Susceptibility` });
-  for (const x of e.amp ?? []) if (on(x)) out.push({ id: `amp_${x.kind}`, name: `${EFFECT_KIND[x.kind] ?? x.kind} Amp` });
+  // One icon per source, as the game draws them: Xaihi's and Si's ultimates each give the team a Cryo Amp
+  // (`amp_Crystal@chr_0011_seraph`, `amp_Crystal@chr_0036_jsspsi`).
+  const from = (x: Effect) => /chr_\d+_[a-z]+/.exec(x.key)?.[0] ?? x.key;
+  for (const x of e.vulnerable ?? []) if (on(x)) out.push({ id: `vul_${x.kind}@${from(x)}`, name: `${EFFECT_KIND[x.kind] ?? x.kind} Susceptibility` });
+  for (const x of e.amp ?? []) if (on(x)) out.push({ id: `amp_${x.kind}@${from(x)}`, name: `${EFFECT_KIND[x.kind] ?? x.kind} Amp` });
   for (const x of e.haste ?? []) if (on(x)) out.push({ id: 'haste', name: 'Haste' });
   return out;
 }
@@ -408,6 +411,8 @@ const attrName = (b: Bundle, v: unknown): string | undefined => b.attributes?.[v
 const REFRAIN_ANY = -1;
 /** Seconds over which uptime repeats: so much to hit, then the rest waiting. */
 const UPTIME_PERIOD = 10;
+/** The game's time scale in a combo banner's slow motion (the recordings: regeneration at about a sixth). */
+const COMBO_SLOW = 1 / 6;
 /** A Final Strike's damage decorate mask. */
 const FINAL_STRIKE = 2097152;
 /**
@@ -466,10 +471,11 @@ export interface Enemy {
   fullUltimate?: boolean;
   prep?: boolean;
   /**
-   * A stage's own SP: where it starts, its cap and its regeneration a second (Glaiver File: 620 of 700, about 4 a
-   * second, read from a recording). Unset: 200 of 300, 8 a second.
+   * A stage's own SP: where it starts, its cap, its regeneration a second and what share of every other SP gain the
+   * team gets (`gain`: Final Strikes, Finishers, battle-skill returns; Glaiver File's get_atb_reduce -0.5, "All SP
+   * recovery and regeneration -50%": 4 a second and half of each gain). Unset: 200 of 300, 8 a second, gains whole.
    */
-  sp?: { start: number; max: number; regen: number };
+  sp?: { start: number; max: number; regen: number; gain?: number };
   /**
    * A guard stance it takes when its HP falls below each share in `below` (needs phaseHp): for `seconds`, damage
    * taken changes by `damageTaken` (-0.9: a tenth), its DEF by `def`, and its Stagger meter heals faster than hits
@@ -682,13 +688,15 @@ export class World {
     // A selector with a finder of its own is a search's (InstantSearch); left on a fixed source it does nothing. Camille's
     // combo heals "Source" with the controlled-operator search's filter on it, and he heals himself off the field too (wiki).
     if (spec.selectorData?.finderData) return list;
-    return this.validate(list, spec.selectorData?.validatorData ?? []);
+    return this.validate(list, spec.selectorData?.validatorData ?? [], ctx);
   }
 
-  private validate(list: Entity[], validators: Data[]): Entity[] {
+  /** A search's filters: the controlled operator only; everyone but the ability's owner (Xaihi's set: "other teammates"). */
+  private validate(list: Entity[], validators: Data[], ctx: Ctx): Entity[] {
     for (const v of validators) {
       const t = short(v.$type);
       if (t === 'Selector+MainCharacterValidator') list = list.filter((e) => e.side === 'team' && e.slot === this.controlled);
+      else if (t === 'Selector+ExcludeOwnerValidator') list = list.filter((e) => e !== ctx.owner && e !== ctx.owner.owner);
     }
     return list;
   }
@@ -729,7 +737,7 @@ export class World {
     else if (/FixedPointFinder|PointFinder|NavMesh/.test(t)) list = [];
     // Factions are the ability's source's (autoSetTargetFaction): a buff on the enemy from an operator still finds enemies.
     else list = anti === ((ctx.source.owner ?? ctx.source).side === 'team') ? [this.enemy] : this.team;
-    return this.validate(list, a.selectorData?.validatorData ?? []);
+    return this.validate(list, a.selectorData?.validatorData ?? [], ctx);
   }
 
   // -------------------------------------------------------------------------
@@ -948,7 +956,7 @@ export class World {
       case 'Conditions.CheckTagMatch': {
         const want: Data[] = c.query?.tags ?? [];
         const has = (e: Entity, t: Data) =>
-          e.buffs.some((b) => (b.def.applyTags ?? []).some((x: Data) => x.tagId === t.tagId)) || inflictionsIn([t]).some((x) => (e.bb.get(`inflict_${x}`) ?? 0) > 0);
+          e.buffs.some((b) => (b.def.applyTags ?? []).some((x: Data) => x.tagId === t.tagId)) || inflictionsIn([t]).some((x) => (e.bb.get(`inflict_${x}`) ?? 0) > 0) || this.ownTags(e).includes(Number(t.tagId));
         const q = c.query?.queryType ?? 'HasAny';
         const ok = (e: Entity) => (q === 'HasAll' ? want.every((t) => has(e, t)) : q === 'ExceptAny' ? !want.some((t) => has(e, t)) : want.some((t) => has(e, t)));
         return this.targets(c.checkTarget, ctx).some(ok);
@@ -1672,7 +1680,7 @@ export class World {
       // A group, filtered: ExcludeTarget (Ardelia's bomb: the half-damage blast is for the others), a priority filter's
       // count (Tangtang); a body part is its body here.
       case 'TargetPostProcessorAction': {
-        let list = this.validate(this.targets(a.target, ctx), a.validatorData ?? []);
+        let list = this.validate(this.targets(a.target, ctx), a.validatorData ?? [], ctx);
         for (const pp of a.postProcessorData ?? []) {
           const k = short(pp.$type);
           if (k === 'Selector+ExcludeTarget') {
@@ -1723,12 +1731,26 @@ export class World {
       case 'SetSuperArmorAction':
       case 'InterruptAction':
       case 'CurveEvaluateFloat':
-      case 'TimeDilationAction':
       case 'TemporaryUnlockAction':
       case 'SaveTargetDistanceAction':
       case 'ChannelingCastingAction':
       case 'TogglableAction':
         return;
+      // A combo skill's banner: the game slows everyone but its caster (Global, curve "ComboSkill") for the action's
+      // duration, cut short by a later RESETto1 in the same skill (Arcane's after 9 frames). The curve isn't in the
+      // dump: the recordings show regeneration and the Staggered meter at about a sixth of their rate (COMBO_SLOW),
+      // so both stand still for the time lost (`slowLeft`). Inside a cut-in it adds nothing.
+      case 'TimeDilationAction': {
+        if (a.layer !== 'Global' || a.curveKey !== 'ComboSkill' || !ctx.run || ctx.run.owner.side !== 'team' || this.freeze) return;
+        const at = this.frame - ctx.run.start;
+        let span = Math.round(this.val(a.duration, ctx.bb) * FPS);
+        for (const ta of ctx.run.skill.actionGroupData?.timelineActions ?? [])
+          if (ta._startFrame > at && (ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'TimeDilationAction' && d.layer === 'Global' && d.curveKey === 'RESETto1'))
+            span = Math.min(span, ta._startFrame - at);
+        const left = Math.round(span * (1 - COMBO_SLOW));
+        this.slowLeft = Math.max(this.slowLeft, left);
+        return;
+      }
       // Time stops for everyone but the caster while its timeline entry lasts (the ultimate's cut-in).
       case 'UltimateTimeAction':
         if (ctx.run && Number(a.timeScale ?? 1) === 0 && ctx.span) {
@@ -1777,6 +1799,11 @@ export class World {
     this.runs.push(run);
     this.stepRun(run);
     return run;
+  }
+
+  /** A summon (an operator's ability entity) of someone other than `caster`: it runs on through `caster`'s cut-in. */
+  private summonOfOther(e: Entity, caster: Entity): boolean {
+    return e.side === 'team' && e.slot < 0 && !!e.owner && e.owner !== caster && e.owner.side === 'team';
   }
 
   /** Whether a run was cast at or after a world frame. */
@@ -2461,6 +2488,7 @@ export class World {
   obtain(type: string, amount: number, who: Entity, tag?: number, raw = false): void {
     if (!amount) return;
     if (type === 'Atb') {
+      if (amount > 0) amount *= this.foe.sp?.gain ?? 1;
       this.lastAtbAmount = amount;
       this.sp = Math.min(this.spMax, this.sp + amount);
       this.abilityEvent(who.owner ?? who, 'OnObtainAtb', null);
@@ -2482,6 +2510,12 @@ export class World {
 
   /** Time stopped by an ultimate: only its caster's runs started since go on. */
   freeze: { owner: Entity; from: number; left: number } | null = null;
+  /**
+   * Frames left of a combo banner's slow motion, in the time it loses: SP doesn't regenerate and the Staggered time
+   * stands still (the recordings), while the team acts on (Arcane's Final Strike after Last Rite's combo at 0:23.5 in
+   * the Last Rite run kept its time).
+   */
+  slowLeft = 0;
   /** No SP regeneration this frame: a replay's stopwatch stood still (replaySim), so the game's timer did too. */
   holdSp = false;
   /** Cut-ins waiting for the one playing (ultimates pressed in it). */
@@ -2533,8 +2567,10 @@ export class World {
       const { owner, from } = this.freeze;
       this.freeze.left--;
       this.frozenFrames++;
+      // The caster's own casts go on, and so do other operators' summons (the owner's Last Rite recording: Si's Ink
+      // Lung, frozen through her own cut-in, counts on through Arcane's, and its combo-cooldown cut lands inside it).
       for (const r of [...this.runs])
-        if (!r.ended && r.owner === owner && this.startedSince(r, from)) {
+        if (!r.ended && ((r.owner === owner && this.startedSince(r, from)) || this.summonOfOther(r.owner, owner))) {
           r.start--;
           this.stepRun(r);
         }
@@ -2569,7 +2605,12 @@ export class World {
           this.jumpTo(j.run, Number(j.a.destFrame));
         }
     }
-    if (!this.holdSp) this.sp = Math.min(this.spMax, this.sp + (this.foe.sp?.regen ?? 8) / FPS);
+    const slowed = this.slowLeft > 0;
+    if (slowed) {
+      this.slowLeft--;
+      this.holdStagger(1);
+    }
+    if (!this.holdSp && !slowed) this.sp = Math.min(this.spMax, this.sp + (this.foe.sp?.regen ?? 8) / FPS);
     // Summons whose time is up.
     for (const e of this.entities) if (e.alive && e.until !== undefined && e.until <= this.frame) this.finishEntity(e);
     // Channels: their next hits, while their skill runs.
@@ -2819,9 +2860,14 @@ export class World {
     this.chains[slot] = null;
   }
 
-  /** Frames a press would hold its operator before a basic attack may follow (its skill's exclusiveFrame). */
+  /**
+   * Frames a press would hold its operator before a basic attack may follow, as `busy` holds it: to its skill's
+   * MarkCanInterrupt where it has one (Last Rite's battle skill: 51, not its exclusiveFrame 373), else its exclusiveFrame.
+   */
   holdOf(slot: number, input: Input): number {
-    return this.skillOf.get(this.skillIdOf(this.team[slot], input))?.exclusiveFrame ?? 0;
+    const skill = this.skillOf.get(this.skillIdOf(this.team[slot], input));
+    const mark = (skill?.actionGroupData?.timelineActions ?? []).find((ta: Data) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'MarkCanInterrupt'));
+    return mark ? (mark._startFrame ?? 0) : (skill?.exclusiveFrame ?? 0);
   }
 
   /** Frames an operator's ultimate stops time for everyone else (its cut-in: UltimateTimeAction, time scale 0). */
@@ -2946,7 +2992,11 @@ export class World {
   private jumpTo(run: Run, dest: number): void {
     run.start = this.frame - dest;
     (run.skill.actionGroupData?.timelineActions ?? []).forEach((ta: Data, i: number) => {
-      if ((ta._startFrame ?? 0) < dest) run.done.add(i);
+      if ((ta._startFrame ?? 0) >= dest || run.done.has(i)) return;
+      run.done.add(i);
+      // A jump past the skill's MarkCanInterrupt skips the part it holds the operator for: Last Rite's battle skill
+      // cast off-field goes from frame 0 to 300, past its mark at 51, and the recording swaps to her 0.75 s in.
+      if ((ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'MarkCanInterrupt')) run.canInterrupt = true;
     });
   }
 
@@ -3130,7 +3180,17 @@ export class World {
 
   /** An operator's Haste now: the highest one (they don't add up: "HighPriority"). */
   hasteOf(op: Entity): number {
-    return Math.max(0, ...(op.haste ?? []).filter((x) => x.until > this.frame && (!x.parent || x.parent.owner.buffs.includes(x.parent))).map((x) => x.rate));
+    return Math.max(0, ...this.hastes(op).map((x) => x.rate));
+  }
+
+  /** Frames the Haste that counts now (hasteOf) has left: its own time or its buff's, whichever ends first. */
+  hasteLeft(op: Entity): number {
+    const x = this.hastes(op).reduce<Effect | undefined>((a, y) => (!a || y.rate > a.rate ? y : a), undefined);
+    return x ? Math.min(x.until, x.parent?.end ?? Infinity) - this.frame : 0;
+  }
+
+  private hastes(op: Entity): Effect[] {
+    return (op.haste ?? []).filter((x) => x.until > this.frame && (!x.parent || x.parent.owner.buffs.includes(x.parent)));
   }
 
   /** Whether an operator can do its next basic attack (not in a skill; its chain's window open, or the chain over). */
@@ -3390,6 +3450,35 @@ export class World {
   bundleOf(op: Entity): Bundle | undefined {
     return this.bundles.find((b) => b.operator === op.id);
   }
+
+  /**
+   * The gameplay tag an operator carries as herself: the one her own skills mark their Ultimate Energy with
+   * (ObtainCostAction uspRecoverTag) that her passive's RefrainObtainUsp lets through. Last Rite's 264623624: her
+   * Perfusion makes phantom_main, not the teammates' phantom, when the strike is hers (CheckTagMatch on its owner).
+   */
+  ownTags(op: Entity): number[] {
+    const b = op.side === 'team' && op.slot >= 0 ? this.bundleOf(op) : undefined;
+    if (!b) return [];
+    const cached = this.ownTagCache.get(op.id);
+    if (cached) return cached;
+    const gains = new Set<number>();
+    const let_through = new Set<number>();
+    const walk = (x: unknown, into: (d: Data) => void): void => {
+      if (Array.isArray(x)) for (const v of x) walk(v, into);
+      else if (x && typeof x === 'object') {
+        into(x as Data);
+        for (const v of Object.values(x)) walk(v, into);
+      }
+    };
+    for (const [id, sk] of Object.entries(b.skills)) if (id.startsWith(op.id)) walk(sk, (d) => d.useUspRecoverTag && d.uspRecoverTag && gains.add(Number(d.uspRecoverTag.tagId)));
+    walk(b.buffs[`buff_${op.id}_passive`], (d) => {
+      if (short(d.$type) === 'RefrainObtainUsp') for (const t of d.refrainObtainUspTags?.predefinedTag ?? []) let_through.add(Number(t.tagId));
+    });
+    const tags = [...gains].filter((t) => let_through.has(t));
+    this.ownTagCache.set(op.id, tags);
+    return tags;
+  }
+  private ownTagCache = new Map<string, number[]>();
 }
 
 /** Something that happened that a combo trigger can watch for. */
