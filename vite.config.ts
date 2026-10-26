@@ -40,6 +40,7 @@ const PAGES = [
   'aic',
   'rotations',
   'rotations/parser',
+  'rotations/sim',
   'rotations/transcript',
   'achievements',
   'archives',

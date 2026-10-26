@@ -13,7 +13,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   History and Parsed runs), `parser.ts` (the Parser tab: the run's head, discrepancies, the transcript editor,
   `parseView`). Modules only import downwards (state, text, track, fit, buffs, player, results, builds, runs,
   parser, then the page), so none runs another's code while loading.
-- Rotations tab (`/rotations`, `ui/pages/rotations.ts`): a team DPS simulator
+- Rotations tab (`/rotations` Parser, `/rotations/sim` Simulator; `ui/pages/rotations.ts`): a team DPS simulator
   that teaches button order. Four operators in team position order (position
   01 matters: e.g. Si's ultimate cuts its combo cooldown), each from their
   loadout and copies ("My loadouts") or with weapon and gear the sim picks
@@ -100,6 +100,10 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   the local dump has those as binary, the EndfieldData repo as text. `Enemy.guard` (a stance below HP shares: damage
   taken ×(1+x), DEF, no Stagger, `World.checkGuard`, a Guard stance mechanic) is implemented but no enemy uses it:
   the Skydrummer's skill06 stance proved short in the recording.
+  Its replay breaks Stagger early (video 57.8 / 129.6, the game 62.1 / 132.95), and that stays (owner, 2026-10-26).
+  Every hit gives its data Stagger, but around Tangtang's battle skill (video 3.5, 22, 49) the footage's meter gains
+  3–5 less: likely Whirlpool ticks missing the big moving boss, which the sim can't place. Alleikhreos shows the
+  full 10 per Whirlpool (5 ticks of 2, `targetTriggerInterval` 0.075 s kept at 2 frames).
   `BLIGHTSHADE` is Echoes of War's "Glaiver File: Yinglung" boss, YSTF Captain Blightshade (eny_0124_kltdcap_tower016,
   template eny_0124_kltdcap: DEF 100, Resistance 20 Physical / 35 Electric / 0 the rest, Stagger 320 + 20 / 9 s with a
   node at half, Finisher ×1.5 / 50 SP, interrupt +20; Brutal/Hard/Normal = Lv 90/75/60). Its spawners
@@ -215,7 +219,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   timeline has an Enemy lane with its Staggered stretches (`World.staggers`); a parsed run always has it, its boss's face
   as its name, in both views, even with nothing on it (a recording with no Stagger or mechanic). Cooldowns run through ultimate cut-ins
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
-  Simulator and Parser (`/rotations/parser`; the old `/rotations/transcript` redirects): a read video's team, enemy
+  Parser (`/rotations`, also `/rotations/parser`; opens on the newest parsed run) and Simulator (`/rotations/sim`); the old `/rotations/transcript` redirects): a read video's team, enemy
   (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only and comes
   first, with Parse gameplay and Import run at its bottom; an opened run shows below it on the page, not in
   a card (its name as a header, date and length under it, its buttons at the right; then Damage per second, Total

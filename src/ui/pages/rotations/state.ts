@@ -63,6 +63,8 @@ interface PageState {
   draft: { at: number; steps: VideoStep[]; away: [number, number][]; seconds: number; builds: SimBuild[]; orig: Pick<SavedSim<SimResult>, 'key' | 'result' | 'video' | 'name' | 'note'> } | null;
   /** Parsed runs' list shown (true) or folded to its title row (false); null: folded while a run is open. */
   runsShown: boolean | null;
+  /** The Parser already opened the newest run once (closing it afterwards stays closed). */
+  latestOpened: boolean;
   /**
    * A read video waiting for the player's picks: its review section (the reader's own, kept so picks survive redraws),
    * whether a draft is saved (after a reload, before it's reopened), and whether it's what the page shows.
@@ -134,6 +136,7 @@ export const page: PageState = {
   replayWorker: null,
   draft: null,
   runsShown: null,
+  latestOpened: false,
   readerEl: null,
   hasDraft: false,
   draftOpen: false,

@@ -409,11 +409,18 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   page.redrawPage = redraw;
   loadSaved(redraw);
   loadBuffIcons(redraw);
+  const TABS: [string, string, string][] = [['/rotations', 'Parser', ''], ['/rotations/sim', 'Simulator', '']];
   const tabs = (current: string, body: Html) =>
-    html`<main class="container fade-in">${sideTabs('Rotations', [['/rotations', 'Simulator', ''], ['/rotations/parser', 'Parser', '']], current, html`<div class="sim-page">${body}</div>`, header)}</main>`;
-  if (view === 'parser') {
+    html`<main class="container fade-in">${sideTabs('Rotations', TABS, current, html`<div class="sim-page">${body}</div>`, header)}</main>`;
+  if (view !== 'sim') {
+    // Nothing chosen: the newest parsed run opens, once.
+    if (page.saved && !page.latestOpened) {
+      page.latestOpened = true;
+      const newest = page.runs.filter(isRecording).sort((a, b) => b.at - a.at)[0];
+      if (newest && !page.replay && !page.draftOpen) page.replay = { names: newest.names, ids: newest.ids, result: newest.result as ReplayResult, at: newest.at };
+    }
     const body = parseView(wiki, index.data, s, redraw);
-    return html`<main class="container fade-in">${sideTabs('Rotations', [['/rotations', 'Simulator', ''], ['/rotations/parser', 'Parser', '']], '/rotations/parser', html`<div class="sim-page">${body}</div>`, header, runsAside(page.replay?.at))}</main>`;
+    return html`<main class="container fade-in">${sideTabs('Rotations', TABS, '/rotations', html`<div class="sim-page">${body}</div>`, header, runsAside(page.replay?.at))}</main>`;
   }
   // Standard and Moderate unless picked.
   const style = s.style ? styleOf(s.style) : 'standard';
@@ -460,7 +467,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   }
   const progress = page.running?.progress;
   return tabs(
-    '/rotations',
+    '/rotations/sim',
     html`<details class="card sim-how"><summary class="card-body label-14">How it works</summary>
         <dl class="card-body copy-14">${HOW.map(([k, v]) => html`<div><dt class="label-14">${k}</dt><dd class="secondary">${v}</dd></div>`)}</dl>
       </details>

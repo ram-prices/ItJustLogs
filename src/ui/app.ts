@@ -669,7 +669,7 @@ function installImport(): void {
 /** Rotations → Parser, where a pasted or dropped recording is parsed and an exported run opened. */
 const onParser = (): boolean => {
   const r = parseRoute();
-  return r.page === 'rotations' && r.id === 'parser';
+  return r.page === 'rotations' && r.id !== 'sim';
 };
 
 /**
