@@ -5,8 +5,15 @@
  * picked another (`settings.potentialArt`).
  */
 
-/** ef-assets operators/potential/index.json: operator id → Potential → files. */
-export type PotentialArtIndex = Record<string, Record<string, string[]>>;
+/**
+ * ef-assets operators/potential/index.json: operator id → Potential → files,
+ * and `focus`: file → the point the banner keeps in view (the face and upper
+ * body, x and y as fractions), set by hand there.
+ */
+export interface PotentialArtIndex {
+  focus?: Record<string, [number, number]>;
+  [opId: string]: Record<string, string[]> | Record<string, [number, number]> | undefined;
+}
 
 /** A pick: 'auto' (the highest owned), 'base' (no Potential art), or a picture's key ("p3", "p1-ex01"). */
 export type ArtChoice = string;
@@ -16,14 +23,20 @@ export interface PotentialPicture {
   key: string;
   level: number;
   file: string;
+  /** Where the banner keeps it in view, x and y in % (the centre without a point). */
+  focus: [number, number];
 }
 
 /** An operator's pictures, lowest Potential first. */
 export function potentialPictures(index: PotentialArtIndex | null, opId: string): PotentialPicture[] {
-  const levels = index?.[opId];
+  const levels = opId === 'focus' ? undefined : (index?.[opId] as Record<string, string[]> | undefined);
   if (!levels) return [];
+  const focus = (file: string): [number, number] => {
+    const f = index?.focus?.[file];
+    return f ? [Math.round(f[0] * 100), Math.round(f[1] * 100)] : [50, 50];
+  };
   return Object.entries(levels)
-    .flatMap(([n, files]) => files.map((file) => ({ key: file.slice(opId.length + 1).replace(/\.webp$/, ''), level: Number(n), file })))
+    .flatMap(([n, files]) => files.map((file) => ({ key: file.slice(opId.length + 1).replace(/\.webp$/, ''), level: Number(n), file, focus: focus(file) })))
     .sort((a, b) => a.level - b.level);
 }
 

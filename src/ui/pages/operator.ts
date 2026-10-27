@@ -149,16 +149,20 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
  * glow of their portrait), with the player's character picture in place of
  * the portrait when they picked one (pages/art.ts). The banner: a Potential's
  * picture the player picked, else their own banner pictures, else the highest
- * Potential's picture they own (pages/potentialArt.ts).
+ * Potential's picture they own (pages/potentialArt.ts), which makes the header
+ * taller (`.tall`) and sits on the picture's focus point from ef-assets.
  */
 function hero(id: string, o: WikiOperator, potential: number, redraw: () => void, overBackdrop = false): Html {
   const pot = heroPotentialArt(id, potential, redraw);
   const own = pot.picked ? null : currentArt(id, 'banner', redraw);
   const banner = own ?? (pot.shown && { id: `potential:${pot.shown.file}`, src: potentialArtUrl(pot.shown.file) });
+  // A Potential's picture (2:1) gets a taller header, kept on its focus point.
+  const tall = !own && !!pot.shown;
+  const [x, y] = tall ? pot.shown!.focus : banner ? positionOf(banner.id) : [0, 0];
   const portrait = currentArt(id, 'portrait', redraw);
-  return html`<section class="wiki-hero${banner ? ' has-art' : ''}${overBackdrop ? ' over-backdrop' : ''}">
+  return html`<section class="wiki-hero${banner ? ' has-art' : ''}${tall ? ' tall' : ''}${overBackdrop ? ' over-backdrop' : ''}">
     ${banner
-      ? html`<img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="object-position:${positionOf(banner.id)[0]}% ${positionOf(banner.id)[1]}%" alt="" decoding="async" />`
+      ? html`<img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="object-position:${x}% ${y}%" alt="" decoding="async" />`
       : heroGlow('char', id)}
     <div class="container wiki-hero-inner">
       ${portrait ? html`<img class="wiki-hero-portrait user-art" src="${portrait.src}" alt="" decoding="async" />` : itemImg('char', id, 'wiki-hero-portrait')}

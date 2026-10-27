@@ -7,6 +7,7 @@ const index: PotentialArtIndex = {
     '3': ['chr_0004_pelica-p3.webp'],
     '5': ['chr_0004_pelica-p5.webp'],
   },
+  focus: { 'chr_0004_pelica-p3.webp': [0.33, 0.3] },
 };
 const list = potentialPictures(index, 'chr_0004_pelica');
 
@@ -15,6 +16,12 @@ describe('potential art', () => {
     expect(list.map((p) => p.key)).toEqual(['p1', 'p1-ex01', 'p3', 'p5']);
     expect(potentialPictures(index, 'chr_0037_minghe')).toEqual([]);
     expect(potentialPictures(null, 'chr_0004_pelica')).toEqual([]);
+  });
+
+  it('takes each picture’s focus point in %, the centre without one', () => {
+    expect(list.find((p) => p.key === 'p3')?.focus).toEqual([33, 30]);
+    expect(list.find((p) => p.key === 'p5')?.focus).toEqual([50, 50]);
+    expect(potentialPictures(index, 'focus')).toEqual([]);
   });
 
   it('auto shows the highest Potential owned', () => {

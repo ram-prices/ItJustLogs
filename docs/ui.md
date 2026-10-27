@@ -57,6 +57,14 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     (`wallpaper`, labelled with what shows) opens a pop-up of Auto, Base and
     every picture, locked ones dimmed with a lock and still pickable. A picked
     picture goes over the player's own banner pictures; Auto and Base don't.
+    A Potential picture makes the hero taller (`.wiki-hero.tall`: 2.4:1,
+    at least 360px, at most min(640px, 72vh), facts on a stronger bottom
+    fade; phones show the whole 2:1 picture across the top with the facts
+    under its fading foot) and sits on its focus point: `focus` in the
+    `index.json` (file → [x, y] fractions, the face and upper body, set by
+    hand from a contact sheet; `potential-art.py` keeps them and leaves new
+    pictures without one, which centres them). The player's own banner art
+    keeps the usual height and their own position.
     Built pages and Discord embeds keep the base art.
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
     `ui/components.ts` (`OROBERYL_ICON`, ef-assets icons/items, `--oroberyl`).
