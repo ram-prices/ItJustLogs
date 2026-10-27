@@ -403,14 +403,15 @@
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
 }
 /* A Potential's picture (2:1, operator.ts `tall`): a taller header, about
-   2.4:1, capped on wide screens; the facts sit at its foot on a stronger fade.
+   3.4:1, capped at 460px or half the window on wide screens (the picture
+   keeps its shape, cropped top and bottom); the facts sit at its foot on a stronger fade.
    The picture keeps its focus point (ef-assets index.json) in view. */
 .wiki-hero.tall {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   /* Not aspect-ratio: a max-height there would narrow the header too. */
-  min-height: clamp(360px, 100vw / 2.4, min(640px, 72vh));
+  min-height: clamp(300px, 100vw / 3.4, min(460px, 50vh));
 }
 .wiki-hero.tall::after {
   background: linear-gradient(

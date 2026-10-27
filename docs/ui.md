@@ -57,8 +57,8 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     (`wallpaper`, labelled with what shows) opens a pop-up of Auto, Base and
     every picture, locked ones dimmed with a lock and still pickable. A picked
     picture goes over the player's own banner pictures; Auto and Base don't.
-    A Potential picture makes the hero taller (`.wiki-hero.tall`: 2.4:1,
-    at least 360px, at most min(640px, 72vh), facts on a stronger bottom
+    A Potential picture makes the hero taller (`.wiki-hero.tall`: 3.4:1,
+    at least 300px, at most min(460px, 50vh), the picture cropped not stretched, facts on a stronger bottom
     fade; phones show the whole 2:1 picture across the top with the facts
     under its fading foot) and sits on its focus point: `focus` in the
     `index.json` (file → [x, y] fractions, the face and upper body, set by
