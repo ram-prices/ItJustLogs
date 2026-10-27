@@ -140,6 +140,8 @@ export interface Settings {
   sim?: import('./domain/sim/team').SimSettings;
   /** A banner picture's focus (x, y in %), when moved from where it starts. */
   artPos?: Record<string, [number, number]>;
+  /** Each operator's banner art: a Potential's picture key ("p3") or 'base'; unset = Auto (domain/potentialArt.ts). */
+  potentialArt?: Record<string, string>;
   /** What each operator has equipped (weapon and gear), by operator id. */
   loadouts?: Record<string, Loadout>;
   /** The profile picture rises above its circle (its top half isn't cropped), for cut-out pictures: cat ears. */

@@ -23,6 +23,7 @@ import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
+import { openPotentialArtPicker } from './pages/potentialArt';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
 import { achievementsPage, archivesPage, collectionAction, collectionChange, readFindingsFrom, readMedalsFrom } from './pages/collections';
@@ -931,6 +932,9 @@ async function onClick(e: MouseEvent): Promise<void> {
     }
     case 'art-manage':
       openArtManager(el.dataset.op!, el.dataset.name!, draw);
+      break;
+    case 'potential-art':
+      openPotentialArtPicker(el, el.dataset.op!, Number(el.dataset.pot));
       break;
     case 'art-shuffle':
       shuffleArt(el.dataset.op!, draw);

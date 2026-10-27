@@ -41,6 +41,10 @@ Read when touching `src/drive.ts`, `ui/sync.ts`, snapshots, operator art or the 
     travel as `settings.deletedArt` tombstones. Downloaded full backups do
     include it (`Backup.art`, data URLs; `buildBackup({ art: true })`), and
     importing one restores pictures this browser lacks.
+  - Potential art picks (`settings.potentialArt`: operator id → `'base'` or a
+    picture key like `'p3'`; Auto isn't stored, so older settings load as
+    Auto) are plain settings: they sync and go in backups with the rest, and
+    the pictures themselves stay on ef-assets (docs/ui.md).
   - Parsed runs (Rotations → Parser) sync too, each as its own appData file
     `run:<at>` (`syncRuns`, its last change `edited` in appProperties; the newer
     side wins); deletions travel as `settings.deletedRuns`. Simulator results

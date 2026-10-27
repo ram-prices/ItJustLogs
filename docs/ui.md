@@ -49,6 +49,15 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     made. Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
     art). Unpulled Headhunting cards prefer it over the schedule's `art`.
     Discord embeds still use the schedule's `art`.
+  - Potential art (`domain/potentialArt.ts`, `ui/pages/potentialArt.ts`): the
+    pictures P1, P3 and P5 unlock (ef-assets `operators/potential/<id>-p<n>.webp`
+    and its `index.json`, from `scripts/potential-art.py` and the EndfieldDataDump
+    checkout; Minghe has none in the game's table). An operator page's banner
+    shows the highest one the player owns (Auto); the hero's Banner art button
+    (`wallpaper`, labelled with what shows) opens a pop-up of Auto, Base and
+    every picture, locked ones dimmed with a lock and still pickable. A picked
+    picture goes over the player's own banner pictures; Auto and Base don't.
+    Built pages and Discord embeds keep the base art.
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
     `ui/components.ts` (`OROBERYL_ICON`, ef-assets icons/items, `--oroberyl`).
   - Rarity is drawn with the game's emblem, not a ★ glyph: `STAR_SVG`,

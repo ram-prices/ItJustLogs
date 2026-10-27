@@ -5,6 +5,7 @@ import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } f
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
 import { canShuffle, currentArt, gallerySection, positionOf } from './art';
+import { heroPotentialArt, potentialArtButton, potentialArtUrl } from './potentialArt';
 import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
@@ -144,12 +145,16 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
 // ---------------------------------------------------------------------------
 
 /**
- * The page's header: the operator's facts over the player's banner art (or a
- * soft glow of their portrait), with the player's character picture in place
- * of the portrait when they picked one (pages/art.ts).
+ * The page's header: the operator's facts over the banner art (or a soft
+ * glow of their portrait), with the player's character picture in place of
+ * the portrait when they picked one (pages/art.ts). The banner: a Potential's
+ * picture the player picked, else their own banner pictures, else the highest
+ * Potential's picture they own (pages/potentialArt.ts).
  */
-function hero(id: string, o: WikiOperator, redraw: () => void, overBackdrop = false): Html {
-  const banner = currentArt(id, 'banner', redraw);
+function hero(id: string, o: WikiOperator, potential: number, redraw: () => void, overBackdrop = false): Html {
+  const pot = heroPotentialArt(id, potential, redraw);
+  const own = pot.picked ? null : currentArt(id, 'banner', redraw);
+  const banner = own ?? (pot.shown && { id: `potential:${pot.shown.file}`, src: potentialArtUrl(pot.shown.file) });
   const portrait = currentArt(id, 'portrait', redraw);
   return html`<section class="wiki-hero${banner ? ' has-art' : ''}${overBackdrop ? ' over-backdrop' : ''}">
     ${banner
@@ -170,6 +175,7 @@ function hero(id: string, o: WikiOperator, redraw: () => void, overBackdrop = fa
         ${o.tags.length ? html`<div class="wiki-tags">${o.tags.map((t) => badge(t, 'outline'))}</div>` : ''}
       </div>
       <div class="row wiki-hero-link">
+        ${pot.list.length ? potentialArtButton(id, potential, pot) : ''}
         ${canShuffle(id, redraw) ? html`<button type="button" class="btn secondary sm" data-action="art-shuffle" data-op="${id}" title="Pick other pictures for the banner, picture and background">${icon('shuffle')}<span class="hide-sm">Shuffle</span></button>` : ''}
         <button type="button" class="btn secondary sm" data-action="art-manage" data-op="${id}" data-name="${o.name}" title="Add pictures for this page's banner">${icon('image')}<span class="hide-sm">Art</span></button>
         ${copyLinkButton(id)}
@@ -512,7 +518,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
   const bonuses = bonusesFor(id, o, a, redraw);
   const backdrop = currentArt(id, 'background', redraw);
   return html`${backdrop ? html`<img class="op-backdrop" src="${backdrop.src}" alt="" decoding="async" />` : ''}
-    ${hero(id, o, redraw, !!backdrop)}
+    ${hero(id, o, owned?.copies ? owned.potential : -1, redraw, !!backdrop)}
     <main class="container fade-in wiki-page${backdrop ? ' has-backdrop' : ''}">
       ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined)}
       <div class="wiki-cols even">

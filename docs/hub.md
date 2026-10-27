@@ -47,7 +47,7 @@ conversation.
 
 ## State (2026-10-27)
 
-- Live: the "Weapon tuning and essence levels" commit (2026-10-27; sha in the pending-work memory).
+- Live: 6a69d54 (weapon tuning and essence levels).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
 - Recently shipped: weapon tuning (0–4) and per-skill essence levels on the weapon page, Loadout and
   builds (ef-assets `combat/weapon-tuning.json`), fixing weapon Potential counted twice in the sim;
