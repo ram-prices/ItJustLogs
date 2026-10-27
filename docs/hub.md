@@ -42,14 +42,19 @@ conversation.
 - Engine rules come from game data (EndfieldData dump, ef-assets). Footage only confirms
   mechanics and is never a DPS target. Flag any rule modelled from footage.
 - When a batch is done, say so; the owner archives idle workers.
+- Every website preview loads `D:\Dev\ijl_DEFAULT.json` into the test instance.
 - Reading a recording: a worker with "/parse-recording <path>" (follows `tools/ai-parser/README.md`).
   It only touches `tools/ai-parser/`, so it can run beside a Rotations worker.
 
 ## State (2026-10-27)
 
-- Live: 6a69d54 (weapon tuning and essence levels).
+- Live: the "Operator banner layers, Arsenal Skills, Loadout weapon slot, backups with runs" commit
+  (sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: weapon tuning (0–4) and per-skill essence levels on the weapon page, Loadout and
+- Recently shipped: full backups with saved runs (`Backup.sims`, `restoreSims`); Arcane back in
+  `GAME_ART`; operator banner parallax (ef-assets `banners/game/layers/`) and the pinned operator
+  hero with per-Potential face anchors; the Arsenal page's single Skills section (`grooveSlots`);
+  the Loadout weapon slot with the skill 3 summary (ef-assets `wiki/weapon-summaries.json`); weapon tuning (0–4) and per-skill essence levels on the weapon page, Loadout and
   builds (ef-assets `combat/weapon-tuning.json`), fixing weapon Potential counted twice in the sim;
   "Your pulls" → "Pull history" (Database and Home tooltip); one shared tooltip
   and right-click menu style (`data-tip`, `tip`/`tipNote`/`tipRow`, `.tooltip`/`.ctx-menu` in
@@ -78,6 +83,5 @@ conversation.
 8. The "SP at the start" field cap of 300: unverified whether it was fixed.
 9. Heat and Electric element icons have no backup mirror, so they sometimes load empty.
 10. Owner checks: parsed-run Drive sync on two devices; the first ef-assets schedule pull request.
-11. Arcane's game-screen banner (ef-assets banners/game/special_1_4_1.webp) draws her about 1.33x
-   too wide: `operator-banner.py` grows a stretch-anchored layer with its wider-than-16:9 screen.
-   The site uses her older banner art meanwhile (`GAME_ART` in banners.ts). Needs the game dump.
+11. Done: stretched game-screen banners. `operator-banner.py` drew tightly packed sprites over
+   their whole rect; fixed in ef-assets 6e84af1, which rebuilt 12 banners. Arcane is back in `GAME_ART`.

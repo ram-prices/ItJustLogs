@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bannerEnded } from './catalog';
-import { artificeLevels, artificeState, artificeTops, atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, essenceFromRanks, essenceMax, skillLevel, tuningMaxLevel, tuningOf, weaponBaseRanks, weaponBounds, weaponRankCaps, weaponSkillLevels, setCounts, statBonuses, wieldersOf, withArtifice, withSlot, type Loadout, type WeaponTuningFile } from './loadout';
+import { artificeLevels, artificeState, artificeTops, atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, essenceFromRanks, essenceMax, fillTemplate, grooveSlots, skillLevel, skillStat, summaryLines, tuningMaxLevel, tuningOf, weaponBaseRanks, weaponBounds, weaponRankCaps, weaponSkillLevels, setCounts, statBonuses, wieldersOf, withArtifice, withSlot, type Loadout, type WeaponSummary, type WeaponTuningFile } from './loadout';
 import { equip, type GearData } from './sim/build';
 import type { Schedule } from './schedule';
 import type { WikiGear, WikiWeapon } from './wiki';
@@ -137,6 +137,59 @@ describe('loadout bonuses', () => {
     expect(skillLevel([3, 9], 9)).toBe(9);
     // A save that held ranks (fully tuned): rank less the lowest.
     expect(essenceFromRanks([5, 9, 3], weaponBounds(weapon, 2, six, 4), essenceMax(weapon))).toEqual([2, 6, 0]);
+  });
+
+  it('reads the stat a weapon skill gives at a level', () => {
+    expect(skillStat(weapon.skills[0], 9)).toEqual({ stat: 'Intellect', value: 156, pct: false });
+    expect(skillStat(weapon.skills[2], 4)).toEqual({ stat: 'Secondary attribute', value: 25.6, pct: true });
+    expect(skillStat({ text: 'After the wielder…', values: [[1]] }, 1)).toBeNull();
+  });
+
+  // ef-assets wiki/weapon-summaries.json's Type 42: Solemn Phalanx (wpn_funnel_0016), and its skill's values.
+  const phalanx: WeaponSummary = {
+    branches: [
+      { if: ['Intellect', '>=', 'Will'], label: 'INT ≥ Will', lines: ['Apply ⟦key|Arts Infliction⟧: Arts DMG Dealt ⟦num|+{1}%⟧ for 20.00s.', 'Apply ⟦key|Arts Susceptibility⟧: ATK ⟦num|+{2}%⟧ for 20.00s.'] },
+      { if: ['Will', '>', 'Intellect'], label: 'Will > INT', lines: ['Apply ⟦key|Arts Burst⟧: enemy Arts DMG Taken ⟦num|+{3}%⟧ for 25.00s.', 'Apply ⟦key|Arts Susceptibility⟧: enemy Arts DMG Taken ⟦num|+{4}%⟧ for 25.00s.'] },
+    ],
+  };
+  const phalanxValues = [
+    [16, 19.2, 22.4, 25.6, 28.8, 32, 35.2, 38.4, 44.8],
+    [20, 24, 28, 32, 36, 40, 44, 48, 56],
+    [20, 24, 28, 32, 36, 40, 44, 48, 56],
+    [6, 7.2, 8.4, 9.6, 10.8, 12, 13.2, 14.4, 16.8],
+    [6, 7.2, 8.4, 9.6, 10.8, 12, 13.2, 14.4, 16.8],
+  ];
+
+  it('picks the summary branch the wielder’s attributes meet', () => {
+    const stats = (int: number, will: number) => (name: string) => (name === 'Intellect' ? int : name === 'Will' ? will : 0);
+    expect(summaryLines(phalanx, stats(430, 765))?.label).toBe('Will > INT');
+    expect(summaryLines(phalanx, stats(765, 430))?.label).toBe('INT ≥ Will');
+    // A tie is Intellect ≥ Will.
+    expect(summaryLines(phalanx, stats(500, 500))?.label).toBe('INT ≥ Will');
+    expect(summaryLines({ lines: ['x'] }, stats(0, 0))).toEqual({ lines: ['x'] });
+    expect(summaryLines(undefined, stats(0, 0))).toBeNull();
+  });
+
+  it('fills a summary with the skill’s values at its level', () => {
+    const line = summaryLines(phalanx, () => 0)!.lines[0];
+    expect(fillTemplate(line, phalanxValues, 4)).toBe('Apply ⟦key|Arts Infliction⟧: Arts DMG Dealt ⟦num|+32%⟧ for 20.00s.');
+    expect(fillTemplate(phalanx.branches![1].lines[0], phalanxValues, 4)).toBe('Apply ⟦key|Arts Burst⟧: enemy Arts DMG Taken ⟦num|+9.6%⟧ for 25.00s.');
+    expect(fillTemplate(phalanx.branches![1].lines[0], phalanxValues, 9)).toContain('+16.8%');
+    // Levels past the table are held at its last.
+    expect(fillTemplate('{1}', phalanxValues, 12)).toBe('56');
+  });
+
+  it('groups each skill’s 9 levels into tuning, Potential and essence grooves', () => {
+    expect(grooveSlots(weapon, six)).toEqual([
+      { own: 3, potential: 0, essence: 6 },
+      { own: 3, potential: 0, essence: 6 },
+      { own: 1, potential: 5, essence: 3 },
+    ]);
+    expect(grooveSlots({ skills: weapon.skills.slice(0, 2) }, tuningOf(tuningFile, 'wpn_three'))).toEqual([
+      { own: 5, potential: 0, essence: 4 },
+      { own: 1, potential: 5, essence: 3 },
+    ]);
+    expect(grooveSlots(weapon)).toEqual(grooveSlots(weapon, six));
   });
 
   it('reads a 3★ weapon’s two skills the same way (Potential on its second)', () => {

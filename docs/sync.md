@@ -48,7 +48,8 @@ Read when touching `src/drive.ts`, `ui/sync.ts`, snapshots, operator art or the 
   - Parsed runs (Rotations → Parser) sync too, each as its own appData file
     `run:<at>` (`syncRuns`, its last change `edited` in appProperties; the newer
     side wins); deletions travel as `settings.deletedRuns`. Simulator results
-    stay in this browser. Not in downloaded backups (Export run moves one).
+    stay in this browser. Downloaded full backups carry both kinds (`Backup.sims`, merged on import
+    by time, the later `edited` wins, capped at 100; `restoreSims`), not the Drive copy.
   - The profile picture's original (at most 1024px) with its framing and
     painting (`AvatarEdit` in store.ts, for Edit picture) syncs as one
     appData file, `avatar-edit` (`syncAvatarEdit`; the newer `at` wins, gone

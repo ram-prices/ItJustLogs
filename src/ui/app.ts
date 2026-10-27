@@ -382,6 +382,34 @@ let lastKey = '';
 let openedAt = 0;
 const SETTLE_MS = 1500;
 
+/** The site header's height as --header-h on the page, so a pinned operator header sits just under it. */
+let headerSize: ResizeObserver | null = null;
+let watchedHeader: Element | null = null;
+function watchHeader(): void {
+  const h = document.querySelector('.header');
+  if (!h || h === watchedHeader) return;
+  headerSize ??= new ResizeObserver(([e]) =>
+    document.documentElement.style.setProperty('--header-h', `${Math.round(e.target.getBoundingClientRect().height)}px`),
+  );
+  if (watchedHeader) headerSize.unobserve(watchedHeader);
+  headerSize.observe(h);
+  watchedHeader = h;
+}
+
+/** The operator header's height as `--hero-h`, which its pinned picture takes (database.css). */
+let heroSize: ResizeObserver | null = null;
+let watchedHero: Element | null = null;
+function watchHero(): void {
+  const h = document.querySelector('.wiki-hero.has-art');
+  if (h === watchedHero) return;
+  heroSize ??= new ResizeObserver(([e]) =>
+    document.documentElement.style.setProperty('--hero-h', `${Math.round(e.target.getBoundingClientRect().height)}px`),
+  );
+  if (watchedHero) heroSize.unobserve(watchedHero);
+  if (h) heroSize.observe(h);
+  watchedHero = h;
+}
+
 function applyTheme(): void {
   const t = state.settings.theme;
   document.documentElement.dataset.theme =
@@ -451,6 +479,8 @@ function draw(): void {
   clearTimeout(redrawnTimer);
   redrawnTimer = setTimeout(() => root().classList.remove('redrawn'), 200);
   render(root(), html`${header(route)}${page(route)}${footer()}`);
+  watchHeader();
+  watchHero();
   restoreTabRows(tabRows);
   if (searching) refocusListSearch();
   if (key !== lastKey) {
@@ -951,6 +981,8 @@ async function onClick(e: MouseEvent): Promise<void> {
       setMaxEssence(el.dataset.wpn!, el.getAttribute('aria-pressed') !== 'true');
       break;
     case 'essence-notch':
+      // The grooves sit in a skill's row head: the click etches, it doesn't open the row.
+      e.preventDefault();
       pickEssenceNotch(el.dataset.wpn!, Number(el.dataset.skill), Number(el.dataset.value));
       break;
     case 'weapon-tuning':

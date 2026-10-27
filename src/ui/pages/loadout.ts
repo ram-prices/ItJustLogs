@@ -1,9 +1,9 @@
 import type { Analysis } from '../../domain/analyze';
 import { gearIconUrl } from '../../domain/banners';
-import { GEAR_SLOTS, SET_PIECES, TUNING_MAX, artificeOf, artificeState, artificeTops, atkTotal, essenceFromRanks, essenceMax, hpTotal, isLoadoutSlot, tuningMaxLevel, tuningOf, weaponBounds, weaponSkillLevels, withArtifice, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot, type WeaponTuning, type WeaponTuningFile } from '../../domain/loadout';
+import { GEAR_SLOTS, SET_PIECES, TUNING_MAX, artificeOf, artificeState, artificeTops, atkTotal, essenceFromRanks, essenceMax, fillTemplate, hpTotal, isLoadoutSlot, skillStat, summaryLines, tuningMaxLevel, tuningOf, weaponBounds, weaponSkillLevels, withArtifice, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot, type WeaponSummaryFile, type WeaponTuning, type WeaponTuningFile } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, essenceNotches, skillNotches, slotIcon, tileArt, weaponTypeIcon } from '../components';
+import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { tip, tipNote, tipRow } from '../charts';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
@@ -179,23 +179,38 @@ export const essenceTag = (wpnId: string, w?: WikiWeapon, potential: number | nu
 };
 
 /**
- * The weapon's essence and ranks, kept per weapon (set on its page; every loadout holding it reads the same). On the
- * weapon's page (`ranks` false): each skill with the essence's own grooves (`essenceNotches`, a click etches to one),
- * a list whose rows line up with its Skills' (the own skill by its kind, "Efficacy": an essence fits any weapon whose
- * third skill is of that kind). In a loadout, under the weapon's name like a gear piece's stats, only each skill's
- * rank at the right (`skillNotches`: the weapon's own levels and the essence's together).
+ * The weapon's skills in a loadout, under its name like a gear piece's stats: each skill's level of what it can reach
+ * now ("7/9": its cap from tuning, or Potential on the own skill) where a gear stat has its Artifice mark, its name (the
+ * own skill by its kind, "Medicant"), and at the right what it gives at that level (the game's value; `skillStat`):
+ * "+156" on a stat skill, whose name says the stat, "Treatment Efficiency +18%" on the own one ("Main/Secondary
+ * attribute" as the operator's own, `attrs`). Under the own skill, its effect in short (ef-assets
+ * wiki/weapon-summaries.json, filled at its level; a branching one by the operator's attribute totals, `attr`).
+ * Tuning and essence are kept per weapon and set on its page.
  */
-export function weaponPicker(wpnId: string, w: WikiWeapon, potential: number | null, ranks = true): Html {
+export function weaponPicker(
+  wpnId: string,
+  w: WikiWeapon,
+  potential: number | null,
+  attrs?: { main: string | null; secondary: string | null },
+  attr?: (name: string) => number,
+  summaries?: WeaponSummaryFile | null,
+): Html {
   const b = weaponBuildOf(wpnId, w, potential);
-  if (!ranks)
-    return html`<div class="card wiki-accs wiki-essence">${w.skills.map((s, i) => {
-      const name = i === w.skills.length - 1 && w.skills.length > 1 ? (s.tag ?? s.name.split(':')[0]) : s.name;
-      return html`<div class="wiki-essence-row"><span class="wiki-acc-name min0 ellipsis">${name}</span>${essenceNotches(wpnId, i, name, b.essence[i], b.max[i])}</div>`;
-    })}</div>`;
+  const statName = (stat: string) =>
+    /^main attribute$/i.test(stat) ? (attrs?.main ?? stat) : /^secondary attribute$/i.test(stat) ? (attrs?.secondary ?? stat) : stat;
   return html`<div class="gear-stats">
     ${w.skills.map((s, i) => {
-      const [lo, hi] = b.bounds[i];
-      return html`<div class="gear-stat"><span class="min0 ellipsis">${s.name}</span><span class="gear-stat-val">${skillNotches(lo, b.levels[i], hi)}</span></div>`;
+      const st = skillStat(s, b.levels[i]);
+      // A stat skill's name already says its stat ("Will [L]"): just the amount. The own skill goes by its kind
+      // ("Medicant") with its stat written out.
+      const own = i === w.skills.length - 1 && w.skills.length > 1;
+      const amount = st ? `+${st.pct ? `${st.value}%` : st.value.toLocaleString()}` : '';
+      // Under the own skill: its effect in short (`summaryLines`: the branch the operator's attributes meet), at its level.
+      const sum = own && attr ? summaryLines(summaries?.summaries[wpnId], attr) : null;
+      return html`<div class="gear-stat"><span class="wpn-skill-lv num" title="Rank ${b.levels[i]} of ${b.bounds[i][1]}">${b.levels[i]}<span class="tertiary">/${b.bounds[i][1]}</span></span><span class="min0 ellipsis" title="${s.name}">${own ? (s.tag ?? s.name) : s.name}</span>${st
+        ? html`<span class="gear-stat-val num">${own ? `${statName(st.stat)} ${amount}` : amount}</span>`
+        : ''}</div>
+        ${sum ? html`<div class="wpn-summary">${sum.label ? html`<span class="wpn-summary-label">${sum.label}</span>` : ''}${sum.lines.map((line) => html`<span>${rich(fillTemplate(line, s.values, b.levels[i]))}</span>`)}</div>` : ''}`;
     })}
   </div>`;
 }
@@ -253,9 +268,11 @@ export function setArtifice(opId: string, slot: string, stat: number, level: num
 }
 
 /** The Loadout section of an operator's page. */
-export function loadoutSection(opId: string, a: Analysis | null, redraw: () => void, weaponType?: string): Html {
+export function loadoutSection(opId: string, a: Analysis | null, redraw: () => void, weaponType?: string, attr?: (name: string) => number): Html {
   const weps = wikiFile<WikiWeaponFile>('weapons.json', redraw).data;
+  const summaries = attr ? wikiFile<WeaponSummaryFile>('weapon-summaries.json', redraw).data : null;
   const gear = wikiFile<WikiGearFile>('gear.json', redraw).data;
+  const op = wikiFile<WikiOperatorFile>('operators.json', redraw).data?.operators[opId];
   const l = loadoutOf(opId) ?? {};
   const ownedWeps = ownedOf(a, 'weap');
 
@@ -272,7 +289,7 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
           name: w?.name ?? l.weapon,
           sub: html`${[ownedWeps?.get(l.weapon)?.copies ? `P${ownedWeps.get(l.weapon)!.potential}` : '', tag ?? ''].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}`,
           href: infoHref('weap', l.weapon),
-          extra: w?.skills.length ? weaponPicker(l.weapon, w, wp) : undefined,
+          extra: w?.skills.length ? weaponPicker(l.weapon, w, wp, op ? { main: op.mainAttribute, secondary: op.secondaryAttribute } : undefined, attr, summaries) : undefined,
         }
       : null,
     weaponType ? weaponTypeIcon(weaponType) : undefined,

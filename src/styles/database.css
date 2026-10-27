@@ -134,9 +134,9 @@
 .slot-icon.kit {
   mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/kit.png);
 }
-/* A weapon skill's rank as the game's notches (`skillNotches`): slanted pills that overlap a little, the weapon's
-   own white, the essence's #FFF100 (the game's ProgressGem), still reachable dim, out of reach an outline crossed by
-   a slash. Masks of the game's white sprites, tinted here. */
+/* A weapon skill's levels as the game's notches (`baseNotches`, `essenceNotches`): slanted pills that overlap a little,
+   the weapon's own white, the essence's #FFF100 (the game's ProgressGem), still reachable dim, out of reach an outline
+   crossed by a slash. Masks of the game's white sprites, tinted here. */
 .skill-notches {
   display: inline-flex;
   flex: none;
@@ -167,6 +167,10 @@
 .notch.gem {
   background: var(--notch-gem);
 }
+/* The levels Potential gives (the weapon page's own skill), in the operators' purple. */
+.notch.pot {
+  background: var(--op-text);
+}
 .notch.shut {
   background: none;
   mask: none;
@@ -192,9 +196,6 @@
   border: 0;
   cursor: pointer;
 }
-.essence-notches .notch.open {
-  background: var(--gray-alpha-500);
-}
 .essence-notches .notch.open:hover {
   background: var(--gray-alpha-600);
 }
@@ -202,18 +203,56 @@
   outline: 2px solid var(--focus);
 }
 /* The weapon page's Skills: the ranks' notches by each name. */
-.wiki-acc .skill-notches {
+/* The weapon page's skill rows: tuning + Potential grooves, then the essence's, a small gap between the groups, then
+   the rank ("7/9"). */
+.skill-grooves {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
   margin-left: auto;
   padding-left: 12px;
 }
-/* The same size as Essence's beside them. */
-.wiki-acc .skill-notches .notch {
+.skill-level {
+  min-width: 32px;
+  font: 500 12px/16px var(--font-sans);
+  text-align: right;
+}
+/* Both groups' grooves the same size. */
+.wpn-skill .skill-notches .notch {
   width: 16px;
   height: 16px;
   margin-right: -4px;
 }
-.wiki-acc .skill-notches .notch:last-child {
+.wpn-skill .skill-notches .notch:last-child {
   margin-right: 0;
+}
+/* The weapon page's skill rows (`skillRow`): the name on its own line, then the grooves and rank at the left and the
+   stat at the far right; the own skill's effect under them, always shown. The same at every width. */
+.wpn-skill {
+  padding: 12px 20px;
+}
+.wpn-skill-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.wpn-skill-head > .wiki-acc-name {
+  flex-basis: 100%;
+}
+.wpn-skill-head > .skill-grooves {
+  margin-left: 0;
+  padding-left: 0;
+}
+.wpn-skill-stat {
+  flex: 0 0 auto;
+  margin-left: auto;
+  text-align: right;
+  font: 500 13px/20px var(--font-sans);
+}
+.wpn-skill-effect {
+  margin: 8px 0 0;
 }
 .loadout-label .slot-icon {
   width: 14px;
@@ -398,20 +437,195 @@
   pointer-events: none;
   background: radial-gradient(ellipse 75% 120% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
 }
+/* An operator header's picture sits in .wiki-hero-pin (operator.ts), which
+   pinning moves; the picture itself keeps its own shift (ui/parallax.ts). */
+.wiki-hero-pin {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+/* A header with a picture (not over the player's background picture, whose
+   page lets it show through): the picture stays put under the site header
+   while the operator's facts and the page scroll up over it, and it slowly
+   fades out as the page scrolls (a scroll-linked animation, no script). Its
+   shades stay with it; only the shade behind the facts moves with them. The
+   picture runs on under the top of the page (--pin-under), whose background
+   is clear there and whose cards turn acrylic, so it shows behind them. The
+   pinned picture is as tall as the header (--hero-h, app.ts). Browsers
+   without scroll-linked animations pin the whole header instead, under the
+   site header (--header-h, app.ts), the page covering it on its own
+   background, which spans the window (border-image adds no scrolling). */
+:root {
+  --pin-under: 220px;
+}
+.wiki-hero.has-art:not(.over-backdrop) {
+  z-index: 0;
+}
+.wiki-hero.has-art:not(.over-backdrop) ~ :is(main, .site-footer) {
+  position: relative;
+  z-index: 1;
+  background: var(--background-100);
+  border-image: linear-gradient(var(--background-100) 0 0) fill 0 / 0 / 0 100vmax;
+}
+@supports not (animation-timeline: scroll()) {
+  .wiki-hero.has-art:not(.over-backdrop) {
+    position: sticky;
+    top: var(--header-h, 0px);
+  }
+}
+@keyframes pin-fade {
+  to {
+    opacity: 0;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .wiki-hero.has-art:not(.over-backdrop) {
+    padding-bottom: var(--pin-under);
+    margin-bottom: calc(-1 * var(--pin-under));
+  }
+  .wiki-hero.tall:not(.over-backdrop) {
+    min-height: calc(var(--band) + var(--pin-under));
+  }
+  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin {
+    position: fixed;
+    top: var(--header-h, 0px);
+    bottom: auto;
+    height: var(--hero-h, 360px);
+    overflow: hidden;
+    animation: pin-fade linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 70vh;
+  }
+  /* The picture's shades sit on it, so they stay and fade with it: a strong
+     vignette in the page's colour, and its foot fading gradually (eased) into
+     the page, from mid-band to the end of the strip under the page. */
+  .wiki-hero.has-art:not(.over-backdrop)::before,
+  .wiki-hero.has-art:not(.over-backdrop)::after {
+    display: none;
+  }
+  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin {
+    --fade-from: 45%;
+  }
+  .wiki-hero.tall:not(.over-backdrop) .wiki-hero-pin {
+    --fade-from: calc(var(--band) * 0.4);
+  }
+  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      transparent var(--fade-from),
+      color-mix(in srgb, var(--background-100) 8%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.15),
+      color-mix(in srgb, var(--background-100) 25%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.3),
+      color-mix(in srgb, var(--background-100) 50%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.48),
+      color-mix(in srgb, var(--background-100) 73%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.65),
+      color-mix(in srgb, var(--background-100) 90%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.82),
+      var(--background-100)
+    );
+  }
+  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 68% 80% at 52% 34%,
+      transparent 22%,
+      color-mix(in srgb, var(--background-100) 40%, transparent) 50%,
+      color-mix(in srgb, var(--background-100) 75%, transparent) 75%,
+      color-mix(in srgb, var(--background-100) 95%, transparent)
+    );
+  }
+  /* Desktop: a face low in its picture can't reach the band while the
+     picture covers the whole header, so the picture's own box ends sooner,
+     just enough (never above half the strip under the page), fading out. */
+  @media (min-width: 641px) {
+    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-art {
+      bottom: auto;
+      height: clamp(
+        calc(var(--band) + var(--pin-under) / 2),
+        calc((100 - var(--fy, 50)) * 0.5cqw + var(--band) * 0.4),
+        100%
+      );
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
+    }
+  }
+  .wiki-hero.has-art:not(.over-backdrop) ~ main.wiki-page {
+    background: none;
+    border-image: none;
+  }
+  .wiki-hero.has-art:not(.over-backdrop) ~ main > .section:first-child {
+    margin-top: 24px;
+  }
+  .wiki-hero.has-art:not(.over-backdrop) ~ main .section-head {
+    text-shadow: 0 1px 8px var(--background-100);
+  }
+  .wiki-hero.has-art:not(.over-backdrop) ~ main :is(.card, .metrics:not(.plain)) {
+    background: color-mix(in srgb, var(--background-100) 65%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    backdrop-filter: blur(16px) saturate(1.3);
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --pin-under: 96px;
+  }
+  /* Phones: the whole picture across the top as before; no blur on the cards.
+     The facts carry a shade with them as they scroll up over the picture. */
+  @supports (animation-timeline: scroll()) {
+    .wiki-hero.tall:not(.over-backdrop) {
+      min-height: 0;
+    }
+    /* The picture spans the top only (50vw): it fades out by its own foot. */
+    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-pin::after {
+      display: none;
+    }
+    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-pin::before {
+      bottom: auto;
+      height: 50vw;
+    }
+    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-art {
+      -webkit-mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
+      mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
+    }
+    .wiki-hero.has-art:not(.over-backdrop) ~ main :is(.card, .metrics:not(.plain)) {
+      background: color-mix(in srgb, var(--background-100) 85%, transparent);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+}
 /* Text over the player's banner stays readable on bright art. */
 .wiki-hero.has-art .wiki-hero-text {
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
 }
-/* A Potential's picture (2:1, operator.ts `tall`): a taller header, about
-   3.4:1, capped at 460px or half the window on wide screens (the picture
-   keeps its shape, cropped top and bottom); the facts sit at its foot on a stronger fade.
-   The picture keeps its focus point (ef-assets index.json) in view. */
+/* A Potential's picture (2:1, operator.ts `tall`): a wide band, 20% of the
+   window's width, 260–320px (the picture keeps its shape, cropped top and
+   bottom); the facts sit at its foot on a stronger fade. */
 .wiki-hero.tall {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   /* Not aspect-ratio: a max-height there would narrow the header too. */
-  min-height: clamp(300px, 100vw / 3.4, min(460px, 50vh));
+  --band: clamp(260px, 20vw, 320px);
+  min-height: var(--band);
+}
+.wiki-hero.tall .wiki-hero-pin {
+  container-type: inline-size;
+}
+/* The operator's eyes (--fx, --fy in %: the picture's focus point in
+   ef-assets, operator.ts) about 40% down the band, as near as the picture
+   allows: 50cqw is the picture's height across the header's width (the
+   pinned picture's box is the container), and the
+   clamp keeps it covering the header (100% is the most it can move up). */
+.wiki-hero.tall .wiki-hero-art {
+  object-position: calc(var(--fx, 50) * 1%) clamp(100%, calc(var(--band) * 0.4 - var(--fy, 50) * 0.5cqw), 0px);
 }
 .wiki-hero.tall::after {
   background: linear-gradient(

@@ -1,4 +1,4 @@
-import type { WikiGear, WikiGearSet, WikiOperator, WikiWeapon } from './wiki';
+import { fmtSkillValue, type WikiGear, type WikiGearSet, type WikiOperator, type WikiWeapon } from './wiki';
 
 /**
  * What the player has equipped on an operator: a weapon and four gear
@@ -156,6 +156,59 @@ export function weaponBounds(w: Pick<WikiWeapon, 'skills'>, potential: number | 
   });
 }
 
+/**
+ * A skill's 9 levels as the weapon page groups its grooves: `own` the levels tuning gives (the most its lowest reaches
+ * at P0 over the stages: 3 on a 4–6★ stat skill, 5 on a 3★'s, 1 on the own skill), `potential` the ones Potential adds
+ * (5 on the own skill), `essence` the rest an essence can add (6/6/3; 4 on a 3★'s stat skill, past which its 6 can't
+ * count). Without the table: 3–6 on a stat skill, 1–5–3 on the own one.
+ */
+export function grooveSlots(w: Pick<WikiWeapon, 'skills'>, t?: WeaponTuning): { own: number; potential: number; essence: number }[] {
+  const max = essenceMax(w);
+  return w.skills.map((_, i) => {
+    const own = t ? Math.max(1, ...t.bounds.map((row) => row[i]?.[0] ?? 1)) : isOwnSkill(w, i) ? 1 : 3;
+    const potential = t ? (t.potential.at(-1)?.[i]?.[0] ?? 0) : isOwnSkill(w, i) ? 5 : 0;
+    return { own, potential, essence: Math.max(0, Math.min(max[i], WEAPON_SKILL_RANK - own - potential)) };
+  });
+}
+
+/**
+ * The stat a weapon skill always gives at a level: its text opens with "Stat +{0}" or "Stat +{0}%" (the game's value
+ * at that level; percents in %). Null when it gives none ("Main/Secondary attribute" stay as written).
+ */
+export function skillStat(sk: Pick<WikiWeapon['skills'][number], 'text' | 'values'>, level: number): { stat: string; value: number; pct: boolean } | null {
+  const m = sk.text?.match(/^([A-Za-z][A-Za-z &.'-]*?)\s*⟦num\|\+\{0\}(%?)⟧/);
+  const v = m ? sk.values[0]?.[Math.max(1, Math.min(level, sk.values[0].length)) - 1] : undefined;
+  return m && v != null ? { stat: m[1], value: v, pct: !!m[2] } : null;
+}
+
+/**
+ * Short summaries of each weapon's own (last) skill effect, from ef-assets wiki/weapon-summaries.json: lines in the
+ * wiki's markup with {k} for the skill's values[k] at its level. `branches`: the one whose `if` holds for the wielder's
+ * attributes applies (Type 42: Solemn Phalanx, Intellect ≥ Will or Will > Intellect).
+ */
+export interface WeaponSummary {
+  lines?: string[];
+  branches?: { if: [string, '>=' | '>', string]; label: string; lines: string[] }[];
+}
+export interface WeaponSummaryFile {
+  summaries: Record<string, WeaponSummary>;
+}
+
+/** The summary lines that apply, with the branch's label when it branches (`attr`: the wielder's attribute totals). */
+export function summaryLines(sum: WeaponSummary | undefined, attr: (name: string) => number): { label?: string; lines: string[] } | null {
+  if (!sum) return null;
+  if (sum.lines) return { lines: sum.lines };
+  const b = sum.branches?.find(({ if: [x, op, y] }) => (op === '>=' ? attr(x) >= attr(y) : attr(x) > attr(y)));
+  return b ? { label: b.label, lines: b.lines } : null;
+}
+
+/** A summary line with each {k} as the skill's values[k] at `level` (fmtSkillValue: the wiki's numbers, "16.2"). */
+export const fillTemplate = (line: string, values: number[][], level: number): string =>
+  line.replace(/\{(\d+)\}/g, (_, k: string) => {
+    const v = values[Number(k)];
+    return fmtSkillValue(v?.[Math.max(1, Math.min(level, v.length)) - 1]);
+  });
+
 /** A skill's level: its lowest plus the essence's level for it, up to its highest. */
 export const skillLevel = ([lo, hi]: [number, number], essence: number): number => Math.max(lo, Math.min(hi, lo + Math.max(0, Math.floor(essence))));
 
@@ -301,13 +354,9 @@ export function operatorBonuses(
       if (atk != null) add('ATK', `${w.name} (base ATK)`, atk, 0);
     }
     w.skills.forEach((sk, i) => {
-      // The stat a skill always gives: its text opens with "Stat +{0}" or "+{0}%".
-      const m = sk.text?.match(/^([A-Za-z][A-Za-z &.'-]*?)\s*⟦num\|\+\{0\}(%?)⟧/);
-      if (!m) return;
       const rank = Math.min(ranks?.[i] ?? caps[i], caps[i]);
-      const v = sk.values[0]?.[Math.min(rank, sk.values[0].length) - 1];
-      if (v == null) return;
-      add(m[1], `${w.name}: ${sk.name} (rank ${rank})`, m[2] ? 0 : v, m[2] ? v : 0);
+      const st = skillStat(sk, rank);
+      if (st) add(st.stat, `${w.name}: ${sk.name} (rank ${rank})`, st.pct ? 0 : st.value, st.pct ? st.value : 0);
     });
   }
 

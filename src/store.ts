@@ -356,9 +356,35 @@ export const listSims = <R>(): Promise<SavedSim<R>[]> =>
 async function putSims<R>(entry: SavedSim<R>): Promise<void> {
   const list = (await listSims<R>()).filter((e) => e.at !== entry.at);
   list.push(entry);
+  await idb('data', 'readwrite', (s) => s.put(trimSims(list), 'sims'));
+}
+
+/** Drops the oldest results beyond MAX_SIMS, favorites never. */
+function trimSims<R>(list: SavedSim<R>[]): SavedSim<R>[] {
   for (let i = 0; list.length > MAX_SIMS && i < list.length; ) if (list[i].fav) i++;
     else list.splice(i, 1);
-  await idb('data', 'readwrite', (s) => s.put(list, 'sims'));
+  return list;
+}
+
+/** Local results plus a backup's, oldest first: one with the same time keeps whichever was edited later (ties keep the local one). */
+export function mergeSims<R>(local: SavedSim<R>[], incoming: SavedSim<R>[]): SavedSim<R>[] {
+  const byAt = new Map(local.map((e) => [e.at, e]));
+  for (const e of incoming) {
+    const have = byAt.get(e.at);
+    if (!have || (e.edited ?? 0) > (have.edited ?? 0)) byAt.set(e.at, e);
+  }
+  return [...byAt.values()].sort((a, b) => a.at - b.at);
+}
+
+/** A backup's saved results, merged into this browser's (not reported to Drive sync). Returns how many were added or updated. */
+export async function restoreSims(incoming: SavedSim[]): Promise<number> {
+  const valid = incoming.filter((e) => e && typeof e.at === 'number' && typeof e.key === 'string');
+  const local = await listSims();
+  const merged = mergeSims(local, valid);
+  const before = new Map(local.map((e) => [e.at, e]));
+  const changed = merged.filter((e) => before.get(e.at) !== e).length;
+  if (changed) await idb('data', 'readwrite', (s) => s.put(trimSims(merged), 'sims'));
+  return changed;
 }
 
 /** Saves a result after the others (the newest for a request is the one shown) and trims to MAX_SIMS. */

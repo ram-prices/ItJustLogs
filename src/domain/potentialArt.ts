@@ -7,8 +7,8 @@
 
 /**
  * ef-assets operators/potential/index.json: operator id → Potential → files,
- * and `focus`: file → the point the banner keeps in view (the face and upper
- * body, x and y as fractions), set by hand there.
+ * and `focus`: file → the point between the operator's eyes, which the
+ * banner places in its band (x and y as fractions), set by hand there.
  */
 export interface PotentialArtIndex {
   focus?: Record<string, [number, number]>;

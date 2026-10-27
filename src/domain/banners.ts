@@ -109,7 +109,7 @@ export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${
  */
 const GAME_ART = new Set([
   'special_1_0_1', 'special_1_0_2', 'special_1_0_3', 'special_1_1_1', 'special_1_1_2', 'special_1_2_1',
-  'special_1_3_1', 'special_1_3_2', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1',
+  'special_1_3_1', 'special_1_3_2', 'special_1_4_1', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1',
   'rerun_chr_tangtang', 'rerun_chr_yvonne',
 ]);
 
@@ -131,6 +131,18 @@ export function issueLayerUrls(poolId: string): { back: string; weapon: string; 
   if (!id.startsWith('weponbox_') && !id.startsWith('weaponbox_constant_')) return null;
   const at = `${EF_ASSETS_CDN}/banners/layers/`;
   return { back: `${at}issue-back.webp`, weapon: `${at}${id}.webp`, front: `${at}issue-front.webp` };
+}
+
+/**
+ * A `GAME_ART` banner in two layers (ef-assets banners/game/layers/, from
+ * operator-banner.py): the banner without its operator, and the operator on
+ * transparency. Stacked they give the flat art. Null for other banners.
+ */
+export function operatorLayerUrls(poolId: string): { back: string; op: string } | null {
+  const id = canonicalPoolId(poolId);
+  if (!GAME_ART.has(id)) return null;
+  const at = `${EF_ASSETS_CDN}/banners/game/layers/${id}`;
+  return { back: `${at}-back.webp`, op: `${at}-op.webp` };
 }
 
 /**

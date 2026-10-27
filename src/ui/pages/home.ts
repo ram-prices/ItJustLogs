@@ -20,7 +20,7 @@ import { tip, tipNote, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
-import { backgroundSource, heat, icon, issueArt } from '../components';
+import { backgroundSource, heat, icon, layeredArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpIdsOf, rateUpOwned, rateUpPotential } from './kind';
 import { bannerHref, wikiFile } from './info';
@@ -106,7 +106,7 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
   const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
   return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-link="${linkOf(b)}" data-card-image="${b.name}">
     <div class="banner-art">
-      ${src ? ((b.poolId && src === bannerArtUrl(b.poolId) ? issueArt(b.poolId, src) : null) ?? html`<img src="${src}" alt="" loading="lazy" decoding="async" data-fallback />`) : ''}
+      ${src ? ((b.poolId && src === bannerArtUrl(b.poolId) ? layeredArt(b.poolId, src) : null) ?? html`<img src="${src}" alt="" loading="lazy" decoding="async" data-fallback />`) : ''}
       <div class="banner-art-text">
         <span class="sched-kind">${KIND_LABEL[b.kind]}</span>
         <div class="banner-name ellipsis">${b.name}</div>

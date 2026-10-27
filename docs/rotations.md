@@ -292,7 +292,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   between them doesn't count. The stopwatch's end without a read final value is its last tick that follows another
   changing one (a lone change is the HUD fading out). Enemies can have mechanics (`Enemy.nodeStagger`/`nodeMechanic`:
   Alleikhreos's Foundite Weapon, 20 Stagger when his meter passes its node, from his interrupt buff), drawn in the
-  Enemy lane (`World.mechanics`). Times show as m:ss.s (`clockTime`). A parsed run can be exported as a file and
+  Enemy lane (`World.mechanics`). Times show as m:ss.s (`clockTime`). Full backups (Settings) also carry every saved result (`Backup.sims`). A parsed run can be exported as a file and
   imported elsewhere (Export, Import run: `RUN_FILE`); on the Parser a pasted or dropped recording is parsed and
   an exported run opened (`parserFiles`; other JSON goes to the pull import). The transcript editor also takes Dive attack (`dive`: the
   controlled operator's `_plunging_attack_end`; the parser can't see one) and Invulnerable stretches

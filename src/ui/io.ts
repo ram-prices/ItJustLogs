@@ -1,7 +1,7 @@
 import { compareHistories, parseHistoryJson, type HistoryMatch } from '../domain/parse';
 import type { PullHistory } from '../domain/types';
 import { artChanged, clearHistory, importHistory, setImage, state, updateSettings } from '../state';
-import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, loadAvatarEdit, putArt, saveAvatarEdit, type AvatarEditJson, type ChangeTimes, type Settings } from '../store';
+import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, listSims, loadAvatarEdit, putArt, restoreSims, saveAvatarEdit, type AvatarEditJson, type ChangeTimes, type SavedSim, type Settings } from '../store';
 import { toast } from './common';
 import { forgetLoadedArt } from './pages/art';
 
@@ -23,6 +23,11 @@ export interface Backup {
   art?: Record<string, string>;
   /** The profile picture's original and framing (Edit picture); downloaded backups only, like `art`. */
   avatarEdit?: AvatarEditJson;
+  /**
+   * Rotations results, simulator and parsed runs (store.ts `SavedSim`). Only in
+   * downloaded backups: Drive carries parsed runs as files of their own.
+   */
+  sims?: SavedSim[];
   changed?: ChangeTimes;
 }
 
@@ -59,6 +64,7 @@ export async function buildBackup(opts: { art?: boolean } = {}): Promise<Backup>
   if (opts.art) {
     const edit = state.images.avatar ? await loadAvatarEdit() : undefined;
     if (edit) backup.avatarEdit = await avatarEditToJson(edit);
+    backup.sims = await listSims();
     backup.art = {};
     for (const key of await allArtKeys()) {
       const blob = await artBlob(key);
@@ -140,8 +146,13 @@ export async function importText(text: string, source: string, mode: ImportMode 
       if (img?.startsWith('data:image/')) await setImage(slot, await dataUrlToBlob(img));
     }
     if (b.avatarEdit?.source?.startsWith('data:image/') && b.images?.avatar) await saveAvatarEdit(await avatarEditFromJson(b.avatarEdit));
+    const sims = Array.isArray(b.sims) ? await restoreSims(b.sims) : 0;
     const art = await restoreArt(b.art);
-    toast(art ? `Export imported, with ${art} operator ${art === 1 ? 'picture' : 'pictures'}.` : 'Export imported.');
+    const extra = [
+      sims ? `${sims} saved ${sims === 1 ? 'run' : 'runs'}` : '',
+      art ? `${art} operator ${art === 1 ? 'picture' : 'pictures'}` : '',
+    ].filter(Boolean);
+    toast(extra.length ? `Export imported, with ${extra.join(' and ')}.` : 'Export imported.');
     return;
   }
   const incoming = parseHistoryJson(text);

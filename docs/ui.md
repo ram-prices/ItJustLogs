@@ -39,13 +39,20 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     Save-Data get the still frame only. Pictures (banner art, headers, the
     Character card) shift a little against the mouse (`ui/parallax.ts`;
     Arsenal Issues in layers from ef-assets `banners/layers/`, the weapon
-    floating). Firefox puts moved-only pictures on whole pixels (twitching);
+    floating; `GAME_ART` Headhunting cards as backdrop + operator from
+    `banners/game/layers/<pool>-back|op.webp` (`operatorArt`, made by
+    `operator-banner.py`: the operator is the layout's `MainRoleImage`, its
+    colours solved so the pair stacks back to the flat file), the operator
+    moving ~3 px against a ~1 px backdrop on Home's and the Headhunting page's
+    cards; only drawn where pictures can move, so phones and Still load the
+    flat file). Firefox puts moved-only pictures on whole pixels (twitching);
     `transform: perspective(600px) rotateY(0.02deg)` stops it, measured on a
     real screen (a flat `rotate` fixes headless Firefox only).
   - Banner art (`bannerArtUrl` in `domain/banners.ts`): Headhunting pools in
     `GAME_ART` use ef-assets `banners/game/<pool id>.webp`, the game's own
     banner screen laid out without text (ef-assets `scripts/operator-banner.py`,
-    from the EndfieldDataDump checkout); add a pool there once its file is
+    from the EndfieldDataDump checkout; it puts tightly packed sprites back on
+    their full rect so nothing stretches); add a pool there once its file is
     made. Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
     art). Unpulled Headhunting cards prefer it over the schedule's `art`.
     Discord embeds still use the schedule's `art`.
@@ -57,14 +64,28 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     (`wallpaper`, labelled with what shows) opens a pop-up of Auto, Base and
     every picture, locked ones dimmed with a lock and still pickable. A picked
     picture goes over the player's own banner pictures; Auto and Base don't.
-    A Potential picture makes the hero taller (`.wiki-hero.tall`: 3.4:1,
-    at least 300px, at most min(460px, 50vh), the picture cropped not stretched, facts on a stronger bottom
+    A Potential picture makes the hero taller (`.wiki-hero.tall`: a wide
+    band, 20vw between 260px and 320px, the picture cropped not stretched, facts on a stronger bottom
     fade; phones show the whole 2:1 picture across the top with the facts
-    under its fading foot) and sits on its focus point: `focus` in the
-    `index.json` (file → [x, y] fractions, the face and upper body, set by
-    hand from a contact sheet; `potential-art.py` keeps them and leaves new
+    under its fading foot) with the operator's eyes about 40% down the band:
+    `focus` in the `index.json` (file → [x, y] fractions, between the eyes, set by
+    hand from a contact sheet; operator.ts passes it as `--fx`/`--fy`, CSS
+    places it with `cqw` and lets the picture end early, faded, when a low
+    face needs room; `potential-art.py` keeps them and leaves new
     pictures without one, which centres them). The player's own banner art
-    keeps the usual height and their own position.
+    keeps the usual height and their own position. A hero with a picture
+    (`.wiki-hero.has-art`, not over a background picture) pins only its
+    picture (`.wiki-hero-pin`, `position: fixed` under the site header, as tall
+    as the header: `--hero-h`, app.ts `watchHero`), which fades out over the
+    first 70vh of scrolling (scroll-linked, no script); its shades sit on the
+    pin and fade with it: a strong vignette in the page's colour and an eased
+    fade at its foot (from 40% of the band) into the page. The facts, page and footer scroll up over it; the
+    page's background is clear and its cards acrylic. The picture runs on
+    `--pin-under` (220px, phones 96px) under the top of the page. No shade
+    behind the facts: the text keeps its halo (`.tall .wiki-hero-text`). Browsers without
+    scroll-linked animations (Firefox) pin the whole header under the site
+    header instead (`--header-h`, app.ts `watchHeader`), the page covering it. The picture is one flat file (Potential posters and the
+    player's art have no layers), so on the detail view it shifts as a whole.
     Built pages and Discord embeds keep the base art.
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
     `ui/components.ts` (`OROBERYL_ICON`, ef-assets icons/items, `--oroberyl`).
@@ -93,16 +114,28 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     skill) to the lowest, up to the highest (`skillLevel`). Per weapon in settings (`weaponTuning`, unset
     = 4; `weaponEssence`, else old `weaponRanks` read as fully tuned, `essenceFromRanks`; `maxEssence`),
     so every operator holding it agrees. The weapon's page (Database → Arsenals) is the main place to set
-    them. Ranks show as the game's notches (`skillNotches`, WeaponSkillCell's notch cell: ef-assets
-    icons/weapon-skill from its scripts/weapon-skill-notches.py; white = the weapon's own level, #FFF100 =
-    what essence adds, dim = still reachable, outline crossed by a slash = past its tuning/Potential cap):
-    by each name in Skills (16px, as Essence's; no rank slider: each skill's text shows at its rank). Beside it, Essence holds only the
-    essence's own grooves per skill, a list whose rows line up with Skills' (the third skill named by its kind,
-    "Efficacy": an essence fits any weapon with that kind of third skill) (`essenceNotches`, 6/6/3: yellow etched, grey not yet), each a button:
-    a click etches up to it, on the top one back one. Under both, Tuning: each tuning row a button (the done
-    ones lit, the level reached in the head), a click tunes up to it, on the current one back one.
-    Loadout's weapon slot (`weaponPicker`) only shows them: each skill's name and rank notches under
-    the weapon's name, like gear stats; tuning and essence are set on the weapon's page. Gear slots show the game's slot
+    them, in one Skills section beside Base ATK (stacked on phones; Maxed Essence in its head). Grooves are the game's notches (WeaponSkillCell's
+    notch cell: ef-assets icons/weapon-skill from its scripts/weapon-skill-notches.py). Each skill row, after
+    its name, has its 9 levels as two groups side by side (`grooveSlots`): what tuning gives (white: 3 on a
+    4–6★ stat skill, 5 on a 3★'s, 1 on the own skill, lit up to its lowest at the stage) joined with what
+    Potential gives (purple, 5, own skill only: lit per Potential, crossed out past it; `baseNotches`), then the essence's (yellow,
+    6/6/3, 4 on a 3★'s stat skill; grey not yet etched, crossed out past what the tuning cap lets count;
+    `essenceNotches`, each a button: a click etches up to it, on the top one back one), with its rank "7/9", on a line under its
+    name, and at the far right its stat at that rank (`skillStat`: "+100", the own skill's named, "Treatment
+    Efficiency +18%"); the same at every width. Rows don't collapse; the own skill's effect (its text past that
+    stat, at its rank) always shows under them. Under
+    both columns, Tuning: each tuning
+    row a button (the done ones lit, the level reached in the head), a click tunes up to it, on the current
+    one back one.
+    Loadout's weapon slot (`weaponPicker`) only shows them, under the weapon's name laid out like gear stats:
+    each skill's level of what it can reach now ("5/7": tuning's cap, Potential's on the own skill) where a
+    gear stat has its Artifice mark, its name (the own skill by its kind, "Medicant"), and at the right what it
+    gives at that level (`skillStat`, the game's value: "+100", or "Treatment Efficiency +18%" on the own
+    skill). Under the own skill, its effect in short: ef-assets wiki/weapon-summaries.json (hand-written, checked
+    by its scripts/check-weapon-summaries.mjs), lines in wiki markup with {k} = the skill's values[k] at its level
+    (`fillTemplate`); a branching one (Type 42: Solemn Phalanx, Intellect vs Will) shows only the branch the
+    operator's attribute totals meet (`summaryLines`, the Attributes card's numbers), its label first.
+    Tuning and essence are set on the weapon's page. Gear slots show the game's slot
     marks (`slotIcon`, ef-assets icons/gear-slots, the wiki's Gear Icons),
     the weapon slot the operator's weapon type (`weaponTypeIcon`, ef-assets weapon-types).
     The Operators list (`database.css` `.op-card`) is portrait cards, our take on

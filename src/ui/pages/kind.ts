@@ -5,7 +5,7 @@ import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
 import type { Schedule, Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
-import { badge, heat, icon, issueArt, withStars, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
+import { badge, heat, icon, layeredArt, withStars, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
 import { infoHref, ownedOf, pullsTabs } from './info';
 import { state } from '../../state';
@@ -77,7 +77,7 @@ function art(b: BannerSummary): Html {
   const { art: url, weapon, item } = artUrls(b);
   // Cards with one rate-up take their glow from it (see tintWeaponCards), so their art doesn't tint.
   const tint = item ? '' : raw('data-tint');
-  if (url) return issueArt(b.poolId, url) ?? html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`;
+  if (url) return layeredArt(b.poolId, url) ?? html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`;
   if (weapon) return html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`;
   return html``;
 }
@@ -302,7 +302,7 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
   const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${c.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
   const tint = item ? '' : raw('data-tint');
   const img = url
-    ? (!c.art && c.poolId ? issueArt(c.poolId, url) : null) ??
+    ? (c.poolId && url === bannerArtUrl(c.poolId) ? layeredArt(c.poolId, url) : null) ??
       html`<img src="${url}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback data-alt="${weapon}" />`
     : weapon
       ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`

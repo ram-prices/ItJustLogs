@@ -1,9 +1,10 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, heroGlow, icon, itemImg, pageHeader, skillNotches, stars, tileArt, trait, withStars } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, pageHeader, baseNotches, essenceNotches, stars, tileArt, trait, withStars } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { essenceTag, weaponBuildOf, weaponPicker, wieldersSection } from './loadout';
+import { essenceTag, weaponBuildOf, wieldersSection, type WeaponBuild } from './loadout';
+import { grooveSlots, skillStat, weaponBounds } from '../../domain/loadout';
 import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rateUpCard, rich, statusPage, wikiFile } from './info';
@@ -14,8 +15,6 @@ import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, info
  * wiki data, plus the player's copies. CC BY-SA 4.0: every page credits
  * endfield.wiki.gg.
  */
-
-const MAX_RANK = 9;
 
 /** Link to a weapon's info page (or the list of all of them). */
 export const weaponInfoHref = (id?: string): string => infoHref('weap', id);
@@ -120,55 +119,55 @@ function statsSection(w: WikiWeapon): Html {
   </section>`;
 }
 
-/**
- * One skill: its rank as the game's notches by its name, and its text at that rank. The rank comes from the player's
- * tuning, Potential and essence for this weapon (the last skill is the one Potential raises: 1–4 at P0, up to 6–9 at
- * P5; the first two rise with tuning and essence).
- */
-function skillRow(i: number, s: WikiWeaponSkill, isLast: boolean, owned: Owned | undefined, level: number, [lo, hi]: [number, number]): Html {
-  const p = owned?.copies ? owned.potential : null;
-  return accordion(
-    `skill-${i}`,
-    html`<span class="wiki-acc-title min0"><span class="wiki-acc-name">${s.name}</span></span>${skillNotches(lo, level, hi)}`,
-    html`<p class="copy-14 wiki-text">${s.text ? rich(s.text, s.values, level) : html`<span class="secondary">No description on the wiki yet.</span>`}</p>
-      ${isLast
-        ? html`<p class="copy-13 secondary wiki-note">
-            Ranks 1–4 at P0; each Potential adds one, up to ${1 + MAX_POTENTIAL}–${MAX_RANK} at P${MAX_POTENTIAL}.
-            ${p !== null ? html`<span class="wiki-em">Yours: P${p}, ranks ${1 + p}–${4 + p}.</span>` : ''}
-          </p>`
-        : ''}`,
-  );
+/** The stat a skill's text opens with ("Treatment Efficiency ⟦num|+{0}%⟧."), taken off to leave its effect. */
+const LEADING_STAT = /^[A-Za-z][A-Za-z &.'-]*?\s*⟦num\|\+\{0\}%?⟧[.,]?\s*/;
+
+/** What a skill gives at a level, as its row shows it ("+100"; the own skill's with its stat named). */
+function statText(s: WikiWeaponSkill, level: number, isLast: boolean): string {
+  const st = skillStat(s, level);
+  if (!st) return '';
+  const amount = `+${st.pct ? `${st.value}%` : st.value.toLocaleString()}`;
+  return isLast ? `${st.stat} ${amount}` : amount;
 }
 
 /**
- * The skills, each with its rank as the game's notches (the weapon's own levels and the essence's together, from the
- * player's tuning, Potential and essence) and its text at that rank.
+ * One skill as a row: its name, its two groove groups and rank ("7/9"), and at the far right the stat it gives at that
+ * rank (the game's value, `skillStat`: "+100" on a stat skill, whose name says the stat; "Treatment Efficiency +18%"
+ * on the weapon's own). The own skill's effect, its text past that stat at its rank, always shows under its name.
+ */
+function skillRow(id: string, i: number, s: WikiWeaponSkill, isLast: boolean, b: WeaponBuild, slots: ReturnType<typeof grooveSlots>[number], ownLit: number): Html {
+  const level = b.levels[i];
+  const [lo, hi] = b.bounds[i];
+  const effect = isLast && s.text ? s.text.replace(LEADING_STAT, '').trim() : '';
+  return html`<div class="wpn-skill">
+    <div class="wpn-skill-head">
+      <span class="wiki-acc-name min0">${s.name}</span>
+      <span class="skill-grooves">${baseNotches(slots.own, ownLit, slots.potential, lo - ownLit)}${essenceNotches(id, i, s.name, b.essence[i], slots.essence, hi - lo)}<span class="skill-level num">${level}<span class="tertiary">/${hi}</span></span></span>
+      <span class="wpn-skill-stat num">${statText(s, level, isLast)}</span>
+    </div>
+    ${effect ? html`<p class="copy-13 secondary wiki-text wpn-skill-effect">${rich(effect, s.values, level)}</p>` : ''}
+  </div>`;
+}
+
+/**
+ * The skills, with the player's tuning, Potential and essence for this weapon (the source every loadout holding it
+ * reads). Each row (`skillRow`): its name, then its 9 levels as two groove groups (`grooveSlots`): what tuning (white)
+ * and Potential (purple) give, then the essence's (yellow; each a button: a click etches up to it), its rank of the
+ * highest it can reach ("7/9") and its stat at the far right. Maxed Essence puts every skill's essence at its most.
  */
 function skillsSection(id: string, w: WikiWeapon, owned: Owned | undefined, redraw: () => void): Html {
   if (!w.skills.length) return html``;
-  const b = weaponBuildOf(id, w, owned?.copies ? owned.potential : null, redraw);
-  return html`<section class="section">
-    <div class="section-head"><h2 class="heading-20">Skills</h2></div>
-    <div class="card wiki-accs">${w.skills.map((s, i) => skillRow(i, s, i === w.skills.length - 1 && w.skills.length > 1, owned, b.levels[i], b.bounds[i]))}</div>
-  </section>`;
-}
-
-/**
- * The player's tuning and essence for this weapon: the source every loadout
- * holding it reads (a loadout's weapon slot sets the same). By default fully
- * tuned with no essence; Maxed Essence puts every skill's essence at its most.
- */
-function essenceSection(id: string, w: WikiWeapon, owned: Owned | undefined, redraw: () => void): Html {
-  if (!w.skills.length) return html``;
   const p = owned?.copies ? owned.potential : null;
-  const maxed = weaponBuildOf(id, w, p, redraw).maxed;
+  const b = weaponBuildOf(id, w, p, redraw);
+  const slots = grooveSlots(w, b.tuning);
+  const ownLit = weaponBounds(w, 0, b.tuning, b.stage).map((x) => x[0]);
   return html`<section class="section">
     <div class="section-head">
-      <h2 class="heading-20">Essence</h2>
-      <button type="button" class="attr-toggle" data-action="weapon-essence" data-wpn="${id}" aria-pressed="${String(maxed)}"
-        title="${maxed ? 'Maxed Essence: every skill at the highest rank it can reach. Press to set the essence you have' : 'Every skill at the highest rank it can reach (Maxed Essence)'}">${essenceIcon()}Maxed Essence</button>
+      <h2 class="heading-20">Skills</h2>
+      <button type="button" class="attr-toggle" data-action="weapon-essence" data-wpn="${id}" aria-pressed="${String(b.maxed)}"
+        title="${b.maxed ? 'Maxed Essence: every skill at the highest rank it can reach. Press to set the essence you have' : 'Every skill at the highest rank it can reach (Maxed Essence)'}">${essenceIcon()}Maxed Essence</button>
     </div>
-    ${weaponPicker(id, w, p, false)}
+    <div class="card wiki-accs">${w.skills.map((s, i) => skillRow(id, i, s, i === w.skills.length - 1 && w.skills.length > 1, b, slots[i], ownLit[i]))}</div>
   </section>`;
 }
 
@@ -221,12 +220,8 @@ function detailPage(id: string, w: WikiWeapon, attribution: WikiAttribution, a: 
       ${ownedSection('weap', w.name, a, owned, w.potential ? potentialText(w) : undefined)}
       ${wieldersSection(id, redraw)}
       <div class="wiki-cols">
-        <div class="wiki-col">${statsSection(w)}</div>
-        <div class="wiki-col">${potentialSection(w, owned)}</div>
-      </div>
-      <div class="wiki-cols">
+        <div class="wiki-col">${statsSection(w)}${potentialSection(w, owned)}</div>
         <div class="wiki-col">${skillsSection(id, w, owned, redraw)}</div>
-        <div class="wiki-col">${essenceSection(id, w, owned, redraw)}</div>
       </div>
       ${tuningSection(id, w, owned, redraw)}
       ${aboutSection(w)}

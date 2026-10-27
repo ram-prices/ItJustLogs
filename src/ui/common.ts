@@ -10,9 +10,9 @@ export function installImageFallback(): void {
       if (next) {
         img.dataset.retried = '1';
         img.src = next;
-      } else if (img.closest<HTMLElement>('.issue-art[data-flat]')) {
-        // An Issue banner whose layers don't exist yet: its flat art instead.
-        const layers = img.closest<HTMLElement>('.issue-art')!;
+      } else if (img.closest<HTMLElement>('.issue-art[data-flat], .op-art[data-flat]')) {
+        // A banner whose layers don't exist (or failed): its flat art instead.
+        const layers = img.closest<HTMLElement>('.issue-art, .op-art')!;
         const flat = document.createElement('img');
         flat.src = layers.dataset.flat!;
         flat.alt = '';

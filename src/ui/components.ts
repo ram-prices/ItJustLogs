@@ -1,4 +1,4 @@
-import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, mirrorUrl, operatorCardUrl } from '../domain/banners';
+import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, operatorLayerUrls, mirrorUrl, operatorCardUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { html, raw, type Html } from './html';
 import { tintFor } from './tint';
@@ -15,6 +15,27 @@ export function issueArt(poolId: string, flat: string): Html | null {
     html`<img class="${cls}" src="${src}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" data-fallback />`;
   return html`<span class="issue-art" data-flat="${flat}">${layer('issue-back', l.back)}<span class="issue-float">${layer('issue-weapon', l.weapon)}</span>${layer('issue-front', l.front)}</span>`;
 }
+
+/** Whether pictures can move with the mouse: a mouse, no reduced motion, Settings → Backgrounds on (as the CSS tests). */
+const parallaxOn = (): boolean =>
+  document.documentElement.dataset.motion !== 'off' && matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').matches;
+
+/**
+ * A Headhunting banner's game-screen art as backdrop and operator, so the
+ * operator can move a little against it (ui/parallax.ts). Only where the
+ * pictures can move: phones and still settings load the one flat file.
+ * Falls back to the flat art (`flat`) if a layer fails (common.ts).
+ */
+export function operatorArt(poolId: string, flat: string): Html | null {
+  const l = operatorLayerUrls(poolId);
+  if (!l || !parallaxOn()) return null;
+  const layer = (cls: string, src: string) =>
+    html`<img class="${cls}" src="${src}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" data-fallback />`;
+  return html`<span class="op-art" data-flat="${flat}">${layer('op-back', l.back)}${layer('op-front', l.op)}</span>`;
+}
+
+/** A banner's art in layers where ef-assets has them (an Issue, a game-screen Headhunting banner), else null. */
+export const layeredArt = (poolId: string, flat: string): Html | null => issueArt(poolId, flat) ?? operatorArt(poolId, flat);
 
 /** Small Geist-style building blocks shared by every page. */
 
@@ -69,27 +90,27 @@ const ARTIFICE_BARS: [number, string][] = [
   [49.98, 'translate(7.43 65.03) rotate(-60)'],
 ];
 /**
- * A weapon skill's rank as the game's notches (WeaponSkillCell, ef-assets icons/weapon-skill), one per level up to 9:
- * white up to `base` (the weapon's own, no essence), yellow up to `level` (what the essence adds), grey up to `cap`
- * (what its tuning and Potential let it reach), crossed out past it.
+ * An essence's levels for one weapon skill as grooves (`max` of them): yellow up to `level`, grey the rest, crossed out
+ * past `room` (what its tuning and Potential let count). Each is a button (`essence-notch`): a click etches up to it,
+ * or on the top one back one.
  */
-export const skillNotches = (base: number, level: number, cap: number, total = 9): Html => {
-  const label = `Rank ${level} of ${cap}`;
-  return html`<span class="skill-notches" role="img" aria-label="${label}" title="${label}">${raw(
-    Array.from({ length: total }, (_, i) => `<span class="notch ${i < base ? 'own' : i < level ? 'gem' : i < cap ? 'open' : 'shut'}"></span>`).join(''),
-  )}</span>`;
-};
-/**
- * An essence's levels for one weapon skill as grooves (`max`: 6 on a stat skill, 3 on the weapon's own): yellow up to
- * `level`, grey the rest. Each is a button (`essence-notch`): a click etches up to it, or on the top one back one.
- */
-export const essenceNotches = (wpnId: string, skill: number, name: string, level: number, max: number): Html =>
+export const essenceNotches = (wpnId: string, skill: number, name: string, level: number, max: number, room = max): Html =>
   html`<span class="skill-notches essence-notches" role="group" aria-label="${name} essence +${level} of ${max}">${raw(
     Array.from(
       { length: max },
       (_, i) =>
-        `<button type="button" class="notch ${i < level ? 'gem' : 'open'}" data-action="essence-notch" data-wpn="${wpnId}" data-skill="${skill}" data-value="${i + 1}" aria-label="Essence +${i + 1}" title="Essence +${i + 1}"></button>`,
+        `<button type="button" class="notch ${i >= room ? 'shut' : i < level ? 'gem' : 'open'}" data-action="essence-notch" data-wpn="${wpnId}" data-skill="${skill}" data-value="${i + 1}" aria-label="Essence +${i + 1}" title="Essence +${i + 1}"></button>`,
     ).join(''),
+  )}</span>`;
+/**
+ * A weapon skill's levels from tuning and Potential as one groove group: `own` white (lit up to `ownLit`, from tuning),
+ * then `potential` purple (lit up to `potLit`, the Potentials the player hasn't crossed out); the unlit tuning ones dim.
+ */
+export const baseNotches = (own: number, ownLit: number, potential: number, potLit: number): Html =>
+  html`<span class="skill-notches">${raw(
+    [...Array.from({ length: own }, (_, i) => (i < ownLit ? 'own' : 'open')), ...Array.from({ length: potential }, (_, i) => (i < potLit ? 'pot' : 'shut'))]
+      .map((c) => `<span class="notch ${c}"></span>`)
+      .join(''),
   )}</span>`;
 /** Artifice level 0–3 as the game draws it: the first `level` bars lit, and all of it at the top. */
 export const artificeIcon = (level: number): Html => {

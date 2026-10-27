@@ -156,13 +156,15 @@ function hero(id: string, o: WikiOperator, potential: number, redraw: () => void
   const pot = heroPotentialArt(id, potential, redraw);
   const own = pot.picked ? null : currentArt(id, 'banner', redraw);
   const banner = own ?? (pot.shown && { id: `potential:${pot.shown.file}`, src: potentialArtUrl(pot.shown.file) });
-  // A Potential's picture (2:1) gets a taller header, kept on its focus point.
+  // A Potential's picture (2:1) gets a taller header, with the operator's face
+  // (its focus point) placed in the band by CSS (database.css `.tall`).
   const tall = !own && !!pot.shown;
   const [x, y] = tall ? pot.shown!.focus : banner ? positionOf(banner.id) : [0, 0];
+  const place = tall ? `--fx:${x};--fy:${y}` : `object-position:${x}% ${y}%`;
   const portrait = currentArt(id, 'portrait', redraw);
   return html`<section class="wiki-hero${banner ? ' has-art' : ''}${tall ? ' tall' : ''}${overBackdrop ? ' over-backdrop' : ''}">
     ${banner
-      ? html`<img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="object-position:${x}% ${y}%" alt="" decoding="async" />`
+      ? html`<div class="wiki-hero-pin"><img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="${place}" alt="" decoding="async" /></div>`
       : heroGlow('char', id)}
     <div class="container wiki-hero-inner">
       ${portrait ? html`<img class="wiki-hero-portrait user-art" src="${portrait.src}" alt="" decoding="async" />` : itemImg('char', id, 'wiki-hero-portrait')}
@@ -527,7 +529,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
       ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined)}
       <div class="wiki-cols even">
         <div class="wiki-col">${statsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
-        <div class="wiki-col">${loadoutSection(id, a, redraw, o.weapon)}</div>
+        <div class="wiki-col">${loadoutSection(id, a, redraw, o.weapon, (label) => attributeTotal(o, bonuses, label))}</div>
       </div>
       ${owned?.copies
         ? html`<div class="wiki-cols even">

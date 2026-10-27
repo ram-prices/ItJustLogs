@@ -126,6 +126,26 @@ select option {
 .gear-stat > .artifice-icon {
   flex: none;
 }
+/* The own skill's effect in short, under its line, from the skill name's column; the branch it took first, dim. */
+.wpn-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -2px 0 2px calc(1.9em + 8px);
+  font: 400 12px/18px var(--font-sans);
+  color: var(--gray-900);
+}
+.wpn-summary-label {
+  color: var(--gray-700);
+}
+/* A weapon skill's level of what it can reach now ("7/9"), where a gear stat has its Artifice mark. */
+.wpn-skill-lv {
+  flex: none;
+  /* As wide as the Artifice mark (.artifice-icon), so skill names line up with the gear stats' names. */
+  width: 1.9em;
+  white-space: nowrap;
+  color: var(--gray-1000);
+}
 /* A stat's Artifice picker: its mark on a light grey box, the select over it unseen (its open list still shows). */
 .gear-art-pick {
   position: relative;
@@ -1601,8 +1621,10 @@ a.six-item {
   opacity: 0.22;
 }
 
-/* An Arsenal Issue's art in layers (components.ts issueArt), stacked exactly. */
+/* An Arsenal Issue's or a Headhunting banner's art in layers (components.ts
+   issueArt, operatorArt), stacked exactly. */
 .issue-art,
+.op-art,
 .issue-float {
   position: absolute;
   inset: 0;
@@ -1614,7 +1636,9 @@ a.six-item {
    show. Banner cards barely move; headers and the Character card more. On an
    Issue the backdrop and dotted rule stay put, the ornaments move a little
    and the weapon most, floating gently (on its wrapper, so the float and the
-   shift never animate the same element). */
+   shift never animate the same element). On a Headhunting banner in layers
+   the backdrop barely moves and the operator a few pixels more, so the two
+   part a little; at rest they're the flat picture. */
 @keyframes weapon-float {
   from {
     transform: translateY(-0.9%);
@@ -1640,6 +1664,12 @@ a.six-item {
   }
   :root[data-motion='on'] .banner-art .issue-weapon {
     --shift: 2.5%;
+  }
+  :root[data-motion='on'] .banner-art .op-back {
+    --shift: 0.3%;
+  }
+  :root[data-motion='on'] .banner-art .op-front {
+    --shift: 1.1%;
   }
   :root[data-motion='on'] .issue-float {
     animation: weapon-float 5s ease-in-out infinite alternate;
