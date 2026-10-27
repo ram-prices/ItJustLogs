@@ -9,7 +9,7 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, heroGlow, icon, itemImg, pageHeader, stars, tileArt, trait, withStars } from '../components';
+import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, pageHeader, stars, trait, withStars } from '../components';
 import { html, type Html } from '../html';
 import finalStrikes from '../../data/final-strikes.json';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
@@ -111,16 +111,21 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
       ${groups.map(
         (g) => html`<section class="section wiki-type">
           <div class="section-head"><h2 class="heading-20">${g.label ? withStars(g.label) : 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
-          <div class="wiki-grid">
+          <div class="op-grid">
             ${g.items.map((r) => {
               const mine = owned?.get(r.id);
-              return html`<a class="wiki-tile card${owned && (r.soon || !mine?.copies) ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}">
-                ${tileArt('char', r.id, r.rarity)}
-                <span class="wiki-tile-text min0">
-                  <span class="wiki-tile-name ellipsis">${r.name}</span>
-                  <span class="label-12 secondary">${[r.class && trait('classes', r.class), r.element && trait('elements', r.element)].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}</span>
+              return html`<a class="op-card card r${r.rarity}${owned && (r.soon || !mine?.copies) ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}" data-search-item>
+                <span class="op-card-art">
+                  ${operatorCard(r.id)}
+                  <span class="op-card-tags">${r.soon ? badge('Unreleased', 'amber') : ownedTag(mine)}</span>
                 </span>
-                ${r.soon ? badge('Unreleased', 'amber') : ownedTag(mine)}
+                <span class="op-card-strip min0">
+                  <span class="op-card-name ellipsis">${r.name}</span>
+                  <span class="op-card-chips">
+                    ${r.class ? html`<span class="op-chip" title="${r.class}">${classIcon(r.class)}<span hidden>${r.class}</span></span>` : ''}
+                    ${r.element ? html`<span class="op-chip" title="${r.element}">${elementIcon(r.element)}<span hidden>${r.element}</span></span>` : ''}
+                  </span>
+                </span>
               </a>`;
             })}
           </div>

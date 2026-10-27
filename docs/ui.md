@@ -61,6 +61,16 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     blue #26bbfd, its gear widgets' COLOR_ENHANCED); gear slots show the game's slot
     marks (`slotIcon`, ef-assets icons/gear-slots, the wiki's Gear Icons),
     the weapon slot the operator's weapon type (`weaponTypeIcon`, ef-assets weapon-types).
+    The Operators list (`database.css` `.op-card`) is portrait cards, our take on
+    the game's: card art (`operatorCard`, ef-assets `operators/bust-3/`; a new
+    folder name whenever the art changes, since caches keep it a week): the
+    official site's operator pictures (endfield.gryphline.com/en-us/operator,
+    clean upper body, no background) cut to 303x324 from the top (shown square) by ef-assets
+    `operator-cards.py`, which the weekly update-wiki run uses for new operators; the face
+    portrait via `data-alt` until a card exists), Potential top right as an acrylic
+    pill, then the name with class and element icons
+    (`classIcon`, `elementIcon`) under it, a rarity-coloured line along the card's bottom; no stars. The class/element names sit in `hidden` spans so
+    the search still finds them.
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
     `/database/operators[/<name>]`, `/database/arsenals[/<name>]`,

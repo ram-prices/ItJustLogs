@@ -91,6 +91,9 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
   return `${EF_ASSETS_CDN}/${kind === 'char' ? 'operators' : 'arsenals'}/${id}.webp`;
 }
 
+/** An operator's card art: the official site's picture (ef-assets operators/bust-3/, from operator-cards.py). */
+export const operatorCardUrl = (id: string): string => itemIconUrl('char', id).replace('/operators/', '/operators/bust-3/');
+
 /** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
 export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
 

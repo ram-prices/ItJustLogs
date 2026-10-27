@@ -733,3 +733,149 @@
   padding-bottom: 8px;
   font-size: 13px;
 }
+
+/* ---------- Operators list (/database/operators): portrait cards -------- */
+/* Our take on the game's operator card: the official site's operator
+   picture from the top, square (ef-assets operators/bust-3/), Potential
+   on it, then the name with class and element icons under it, and a rarity
+   line along the bottom. Unowned ones fade once there's an import. */
+.op-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.op-card {
+  --rc: var(--gray-500);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow 0.15s var(--ease);
+}
+.op-card.r6 { --rc: var(--r6); }
+.op-card.r5 { --rc: var(--r5); }
+.op-card.r4 { --rc: var(--r4); }
+.op-card.r3 { --rc: var(--r3); }
+.op-card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+/* The rarity line along the card's bottom. */
+.op-card::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--rc);
+}
+.op-card-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--gray-100);
+}
+.op-card-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0;
+  transform-origin: 50% 20%;
+  transition: transform 0.3s var(--ease);
+}
+/* The face portrait, until ef-assets has the operator's card art. */
+.op-card-img.portrait {
+  object-position: 50% 50%;
+}
+.op-card:hover .op-card-img {
+  transform: scale(1.04);
+}
+.op-card-tags {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+}
+.op-card-tags:empty {
+  display: none;
+}
+/* Acrylic pills over the art. */
+.op-card-tags .wiki-tile-tag {
+  background: color-mix(in srgb, var(--background-100) 70%, transparent);
+  backdrop-filter: blur(8px) saturate(1.2);
+  box-shadow: var(--shadow-border);
+}
+.op-card-tags .wiki-tile-tag {
+  margin: 0;
+}
+.op-card-tags .badge.amber {
+  background: linear-gradient(var(--amber-bg), var(--amber-bg)), color-mix(in srgb, var(--background-100) 80%, transparent);
+  backdrop-filter: blur(8px);
+}
+.op-card-chips {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+.op-chip {
+  display: grid;
+  place-items: center;
+}
+.op-chip .trait-icon {
+  width: 23px;
+  height: 23px;
+  margin: 0;
+  vertical-align: 0;
+}
+/* Class glyphs fill their square; element glyphs don't: smaller to match. */
+.op-chip .class-icon {
+  width: 17px;
+  height: 17px;
+}
+/* The name, class and element under it. */
+.op-card-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* The bottom clears the 3px rarity line. */
+  padding: 8px 12px 14px;
+}
+.op-card-name {
+  font: 600 15px/20px var(--font-sans);
+}
+.op-card.unowned .op-card-img,
+.op-card.unowned .op-card-strip {
+  opacity: 0.45;
+}
+.op-card.unowned:hover .op-card-img,
+.op-card.unowned:hover .op-card-strip {
+  opacity: 1;
+}
+@media (max-width: 640px) {
+  .op-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .op-card-strip {
+    gap: 4px;
+    padding: 6px 8px 11px;
+  }
+  .op-card-name {
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .op-chip .trait-icon {
+    width: 21px;
+    height: 21px;
+  }
+  .op-chip .class-icon {
+    width: 15px;
+    height: 15px;
+  }
+  .op-card-tags {
+    top: 6px;
+    right: 6px;
+  }
+}

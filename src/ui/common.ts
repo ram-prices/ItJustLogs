@@ -20,11 +20,11 @@ export function installImageFallback(): void {
         flat.setAttribute('data-fallback', '');
         layers.replaceWith(flat);
       } else if (img.dataset.alt) {
-        // e.g. banner art that doesn't exist yet: show the rate-up weapon instead.
+        // e.g. banner art that doesn't exist yet: show the rate-up weapon instead (or an operator card's portrait).
         const alt = img.dataset.alt;
         delete img.dataset.alt;
         delete img.dataset.retried;
-        img.classList.add('weapon');
+        img.classList.add(img.dataset.altClass ?? 'weapon');
         img.src = alt;
       } else {
         img.classList.add('missing');

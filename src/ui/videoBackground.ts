@@ -6,7 +6,7 @@
  * phones and Save-Data get the clip's first frame instead, so the video itself
  * is never downloaded there.
  */
-import { EF_ASSETS_CDN } from '../domain/banners';
+import { EF_ASSETS, EF_ASSETS_CDN } from '../domain/banners';
 import { state } from '../state';
 
 interface BackgroundIndex {
@@ -37,7 +37,8 @@ const playing = () =>
 function load(): void {
   if (loading) return;
   loading = true;
-  fetch(`${BASE}/index.json`)
+  // The list is data: raw.githubusercontent stays fresh within minutes, while jsDelivr kept an old list for up to a week.
+  fetch(`${(import.meta.env.DEV && localStorage.getItem('ijl.backgrounds')) || `${EF_ASSETS}/backgrounds`}/index.json`)
     .then((r) => (r.ok ? (r.json() as Promise<BackgroundIndex>) : null))
     .then((data) => {
       index = data ?? { clips: {}, operators: {}, default: [] };

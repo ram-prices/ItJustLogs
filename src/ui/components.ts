@@ -1,4 +1,4 @@
-import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, mirrorUrl } from '../domain/banners';
+import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, mirrorUrl, operatorCardUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { html, raw, type Html } from './html';
 import { tintFor } from './tint';
@@ -143,6 +143,17 @@ export function itemName(name: string): Html {
 export function elementIcon(name: string): Html {
   const src = iconOf('elements', name);
   return src ? html`<span class="trait-icon trait-mask wk-${name.toLowerCase().replace(/\W/g, '')}" style="--icon:url('${src}')" aria-hidden="true"></span>` : html``;
+}
+
+/** A class's game icon (Guard, Caster...) in the text's colour; nothing until icons load. */
+export function classIcon(name: string): Html {
+  const src = iconOf('classes', name);
+  return src ? html`<span class="trait-icon trait-mask class-icon" style="--icon:url('${src}')" aria-hidden="true"></span>` : html``;
+}
+
+/** An operator's card art (the official site's upper-body picture, no background); the face portrait until ef-assets has it. */
+export function operatorCard(id: string): Html {
+  return html`<img class="op-card-img" src="${operatorCardUrl(id)}" alt="" loading="lazy" decoding="async" data-fallback data-alt="${itemIconUrl('char', id)}" data-alt-class="portrait" />`;
 }
 
 /** A weapon type's game icon (Sword, Polearm...) in the text's colour; nothing until icons load. */
