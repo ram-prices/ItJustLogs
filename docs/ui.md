@@ -58,7 +58,15 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     (`potentialStar`) only beside that text or as decoration.
     Artifice levels show the game's mark (`artificeIcon`, endfield.wiki.gg
     Artifice_<n>_icon.svg: a gear and three bars, lit per level, in the game's
-    blue #26bbfd, its gear widgets' COLOR_ENHANCED); gear slots show the game's slot
+    blue #26bbfd, its gear widgets' COLOR_ENHANCED). Artifice is per stat, as in the
+    game (EquipConst maxAttrEnhanceLevel 3; EquipTable's enhancedAttrValues, the
+    same numbers as wiki/gear.json's stat `values` [base, +1, +2, +3]): every stat
+    line (`gearStats` in loadout.ts) has its own mark and "+base » +artificed" (the
+    artificed value in the blue), and the piece its own node (`gearArtificeIcon`:
+    the mark without bars) in three states, `artificeState` after the game's
+    EquipEnhanceNode: empty at 0, half once any stat is artificed, full when the
+    total reaches stats × 3. Loadout: the node at the slot's top right, the stats
+    under the name, each mark a select over it (`gear-art-pick`). Gear slots show the game's slot
     marks (`slotIcon`, ef-assets icons/gear-slots, the wiki's Gear Icons),
     the weapon slot the operator's weapon type (`weaponTypeIcon`, ef-assets weapon-types).
     The Operators list (`database.css` `.op-card`) is portrait cards, our take on

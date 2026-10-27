@@ -77,6 +77,13 @@ export const artificeIcon = (level: number): Html => {
       ARTIFICE_BARS.map(([x, t], i) => `<rect${on(i < level)} x="${x}" y="22.54" width="20.1" height="7.08" rx="3.54" transform="${t}"/>`).join(''),
   )}</svg>`;
 };
+/** A gear piece's own Artifice mark: the same node without bars, empty, half lit or full (`artificeState`). */
+export const gearArtificeIcon = (state: 'empty' | 'half' | 'full'): Html => {
+  const label = state === 'empty' ? 'Not artificed' : state === 'half' ? 'Partly artificed' : 'Fully artificed';
+  return html`<svg class="artifice-icon gear-artifice" viewBox="0 0 42.58 35.25" role="img" aria-label="${label}"><title>${label}</title>${raw(
+    `<path${state === 'full' ? ' class="on"' : ''} d="${ARTIFICE_GEAR}"/>${state === 'half' ? `<path class="on" d="${ARTIFICE_LIT}"/>` : ''}`,
+  )}</svg>`;
+};
 /** Text with each ★ drawn as the game's rarity emblem ("6★ history"). */
 export const withStars = (text: string): Html => html`${text.split('★').map((part, i) => html`${i ? raw(STAR_SVG) : ''}${part}`)}`;
 

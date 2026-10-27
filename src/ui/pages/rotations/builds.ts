@@ -1,12 +1,13 @@
-import { artificeOf, GEAR_SLOTS, type Loadout } from '../../../domain/loadout';
+import { artificeOf, artificeState, artificeTops, GEAR_SLOTS, type Loadout } from '../../../domain/loadout';
+import { statArtifice } from '../../../domain/sim/build';
 import { CHECKED, enemyById, FOODS, type SimBuild, type SimMember } from '../../../domain/sim/team';
 import { wikiId } from '../../../domain/wiki';
 import { state } from '../../../state';
 import { cachedBannerDb } from '../../../store';
-import { artificeIcon, badge, essenceIcon, icon, iconOf, itemImg, slotIcon } from '../../components';
+import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, iconOf, itemImg, slotIcon } from '../../components';
 import { html, type Html } from '../../html';
 import { infoHref, ownedOf } from '../info';
-import { weaponRanksFor } from '../loadout';
+import { gearStats, weaponRanksFor } from '../loadout';
 import { type CombatIndex, page, settings, type Wiki } from './state';
 
 /** The page's fields. True if it was one of theirs. */
@@ -26,7 +27,16 @@ export function editBuild(k: number, name: string, v: number | undefined): void 
     nb.ranks = Object.keys(ranks).length ? ranks : undefined;
   } else if (nb.weapon && name === 'wlevel') nb.weapon.level = v === 90 ? undefined : v;
   else if (nb.weapon && name === 'wpotential') nb.weapon.potential = v ?? 0;
-  else if (/^art\d$/.test(name) && nb.gear[Number(name[3])]) nb.gear[Number(name[3])].artifice = v ?? 0;
+  else if (/^art\d+:\d$/.test(name)) {
+    // One stat's Artifice ("art<piece>:<stat>"): the piece's levels as a list from then on.
+    const [k, x] = name.slice(3).split(':').map(Number);
+    const g = nb.gear[k];
+    if (g) {
+      const levels = Array.from({ length: page.wikiNow?.gear[g.id]?.stats.length ?? 3 }, (_, y) => statArtifice(g.artifice, y));
+      levels[x] = v ?? 0;
+      g.artifice = levels;
+    }
+  }
   else if (nb.weapon && /^rank\d$/.test(name)) {
     // A skill's rank as shown: its level, plus the weapon's Potential on the last skill. At its cap: maxed (unset).
     const caps = essenceCaps(nb);
@@ -150,7 +160,7 @@ export function memberCard(m: SimMember, i: number, n: number, wiki: Wiki, index
       ${optimal ? '' : GEAR_SLOTS.map(({ slot, type, label }) => {
         const id = l[slot];
         const g = id ? wiki.gear[id] : undefined;
-        return g ? html`<div class="sim-piece secondary">${slotIcon(type)}<span class="min0 ellipsis">${g.name}</span>${artificeIcon(build.gear.find((x) => x.id === id)?.artifice ? artificeOf(l, slot, g) : 0)}</div>` : html`<div class="sim-piece secondary">${slotIcon(type)}No ${label.toLowerCase()}</div>`;
+        return g ? gearLine(id!, artificeOf(l, slot, g), `${m.op}:${slot}`, wiki) : html`<div class="sim-piece secondary">${slotIcon(type)}No ${label.toLowerCase()}</div>`;
       })}
     </div>
   </div>`;
@@ -252,9 +262,40 @@ const noEssence = (b: SimBuild): boolean => !!b.weapon?.skillLevels && b.weapon.
 
 /** A build's weapon and gear, as lines. */
 export function buildLines(b: SimBuild, wiki: Wiki, edit?: number): Html {
-  // While a parsed run is edited each Artifice mark is a button: a click steps it 0 → 3 and round (`sim-art`).
   return html`${b.weapon?.id ? weaponLine(b.weapon, wiki, edit) : ''}
-    ${b.gear.map((g, k) => html`<div class="sim-piece secondary">${slotIcon(wiki.gear[g.id]?.type ?? '')}<span class="min0 ellipsis">${wiki.gear[g.id]?.name ?? g.id}</span>${edit !== undefined
-      ? html`<button type="button" class="sim-art-btn" data-action="sim-art" data-value="${edit}:${k}" title="Artifice ${g.artifice ?? 0}: click to change">${artificeIcon(g.artifice ?? 0)}</button>`
-      : artificeIcon(g.artifice ?? 0)}</div>`)}`;
+    ${b.gear.map((g, k) => gearLine(g.id, g.artifice, `${b.op}:${k}`, wiki, edit === undefined ? undefined : `${edit}:${k}`))}`;
+}
+
+/** Gear lines opened to their stats, by `data-gear-key`, so they stay open through redraws (and Edit). */
+const openGear = new Set<string>();
+if (typeof document !== 'undefined')
+  document.addEventListener(
+    'toggle',
+    (e) => {
+      const d = e.target as HTMLDetailsElement;
+      const key = d.dataset?.gearKey;
+      if (key) (d.open ? openGear.add(key) : openGear.delete(key));
+    },
+    true,
+  );
+
+/**
+ * A gear piece as a line: its slot mark, name and own Artifice mark (empty, half or full: `artificeState`); a click opens
+ * its stats under it, each with its Artifice mark and "+base » +artificed" (`gearStats`). While a parsed run is edited
+ * (`edit`: "<build>:<piece>") each stat's mark is a button: a click steps it 0 → 3 and round (`sim-art`).
+ */
+export function gearLine(id: string, artifice: number | number[] | undefined, key: string, wiki: Wiki, edit?: string): Html {
+  const g = wiki.gear[id];
+  if (!g) return html`<div class="sim-piece secondary">${slotIcon('')}<span class="min0 ellipsis">${id}</span></div>`;
+  const tops = artificeTops(g);
+  const levels = tops.map((top, i) => Math.min(top, statArtifice(artifice, i)));
+  const mark = artificeState(levels, tops);
+  return html`<details class="sim-gear-d" data-gear-key="${key}" ${openGear.has(key) ? 'open' : ''}>
+    <summary class="sim-piece secondary">${slotIcon(g.type)}<span class="min0 ellipsis">${g.name}</span>${mark ? gearArtificeIcon(mark) : ''}</summary>
+    ${gearStats(g, levels, (i, lv) =>
+      edit === undefined
+        ? artificeIcon(lv)
+        : html`<button type="button" class="sim-art-btn" data-action="sim-art" data-value="${edit}:${i}" title="Artifice ${lv}: click to change">${artificeIcon(lv)}</button>`,
+    )}
+  </details>`;
 }

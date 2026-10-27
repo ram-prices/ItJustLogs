@@ -1,9 +1,9 @@
 import type { Analysis } from '../../domain/analyze';
 import { gearIconUrl } from '../../domain/banners';
-import { GEAR_SLOTS, SET_PIECES, artificeOf, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, weaponBaseRanks, weaponRankCaps, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
+import { GEAR_SLOTS, SET_PIECES, artificeOf, artificeState, artificeTops, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, weaponBaseRanks, weaponRankCaps, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { artificeIcon, badge, essenceIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
+import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
 
@@ -118,22 +118,42 @@ export const essenceTag = (wpnId: string, w?: WikiWeapon, potential: number | nu
   return r ? html`<span class="essence-part">Ranks ${r.join(' · ')}</span>` : null;
 };
 
-/** A gear slot's Artifice level picker (pieces that can be refined only). */
-function artificePicker(opId: string, slot: GearSlot, l: Loadout, g: WikiGear): Html {
-  const top = Math.max(0, ...g.stats.map((s) => s.values.length - 1));
-  if (!top) return html``;
-  const at = artificeOf(l, slot, g);
-  // The game's mark shows the level; the select over it picks one.
-  return html`<span class="loadout-artifice" title="Artifice level: its stats count at this level">${artificeIcon(at)}<select data-artifice-op="${opId}" data-artifice-slot="${slot}" aria-label="${g.name} Artifice level">
-    ${Array.from({ length: top + 1 }, (_, i) => html`<option value="${i}" ${raw(i === at ? 'selected' : '')}>Artifice ${i}</option>`)}
-  </select></span>`;
+/** A gear stat's value as the game writes it: "+32", fractions as percents ("+41.4%"). */
+export const gearValue = (v: number | undefined): string => (v == null ? '' : v < 1 ? `+${Math.round(v * 1000) / 10}%` : `+${v.toLocaleString()}`);
+
+/**
+ * A gear piece's stats as the game lists them: each one's Artifice mark (`mark`: the mark, or a control over it; none
+ * on a stat that can't be artificed), its name and its value, "+32 » +38" once artificed (base, then what it counts at).
+ */
+export function gearStats(g: WikiGear, levels: number[], mark: (i: number, level: number) => Html): Html {
+  const tops = artificeTops(g);
+  return html`<div class="gear-stats">${g.stats.map((s, i) => {
+    const lv = levels[i] ?? 0;
+    return html`<div class="gear-stat">${tops[i] ? mark(i, lv) : ''}<span class="min0 ellipsis">${s.stat}</span><span class="gear-stat-val num">${gearValue(s.values[0])}${lv ? html`<span class="gear-stat-art"> » ${gearValue(s.values[lv])}</span>` : ''}</span></div>`;
+  })}</div>`;
 }
 
-/** Sets (or, with null, resets to the highest) a gear slot's Artifice level. */
-export function setArtifice(opId: string, slot: string, level: number | null): void {
-  if (!GEAR_SLOTS.some((g) => g.slot === slot)) return;
+/** A gear slot's stats, each with its Artifice level picker (the mark, a select over it), and the piece's own mark. */
+function artificePicker(opId: string, slot: GearSlot, l: Loadout, g: WikiGear): Html {
+  const tops = artificeTops(g);
+  const levels = artificeOf(l, slot, g);
+  const mark = artificeState(levels, tops);
+  return html`${mark ? html`<span class="loadout-artifice">${gearArtificeIcon(mark)}</span>` : ''}${gearStats(
+    g,
+    levels,
+    (i, at) => html`<span class="gear-art-pick" title="Artifice ${at}">${artificeIcon(at)}<select data-artifice-op="${opId}" data-artifice-slot="${slot}" data-artifice-stat="${i}" aria-label="${g.stats[i].stat} Artifice level">
+      ${Array.from({ length: tops[i] + 1 }, (_, k) => html`<option value="${k}" ${raw(k === at ? 'selected' : '')}>Artifice ${k}</option>`)}
+    </select></span>`,
+  )}`;
+}
+
+/** Sets one stat's Artifice level on a gear slot (null: the whole piece back to the highest). */
+export function setArtifice(opId: string, slot: string, stat: number, level: number | null): void {
+  const id = state.settings.loadouts?.[opId]?.[slot as GearSlot];
+  const g = id ? wikiFile<WikiGearFile>('gear.json', () => {}).data?.gear.items[id] : undefined;
+  if (!GEAR_SLOTS.some((x) => x.slot === slot) || !g) return;
   const all = { ...state.settings.loadouts };
-  const next = withArtifice(all[opId], slot as GearSlot, level);
+  const next = withArtifice(all[opId], slot as GearSlot, g, stat, level);
   if (next) all[opId] = next;
   else delete all[opId];
   updateSettings({ loadouts: all });

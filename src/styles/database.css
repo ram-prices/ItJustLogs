@@ -158,6 +158,32 @@
 .sim-piece > .artifice-icon {
   margin-left: auto;
 }
+/* A gear line opens to its stats (builds.ts gearLine): the line itself is the summary, without the marker. */
+.sim-gear-d > summary {
+  list-style: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.sim-gear-d > summary::-webkit-details-marker {
+  display: none;
+}
+.sim-gear-d > summary:hover > span {
+  color: var(--gray-1000);
+}
+.sim-gear-d > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Its stats under the name, in from the slot marks' column. */
+.sim-gear-d > .gear-stats {
+  padding: 4px 0 6px calc(1.1em + 4px);
+}
+.sim-gear-d .gear-stat {
+  font-size: inherit;
+}
+.gear-stat > .sim-art-btn {
+  margin: -2px -4px;
+}
 /* The weapon line's right end: its level, its skill ranks when not maxed, the essence icon. */
 .sim-weapon-end {
   display: inline-flex;
@@ -225,6 +251,10 @@
 }
 :root[data-theme='light'] .artifice-icon .on {
   fill: #0b8fc4;
+}
+/* A gear piece's own mark: the node alone, without the bars. */
+.artifice-icon.gear-artifice {
+  width: 1.21em;
 }
 /* On Home they're white, as in the game, not the grey of the text around them. */
 .home .rarity-star {

@@ -768,8 +768,8 @@ function installProfile(): void {
     if (el.dataset?.extraCopies) editExtra(Number(el.dataset.extraCopies), { copies: Math.max(1, Math.min(99, Math.floor(Number(el.value)) || 1)) });
     if (el.dataset?.extraNote) editExtra(Number(el.dataset.extraNote), { note: el.value.trim() });
     if (el.dataset?.extraId) editExtra(Number(el.dataset.extraId), { id: el.value });
-    // Loadout: a gear piece's Artifice level.
-    if (el.dataset?.artificeOp) setArtifice(el.dataset.artificeOp, el.dataset.artificeSlot!, Number(el.value));
+    // Loadout: one gear stat's Artifice level.
+    if (el.dataset?.artificeOp) setArtifice(el.dataset.artificeOp, el.dataset.artificeSlot!, Number(el.dataset.artificeStat), Number(el.value));
     // A weapon's page without Maxed Essence: its skill sliders are the player's ranks.
     if (el.dataset?.saveWpn) setWeaponRank(el.dataset.saveWpn, Number(el.dataset.saveIndex), Number(el.value), (el.dataset.saveBase ?? '').split(',').map(Number));
   });

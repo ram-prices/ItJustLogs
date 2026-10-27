@@ -1,6 +1,6 @@
 /**
  * An operator's build for the simulator: level, weapon (level, Potential,
- * skill levels) and gear (each piece's artifice level), turned into the
+ * skill levels) and gear (each piece's Artifice per stat), turned into the
  * fight's Stats and the passive skills the weapon and gear sets add, from
  * ef-assets combat/ops/<operator>.json (base), combat/weapons/<id>.json and
  * combat/gear.json. Pure logic.
@@ -46,9 +46,16 @@ export interface Build {
   /** Promotions (0–4); attribute talents need them. */
   promotion?: number;
   weapon?: { id: string; level?: number; potential?: number; skillLevels?: number[] };
-  /** Gear pieces by item id, with their artifice level (0–3). */
-  gear?: { id: string; artifice?: number }[];
+  /**
+   * Gear pieces by item id, with each stat's Artifice level (0–3, the stats in the game's order; gear.json's DEF row
+   * before them takes none). One number: every stat at that level (requests and runs from before per-stat Artifice).
+   */
+  gear?: { id: string; artifice?: number | number[] }[];
 }
+
+/** One stat's Artifice level from a build's `artifice` (a list per stat, or one number for all). */
+export const statArtifice = (artifice: number | number[] | undefined, stat: number): number =>
+  (Array.isArray(artifice) ? artifice[stat] : artifice) ?? 0;
 
 /** The operator's bundle with its weapon's and sets' skills, and its Stats. */
 export function equip(op: Bundle & { base?: Base }, build: Build, weapon?: WeaponData, gear?: GearData): { bundle: Bundle; stats: Stats } {
@@ -90,9 +97,12 @@ export function equip(op: Bundle & { base?: Base }, build: Build, weapon?: Weapo
       const item = gear.items[g.id];
       if (!item) continue;
       if (item.suit) worn.set(item.suit, (worn.get(item.suit) ?? 0) + 1);
+      // DEF (the same at every level) comes first; the stats after it are the game's three, each artificed on its own.
+      let k = 0;
       for (const st of item.stats) {
         const attributeType = st.attr === 'Main' ? (base?.main ?? '') : st.attr === 'Sub' ? (base?.sub ?? '') : st.attr;
-        mods.push({ attributeType, formulaItem: st.how, value: st.values[Math.min(st.values.length - 1, g.artifice ?? 0)] ?? 0 });
+        const level = st.attr === 'Def' ? 0 : statArtifice(g.artifice, k++);
+        mods.push({ attributeType, formulaItem: st.how, value: st.values[Math.max(0, Math.min(st.values.length - 1, level))] ?? 0 });
       }
     }
     for (const [suit, n] of worn)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bannerEnded } from './catalog';
-import { atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, weaponBaseRanks, weaponRankCaps, setCounts, statBonuses, wieldersOf, withSlot, type Loadout } from './loadout';
+import { artificeLevels, artificeState, artificeTops, atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, weaponBaseRanks, weaponRankCaps, setCounts, statBonuses, wieldersOf, withArtifice, withSlot, type Loadout } from './loadout';
+import { equip, type GearData } from './sim/build';
 import type { Schedule } from './schedule';
 import type { WikiGear, WikiWeapon } from './wiki';
 
@@ -193,6 +194,75 @@ describe("Arcane's in-game stats", () => {
   it('counts a lower Artifice level when one is set', () => {
     const low = operatorBonuses(arcane, { loadout: { ...loadout, artifice: { gloves: 0 } }, weapon: { w: type42, potential: 0 }, items, sets });
     expect(Math.trunc(statTotal(176.44, low.get('Intellect')))).toBe(418);
+  });
+
+  it('counts each stat at its own Artifice level', () => {
+    const at = (gloves: number | number[]) => operatorBonuses(arcane, { loadout: { ...loadout, artifice: { gloves } }, weapon: { w: type42, potential: 0 }, items, sets });
+    // Wraps: Will 65/71/78/84, Intellect 43/47/51/55. Will kept at 3, Intellect at 0: only Intellect drops (55 → 43).
+    const intLow = at([3, 0]);
+    expect(Math.trunc(statTotal(176.44, intLow.get('Intellect')))).toBe(418);
+    expect(Math.round(statTotal(121.499, intLow.get('Will')))).toBe(765);
+    const willLow = at([0, 3]);
+    expect(Math.trunc(statTotal(176.44, willLow.get('Intellect')))).toBe(430);
+    expect(willLow.get('Will')!.flat).toBe(b.get('Will')!.flat - 19);
+    expect(willLow.get('Will')!.sources.find((s) => s.from.startsWith('Wraps'))?.from).toBe('Wraps (Artifice 0/3)');
+  });
+
+  it('reads a save from before per-stat Artifice as every stat at that level', () => {
+    for (const n of [0, 1, 2, 3]) {
+      const old = operatorBonuses(arcane, { loadout: { ...loadout, artifice: { gloves: n } }, items, sets });
+      const now = operatorBonuses(arcane, { loadout: { ...loadout, artifice: { gloves: [n, n] } }, items, sets });
+      expect(now).toEqual(old);
+    }
+  });
+});
+
+describe('per-stat Artifice', () => {
+  const g = (stats: number[][], artifice = true): WikiGear => ({ ...piece(null), artifice, stats: stats.map((values, i) => ({ stat: `S${i}`, values })) });
+  const gold = g([[32, 35, 38, 41], [21, 23, 25, 27], [0.414, 0.455, 0.497, 0.538]]);
+
+  it('converts old saves: one number for every stat, nothing for each stat at its highest', () => {
+    expect(artificeLevels(2, [3, 3, 3])).toEqual([2, 2, 2]);
+    expect(artificeLevels(undefined, [3, 3, 3])).toEqual([3, 3, 3]);
+    expect(artificeLevels([3, 0, 1], [3, 3, 3])).toEqual([3, 0, 1]);
+    // Kept to each stat's own range; a piece that can't be artificed stays at 0.
+    expect(artificeLevels(9, [3, 3, 0])).toEqual([3, 3, 0]);
+    expect(artificeLevels([-1, 5], [3, 3])).toEqual([0, 3]);
+    expect(artificeTops(g([[10], [5]], false))).toEqual([0, 0]);
+  });
+
+  it('marks the piece empty, half or full as the game does', () => {
+    const tops = artificeTops(gold);
+    expect(artificeState([0, 0, 0], tops)).toBe('empty');
+    expect(artificeState([1, 0, 0], tops)).toBe('half');
+    expect(artificeState([3, 3, 2], tops)).toBe('half');
+    expect(artificeState([3, 3, 3], tops)).toBe('full');
+    // Two stats: full at 6 (stats × 3).
+    expect(artificeState([3, 3], [3, 3])).toBe('full');
+    expect(artificeState([0, 0], [0, 0])).toBeNull();
+  });
+
+  it('sets one stat, and drops the entry when every stat is back at its highest', () => {
+    const l: Loadout = { kit1: 'k', artifice: { kit1: 2 } };
+    expect(withArtifice(l, 'kit1', gold, 1, 0)?.artifice).toEqual({ kit1: [2, 0, 2] });
+    expect(withArtifice({ kit1: 'k' }, 'kit1', gold, 0, 1)?.artifice).toEqual({ kit1: [1, 3, 3] });
+    expect(withArtifice({ kit1: 'k', artifice: { kit1: [2, 3, 3] } }, 'kit1', gold, 0, 3)).toEqual({ kit1: 'k' });
+    expect(withArtifice(l, 'kit1', gold, 0, null)).toEqual({ kit1: 'k' });
+  });
+
+  it('gives the sim each stat at its own level, DEF unchanged, and old runs the same stats as before', () => {
+    const gear = {
+      items: { k: { suit: null, part: 'EDC', level: 70, stats: [{ attr: 'Def', how: 'BaseAddition', values: [21, 21, 21, 21] }, { attr: 'Will', how: 'BaseAddition', values: [32, 35, 38, 41] }, { attr: 'Agi', how: 'BaseAddition', values: [21, 23, 25, 27] }, { attr: 'NormalSkillDamageIncrease', how: 'BaseAddition', values: [0.414, 0.455, 0.497, 0.538] }] } },
+      sets: {},
+      skills: {},
+      buffs: {},
+      patch: {},
+    } as GearData;
+    const op = { skills: {}, buffs: {}, patch: {} } as unknown as Parameters<typeof equip>[0];
+    const values = (artifice: number | number[]) => equip(op, { gear: [{ id: 'k', artifice }] }, undefined, gear).stats.mods!.map((m) => m.value);
+    expect(values([3, 0, 1])).toEqual([21, 41, 21, 0.455]);
+    for (const n of [0, 1, 2, 3]) expect(values(n)).toEqual(values([n, n, n]));
+    expect(values(2)).toEqual([21, 38, 25, 0.497]);
   });
 });
 

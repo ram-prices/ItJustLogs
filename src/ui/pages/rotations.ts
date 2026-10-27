@@ -1,7 +1,9 @@
 import { BUILD_MODES, type BuildMode, DEFAULT_HP, DEFAULT_LIMIT, DEFAULT_SECONDS, type Effort, ENEMIES, enemyById, type Goal, GOALS, type ReplayResult, type SimRequest, spGained, START_SP, type Style, styleOf, STYLES } from '../../domain/sim/team';
+import { artificeTops } from '../../domain/loadout';
+import { statArtifice } from '../../domain/sim/build';
 import type { WikiGearFile, WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { deleteSim, updateSim } from '../../store';
-import { artificeIcon, icon, pageHeader, toggleGroup } from '../components';
+import { icon, pageHeader, toggleGroup } from '../components';
 import { html, type Html } from '../html';
 import { sideTabs, wikiFile } from './info';
 import { AUTO_CORES, type CombatIndex, CORES, EFFORTS, page, save, saveZoom, settings, teamKey, teamOf, TL_ZOOMS, type VideoStep, type Wiki } from './rotations/state';
@@ -9,7 +11,7 @@ import { big, clockTime } from './rotations/text';
 import { loadBuffIcons } from './rotations/buffs';
 import { paintPlay, runPlay, showPlayhead } from './rotations/player';
 import { CREDIT, resultsView } from './rotations/results';
-import { buildOf, editBuild, limitedWeapons, memberCard, optimalBuildOf, signatureWeapons, weaponsFor } from './rotations/builds';
+import { buildOf, editBuild, gearLine, limitedWeapons, memberCard, optimalBuildOf, signatureWeapons, weaponsFor } from './rotations/builds';
 import { exportRun, historyView, importRun, isRecording, loadSaved, openRun, playDraft, run, runReplay, runsAside, stop, videoOf } from './rotations/runs';
 import { onDraft, parseView, simulated, videoTimeOf } from './rotations/parser';
 
@@ -93,14 +95,18 @@ export function simAction(action: string, el: HTMLElement): boolean {
       return true;
     }
     case 'sim-art': {
-      // A gear piece's Artifice while a parsed run is edited: the next level, 3 back to 0.
-      const [i, k] = (el.dataset.value ?? '').split(':').map(Number);
+      // One gear stat's Artifice while a parsed run is edited: the next level, its highest back to 0. Only that gear
+      // line is drawn again (its values and own mark change too), open as it was.
+      const [i, k, x] = (el.dataset.value ?? '').split(':').map(Number);
       const g = page.draft?.builds[i]?.gear[k];
-      if (!g) return false;
-      const next = ((g.artifice ?? 0) + 1) % 4;
-      editBuild(i, `art${k}`, next);
-      el.innerHTML = String(artificeIcon(next));
-      el.title = `Artifice ${next}: click to change`;
+      const w = g && page.wikiNow?.gear[g.id];
+      if (!g || !w) return false;
+      editBuild(i, `art${k}:${x}`, (statArtifice(g.artifice, x) + 1) % ((artificeTops(w)[x] ?? 0) + 1));
+      const line = el.closest<HTMLElement>('.sim-gear-d');
+      if (line) {
+        line.outerHTML = String(gearLine(g.id, g.artifice, line.dataset.gearKey ?? '', page.wikiNow!, `${i}:${k}`));
+        document.querySelector<HTMLElement>(`[data-action="sim-art"][data-value="${i}:${k}:${x}"]`)?.focus();
+      }
       return false;
     }
     case 'sim-main': {

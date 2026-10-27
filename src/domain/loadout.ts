@@ -11,8 +11,11 @@ export interface Loadout {
   gloves?: string;
   kit1?: string;
   kit2?: string;
-  /** Each gear piece's Artifice level (0 = none), when not the highest. */
-  artifice?: Partial<Record<GearSlot, number>>;
+  /**
+   * Each gear piece's Artifice per stat ([0–3, 0–3, 0–3], the stats in the piece's order), when not all at their
+   * highest. Saves from before per-stat Artifice hold one number for all three (`artificeLevels` reads both).
+   */
+  artifice?: Partial<Record<GearSlot, number | number[]>>;
 }
 
 export type GearSlot = 'armor' | 'gloves' | 'kit1' | 'kit2';
@@ -55,13 +58,43 @@ export function withSlot(l: Loadout | undefined, slot: LoadoutSlot, id: string |
   return Object.keys(next).length ? next : undefined;
 }
 
-/** `l` with a gear slot's Artifice level set (null: back to the highest). */
-export function withArtifice(l: Loadout | undefined, slot: GearSlot, level: number | null): Loadout | undefined {
+/** `l` with one stat's Artifice level set on a gear slot (null: the whole piece back to the highest). */
+export function withArtifice(l: Loadout | undefined, slot: GearSlot, g: WikiGear, stat: number, level: number | null): Loadout | undefined {
   const next: Loadout = { ...l, artifice: { ...l?.artifice } };
-  if (level == null) delete next.artifice![slot];
-  else next.artifice![slot] = Math.max(0, Math.floor(level));
+  const tops = artificeTops(g);
+  const levels = artificeOf(l ?? {}, slot, g);
+  if (level != null && stat >= 0 && stat < levels.length) levels[stat] = Math.max(0, Math.min(tops[stat], Math.floor(level)));
+  if (level == null || levels.every((x, i) => x === tops[i])) delete next.artifice![slot];
+  else next.artifice![slot] = levels;
   if (!Object.keys(next.artifice!).length) delete next.artifice;
   return Object.keys(next).length ? next : undefined;
+}
+
+/** The game's highest Artifice level for one stat (EquipConst maxAttrEnhanceLevel). */
+export const ARTIFICE_MAX = 3;
+
+/**
+ * Artifice per stat from what a save holds: a list (per stat), one number (saves from before per-stat Artifice, which
+ * counted every stat at that level), or nothing (`fallback`: each stat's own highest). Each is kept to 0–`tops[i]`.
+ */
+export function artificeLevels(saved: number | number[] | undefined | null, tops: number[], fallback = tops): number[] {
+  return tops.map((top, i) => {
+    const v = Array.isArray(saved) ? saved[i] : saved;
+    return Math.max(0, Math.min(top, Math.floor(v ?? fallback[i] ?? 0)));
+  });
+}
+
+/** Each stat's highest Artifice level (0 for a piece that can't be artificed). */
+export const artificeTops = (g: Pick<WikiGear, 'stats'>): number[] => g.stats.map((s) => Math.max(0, Math.min(ARTIFICE_MAX, s.values.length - 1)));
+
+/**
+ * The piece's own Artifice mark, as the game's EquipEnhanceNode draws it: empty with nothing artificed, half once any
+ * stat is, full when every stat is at 3 (its total reaches stats × 3). Null for a piece that can't be artificed.
+ */
+export function artificeState(levels: number[], tops: number[]): 'empty' | 'half' | 'full' | null {
+  if (!tops.some((t) => t > 0)) return null;
+  const total = levels.reduce((a, b) => a + b, 0);
+  return total <= 0 ? 'empty' : total >= tops.length * ARTIFICE_MAX ? 'full' : 'half';
 }
 
 /**
@@ -89,11 +122,8 @@ export function weaponRankCaps(w: WikiWeapon, potential: number | null): number[
   );
 }
 
-/** The Artifice level a slot's stats count at: the one set, else the piece's highest. */
-export const artificeOf = (l: Loadout, slot: GearSlot, g: WikiGear): number => {
-  const top = Math.max(0, ...g.stats.map((s) => s.values.length - 1));
-  return Math.min(l.artifice?.[slot] ?? top, top);
-};
+/** The Artifice level each of a slot's stats counts at: as set, else each stat's highest. */
+export const artificeOf = (l: Loadout, slot: GearSlot, g: WikiGear): number[] => artificeLevels(l.artifice?.[slot], artificeTops(g));
 
 /** Operators (ids) with this weapon equipped. */
 export const wieldersOf = (loadouts: Record<string, Loadout> | undefined, weaponId: string): string[] =>
@@ -231,9 +261,9 @@ export function operatorBonuses(
     if (!g) continue;
     if (g.defense) add('DEF', g.name, g.defense, 0);
     const lv = artificeOf(l!, slot, g);
-    const from = lv ? `${g.name} (Artifice ${lv})` : g.name;
-    for (const st of g.stats) {
-      const v = st.values[Math.min(lv, st.values.length - 1)];
+    const from = lv.some((x) => x) ? `${g.name} (Artifice ${lv.join('/')})` : g.name;
+    for (const [i, st] of g.stats.entries()) {
+      const v = st.values[Math.min(lv[i], st.values.length - 1)];
       if (v == null) continue;
       if (v < 1) add(st.stat, from, 0, Math.round(v * 1000) / 10);
       else add(st.stat, from, v, 0);

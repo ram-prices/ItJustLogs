@@ -17,7 +17,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   that teaches button order. Four operators in team position order (position
   01 matters: e.g. Si's ultimate cuts its combo cooldown), each from their
   loadout and copies ("My loadouts") or with weapon and gear the sim picks
-  ("Optimal gear", `domain/sim/gearSearch.ts`: Maxed Essence, top Artifice,
+  ("Optimal gear", `domain/sim/gearSearch.ts`: Maxed Essence, every stat at top Artifice,
   chosen by fights; weapons tried again on the second pass with the gear found; gear.json names a piece's slot
   "Body"/"Hand"/"EDC", `partOf`; a third start gives each operator their signature weapon, the Arsenal Issue that ran
   with their banner (`signatures`: special_<n> with weponbox_<n>), and the start whose rotation plays best is kept); styles Advanced (swaps, animation cancels) / Standard (the default, with search Moderate; one
@@ -38,7 +38,11 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   and buff logic: `domain/sim/engine.ts` interprets the EndfieldData skill and
   buff files (ef-assets `combat/`: `ops/<id>.json`, `weapons/`, `gear.json`,
   `settings.json`, `index.json`, made by its `scripts/combat-bundle.mjs`);
-  `build.ts` equips; `rotation.ts` searches (priority list, then a beam search
+  `build.ts` equips (gear: gear.json's DEF row, then the game's three stats, each at its own Artifice level from
+  `artifice: [s1, s2, s3]`; one number, as in requests, saved runs, parsed runs and loadouts from before per-stat
+  Artifice and the ai-parser's files, is every stat at that level, which is what it meant, so no total moved:
+  Skydrummer 3,569,029, Alleikhreos 4,434,405, Last Rite 4,076,698 before and after; `statArtifice`,
+  `artificeLevels` in loadout.ts); `rotation.ts` searches (priority list, then a beam search
   over presses using `World.clone()`); `team.ts` is the page's side. Runs in
   `ui/simWorker.ts`. Damage formula from the endfield.wiki.gg Damage page
   (credit it). Checked against a community calculation for Arcane, Last Rite,
@@ -228,7 +232,9 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   by source with a Total pinned to the box's bottom; a loadout's weapon is a line like its gear's (`weaponLine`: its
   picture, its name in the text's colour, at the right its level when not 90 and the essence icon: green when maxed,
   dim with the skill ranks before it otherwise, none with no essence; its picture centred on the gear marks' column,
-  its name a link to its Database page), every gear line's Artifice mark at the right edge (unlit at 0); the
+  its name a link to its Database page), every gear line's own Artifice node at the right edge (empty, half, full),
+  the line a `<details>` that opens to its three stats with their marks and "+base » +artificed" (`gearLine`, its open
+  state kept through redraws and Edit by `data-gear-key`); the
   operator's level and skill ranks when not maxed at the box's top right (`levelsLine`); the timeline (`lanes` in results.ts) is
   one area that scrolls sideways (`.sim-tl-scroll`), every row on one clock from `page.tlStart` (a whole second at
   least half a second before a press cast before the stopwatch's 0, `startOf`; else 0) to the player's end: the
@@ -435,7 +441,8 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   (store.ts `readerDraft`; "Not simulated yet" in the list; Discard drops it); one Edit (the edit view kept as literally like the normal one as it can be: the owner's rule) opens a run's name, note, duration (the Duration figure, m:ss.s or seconds), who's controlled (click an operator's box: the outline moves, `sim-main`),
   loadouts, length (`step-len`, the stopwatch's stop moves with it) and transcript, each edited in place where it's
   shown (numbers as `sim-inl` fields, choices as `sim-inl-sel`: grey boxes reaching 3px past their text with a margin
-  taking it back, so the text sits at the same pixel as unedited; Artifice marks as buttons; the transcript's own lines
+  taking it back, so the text sits at the same pixel as unedited; each gear stat's Artifice mark as a button stepping it
+  0 → 3 and round, only that gear line drawn again (`sim-art`); the transcript's own lines
   under the timeline, `transcriptLines`: one grid for both views, each line a subgrid: remove, time, operator (as wide as the
   team's widest name, `opSizers`), the dot, action (as wide as its widest label, `actSizers`), SP gained, interrupt,
   the stretch, SP, bar after, damage; remove, interrupt and SP gained empty unedited; the scrollbar's room always kept; times as m:ss.s on the fight's clock, `videoTimeOf` adding the pauses back, Add action / Add invulnerable where Full transcript is), all kept in `draft` (no replay or redraw per change) until Play edited
@@ -473,7 +480,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   CharGrowthTable's passive skill nodes, filtered in `equip`; a level with none, such as Xaihi's talent_2_2, is never
   given; `promotionOf`: the lowest stage whose level and skill-rank caps hold them, CharBreakStageTable; a level at a cap, 80, takes the lower stage). A
   parsed run keeps the loadouts it ran with in its request; while it's edited each box has fields for them plus
-  Potential, each gear piece's Artifice (0–3) and each weapon skill's rank (its level, the data's caps 9/9/4, plus
+  Potential, each gear stat's Artifice (0–3; `art<piece>:<stat>`, saved as a list) and each weapon skill's rank (its level, the data's caps 9/9/4, plus
   the weapon's Potential on the last: `essenceCaps`, `skillRanks`) (`levelsEdit` in the top row, where the name gives way; `weaponLine`; `editBuild`),
   portraits square in the boxes, a box's food as a sixth line under its gear (`foodLine`: item icon and name, a choice in
   place while edited; only where the stage allows food),
