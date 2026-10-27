@@ -937,7 +937,7 @@ code {
   border-top-color: color-mix(in srgb, #e5484d 40%, transparent);
 }
 
-/* ---------- Charts, tooltip --------------------------------------------- */
+/* ---------- Charts ------------------------------------------------------ */
 .chart {
   position: relative;
 }
@@ -973,44 +973,6 @@ code {
 }
 .legend i.round {
   border-radius: 50%;
-}
-.tooltip {
-  position: fixed;
-  z-index: 60;
-  pointer-events: none;
-  min-width: 160px;
-  max-width: 280px;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  background: var(--background-100);
-  box-shadow: var(--shadow-menu);
-  font: 400 13px/18px var(--font-sans);
-}
-.tooltip .t-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.tooltip .t-note {
-  max-width: 220px;
-  margin-bottom: 6px;
-  color: var(--gray-900);
-}
-.tooltip .t-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--gray-900);
-}
-.tooltip .t-row b {
-  font-weight: 500;
-  color: var(--gray-1000);
-}
-.tooltip i {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  margin-right: 6px;
 }
 .bar-cell {
   display: flex;

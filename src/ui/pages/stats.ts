@@ -15,7 +15,7 @@ import {
 } from '../../domain/income';
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
-import { weeklyChart } from '../charts';
+import { tip, tipNote, tipRow, weeklyChart } from '../charts';
 import { OROBERYL_ICON, TAB_ICON, badge, colorOf, icon, iconOf, itemName, metric, metrics, pageHeader, withStars } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { bannerHref, credit, external, pullsTabs, wikiFile } from './info';
@@ -413,10 +413,14 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
       return html`<div class="bar-cell"><span class="num">${fmtInt(n)}</span><div class="bar"><i style="width:${pct(n)};background:${color}"></i></div></div>`;
     const e = Math.round(earned);
     const diff = n - e;
-    const tip = `${fmtInt(n)} spent · ${projected ? '≈' : ''}${fmtInt(e)} ${paid.length ? 'earned' : 'free'}${projected ? ' (projected to the patch end)' : ''}: ${
-      diff > 0 ? `${fmtInt(diff)} more than earned (savings or bought)` : diff < 0 ? `${fmtInt(-diff)} spare` : 'all of it'
-    }`;
-    return html`<div class="bar-pair" title="${tip}">
+    const tipHtml = tip('', [
+      ...(projected ? [tipNote('Projected to the patch end.')] : []),
+      ...(diff > 0 ? [tipNote('Savings or bought.')] : []),
+      tipRow('Spent', fmtInt(n)),
+      tipRow(paid.length ? 'Earned' : 'Free', `${projected ? '≈' : ''}${fmtInt(e)}`),
+      diff > 0 ? tipRow('More than earned', fmtInt(diff)) : diff < 0 ? tipRow('Spare', fmtInt(-diff)) : tipRow('Spent', 'All of it'),
+    ]);
+    return html`<div class="bar-pair" data-tip="${tipHtml}">
       <span class="num">${fmtInt(n)}</span><div class="bar"><i style="width:${pct(n)};background:${color}"></i></div>
       <span class="num secondary">${projected ? '≈' : ''}${fmtInt(e)}</span><div class="bar earned"><i style="width:${pct(earned)};background:${color}"></i></div>
     </div>`;
@@ -453,7 +457,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
     const e = Math.round(earnedPulls);
     const diff = made - e;
     const pct = (x: number) => `${Math.min(100, (x / totalMax) * 100)}%`;
-    return html`<div class="bar-pair" title="${fmtInt(made)} spent · ${fmtInt(e)} earned so far">
+    return html`<div class="bar-pair" data-tip="${tip('', [tipRow('Spent', fmtInt(made)), tipRow('Earned so far', fmtInt(e))])}">
         <span class="num">${fmtInt(made)}</span><div class="bar"><i style="width:${pct(made)};background:${color}"></i></div>
         <span class="num secondary">${fmtInt(e)}</span><div class="bar earned"><i style="width:${pct(earnedPulls)};background:${color}"></i></div>
       </div>

@@ -3,9 +3,10 @@ import { type BuffSpan, ENEMIES, INPUT_NAME, type ReplayResult, type SimResult }
 import { icon, itemImg, metric, metrics } from '../../components';
 import { EF_ASSETS_CDN } from '../../../domain/banners';
 import { html, type Html } from '../../html';
+import { tip, tipRow } from '../../charts';
 import { page, type VideoStep } from './state';
 import { big, clockTime, pct, secs, spText } from './text';
-import { dmgOf, formLength, formOf, simTrack, spOf, steps, type Track } from './track';
+import { formLength, formOf, simTrack, steps, tipDmg, tipSp, type Track } from './track';
 import { buffRows, buffsPanel } from './buffs';
 import { bossRow, playControls, preparePlay, spRow } from './player';
 
@@ -96,24 +97,24 @@ function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], id
         ${who(name, slot)}
         <span class="sim-lane-track">
           ${spans.filter((s) => s.slot === slot).map((s) => html`<i class="sim-control" style="left:${at(s.from)};width:${len(s.to - s.from)}"></i>`)}
-          ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${len(f.end - f.frame)}" title="${secs(f.frame)} · Ultimate ${formLength(f)}"></i>`)}
+          ${(r.forms ?? []).filter((f) => f.slot === slot).map((f) => html`<i class="sim-form" style="left:${at(f.frame)};width:${len(f.end - f.frame)}" data-tip="${tip('Ultimate', [tipRow('Time', secs(f.frame)), tipRow('Length', formLength(f))])}"></i>`)}
           ${r.strikes
             .filter((s) => s.slot === slot)
-            .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" title="${secs(s.frame)} · ${s.finisher ? 'Finisher' : 'Final Strike'}${dmgOf(r.strikeDmg, r.strikes, s)}${spOf(r.strikeSp, r.strikes, s)}"></i>`)}
-          ${presses.map((x, k) => html`<i class="sim-press ${x.input}${tier[k] ? ' t1' : ''}" style="left:${at(x.frame)}" title="${secs(x.frame)} · ${INPUT_NAME[x.input]}${formOf(r, x) ? ` ${formLength(formOf(r, x))}` : ''}${dmgOf(r.pressDmg, r.presses, x)}${spOf(r.pressSp, r.presses, x)}">${x.input === 'battle' ? 'B' : x.input === 'combo' ? 'C' : x.input === 'dive' ? 'D' : 'U'}</i>`)}
+            .map((s) => html`<i class="sim-strike${s.finisher ? ' finisher' : ''}" style="left:${at(s.frame)}" data-tip="${tip(s.finisher ? 'Finisher' : 'Final Strike', [tipRow('Time', secs(s.frame)), ...tipDmg(r.strikeDmg, r.strikes, s), ...tipSp(r.strikeSp, r.strikes, s)])}"></i>`)}
+          ${presses.map((x, k) => html`<i class="sim-press ${x.input}${tier[k] ? ' t1' : ''}" style="left:${at(x.frame)}" data-tip="${tip(INPUT_NAME[x.input], [tipRow('Time', secs(x.frame)), ...(formOf(r, x) ? [tipRow('Length', formLength(formOf(r, x)))] : []), ...tipDmg(r.pressDmg, r.presses, x), ...tipSp(r.pressSp, r.presses, x)])}">${x.input === 'battle' ? 'B' : x.input === 'combo' ? 'C' : x.input === 'dive' ? 'D' : 'U'}</i>`)}
         </span>
       </div>${buffRows(buffs, slot, name, at, len)}`;
     })}
     ${r.dps.length && dpsMax > 0
       ? html`<div class="sim-lane">
           <span class="sim-lane-name label-12 ellipsis">Damage</span>
-          <span class="sim-lane-track sim-dmg">${r.dps.map((d, k) => (d > 0 ? html`<i style="left:${at(k * FPS)};width:${len(FPS)};height:${Math.max(4, Math.round((d / dpsMax) * 100))}%" title="${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')} · ${big(d)}"></i>` : ''))}</span>
+          <span class="sim-lane-track sim-dmg">${r.dps.map((d, k) => (d > 0 ? html`<i style="left:${at(k * FPS)};width:${len(FPS)};height:${Math.max(4, Math.round((d / dpsMax) * 100))}%" data-tip="${tip('Damage', [tipRow('Time', `${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')}`), tipRow('Damage', big(d))])}"></i>` : ''))}</span>
         </div>`
       : ''}
     ${r.staggers.length || r.mechanics.length || r.away.length || r.guard.length
       ? html`<div class="sim-lane">
           ${enemyName()}
-          <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${len(b - a)}" title="${secs(a)} · Invulnerable ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${len(b - a)}" title="${secs(a)} · No Stagger ${((b - a) / FPS).toFixed(1)} s"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${len(s.end - s.frame)}" title="${secs(s.frame)} · Staggered ${((s.end - s.frame) / FPS).toFixed(1)} s"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" title="${secs(m.frame)} · ${m.label}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
+          <span class="sim-lane-track">${r.away.map(([a, b]) => html`<i class="sim-away" style="left:${at(a)};width:${len(b - a)}" data-tip="${tip('Invulnerable', [tipRow('Time', secs(a)), tipRow('Length', `${((b - a) / FPS).toFixed(1)} s`)])}"></i>`)}${r.guard.map(([a, b]) => html`<i class="sim-guard" style="left:${at(a)};width:${len(b - a)}" data-tip="${tip('No Stagger', [tipRow('Time', secs(a)), tipRow('Length', `${((b - a) / FPS).toFixed(1)} s`)])}"></i>`)}${r.staggers.map((s) => html`<i class="sim-stagger" style="left:${at(s.frame)};width:${len(s.end - s.frame)}" data-tip="${tip('Staggered', [tipRow('Time', secs(s.frame)), tipRow('Length', `${((s.end - s.frame) / FPS).toFixed(1)} s`)])}"></i>`)}${r.mechanics.map((m) => html`<i class="sim-mechanic" style="left:${at(m.frame)}" data-tip="${tip(m.label, [tipRow('Time', secs(m.frame))])}">${icon(m.label === 'Interrupted' ? 'close' : m.label === 'Stagger node' ? 'change_history' : 'swords')}</i>`)}</span>
         </div>`
       : faces || (page.fold.buffs && buffs?.some((b) => b.slot < 0))
         ? html`<div class="sim-lane">${enemyName()}<span class="sim-lane-track"></span></div>`
@@ -188,7 +189,7 @@ export function resultsView(r: SimResult, names: string[], ids: string[], stale:
         ? extra.editor(shown ?? simTrack(r))
         : html`<div class="sim-moves-wrap">
       <ol class="sim-moves copy-14${page.fold.moves ? '' : ' one'}">
-        ${((page.actLabels = moveLabels(shown ?? simTrack(r))), '')}${steps(shown ?? simTrack(r)).map((p) => html`<li class="${p.strike ? 'secondary' : ''}" data-t="${p.frame / FPS}"><span></span><button type="button" class="sim-seek num" data-action="sim-seek" data-value="${String(p.frame / FPS)}" title="Go to ${secs(p.frame)}">${secs(p.frame)}</button><span class="sim-move-op">${p.slot < 0 ? 'Enemy' : names[p.slot]}${opSizers(names)}</span><span class="sim-move-dot">·</span><span class="sim-move-act">${p.label}${actSizers(page.actLabels)}</span><span></span><span></span><span class="num secondary sim-move-len" title="${p.length ? 'How long the ultimate lasted' : ''}">${p.length ?? ''}</span><span class="num sim-move-sp${p.sp && p.sp < 0 ? ' used' : ''}" title="${p.sp ? `${p.sp > 0 ? 'Gained' : 'Used'} ${Math.abs(p.sp)} SP${p.spAfter !== undefined ? `, ${p.spAfter} after` : ''}` : ''}">${spText(p.sp)}</span><span class="num sim-move-spafter">${p.sp !== undefined && p.spAfter !== undefined ? `→ ${p.spAfter}` : ''}</span><span class="num sim-move-dmg">${p.dmg ? big(p.dmg) : ''}</span></li>`)}
+        ${((page.actLabels = moveLabels(shown ?? simTrack(r))), '')}${steps(shown ?? simTrack(r)).map((p) => html`<li class="${p.strike ? 'secondary' : ''}" data-t="${p.frame / FPS}"><span></span><button type="button" class="sim-seek num" data-action="sim-seek" data-value="${String(p.frame / FPS)}" title="Go to ${secs(p.frame)}">${secs(p.frame)}</button><span class="sim-move-op">${p.slot < 0 ? 'Enemy' : names[p.slot]}${opSizers(names)}</span><span class="sim-move-dot">·</span><span class="sim-move-act">${p.label}${actSizers(page.actLabels)}</span><span></span><span></span><span class="num secondary sim-move-len" ${p.length ? html`data-tip="${tip('How long the ultimate lasted', [])}"` : ''}>${p.length ?? ''}</span><span class="num sim-move-sp${p.sp && p.sp < 0 ? ' used' : ''}" ${p.sp ? html`data-tip="${tip(`${p.sp > 0 ? 'Gained' : 'Used'} ${Math.abs(p.sp)} SP`, p.spAfter !== undefined ? [tipRow('After', String(p.spAfter))] : [])}"` : ''}>${spText(p.sp)}</span><span class="num sim-move-spafter">${p.sp !== undefined && p.spAfter !== undefined ? `→ ${p.spAfter}` : ''}</span><span class="num sim-move-dmg">${p.dmg ? big(p.dmg) : ''}</span></li>`)}
       </ol>
       ${foldButton('moves', 'Full transcript')}
       </div>`}

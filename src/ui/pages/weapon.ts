@@ -176,7 +176,7 @@ function skillsSection(id: string, w: WikiWeapon, owned: Owned | undefined): Htm
 const potentialText = (w: WikiWeapon): Html =>
   html`<div class="card card-body"><p class="copy-14 wiki-text">${rich(w.potential ?? '')} Each duplicate raises Potential by one, to P${MAX_POTENTIAL}.</p></div>`;
 
-/** What Potential does, as a section of its own when the player has no copy (else it's in Your pulls). */
+/** What Potential does, as a section of its own when the player has no copy (else it's in Pull history). */
 function potentialSection(w: WikiWeapon, owned: Owned | undefined): Html {
   if (!w.potential || owned?.copies) return html``;
   return html`<section class="section">

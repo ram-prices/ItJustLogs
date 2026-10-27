@@ -16,7 +16,7 @@ import {
   type ScheduleItem,
   type Server,
 } from '../../domain/schedule';
-import { tip, tipRow } from '../charts';
+import { tip, tipNote, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
@@ -162,9 +162,9 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 
 function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule, r?: EventRewards): Html {
   // Each event opens its own page (rewards and dates): pages/event.ts.
-  return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`title="${e.details}"` : ''}>
+  return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`data-tip="${tip(e.name, [tipNote(e.details)])}"` : ''}>
     ${e.art
-      ? html`<div class="sched-thumb evt-art"><img src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback /><span class="evt-art-type" title="${e.type}">${icon(eventIcon(e))}</span></div>`
+      ? html`<div class="sched-thumb evt-art"><img src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback /><span class="evt-art-type" data-tip="${tip(e.type, [])}">${icon(eventIcon(e))}</span></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>
@@ -221,7 +221,7 @@ function timeline(schedule: Schedule, now: number, server: Server, a: Analysis |
       ...(mine?.info ? [tipRow('You have it', rateUpOwned(mine) ? `Yes, ×${rateUpOwned(mine)}` : 'Not yet')] : []),
       tipRow('Opens', when(start)),
       tipRow('Ends', end == null ? 'TBA' : when(end)),
-      ...(mine ? [tipRow('Your pulls', fmtInt(mine.paidPulls))] : []),
+      ...(mine ? [tipRow('Pull history', fmtInt(mine.paidPulls))] : []),
     ];
     return {
       start,

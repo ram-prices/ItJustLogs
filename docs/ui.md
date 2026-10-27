@@ -79,6 +79,11 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     pill, then the name with class and element icons
     (`classIcon`, `elementIcon`) under it, a rarity-coloured line along the card's bottom; no stars. The class/element names sit in `hidden` spans so
     the search still finds them.
+    6★ Arsenal tiles (`tileArt`, `.rarity-art.smoke`) draw the game's rainbow smoke: the item slot's
+    `6StarColorSequence` with `m_fx_sixstar_bg_w`, pre-rendered by ef-assets `scripts/six-star-smoke.py`
+    into a 10 s loop (`effects/six-star/smoke-loop-3.webp`; sway and speed matched by eye to a recording),
+    sized from the 120px slot to the 48px tile, in place of the rarity glow (no weapon tile has the glow).
+    (A live SVG filter was too slow: Chrome redraws it on the CPU per tile, every frame.)
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
     `/database/operators[/<name>]`, `/database/arsenals[/<name>]`,
@@ -134,6 +139,15 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/banner/headhunting/<banner>` opens one), `operator.ts` / `weapon.ts` = `/database/operators[/<name>]` / `/database/arsenals[/<name>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts`; works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`, `rotations.ts` with its parts in `rotations/` (docs/rotations.md)); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
+  - Popups: hover tips and the right-click menu share one dark panel (`.tooltip`, `.ctx-menu` in
+    `components.css`: `--background-100`, `--shadow-menu`, `--radius-md`). A tip is a `data-tip`
+    attribute holding `tip(title, rows)` from `ui/charts.ts`: a bold title (left out when ''), then
+    `tipNote(text)` lines (muted) and `tipRow(label, value)` rows (muted label, semibold value);
+    joined tips stack with a line between. One delegated host (`installTooltips`) shows them beside
+    the pointer, kept inside the window; on touch screens a tap opens one (links and fields keep
+    their tap). Use it for anything that tells the player something (dates, breakdowns, counts);
+    native `title=` stays only on plain button hints. The right-click / long-press menu is
+    `installCopyMenu` in `home.ts`; a new menu reuses `.ctx-menu` with icon + label buttons.
   - Escape every user/game string: use the `html` tagged template from
     `ui/html.ts` (`raw()` only for trusted markup).
   - Signature features of the old site (6★ portrait strip, pity ruler, luck

@@ -21,8 +21,9 @@ export const tipRow = (label: string, value: string, color?: string) =>
   `<div class="t-row"><span>${color ? `<i style="background:${color}"></i>` : ''}${escape(label).replaceAll('★', STAR_SVG)}</span><b>${escape(value)}</b></div>`;
 /** A line of plain text in a tooltip, under the title. */
 export const tipNote = (text: string) => `<div class="t-note">${escape(text)}</div>`;
+/** A tooltip: a title (left out when empty), then notes (`tipNote`) and label/value rows (`tipRow`). Joined tips stack. */
 export const tip = (title: string, rows: string[]) =>
-  `<div class="t-title">${escape(title)}</div>${rows.join('')}`;
+  `${title ? `<div class="t-title">${escape(title)}</div>` : ''}${rows.join('')}`;
 
 /** Rounded-top column path anchored square to the baseline. */
 function column(x: number, y: number, w: number, h: number, r = 4): string {
@@ -112,33 +113,49 @@ export function installTooltips(): void {
   el.setAttribute('role', 'tooltip');
   document.body.append(el);
   let current: Element | null = null;
+  const tipOf = (e: Event) => (e.target as Element | null)?.closest?.('[data-tip]') ?? null;
 
-  const place = (e: PointerEvent) => {
+  // Beside the pointer, flipped to its other side near the window's edges.
+  const place = (e: { clientX: number; clientY: number }) => {
     const pad = 14;
     const r = el.getBoundingClientRect();
     let left = e.clientX + pad;
     let top = e.clientY + pad;
     if (left + r.width > innerWidth - 8) left = e.clientX - r.width - pad;
     if (top + r.height > innerHeight - 8) top = e.clientY - r.height - pad;
-    el.style.left = `${Math.max(8, left)}px`;
+    el.style.left = `${Math.max(8, Math.min(left, innerWidth - r.width - 8))}px`;
     el.style.top = `${Math.max(8, top)}px`;
+  };
+  const show = (target: Element | null) => {
+    current?.classList.remove('hovered');
+    target?.classList.add('hovered');
+    current = target;
+    el.hidden = !target;
+    if (target) el.innerHTML = target.getAttribute('data-tip') ?? '';
   };
 
   document.addEventListener('pointermove', (e) => {
-    const target = (e.target as Element | null)?.closest?.('[data-tip]') ?? null;
-    if (target !== current) {
-      current?.classList.remove('hovered');
-      current = target;
-      if (!target) {
-        el.hidden = true;
-        return;
-      }
-      el.innerHTML = target.getAttribute('data-tip') ?? '';
-      el.hidden = false;
-    }
+    if (e.pointerType === 'touch') return;
+    const target = tipOf(e);
+    if (target !== current) show(target);
     if (current) place(e);
   });
-  document.addEventListener('scroll', () => (el.hidden = true), { passive: true });
+  // Touch screens have no hover: a tap opens the tip, a second tap or one elsewhere closes it.
+  // Links and fields still do their own thing on a tap.
+  let touch = false;
+  document.addEventListener('pointerdown', (e) => (touch = e.pointerType === 'touch'), { passive: true });
+  document.addEventListener('click', (e) => {
+    if (!touch) return;
+    const target = tipOf(e);
+    const own = (e.target as Element).closest?.('a[href], input, select, textarea, label');
+    if (!target || target === current || (own && target.contains(own))) return show(null);
+    show(target);
+    place(e);
+  });
+  const hide = () => show(null);
+  document.addEventListener('scroll', hide, { passive: true, capture: true });
+  addEventListener('resize', hide);
+  document.addEventListener('contextmenu', hide);
 }
 
 /**

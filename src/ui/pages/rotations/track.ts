@@ -1,6 +1,7 @@
 import { FPS, type Input } from '../../../domain/sim/engine';
 import { INPUT_NAME, type ReplayResult, type SimResult } from '../../../domain/sim/team';
 import type { VideoRotation } from '../../rotationReader';
+import { tipRow } from '../../charts';
 import { big, spText } from './text';
 
 /** The pauses after which the boss's bar was full again (a phase change), by their start, from the recording's bars. */
@@ -136,16 +137,16 @@ export function recordingTrack(reading: VideoRotation, seconds: number, phaseHp:
 }
 
 /** The lanes of a track: each operator's presses and Final Strikes, the damage each second, the enemy's stretches. */
-/** An action's SP change for its hover text (" · −100 SP"), or nothing. */
-export function spOf<T>(sp: (number | undefined)[] | undefined, list: T[], item: T): string {
+/** An action's SP change as a tooltip row ("−100 SP"), or none. */
+export function tipSp<T>(sp: (number | undefined)[] | undefined, list: T[], item: T): string[] {
   const d = sp?.[list.indexOf(item)];
-  return d === undefined ? '' : ` · ${spText(d)}`;
+  return d === undefined ? [] : [tipRow('SP', spText(d))];
 }
 
-/** An action's damage for its hover text (" · 12,345 damage"), or nothing. */
-export function dmgOf<T>(dmg: (number | undefined)[] | undefined, list: T[], item: T): string {
+/** An action's damage as a tooltip row ("12,345"), or none. */
+export function tipDmg<T>(dmg: (number | undefined)[] | undefined, list: T[], item: T): string[] {
   const d = dmg?.[list.indexOf(item)];
-  return d ? ` · ${big(d)} damage` : '';
+  return d ? [tipRow('Damage', big(d))] : [];
 }
 
 /** Each longer timeline (simLong) and the result it extends: the player keeps its place switching views. */

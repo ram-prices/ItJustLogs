@@ -887,3 +887,91 @@ select.input {
   width: 6px;
   height: 6px;
 }
+
+/* ---------- Popups: hover tips and right-click menus -------------------- */
+/* One dark panel for both: `data-tip` tooltips (charts.ts `tip`, `tipNote`,
+   `tipRow`) and the right-click menu (home.ts `installCopyMenu`). */
+.tooltip,
+.ctx-menu {
+  position: fixed;
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  box-shadow: var(--shadow-menu);
+}
+.tooltip {
+  z-index: 60;
+  pointer-events: none;
+  min-width: 160px;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 10px 12px;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--gray-1000);
+}
+.tooltip .t-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+/* Tips joined into one (6★ from the same set): a line between them. */
+.tooltip .t-title:not(:first-child) {
+  margin-top: 8px;
+  padding-top: 8px;
+  box-shadow: inset 0 1px var(--gray-alpha-200);
+}
+.tooltip .t-note {
+  margin-bottom: 6px;
+  color: var(--gray-900);
+}
+.tooltip .t-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--gray-900);
+}
+.tooltip .t-row b {
+  font-weight: 600;
+  color: var(--gray-1000);
+  text-align: right;
+}
+.tooltip i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+.ctx-menu {
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px;
+}
+.ctx-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--gray-1000);
+  font: 500 13px/18px var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.ctx-menu button:hover,
+.ctx-menu button:focus-visible {
+  background: var(--gray-alpha-200);
+  outline: none;
+}
+/* Copy image while the picture is still being drawn (phones). */
+.ctx-menu button:disabled {
+  color: var(--gray-900);
+  cursor: progress;
+}
+.ctx-menu button:disabled:hover {
+  background: none;
+}
+.ctx-menu .icon {
+  font-size: 16px;
+  color: var(--gray-900);
+}

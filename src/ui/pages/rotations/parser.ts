@@ -6,6 +6,7 @@ import { icon, itemImg, toggleGroup } from '../../components';
 import { itemIconUrl } from '../../../domain/banners';
 import { tintFor } from '../../tint';
 import { html, type Html } from '../../html';
+import { tip, tipRow } from '../../charts';
 import { infoHref } from '../info';
 import type { VideoRotation } from '../../rotationReader';
 import { type CombatIndex, page, type VideoStep, type Wiki } from './state';
@@ -339,7 +340,7 @@ export function parseView(wiki: Wiki, index: CombatIndex, s: SimSettings, redraw
                         const own = shown.sources.filter((x) => x.op === op).sort((a, c) => c.total - a.total);
                         return own.length
                           ? html`<div class="sim-member-sources copy-13">
-                              ${own.map((x) => html`<div class="sim-member-source" title="${x.hits} hit${x.hits === 1 ? '' : 's'}"><span class="min0 ellipsis">${x.source}</span><span class="num secondary" data-live="${x.op}|${x.source}" data-full="${x.total}">${big(x.total)}</span><span class="num" data-live-pct="${x.op}|${x.source}" data-full="${x.total / shown.total}">${pct(x.total / shown.total)}</span></div>`)}
+                              ${own.map((x) => html`<div class="sim-member-source" data-tip="${tip(x.source, [tipRow('Hits', String(x.hits))])}"><span class="min0 ellipsis">${x.source}</span><span class="num secondary" data-live="${x.op}|${x.source}" data-full="${x.total}">${big(x.total)}</span><span class="num" data-live-pct="${x.op}|${x.source}" data-full="${x.total / shown.total}">${pct(x.total / shown.total)}</span></div>`)}
                               <div class="sim-member-source total"><span>Total</span><span class="num" data-live-op="${op}" data-full="${dealt ?? 0}">${big(dealt ?? 0)}</span><span class="num" data-live-op-pct="${op}" data-full="${share ?? 0}">${pct(share ?? 0)}</span></div>
                               ${teamShare(i)}
                             </div>`

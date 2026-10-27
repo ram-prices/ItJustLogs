@@ -420,47 +420,6 @@ a.sched-next:hover {
     user-select: none;
   }
 }
-.ctx-menu {
-  position: fixed;
-  z-index: 1000;
-  min-width: 180px;
-  padding: 4px;
-  border-radius: var(--radius-md);
-  background: var(--background-100);
-  box-shadow: var(--shadow-border), 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-.ctx-menu button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--gray-1000);
-  font: 500 13px/18px var(--font-sans);
-  text-align: left;
-  cursor: pointer;
-}
-.ctx-menu button:hover,
-.ctx-menu button:focus-visible {
-  background: var(--gray-alpha-200);
-  outline: none;
-}
-/* Copy image while the picture is still being drawn (phones). */
-.ctx-menu button:disabled {
-  color: var(--gray-900);
-  cursor: progress;
-}
-.ctx-menu button:disabled:hover {
-  background: none;
-}
-.ctx-menu .icon {
-  font-size: 16px;
-  color: var(--gray-900);
-}
-
 /* In-page confirmation (used when an import looks like another player's). */
 .dialog-backdrop {
   position: fixed;

@@ -5,6 +5,7 @@ import { hasDailyRewards, SERVER_LABEL, timeOn, type Schedule, type Server, type
 import { currentServer, state } from '../../state';
 import { badge, icon, itemName } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
+import { tip, tipNote } from '../charts';
 import { credit, external, wikiFile } from './info';
 import { storySlugs, type StoryIndex } from '../../domain/story';
 
@@ -50,7 +51,7 @@ export function eventTags(e: ScheduleEvent, r: EventRewards | undefined, now: nu
     tags.push(
       items
         ? html`${badge('Unique', 'purple')}<span class="evt-tag-note">${r.unique.join(', ')}</span>`
-        : html`<span title="${r.unique.join(', ')}">${badge('Unique', 'purple')}</span>`,
+        : html`<span data-tip="${tip('Unique', [tipNote(r.unique.join(', '))])}">${badge('Unique', 'purple')}</span>`,
     );
   return html`<div class="sched-next-tags">${tags}</div>`;
 }

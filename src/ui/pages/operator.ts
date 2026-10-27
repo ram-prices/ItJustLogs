@@ -11,6 +11,7 @@ import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, sp
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
 import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, pageHeader, stars, trait, withStars } from '../components';
 import { html, type Html } from '../html';
+import { tip, tipRow } from '../charts';
 import finalStrikes from '../../data/final-strikes.json';
 import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
 
@@ -327,15 +328,15 @@ function skillRow(key: string, sliderKey: string, s: WikiSkill, mods: Map<string
               const list = changed && !split ? changed : v.ranks;
               const shown = list[Math.min(rank, list.length) - 1] ?? '–';
               if (!changed) return html`<div><dt>${v.label}</dt><dd class="num" data-ranks="${list.join('|')}">${shown}</dd></div>`;
-              const why = m!.map((x) => `${x.from}: ${modChip(v.label, x)}`).join('\n');
+              const why = tip(v.label, m!.map((x) => tipRow(x.from, modChip(v.label, x))));
               return html`<div><dt>${v.label}</dt><dd class="num">
-                <span class="${split ? '' : isGain(v.label, m!) ? 'attr-total' : 'attr-loss'}" data-ranks="${list.join('|')}" title="${why}">${shown}</span>${split
-                  ? m!.map((x) => html`<span class="attr-bonus" title="${x.from}">${modChip(v.label, x)}</span>`)
+                <span class="${split ? '' : isGain(v.label, m!) ? 'attr-total' : 'attr-loss'}" data-ranks="${list.join('|')}" data-tip="${why}">${shown}</span>${split
+                  ? m!.map((x) => html`<span class="attr-bonus" data-tip="${tip(x.from, [])}">${modChip(v.label, x)}</span>`)
                   : ''}
               </dd></div>`;
             })}
             ${dmg
-              ? html`<div><dt>DMG bonus</dt><dd class="num"><span class="attr-total" title="${dmg.sources.map((x) => `${x.from}: +${Math.round(x.pct * 10) / 10}%`).join('\n')}">+${Math.round(dmg.pct * 10) / 10}%</span></dd></div>`
+              ? html`<div><dt>DMG bonus</dt><dd class="num"><span class="attr-total" data-tip="${tip('DMG bonus', dmg.sources.map((x) => tipRow(x.from, `+${Math.round(x.pct * 10) / 10}%`)))}">+${Math.round(dmg.pct * 10) / 10}%</span></dd></div>`
               : ''}
           </dl>`
         : ''}
@@ -400,7 +401,7 @@ function potentialsList(o: WikiOperator, owned: Owned | undefined, imported: boo
     </div>`;
 }
 
-/** Potentials as a section of their own, when the player has no copy (else they're in Your pulls). */
+/** Potentials as a section of their own, when the player has no copy (else they're in Pull history). */
 function potentialsSection(o: WikiOperator, owned: Owned | undefined, imported: boolean): Html {
   if (!o.potentials.length) return html``;
   return html`<section class="section">
@@ -484,7 +485,7 @@ function breakpointsTable(o: WikiOperator, u: UltimateEnergy, uge: number): Html
     const need = requiredGain(u, b, c);
     if (!Number.isFinite(need)) return html`<td class="num bp-none">–</td>`;
     const met = uge + 1e-9 >= need;
-    return html`<td class="num${met ? ' bp-met' : ''}" title="${`${b} battle skills, ${c} combo skills: ${Math.round(rotationEnergy(u, b, c) * 10) / 10} energy; ${need ? `needs +${pct(need)}` : 'enough without any bonus'}`}">${need ? `+${Math.ceil(need)}%` : '0%'}</td>`;
+    return html`<td class="num${met ? ' bp-met' : ''}" data-tip="${tip(`${b} battle skills, ${c} combo skills`, [tipRow('Energy', String(Math.round(rotationEnergy(u, b, c) * 10) / 10)), tipRow('Needs', need ? `+${pct(need)}` : 'Enough without any bonus')])}">${need ? `+${Math.ceil(need)}%` : '0%'}</td>`;
   };
   return html`<div class="table-wrap">
         <table class="table bp-table">

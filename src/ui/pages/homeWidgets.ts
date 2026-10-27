@@ -4,7 +4,7 @@ import type { Kind } from '../../domain/types';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import type { HomeWidget } from '../../store';
-import { bannerArtUrl } from '../../domain/banners';
+import { bannerArtUrl, operatorFullUrl } from '../../domain/banners';
 import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars } from '../components';
 import { fmtDate, fmtInt, html, raw, render, type Html } from '../html';
 import { artOf, openArtManager } from './art';
@@ -63,8 +63,8 @@ const FACTS: [string, string][] = [
   ['stats', 'Stats'],
 ];
 
-/** An operator's full art: the text-free art of their newest rate-up banner (ef-assets banners/). */
-function fullArtOf(op: string): string | null {
+/** An operator's stitched banner art: the text-free art of their newest rate-up banner (ef-assets banners/), the fallback for full art. */
+function bannerArtOf(op: string): string | null {
   const pools = Object.entries(state.db)
     .filter(([id, e]) => !id.startsWith('weponbox') && (e.rateUpIds ?? []).includes(op))
     .map(([id]) => id)
@@ -76,6 +76,18 @@ function fullArtOf(op: string): string | null {
   }
   return null;
 }
+
+/** The full operator art (ef-assets operators/full/); the stitched banner stands in where it's missing. */
+const fullArtOf = (op: string): string => operatorFullUrl(op);
+
+/** Where each operator's face is in their full art: x and y in image widths (read off the pictures by eye; a lone figure's face reads best near 0.5). */
+const FULL_ART_FACE: Record<string, [number, number]> = {
+  'chr_0002_endminm': [0.45, 0.34], 'chr_0003_endminf': [0.5, 0.35], 'chr_0004_pelica': [0.55, 0.26], 'chr_0005_chen': [0.51, 0.325], 'chr_0006_wolfgd': [0.5, 0.15], 'chr_0007_ikut': [0.5, 0.15], 'chr_0009_azrila': [0.5, 0.23], 'chr_0011_seraph': [0.5, 0.25], 'chr_0012_avywen': [0.45, 0.35], 'chr_0013_aglina': [0.43, 0.23], 'chr_0014_aurora': [0.52, 0.24], 'chr_0015_lifeng': [0.47, 0.33], 'chr_0016_laevat': [0.48, 0.3], 'chr_0017_yvonne': [0.44, 0.41], 'chr_0018_dapan': [0.43, 0.36], 'chr_0019_karin': [0.58, 0.26], 'chr_0020_meurs': [0.33, 0.4], 'chr_0021_whiten': [0.51, 0.34], 'chr_0022_bounda': [0.45, 0.19], 'chr_0023_antal': [0.57, 0.25], 'chr_0024_deepfin': [0.42, 0.19], 'chr_0025_ardelia': [0.45, 0.26], 'chr_0026_lastrite': [0.47, 0.29], 'chr_0027_tangtang': [0.5, 0.35], 'chr_0028_wulfa': [0.49, 0.36], 'chr_0029_pograni': [0.52, 0.25], 'chr_0030_zhuangfy': [0.44, 0.31], 'chr_0031_mifu': [0.51, 0.34], 'chr_0032_lizhiyan': [0.5, 0.21], 'chr_0033_camille': [0.5, 0.28], 'chr_0034_typhoeus': [0.42, 0.32], 'chr_0035_liino': [0.67, 0.31], 'chr_0036_jsspsi': [0.43, 0.31], 'chr_0038_purrche': [0.42, 0.36],
+};
+const faceStyle = (op: string): string => {
+  const [x, y] = FULL_ART_FACE[op] ?? [0.5, 0.2];
+  return `--fx:${x};--fy:${y}`;
+};
 
 interface WidgetDef {
   label: string;
@@ -558,7 +570,8 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
   const weapon = facts.includes('weaponDetail') ? weaponDetail(w.op, c.a, c.redraw) : null;
   const style = w.artStyle ?? (full || art ? 'banner' : 'avatar');
   const src = full ?? art?.src;
-  const picture = html`<span class="char-card-art">${src ? html`<img src="${src}" alt="" decoding="async" />` : itemImg('char', w.op, 'char-card-portrait')}</span>`;
+  const banner = full ? bannerArtOf(w.op) : null;
+  const picture = html`<span class="char-card-art">${src ? html`<img class="${full ? 'full-art' : ''}" src="${src}" alt="" decoding="async" ${full ? raw(`style="${faceStyle(w.op)}" data-fallback${banner ? ` data-alt="${banner}" data-alt-class="stitched"` : ''}`) : ''} />` : itemImg('char', w.op, 'char-card-portrait')}</span>`;
   // Ambient: with a picture, glows of the colours along its edges, each from its side (as
   // YouTube's ambient mode does, tint.ts tintAmbients); else a glow of the portrait's colour. Inside the card
   // while it has its outline, past it without.
@@ -737,7 +750,7 @@ function configDialog(id: string): void {
           ? html`<div class="field"><span class="label-13">Picture</span>
               <div class="char-pics">
                 <label class="char-pic" title="Portrait"><input type="radio" name="pic" value="" ${raw(!draft.pic ? 'checked' : '')} />${itemImg('char', draft.op, 'char-pic-img')}</label>
-                ${fullArtOf(draft.op) ? html`<label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" /></label>` : ''}
+                <label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" data-fallback ${bannerArtOf(draft.op) ? raw(`data-alt="${bannerArtOf(draft.op)}" data-alt-class="stitched"`) : ''} /></label>
                 ${art.map((x) => html`<label class="char-pic"><input type="radio" name="pic" value="${x.id}" ${raw(draft.pic === x.id ? 'checked' : '')} /><img class="char-pic-img" src="${x.src}" alt="" /></label>`)}
                 <button type="button" class="btn secondary sm" data-art>${icon('add')}Add pictures</button>
               </div>

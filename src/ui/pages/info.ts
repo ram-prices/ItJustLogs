@@ -25,7 +25,7 @@ import { fmtDate, html, raw, type Html } from '../html';
 
 /**
  * Shared pieces of the info pages (operator.ts, weapon.ts): wiki data loading,
- * wiki text, the credit line, the rank slider and the "Your pulls" panel that
+ * wiki text, the credit line, the rank slider and the "Pull history" panel that
  * ties the page to the player's imported history.
  */
 
@@ -393,7 +393,7 @@ export function installWikiControls(): void {
  * The player's current Potential as the game draws it: the star, a stroke per
  * Potential (white) and the next one in yellow; the diamond pips until the
  * icons are in. Hard to read on its own, so only beside the level written
- * out ("P3", as in Your pulls) or as decoration (Home's Character card).
+ * out ("P3", as in Pull history) or as decoration (Home's Character card).
  */
 export function potentialStar(potential: number, cls = 'pot-star'): Html {
   const level = `P${Math.max(potential, 0)}`;
@@ -408,7 +408,7 @@ export function pips(potential: number): Html {
 }
 
 // ---------------------------------------------------------------------------
-// Your pulls
+// Pull history
 // ---------------------------------------------------------------------------
 
 const OUTCOME: Record<string, Html> = {
@@ -423,7 +423,7 @@ const OUTCOME: Record<string, Html> = {
  */
 /** The player's copies of an item; `potentials` (what each Potential does) sits beside the list of copies. */
 export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, potentials?: Html): Html {
-  const head = html`<div class="section-head"><h2 class="heading-20">Your pulls</h2></div>`;
+  const head = html`<div class="section-head"><h2 class="heading-20">Pull history</h2></div>`;
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
       <div class="card wiki-owned-empty">

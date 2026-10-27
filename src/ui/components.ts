@@ -222,8 +222,9 @@ export const RARITY_COLOR: Record<number, string> = { 6: 'var(--r6)', 5: 'var(--
 export const rarityArt = (img: Html, r: number, cls = ''): Html =>
   html`<span class="rarity-art r${r}${cls ? ` ${cls}` : ''}" role="img" aria-label="${r}★" title="${r}★">${img}</span>`;
 
-/** A Database list tile's picture with its rarity on it. */
-export const tileArt = (kind: Kind, id: string, r: number): Html => rarityArt(itemImg(kind, id, 'wiki-tile-portrait'), r, 'wiki-tile-art');
+/** A Database list tile's picture with its rarity on it; weapons skip the glow, and 6★ ones get the game's rainbow smoke. */
+export const tileArt = (kind: Kind, id: string, r: number): Html =>
+  rarityArt(itemImg(kind, id, 'wiki-tile-portrait'), r, kind !== 'weap' ? 'wiki-tile-art' : r === 6 ? 'wiki-tile-art weap smoke' : 'wiki-tile-art weap');
 
 export const rarity = (r: number): Html =>
   html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}${stars(1)}</span>`;

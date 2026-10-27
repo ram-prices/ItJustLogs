@@ -2,6 +2,7 @@ import { FPS } from '../../../domain/sim/engine';
 import type { BuffSpan } from '../../../domain/sim/team';
 import { EF_ASSETS, EF_ASSETS_CDN, mirrorUrl } from '../../../domain/banners';
 import { html, type Html } from '../../html';
+import { tip, tipRow } from '../../charts';
 import { page } from './state';
 import { clockTime, secs } from './text';
 
@@ -100,7 +101,7 @@ export function buffRows(buffs: BuffSpan[] | undefined, slot: number, owner: str
     return html`<div class="sim-lane sim-buff-lane">
       <span class="sim-lane-name label-12 ellipsis" title="${full}">${src ? html`<img class="sim-buff-row-icon" src="${src}" alt="" onerror="this.remove()" />` : ''}${name}</span>
       <span class="sim-lane-track">${spans.map(
-        (s) => html`<i class="sim-buff${slot < 0 ? ' debuff' : ''}" style="left:${at(s.from * FPS)};width:${len(Math.max(s.to - s.from, 0.15) * FPS)}" title="${full} · ${secs(s.from * FPS)}–${secs(s.to * FPS)}${s.level ? ` · Level ${s.stacks}` : s.stacks > 1 ? ` · ${s.stacks} stacks` : ''}"></i>`,
+        (s) => html`<i class="sim-buff${slot < 0 ? ' debuff' : ''}" style="left:${at(s.from * FPS)};width:${len(Math.max(s.to - s.from, 0.15) * FPS)}" data-tip="${tip(full, [tipRow('Time', `${secs(s.from * FPS)}–${secs(s.to * FPS)}`), ...(s.level ? [tipRow('Level', String(s.stacks))] : s.stacks > 1 ? [tipRow('Stacks', String(s.stacks))] : [])])}"></i>`,
       )}</span>
     </div>`;
   })}`;
@@ -161,7 +162,7 @@ export function paintBuffs(): void {
           const chip = document.createElement('span');
           chip.className = `sim-buff-chip${slot < 0 ? ' debuff' : ''}`;
           const name = buffName(b);
-          chip.title = `${name}${b.level ? ` · Level ${b.stacks}` : b.stacks > 1 ? ` · ${b.stacks} stacks` : ''}`;
+          chip.dataset.tip = tip(name, b.level ? [tipRow('Level', String(b.stacks))] : b.stacks > 1 ? [tipRow('Stacks', String(b.stacks))] : []);
           const letter = () => {
             const i = document.createElement('i');
             i.textContent = name.slice(0, 1);

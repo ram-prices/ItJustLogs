@@ -1,56 +1,79 @@
-# Hub session: coordinator and deployer
+# Hub session: coordinator and planner
 
-How the owner's hub session works. A hub is short-lived: one per batch of work, archived when the
-batch is done. The next hub starts from this file, CLAUDE.md, git and the memory files, not from
-an old conversation.
+Opening message for a new hub: "You're the hub: coordinator and planner. Read docs/hub.md first,
+then follow it."
 
-## The hub's job
+A hub is short-lived: one per batch of work. The next hub starts from this file, CLAUDE.md, git
+and the memory files (`hub-never-does-work`, `pending-work-2026-10-20`), not from an old
+conversation.
 
-- Turn the owner's requests into worker sessions (`start_session`, `user_asked` when the owner
-  says to start one), each with a complete brief: the task, the files, what done looks like,
-  "don't commit", and the docs file to read first.
-- Track the workers: when one reports, tell the owner in a line or two. Don't re-explain.
-- Answer cross-cutting questions (what's live, what's local, what clashes with what).
-- Deploy when the owner says "deploy" (CLAUDE.md → Deploying), and only then.
+## Roles
 
-## The hub does not
+- Hub = coordinator + planner. The owner asks; the hub writes a plan (a few bullets for the
+  owner), then starts a worker session with a complete brief. The hub never codes, never does
+  lookups (not even a grep for a brief) and never deploys.
+- The hub reads worker reports with `list_events` and relays them in a few lines. Screenshots go
+  to the owner with SendUserFile.
+- Workers implement. A brief has: the task; the area doc to read (`docs/rotations.md`, `ui.md`,
+  `sync.md`, `tabs.md`, `income.md`, `pages.md`) plus the relevant memory files; the files
+  involved; what done looks like; test servers 5175/5176 only (never 5173/5174, real data);
+  quiet test output; update the area doc; don't commit; a 2–3 line report.
+- Deploying: only when the owner says "deploy". The hub messages the deploy worker, "[IJL]
+  Deployer" (`local_f10792e5-bf13-44bc-8c22-0cd7e50ef07e`), which follows CLAUDE.md → Deploying
+  and updates the Live line in memory. If it is gone, start a new deploy worker with the same
+  brief.
+- ef-assets (images, game data) may be pushed directly by workers as `ram-prices` /
+  `celestriad@pm.me`. Site changes stay local until deploy.
 
-- Edit code, run the sim, read recordings or check pages in the browser. A worker does that, or a
-  subagent for a quick lookup.
-- Run two workers on the same files at once. Sim engine, Parser and `ui/pages/rotations.ts` work
-  goes one at a time.
-- Start cloud sessions (they never report back) or nest workers more than one level deep.
-- Stay open for days. When a batch is done, say so; the owner archives it.
+## Models and tokens
 
-## Writing a worker brief
+- Ideal: hub on Fable 5.1; workers on Opus 5.5 at medium effort. While weekly tokens are short,
+  small UI or wording tasks go to Sonnet at low effort.
+- `start_session` may not switch the model. Check with `get_session`, switch with
+  `set_session_model`. If the turn already started on the wrong model, stop it and resend the brief.
 
-Name the area's doc (`docs/rotations.md`, `docs/ui.md`, `docs/sync.md`, `docs/tabs.md`,
-`docs/income.md`, `docs/pages.md`) and the files. Ask for quiet test output, an update to that doc
-when behaviour changes, and a short report (the hub forwards it). Workers use the test dev server
-on 5175 or 5176, never 5173/5174 (real data).
+## Practical rules
 
-## State (2026-10-25)
+- Sim engine, Parser and `ui/pages/rotations*` work: one worker at a time (shared files).
+- When the owner is on Remote Control, `start_session` is refused. Give the task to an idle
+  worker of the right model with SendMessage instead, and say so.
+- No cloud sessions: they can't report back to the hub.
+- Name every recording event with its video time (e.g. Mirage 1, video 12.95 s).
+- Engine rules come from game data (EndfieldData dump, ef-assets). Footage only confirms
+  mechanics and is never a DPS target. Flag any rule modelled from footage.
+- When a batch is done, say so; the owner archives idle workers.
+- Reading a recording: a worker with "/parse-recording <path>" (follows `tools/ai-parser/README.md`).
+  It only touches `tools/ai-parser/`, so it can run beside a Rotations worker.
 
-- Live: 2948d26: styles split, icons from ef-assets (all six checked on both mirrors),
-  `ui/pages/rotations.ts` split into `ui/pages/rotations/` (page state is `page.<field>` in
-  `rotations/state.ts`; keep the one-way import order), and `Enemy.sp` (a stage's own SP
-  start/cap/regen; the SP bar draws a segment per 100).
-- Local: only this file's update.
-- Sessions to archive: "[IJL] DPS Sim", "[IJL] Android Development", "Refactor rotations.ts module
-  state", "Pre-deploy icon check", "Gear slot and poise-node icons migration".
+## State (2026-10-27)
 
-## Next tasks (one worker each, in order)
+- Live: the "Pull history label, shared tooltips, Home full art, 6★ weapon smoke" commit
+  (2026-10-27; its sha is in the pending-work memory).
+- Local, not deployed: nothing. `.claude/launch.json` is never committed.
+- Recently shipped: "Your pulls" → "Pull history" (Database and Home tooltip); one shared tooltip
+  and right-click menu style (`data-tip`, `tip`/`tipNote`/`tipRow`, `.tooltip`/`.ctx-menu` in
+  `components.css`, tap opens tips on phones); Home character cards' "Full art" as the full
+  operator art (ef-assets `operators/full/`) zoomed to each face (`FULL_ART_FACE`); Database
+  weapon tiles without rarity glow, 6★ weapons with the game's smoke (ef-assets
+  `effects/six-star/smoke-loop-3.webp`); mobile-friendly Rotations timeline and Buffs panel; Parser as the first and
+  default Rotations tab; Database operator portrait cards; stitched operator banner art
+  (ef-assets); per-stat gear artifice (0–3 per stat, empty/half/full gear icon); backgrounds list
+  from raw.githubusercontent; Skydrummer second-Finisher fix; Last Rite / Blightshade run fixes.
 
-1. Sim: the Skydrummer's late Stagger at 1:02 (`docs/rotations.md`, current state section).
-2. Sim: the second Skydrummer Finisher lands 0.8 s late.
-3. Sim: rule tests that run for every operator.
-4. Sim: a Glaiver File / YSTF Captain Blightshade entry in `ENEMIES` with its `sp` (~620 of 700,
-   ~4/s, holds during combo banners); parsed runs stand in the training dummy for now.
-5. Rotations page: the "SP at the start" field still caps at 300; follow the stage's `spMax`.
-6. Open: Last Rite's battle skill gave 17–27 SP in footage vs the sim's 30 (check, don't tune).
+## Open items (owner decides the order)
 
-Reading a recording: start a worker with "/parse-recording <path>" (a personal skill; it follows
-`tools/ai-parser/README.md`). It can run alongside a Rotations worker: it only touches `tools/ai-parser/`.
-
-Owner checks (no worker needed): parsed-run Drive sync on two devices; the first ef-assets schedule
-pull request.
+1. Last Rite run is about 10% short (4.08M of 4.54M by 31 s). Not RNG at the sim's 5% crit
+   stats; likely the other player's unknown crit gear. Parked.
+2. Summons running through other operators' cut-ins were modelled from footage, not game data;
+   they need a data source. Tangtang's Whirlpools through cut-ins are unverified.
+3. Yvonne's Final Strikes read 1.15–1.45× high in the owner's runs (crowded readings); they need
+   a clean read before any engine change.
+4. Last Rite's battle skill gave 17–27 SP in footage vs the sim's 30.
+5. Rule tests that run for every operator: not started.
+6. Simulator tab has no buff rows or boss face. Fix scoped: record buffs in the final fight, pass
+   them to the timeline. Waiting on the owner.
+7. Si's "20" portrait badge isn't drawn (not matched to data). Si has no tall card art on the
+   wiki yet.
+8. The "SP at the start" field cap of 300: unverified whether it was fixed.
+9. Heat and Electric element icons have no backup mirror, so they sometimes load empty.
+10. Owner checks: parsed-run Drive sync on two devices; the first ef-assets schedule pull request.

@@ -94,6 +94,9 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
 /** An operator's card art: the official site's picture (ef-assets operators/bust-3/, from operator-cards.py). */
 export const operatorCardUrl = (id: string): string => itemIconUrl('char', id).replace('/operators/', '/operators/bust-3/');
 
+/** An operator's full art: the game's character portrait, the operator in their splash motif on a transparent background (ef-assets operators/full/, from operator-full.py, at the game's own size since cards zoom it). */
+export const operatorFullUrl = (id: string): string => itemIconUrl('char', id).replace('/operators/', '/operators/full/');
+
 /** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
 export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
 

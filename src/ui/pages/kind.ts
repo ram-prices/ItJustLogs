@@ -114,7 +114,7 @@ export function rateUpPotential(kind: Kind, rateUpIds: string[], poolId?: string
   const last = pool ? owned.acquisitions.filter((x) => !x.extra && canonicalPoolId(x.poolId) === pool).at(-1) : undefined;
   const copy = last?.copy ?? owned.copies;
   const level = copyLabel(copy);
-  return html`<span class="rateup-pot${copy >= MAX_COPIES ? ' max' : ''}" title="${last ? 'Potential after this banner' : 'Your Potential now'}: ${level}">${level}</span>`;
+  return html`<span class="rateup-pot${copy >= MAX_COPIES ? ' max' : ''}" data-tip="${tip('Potential', [tipRow(last ? 'After this banner' : 'Now', level)])}">${level}</span>`;
 }
 
 export function rateUpChip(b: BannerSummary): Html {
@@ -130,8 +130,13 @@ export function rateUpChip(b: BannerSummary): Html {
   const rewardKind = b.kind === 'weap' ? 'rate-up reward' : b.rewards?.label.toLowerCase() ?? '';
   const rewardWord = `${rewardKind}${fromRewards === 1 ? '' : 's'}`;
   const breakdown = fromRewards ? ` (${pulled} pulled + ${fromRewards} from ${rewardWord})` : '';
+  const tipHtml = tip('Rate-up', [
+    tipNote(names),
+    tipRow('Obtained', got ? `×${total}` : 'Not yet'),
+    ...(fromRewards ? [tipRow('Pulled', String(pulled)), tipRow(`From ${rewardWord}`, String(fromRewards))] : []),
+  ]);
   const label = `Rate-up: ${names}${got ? ` · obtained ×${total}${breakdown}` : ' · not obtained yet'}`;
-  return html`<span class="banner-rateup${got ? ' got' : ''}" title="${label}" aria-label="${label}">
+  return html`<span class="banner-rateup${got ? ' got' : ''}" data-tip="${tipHtml}" aria-label="${label}">
     ${rateUpIcon(got)}<span class="ellipsis">${names}</span>${rateUpPotential(b.kind, b.info.rateUpIds, b.poolId)}${total > 1 ? html`<span class="rateup-count">×${total}</span>` : ''}
   </span>`;
 }
@@ -232,9 +237,9 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         if (t) {
           // Arsenal counts in sets of ten.
           const n = t.at == null ? null : kind === 'weap' ? setOf(t.at) : t.at;
-          const at = n != null ? `at ${kind === 'weap' ? 'set' : 'pull'} ${n}${t.estimated ? ' (estimated)' : ''}` : 'pull not in your history';
+          const at = n != null ? `${n}${t.estimated ? ' (estimated)' : ''}` : 'Not in your history';
           const name = kind === 'char' ? `${t.name}'s Token` : `${t.name} (rate-up copy)`;
-          return html`<a class="six-item token" href="${infoHref(kind, t.id)}" title="${name} · ${t.bannerName} · ${t.ts ? fmtDate(t.ts, true) : ''} · ${at}"><span class="six-art">${itemImg(kind, t.id, 'six-portrait')}${pot(t.copy)}</span><span class="six-pity">${kind === 'char' ? TOKEN_GLYPH : icon('redeem')}${n ?? '–'}</span></a>`;
+          return html`<a class="six-item token" href="${infoHref(kind, t.id)}" data-tip="${tip(name, [tipRow('Banner', t.bannerName), ...(t.ts ? [tipRow('Date', fmtDate(t.ts, true))] : []), tipRow(kind === 'weap' ? 'Set' : 'Pull', at)])}" aria-label="${name}"><span class="six-art">${itemImg(kind, t.id, 'six-portrait')}${pot(t.copy)}</span><span class="six-pity">${kind === 'char' ? TOKEN_GLYPH : icon('redeem')}${n ?? '–'}</span></a>`;
         }
         g = g!;
         const p = g[0];
@@ -251,9 +256,9 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
           ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"${known ? ` style="--six-tint:${known}"` : ''}`)
           : '';
         const cls = `six-item${up ? ' rateup' : ''}`;
-        const title = (x: AnalyzedPull) => `${x.name} · ${x.bannerName} · ${fmtDate(x.ts, true)}`;
+        const title = (x: AnalyzedPull) => tip(x.name, [tipRow('Banner', x.bannerName), tipRow('Date', fmtDate(x.ts, true))]);
         // Portraits open that operator's or weapon's info page.
-        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" title="${title(p)}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}</span>${pity}</a>`;
+        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}</span>${pity}</a>`;
         // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
         const step = 100 / g.length;
         const blend = Math.min(10, step / 3);
@@ -263,7 +268,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
             return `${c} ${(i ? i * step + blend : 0).toFixed(1)}%, ${c} ${(i < g.length - 1 ? (i + 1) * step - blend : 100).toFixed(1)}%`;
           })
           .join(', ');
-        return html`<div class="${cls} shared" title="${g.map(title).join('\n')}" ${tintAttrs}>
+        return html`<div class="${cls} shared" data-tip="${g.map(title).join('')}" ${tintAttrs}>
           <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}</a>`)}</span></span>
           ${pity}
         </div>`;
@@ -485,10 +490,10 @@ function pityStat(b: BannerSummary, ended: boolean): Html {
     const six = b.pulls.find((p) => p.rarity === 6 && p.pity !== null);
     const n = six ? six.pity! : b.pity.value;
     const say = six ? `First 6★ on pull ${n} of ${b.pity.max}; the banner has ended` : `${n} of ${b.pity.max}: a 6★ is certain by pull ${b.pity.max}, and the banner ends at the first one`;
-    return html`<span class="glance-stat" style="color:${color}" title="${say}" aria-label="6★ pity: ${say}">${hourglass(six ? 1 : n / b.pity.max)}<b>${n}</b><i>/${b.pity.max} or first ${withStars('6★')}</i></span>`;
+    return html`<span class="glance-stat" style="color:${color}" data-tip="${tip('6★ pity', [tipNote(say)])}" aria-label="6★ pity: ${say}">${hourglass(six ? 1 : n / b.pity.max)}<b>${n}</b><i>/${b.pity.max} or first ${withStars('6★')}</i></span>`;
   }
   const say = b.pity.done ? 'done' : `${b.pity.value} of ${b.pity.max}${unit}${ended ? ' (banner ended)' : ''}`;
-  return html`<span class="glance-stat" style="color:${color}" title="6★ pity: ${say}" aria-label="6★ pity ${say}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>`;
+  return html`<span class="glance-stat" style="color:${color}" data-tip="${tip('6★ pity', b.pity.done ? [tipRow('Status', 'Done')] : [tipRow('Pity', `${b.pity.value} of ${b.pity.max}${unit}`), ...(ended ? [tipRow('Banner', 'Ended')] : [])])}" aria-label="6★ pity ${say}">${hourglass(b.pity.done ? 1 : b.pity.value / b.pity.max)}<b>${b.pity.done ? 'Done' : b.pity.value}</b>${b.pity.done ? '' : html`<i>/${b.pity.max}</i>`}</span>`;
 }
 
 /**
@@ -516,7 +521,7 @@ function bannerSection(b: BannerSummary, ended = false, i = 0): Html {
         <div class="glance-row">
           ${pityStat(b, ended)}
           ${b.rewards
-            ? html`<span class="glance-stat glance-reward" title="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()} (${b.rewards.goal})" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${b.rewards.nextReward === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
+            ? html`<span class="glance-stat glance-reward" data-tip="${tip(`Next ${b.rewards.nextReward.toLowerCase()}`, [tipRow('Progress', rewardProgress(b)), tipRow('Goal', String(b.rewards.goal))])}" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${b.rewards.nextReward === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
             : ''}
         </div>
         ${pityRuler(b, ended)}
@@ -689,8 +694,11 @@ function pityRuler(b: BannerSummary, ended = false): Html {
       else bySpot.push([p]);
     }
     const pinTitle = (p: AnalyzedPull) =>
-      (sets ? `${p.name} · set ${posOf(p)} (pull ${p.bannerPull}) · pity ${p.pity}/${WEAPON_PITY_SETS}` : `${p.name} · pull ${p.bannerPull} · pity ${p.pity}`) +
-      (p.outcome === 'guaranteed' ? ' · the rate-up guarantee' : '');
+      tip(p.name, [
+        ...(p.outcome === 'guaranteed' ? [tipNote('The rate-up guarantee.')] : []),
+        sets ? tipRow('Set', `${posOf(p)} (pull ${p.bannerPull})`) : tipRow('Pull', String(p.bannerPull)),
+        tipRow('Pity', sets ? `${p.pity}/${WEAPON_PITY_SETS}` : String(p.pity)),
+      ]);
     const all = [
       ...items[side],
       ...bySpot.map((g): Item => ({
@@ -698,7 +706,7 @@ function pityRuler(b: BannerSummary, ended = false): Html {
         hi: 100,
         w: pinWidth(g.length),
         // The guarantee's 6★: blue ring and number.
-        draw: (left, dx) => html`<div class="ruler-pin ${side}${g.some((p) => p.outcome === 'guaranteed') ? ' guaranteed' : ''}" style="left:${left}%;--dx:${dx}" title="${g.map(pinTitle).join('\n')}">
+        draw: (left, dx) => html`<div class="ruler-pin ${side}${g.some((p) => p.outcome === 'guaranteed') ? ' guaranteed' : ''}" style="left:${left}%;--dx:${dx}" data-tip="${g.map(pinTitle).join('')}">
           <span class="ruler-pin-label">${posOf(g[0])}</span>
           <span class="ruler-pin-heads${g.length > 1 ? ' multi' : ''}">${g.map((p) => html`<a href="${infoHref(p.kind, p.itemId)}" aria-label="${p.name} info">${itemImg(p.kind, p.itemId, 'ruler-portrait')}</a>`)}</span>
           <span class="ruler-pin-point"></span>
@@ -717,7 +725,7 @@ function pityRuler(b: BannerSummary, ended = false): Html {
       <div class="ruler-track"></div>
       <i class="ruler-fill" style="width:${pct(done)}%;background:${fillColor}"></i>
       ${run}${ahead}
-      ${from ? html`<span class="ruler-from" title="The ruler starts here: Basic Headhunting shows the last ${BASIC_WINDOW} pulls">${fmtInt(from)}</span>` : ''}
+      ${from ? html`<span class="ruler-from" data-tip="${tip('The ruler starts here', [tipNote(`Basic Headhunting shows the last ${BASIC_WINDOW} pulls.`)])}">${fmtInt(from)}</span>` : ''}
       <i class="ruler-now" style="left:${pct(done)}%"></i>
     </div>
   </div>`;
@@ -737,7 +745,7 @@ function bannerBody(b: BannerSummary): Html {
     <div class="card-head">
       ${b.kind === 'weap'
         ? // An Issue is pulled a set of 10 at a time: count sets, like the pity and the list's set headings.
-          html`<span class="glance-stat" title="${fmtInt(b.paidPulls)} weapons"><b>${fmtInt(setOf(b.paidPulls))}</b>${setOf(b.paidPulls) === 1 ? 'set' : 'sets'}</span>`
+          html`<span class="glance-stat" data-tip="${tip(`${fmtInt(b.paidPulls)} weapons`, [])}"><b>${fmtInt(setOf(b.paidPulls))}</b>${setOf(b.paidPulls) === 1 ? 'set' : 'sets'}</span>`
         : html`<span class="glance-stat"><b>${fmtInt(b.paidPulls)}</b>pulls</span>`}
       <div class="rarity-filter" role="group" aria-label="Rarity">
         ${hasRateUp ? html`<button type="button" class="filter-up" data-action="filter" data-value="up" aria-pressed="${String(f.has('up'))}" title="Rate-up: always listed" aria-label="Rate-up">${icon('stat_2')}</button>` : ''}
@@ -784,7 +792,7 @@ function pullRow(b: BannerSummary, p: AnalyzedPull): Html {
   const luck = p.luck;
   const hasLuck = p.isRateUp && p.rarity === 6 && p.copy !== undefined && luck !== undefined;
   const open = hasLuck && openLuck.has(p.key);
-  return html`<div class="pull${p.rarity === 6 ? ' six' : p.rarity === 5 ? ' five' : ''}${hasLuck ? ' has-luck' : ''}${open ? ' open' : ''}" title="${fmtDate(p.ts, true)}"
+  return html`<div class="pull${p.rarity === 6 ? ' six' : p.rarity === 5 ? ' five' : ''}${hasLuck ? ' has-luck' : ''}${open ? ' open' : ''}" data-tip="${tip(fmtDate(p.ts, true), [])}"
     ${hasLuck ? raw(`data-action="luck" data-key="${p.key.replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="${String(open)}"`) : ''}>
     <span class="pull-no num">${p.bannerPull ?? '–'}</span>
     <div class="item">${itemImg(p.kind, p.itemId)}<div class="item-name">

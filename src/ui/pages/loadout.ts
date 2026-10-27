@@ -5,6 +5,7 @@ import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon
 import { state, updateSettings } from '../../state';
 import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
 import { html, raw, render, type Html } from '../html';
+import { tip, tipNote, tipRow } from '../charts';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
 
 /**
@@ -401,8 +402,8 @@ const fmtPct = (n: number) => `${Math.round(n * 10) / 10}%`;
 export function bonusChip(b: Bonus | undefined): Html {
   if (!b) return html``;
   const parts = [b.flat ? `+${fmtFlat(b.flat)}` : '', b.pct ? `+${fmtPct(b.pct)}` : ''].filter(Boolean).join(' ');
-  const why = b.sources.map((s) => `${s.from}: ${[s.flat ? `+${fmtFlat(s.flat)}` : '', s.pct ? `+${fmtPct(s.pct)}` : ''].filter(Boolean).join(' ')}`).join('\n');
-  return html`<span class="attr-bonus" title="${why}">${parts}</span>`;
+  const why = tip('', b.sources.map((s) => tipRow(s.from, [s.flat ? `+${fmtFlat(s.flat)}` : '', s.pct ? `+${fmtPct(s.pct)}` : ''].filter(Boolean).join(' '))));
+  return html`<span class="attr-bonus" data-tip="${why}">${parts}</span>`;
 }
 
 /** The Attributes card shows totals; the Breakdown toggle splits them into base + bonuses. Kept across redraws. */
@@ -420,7 +421,7 @@ export function withBonus(base: number, b: Bonus | undefined, fmt: (n: number) =
   if (!b) return html`${fmt(base)}`;
   if (split) return html`${fmt(base)}${bonusChip(b)}`;
   const total = additive ? base + b.pct : (base + b.flat) * (1 + b.pct / 100);
-  return html`<span class="attr-total" title="${`${fmt(base)} base, plus talents, Potentials and your loadout. Press Breakdown to see the parts.`}">${fmt(total)}</span>`;
+  return html`<span class="attr-total" data-tip="${tip('', [tipNote('Base plus talents, Potentials and your loadout. Press Breakdown to see the parts.'), tipRow('Base', fmt(base))])}">${fmt(total)}</span>`;
 }
 
 /** A stat only the loadout gives (no base value): its amount, or "+amount" when split. */
@@ -441,30 +442,32 @@ export const splitToggle = (): Html =>
 export function atkValue(operatorAtk: number, b: Bonus | undefined, t: ReturnType<typeof atkTotal>, main: string | null, secondary: string | null): Html {
   const r = (n: number) => Math.round(n).toLocaleString();
   const attrs = t.fromMain + t.fromSecondary;
-  const why = [
-    `Base ATK ${r(t.base)} (operator ${r(operatorAtk)}${b?.flat ? ` + weapon ${r(b.flat)}` : ''})`,
-    b?.pct ? `ATK bonus +${r(t.basic - t.base)} (+${fmtPct(b.pct)})` : '',
-    `Basic total ${r(t.basic)}`,
-    `Attribute bonuses +${fmtPct(attrs)} (${[main ? `${main} +${fmtPct(t.fromMain)}` : '', secondary ? `${secondary} +${fmtPct(t.fromSecondary)}` : ''].filter(Boolean).join(', ')})`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-  if (split) return html`${r(operatorAtk)}${bonusChip(b)}<span class="attr-bonus" title="${why}">+${fmtPct(attrs)} attributes</span>`;
-  return html`<span class="attr-total" title="${why}">${r(t.total)}</span>`;
+  const why = tip('ATK', [
+    tipRow('Operator', r(operatorAtk)),
+    ...(b?.flat ? [tipRow('Weapon', `+${r(b.flat)}`)] : []),
+    tipRow('Base ATK', r(t.base)),
+    ...(b?.pct ? [tipRow(`ATK bonus +${fmtPct(b.pct)}`, `+${r(t.basic - t.base)}`)] : []),
+    tipRow('Basic total', r(t.basic)),
+    ...(main ? [tipRow(main, `+${fmtPct(t.fromMain)}`)] : []),
+    ...(secondary ? [tipRow(secondary, `+${fmtPct(t.fromSecondary)}`)] : []),
+    tipRow('Attribute bonuses', `+${fmtPct(attrs)}`),
+  ]);
+  if (split) return html`${r(operatorAtk)}${bonusChip(b)}<span class="attr-bonus" data-tip="${why}">+${fmtPct(attrs)} attributes</span>`;
+  return html`<span class="attr-total" data-tip="${why}">${r(t.total)}</span>`;
 }
 
 /** The HP row: the game's total (see hpTotal), or (split) operator HP then what's added. Hover for the breakdown. */
 export function hpValue(operatorHp: number, b: Bonus | undefined, t: ReturnType<typeof hpTotal>): Html {
   const r = (n: number) => Math.round(n).toLocaleString();
-  const why = [
-    `Base HP ${r(t.base)} (operator ${r(operatorHp)} + ${r(t.fromStrength)} from Strength)`,
-    t.others ? `Others +${r(t.others)}` : '',
-    b?.pct ? `HP bonus +${fmtPct(b.pct)}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-  if (split) return html`${r(operatorHp)}<span class="attr-bonus" title="${why}">+${r(t.fromStrength)} Strength</span>${bonusChip(b)}`;
-  return html`<span class="attr-total" title="${why}">${r(t.total)}</span>`;
+  const why = tip('HP', [
+    tipRow('Operator', r(operatorHp)),
+    tipRow('From Strength', `+${r(t.fromStrength)}`),
+    tipRow('Base HP', r(t.base)),
+    ...(t.others ? [tipRow('Others', `+${r(t.others)}`)] : []),
+    ...(b?.pct ? [tipRow('HP bonus', `+${fmtPct(b.pct)}`)] : []),
+  ]);
+  if (split) return html`${r(operatorHp)}<span class="attr-bonus" data-tip="${why}">+${r(t.fromStrength)} Strength</span>${bonusChip(b)}`;
+  return html`<span class="attr-total" data-tip="${why}">${r(t.total)}</span>`;
 }
 
 /**

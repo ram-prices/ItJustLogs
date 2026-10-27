@@ -3,6 +3,7 @@ import { state, updateSettings } from '../../state';
 import { toast } from '../common';
 import { badge, icon, itemName, pageHeader, toggleGroup } from '../components';
 import { html, type Html } from '../html';
+import { tip, tipNote } from '../charts';
 import { subTabs } from './collections';
 import { wikiFile } from './info';
 
@@ -329,7 +330,7 @@ function sitesCards(data: AicData, s: AicSettings, input: PlanInput): Html {
           </label>
         </div>
         <div class="table-wrap"><table class="table aic-sites">
-          <thead><tr><th>Area</th><th class="num">Protocol Capacity</th>${nodes.map((n) => html`<th class="num" title="${data.items[n].name} nodes${n === WATER ? '; blank: no limit' : '; blank: the area’s own'}">${data.items[n].name}</th>`)}</tr></thead>
+          <thead><tr><th>Area</th><th class="num">Protocol Capacity</th>${nodes.map((n) => html`<th class="num" data-tip="${tip(`${data.items[n].name} nodes`, [tipNote(n === WATER ? 'Blank: no limit.' : 'Blank: the area’s own.')])}">${data.items[n].name}</th>`)}</tr></thead>
           <tbody>${r.areas.map((a) => {
             const site = s.sites?.[a.id];
             return html`<tr class="${site ? '' : 'off'}">
