@@ -42,6 +42,13 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     floating). Firefox puts moved-only pictures on whole pixels (twitching);
     `transform: perspective(600px) rotateY(0.02deg)` stops it, measured on a
     real screen (a flat `rotate` fixes headless Firefox only).
+  - Banner art (`bannerArtUrl` in `domain/banners.ts`): Headhunting pools in
+    `GAME_ART` use ef-assets `banners/game/<pool id>.webp`, the game's own
+    banner screen laid out without text (ef-assets `scripts/operator-banner.py`,
+    from the EndfieldDataDump checkout); add a pool there once its file is
+    made. Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
+    art). Unpulled Headhunting cards prefer it over the schedule's `art`.
+    Discord embeds still use the schedule's `art`.
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
     `ui/components.ts` (`OROBERYL_ICON`, ef-assets icons/items, `--oroberyl`).
   - Rarity is drawn with the game's emblem, not a ★ glyph: `STAR_SVG`,

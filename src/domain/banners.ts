@@ -94,8 +94,20 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
 /** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
 export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
 
+/**
+ * Headhunting pools with art laid out from the game's own banner screen
+ * (ef-assets banners/game/, made by its operator-banner.py). Add a pool here
+ * once its file is there; the others keep their operator close-up.
+ */
+const GAME_ART = new Set([
+  'special_1_0_1', 'special_1_0_2', 'special_1_0_3', 'special_1_1_1', 'special_1_1_2', 'special_1_2_1',
+  'special_1_3_1', 'special_1_3_2', 'special_1_4_1', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1',
+  'rerun_chr_tangtang', 'rerun_chr_yvonne',
+]);
+
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
+  if (GAME_ART.has(id)) return `${EF_ASSETS_CDN}/banners/game/${id}.webp`;
   // Constant Issues have ef-assets art (rebuilt from the weapon render); other constant pools don't.
   if (id.includes('constant') && !id.startsWith('weaponbox_constant_')) return null;
   return `${EF_ASSETS_CDN}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;

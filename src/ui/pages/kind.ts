@@ -288,7 +288,8 @@ export interface ListOptions {
 function unpulledCard(c: CatalogBanner, i = 0): Html {
   const weaponId = c.rateUpIds.find((id) => id.startsWith('wpn_'));
   const weapon = weaponId ? itemIconUrl('weap', weaponId) : '';
-  const url = (c.art ? cdnUrl(c.art) : null) ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
+  // Headhunting cards show the pool's banner art (the game's own layout) like pulled ones.
+  const url = (c.kind === 'char' && c.poolId ? bannerArtUrl(c.poolId) : null) ?? (c.art ? cdnUrl(c.art) : null) ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
   // Coloured like a pulled card: from its one rate-up when it has one (see
   // tintWeaponCards), else from the art.
   const operators = c.rateUpIds.filter((id) => id.startsWith('chr_'));
