@@ -66,7 +66,26 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     the mark without bars) in three states, `artificeState` after the game's
     EquipEnhanceNode: empty at 0, half once any stat is artificed, full when the
     total reaches stats × 3. Loadout: the node at the slot's top right, the stats
-    under the name, each mark a select over it (`gear-art-pick`). Gear slots show the game's slot
+    under the name, each mark a select over it (`gear-art-pick`).
+    Weapons: tuning and essence, as in the game (ef-assets combat/weapon-tuning.json, its
+    scripts/weapon-tuning.mjs, from WeaponBreakThroughTemplateTable, WeaponTalentTemplateTable and
+    WeaponBasicTable; `weaponBounds` in domain/loadout.ts). Each tuning stage (0–4, tuned at Lv 20, 40,
+    60, 80) gives each skill a [lowest, highest] level; 4–6★: 1–3/1–3/1–4, 2–5/1–4, 2–6/2–6, 3–8/2–7,
+    3–9/3–9 (the own skill 1–4 at every stage). Each Potential moves the own skill's both bounds up one
+    (P5: 6–9). An essence adds its term level (GemPresetTable: up to 6 on a stat skill, 3 on the own
+    skill) to the lowest, up to the highest (`skillLevel`). Per weapon in settings (`weaponTuning`, unset
+    = 4; `weaponEssence`, else old `weaponRanks` read as fully tuned, `essenceFromRanks`; `maxEssence`),
+    so every operator holding it agrees. The weapon's page (Database → Arsenals) is the main place to set
+    them. Ranks show as the game's notches (`skillNotches`, WeaponSkillCell's notch cell: ef-assets
+    icons/weapon-skill from its scripts/weapon-skill-notches.py; white = the weapon's own level, #FFF100 =
+    what essence adds, dim = still reachable, outline crossed by a slash = past its tuning/Potential cap):
+    by each name in Skills (16px, as Essence's; no rank slider: each skill's text shows at its rank). Beside it, Essence holds only the
+    essence's own grooves per skill, a list whose rows line up with Skills' (the third skill named by its kind,
+    "Efficacy": an essence fits any weapon with that kind of third skill) (`essenceNotches`, 6/6/3: yellow etched, grey not yet), each a button:
+    a click etches up to it, on the top one back one. Under both, Tuning: each tuning row a button (the done
+    ones lit, the level reached in the head), a click tunes up to it, on the current one back one.
+    Loadout's weapon slot (`weaponPicker`) only shows them: each skill's name and rank notches under
+    the weapon's name, like gear stats; tuning and essence are set on the weapon's page. Gear slots show the game's slot
     marks (`slotIcon`, ef-assets icons/gear-slots, the wiki's Gear Icons),
     the weapon slot the operator's weapon type (`weaponTypeIcon`, ef-assets weapon-types).
     The Operators list (`database.css` `.op-card`) is portrait cards, our take on

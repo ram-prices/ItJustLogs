@@ -99,7 +99,11 @@ export interface SimBuild {
   level?: number;
   /** Skill ranks (1–12, 12 unless set): basic attack, battle skill, combo, ultimate. */
   ranks?: { basic?: number; normal?: number; combo?: number; ultimate?: number };
-  weapon?: { id: string; potential: number; skillLevels?: number[]; level?: number };
+  /**
+   * `skillLevels`: each skill's level before Potential (build.ts adds it), unset: each at its cap fully tuned;
+   * `tuning`: its tuning stage (0–4) when not fully tuned, which `skillLevels` and `level` already follow.
+   */
+  weapon?: { id: string; potential: number; skillLevels?: number[]; level?: number; tuning?: number };
   /** Each piece's Artifice per stat (build.ts `Build.gear`; one number in runs saved before per-stat Artifice). */
   gear: { id: string; artifice: number | number[] }[];
   /** A food eaten before the fight (FOODS). */

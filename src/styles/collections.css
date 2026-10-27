@@ -1047,11 +1047,34 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   flex-wrap: wrap;
   gap: 12px;
 }
-/* Weapon page with max essence off: a note above its skills. */
-.wiki-essence-note {
-  margin: -6px 0 12px;
+/* Weapon page Essence (`weaponPicker`): a list whose rows line up with Skills' (the same padding, name type and
+   height as a `.wiki-acc` summary), the essence's grooves at the right. */
+.wiki-essence-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
 }
-/* A weapon skill's own rank: shown on its row, set with the slider inside. */
+.wiki-essence-row .essence-notches {
+  margin-left: auto;
+}
+/* Weapon page Tuning: each tuning a button, the ones done lit. */
+.wiki-tunings li {
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+.wiki-tunings li:hover {
+  background: var(--gray-alpha-100);
+}
+.wiki-tunings li:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.wiki-tunings li.done .wiki-pot {
+  background: var(--gray-1000);
+  color: var(--background-100);
+}
+/* A weapon skill's rank: shown on its row, previewed with the slider inside. */
 .wiki-acc-rank {
   font: 500 12px/16px var(--font-sans);
   color: var(--gray-900);

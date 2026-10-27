@@ -1,9 +1,9 @@
 import type { Analysis } from '../../domain/analyze';
 import { gearIconUrl } from '../../domain/banners';
-import { GEAR_SLOTS, SET_PIECES, artificeOf, artificeState, artificeTops, atkTotal, hpTotal, isLoadoutSlot, withArtifice, type GearSlot, operatorBonuses, setCounts, weaponBaseRanks, weaponRankCaps, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot } from '../../domain/loadout';
+import { GEAR_SLOTS, SET_PIECES, TUNING_MAX, artificeOf, artificeState, artificeTops, atkTotal, essenceFromRanks, essenceMax, hpTotal, isLoadoutSlot, tuningMaxLevel, tuningOf, weaponBounds, weaponSkillLevels, withArtifice, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot, type WeaponTuning, type WeaponTuningFile } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
+import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, essenceNotches, skillNotches, slotIcon, tileArt, weaponTypeIcon } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { tip, tipNote, tipRow } from '../charts';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
@@ -64,60 +64,152 @@ function slotTile(
   </div>`;
 }
 
-/**
- * Whether this weapon has Maxed Essence (off by default): marked so, or
- * with every skill set to the highest rank it can reach (`caps`).
- */
-export const isMaxEssence = (wpnId: string, caps?: number[]): boolean => {
+/** combat/weapon-tuning.json: each weapon's skill bounds per tuning stage and Potential (null until it's loaded). */
+export const tuningFile = (redraw: () => void = () => {}): WeaponTuningFile | null => wikiFile<WeaponTuningFile>('weapon-tuning.json', redraw, 'combat').data;
+
+/** A weapon's tuning stage as the player set it (unset: fully tuned). */
+export const tuningStageOf = (wpnId: string): number => Math.max(0, Math.min(TUNING_MAX, Math.floor(state.settings.weaponTuning?.[wpnId] ?? TUNING_MAX)));
+
+/** The essence levels saved for a weapon (none: no essence); a save that held ranks is read as fully tuned. */
+function essenceSaved(wpnId: string, w: WikiWeapon, potential: number | null, t?: WeaponTuning): number[] | undefined {
+  const max = essenceMax(w);
+  const e = state.settings.weaponEssence?.[wpnId];
+  if (e) return max.map((m, i) => Math.max(0, Math.min(m, Math.floor(e[i] ?? 0))));
+  const r = state.settings.weaponRanks?.[wpnId];
+  return r ? essenceFromRanks(r, weaponBounds(w, potential, t, TUNING_MAX), max) : undefined;
+}
+
+/** Whether this weapon has Maxed Essence (off by default): marked so, or every skill's essence at its most. */
+export const isMaxEssence = (wpnId: string, w?: WikiWeapon, potential: number | null = null): boolean => {
   if (state.settings.maxEssence?.includes(wpnId)) return true;
-  const r = weaponRanksOf(wpnId);
-  return !!(r && caps?.length && caps.every((c, i) => (r[i] ?? 0) >= c));
+  const e = w ? essenceSaved(wpnId, w, potential, tuningOf(tuningFile(), wpnId)) : undefined;
+  return !!e && essenceMax(w!).every((m, i) => e[i] >= m);
 };
 
-/** The skill ranks the player set on the weapon's page (none: no essence, weaponBaseRanks). */
-export const weaponRanksOf = (wpnId: string): number[] | undefined => state.settings.weaponRanks?.[wpnId];
+/** A weapon as the player built it: tuning stage, essence per skill, and from those (and Potential) each skill's level. */
+export interface WeaponBuild {
+  stage: number;
+  tuning?: WeaponTuning;
+  maxed: boolean;
+  /** Essence levels per skill (each at its most with Maxed Essence), and those most. */
+  essence: number[];
+  max: number[];
+  /** Each skill's [lowest, highest] level at this stage and Potential, and its level. */
+  bounds: [number, number][];
+  levels: number[];
+  /** The weapon's highest level at this stage (its base ATK counts there). */
+  level: number;
+}
 
-/** The ranks a weapon's skills count at: unset (each at its cap) when maxed, else the player's or no essence. */
-export const weaponRanksFor = (wpnId: string, w: WikiWeapon, potential: number | null): number[] | undefined =>
-  isMaxEssence(wpnId, weaponRankCaps(w, potential)) ? undefined : (weaponRanksOf(wpnId) ?? weaponBaseRanks(w, potential));
+export function weaponBuildOf(wpnId: string, w: WikiWeapon, potential: number | null, redraw?: () => void): WeaponBuild {
+  const tuning = tuningOf(tuningFile(redraw), wpnId);
+  const stage = tuningStageOf(wpnId);
+  const max = essenceMax(w);
+  const maxed = isMaxEssence(wpnId, w, potential);
+  const essence = maxed ? max : (essenceSaved(wpnId, w, potential, tuning) ?? max.map(() => 0));
+  const bounds = weaponBounds(w, potential, tuning, stage);
+  return { stage, tuning, maxed, essence, max, bounds, levels: weaponSkillLevels(bounds, essence), level: tuningMaxLevel(tuning, stage) };
+}
 
-/**
- * Maxed Essence on or off. Ranks set while it was off are kept for when it's
- * off again, except ranks already at `caps` (they'd keep it maxed): turning
- * it off then goes back to no essence.
- */
-export function setMaxEssence(wpnId: string, on: boolean, caps: number[] = []): void {
-  const list = (state.settings.maxEssence ?? []).filter((id) => id !== wpnId);
+/** The levels a weapon's skills count at (weaponBuildOf). */
+export const weaponRanksFor = (wpnId: string, w: WikiWeapon, potential: number | null): number[] => weaponBuildOf(wpnId, w, potential).levels;
+
+/** A weapon's wiki entry (once loaded) and the player's Potential on it (null: no copy). */
+function weaponOf(wpnId: string): { w?: WikiWeapon; potential: number | null } {
+  const mine = ownedOf(state.analysis, 'weap')?.get(wpnId);
+  return { w: wikiFile<WikiWeaponFile>('weapons.json', () => {}).data?.weapons[wpnId], potential: mine?.copies ? mine.potential : null };
+}
+
+/** Saves a weapon's essence (none, or all 0: no essence) and its Maxed Essence mark; a save's old ranks give way. */
+function saveEssence(wpnId: string, essence: number[] | null, maxed: boolean): void {
+  const all = { ...state.settings.weaponEssence };
   const ranks = { ...state.settings.weaponRanks };
-  if (!on && isMaxEssence(wpnId, caps) && !state.settings.maxEssence?.includes(wpnId)) delete ranks[wpnId];
-  updateSettings({ maxEssence: on ? [...list, wpnId] : list.length ? list : undefined, weaponRanks: Object.keys(ranks).length ? ranks : undefined });
+  delete ranks[wpnId];
+  if (!essence || essence.every((x) => !x)) delete all[wpnId];
+  else all[wpnId] = essence;
+  const list = (state.settings.maxEssence ?? []).filter((id) => id !== wpnId);
+  updateSettings({
+    weaponEssence: Object.keys(all).length ? all : undefined,
+    weaponRanks: Object.keys(ranks).length ? ranks : undefined,
+    maxEssence: maxed ? [...list, wpnId] : list.length ? list : undefined,
+  });
 }
 
-const sameRanks = (a: number[], b: number[]) => a.length === b.length && a.every((r, i) => r === b[i]);
-
 /**
- * One weapon skill's rank as the player built it (`base`: the ranks without
- * essence, where it starts if none are set yet). Ranks back at `base` are
- * forgotten: that's the default.
+ * Maxed Essence on or off. Essence set while it was off is kept for when it's off again, unless it's at its most
+ * (it'd keep it maxed): turning it off then goes back to no essence.
  */
-export function setWeaponRank(wpnId: string, i: number, rank: number, base: number[]): void {
-  const next = [...(weaponRanksOf(wpnId) ?? base)];
-  next[i] = Math.max(1, Math.floor(rank));
-  const all = { ...state.settings.weaponRanks, [wpnId]: next };
-  if (sameRanks(next, base)) delete all[wpnId];
-  updateSettings({ weaponRanks: Object.keys(all).length ? all : undefined });
+export function setMaxEssence(wpnId: string, on: boolean): void {
+  const { w, potential } = weaponOf(wpnId);
+  const saved = w ? essenceSaved(wpnId, w, potential) : state.settings.weaponEssence?.[wpnId];
+  if (on) return saveEssence(wpnId, saved ?? null, true);
+  const marked = state.settings.maxEssence?.includes(wpnId);
+  saveEssence(wpnId, !marked && isMaxEssence(wpnId, w, potential) ? null : (saved ?? null), false);
+}
+
+/** One skill's essence level on a weapon (0 to its most). Maxed Essence gives way to the levels it stood for. */
+export function setWeaponEssence(wpnId: string, i: number, level: number): void {
+  const { w, potential } = weaponOf(wpnId);
+  if (!w || i < 0 || i >= w.skills.length) return;
+  const b = weaponBuildOf(wpnId, w, potential);
+  const next = [...b.essence];
+  next[i] = Math.max(0, Math.min(b.max[i], Math.floor(level)));
+  saveEssence(wpnId, next, false);
+}
+
+/** A weapon's tuning stage (0–4; 4, fully tuned, is the default and isn't saved). */
+export function setTuning(wpnId: string, stage: number): void {
+  const all = { ...state.settings.weaponTuning };
+  const s = Math.max(0, Math.min(TUNING_MAX, Math.floor(stage)));
+  if (s === TUNING_MAX) delete all[wpnId];
+  else all[wpnId] = s;
+  updateSettings({ weaponTuning: Object.keys(all).length ? all : undefined });
 }
 
 /**
- * How the player built a weapon: the green essence icon for Maxed Essence,
- * "Ranks 5 · 9 · 4" if they set ranks, else (no essence, the default) nothing.
+ * How the player built a weapon: the green essence icon for Maxed Essence fully tuned, "Ranks 5 · 9 · 4" if they set
+ * essence or tuning, else (no essence, fully tuned: the default) nothing.
  */
 export const essenceTag = (wpnId: string, w?: WikiWeapon, potential: number | null = null): Html | null => {
-  if (isMaxEssence(wpnId, w ? weaponRankCaps(w, potential) : undefined)) return html`<span class="essence-max">${essenceIcon()}</span>`;
-  const r = weaponRanksOf(wpnId);
-  if (r && w && sameRanks(r, weaponBaseRanks(w, potential))) return null;
-  return r ? html`<span class="essence-part">Ranks ${r.join(' · ')}</span>` : null;
+  if (!w) return isMaxEssence(wpnId) ? html`<span class="essence-max">${essenceIcon()}</span>` : null;
+  const b = weaponBuildOf(wpnId, w, potential);
+  if (b.maxed && b.stage === TUNING_MAX) return html`<span class="essence-max">${essenceIcon()}</span>`;
+  if (b.stage === TUNING_MAX && b.essence.every((x) => !x)) return null;
+  return html`<span class="essence-part">Ranks ${b.levels.join(' · ')}</span>`;
 };
+
+/**
+ * The weapon's essence and ranks, kept per weapon (set on its page; every loadout holding it reads the same). On the
+ * weapon's page (`ranks` false): each skill with the essence's own grooves (`essenceNotches`, a click etches to one),
+ * a list whose rows line up with its Skills' (the own skill by its kind, "Efficacy": an essence fits any weapon whose
+ * third skill is of that kind). In a loadout, under the weapon's name like a gear piece's stats, only each skill's
+ * rank at the right (`skillNotches`: the weapon's own levels and the essence's together).
+ */
+export function weaponPicker(wpnId: string, w: WikiWeapon, potential: number | null, ranks = true): Html {
+  const b = weaponBuildOf(wpnId, w, potential);
+  if (!ranks)
+    return html`<div class="card wiki-accs wiki-essence">${w.skills.map((s, i) => {
+      const name = i === w.skills.length - 1 && w.skills.length > 1 ? (s.tag ?? s.name.split(':')[0]) : s.name;
+      return html`<div class="wiki-essence-row"><span class="wiki-acc-name min0 ellipsis">${name}</span>${essenceNotches(wpnId, i, name, b.essence[i], b.max[i])}</div>`;
+    })}</div>`;
+  return html`<div class="gear-stats">
+    ${w.skills.map((s, i) => {
+      const [lo, hi] = b.bounds[i];
+      return html`<div class="gear-stat"><span class="min0 ellipsis">${s.name}</span><span class="gear-stat-val">${skillNotches(lo, b.levels[i], hi)}</span></div>`;
+    })}
+  </div>`;
+}
+
+/** A click on an essence groove (`essence-notch`): etched up to it, or one less when it's already the top one. */
+export function pickEssenceNotch(wpnId: string, skill: number, n: number): void {
+  const { w, potential } = weaponOf(wpnId);
+  if (!w) return;
+  const now = weaponBuildOf(wpnId, w, potential).essence[skill] ?? 0;
+  setWeaponEssence(wpnId, skill, now === n ? n - 1 : n);
+}
+
+/** A click on a tuning stage (`weapon-tuning`, the weapon page's Tuning): tuned up to it, or one less when it's the stage. */
+export const pickTuning = (wpnId: string, stage: number): void => setTuning(wpnId, tuningStageOf(wpnId) === stage ? stage - 1 : stage);
 
 /** A gear stat's value as the game writes it: "+32", fractions as percents ("+41.4%"). */
 export const gearValue = (v: number | undefined): string => (v == null ? '' : v < 1 ? `+${Math.round(v * 1000) / 10}%` : `+${v.toLocaleString()}`);
@@ -180,6 +272,7 @@ export function loadoutSection(opId: string, a: Analysis | null, redraw: () => v
           name: w?.name ?? l.weapon,
           sub: html`${[ownedWeps?.get(l.weapon)?.copies ? `P${ownedWeps.get(l.weapon)!.potential}` : '', tag ?? ''].filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}`,
           href: infoHref('weap', l.weapon),
+          extra: w?.skills.length ? weaponPicker(l.weapon, w, wp) : undefined,
         }
       : null,
     weaponType ? weaponTypeIcon(weaponType) : undefined,
@@ -386,10 +479,12 @@ export function bonusesFor(opId: string, o: WikiOperator, a: Analysis | null, re
   const gear = l ? wikiFile<WikiGearFile>('gear.json', redraw).data : null;
   const w = l?.weapon ? weps?.weapons[l.weapon] : undefined;
   const mine = l?.weapon ? ownedOf(a, 'weap')?.get(l.weapon) : undefined;
+  const wp = mine?.copies ? mine.potential : null;
+  const wb = w ? weaponBuildOf(l!.weapon!, w, wp, redraw) : undefined;
   return operatorBonuses(o, {
     potential,
     loadout: weps && gear ? l : null,
-    weapon: w ? { w, potential: mine?.copies ? mine.potential : null, ranks: weaponRanksFor(l!.weapon!, w, mine?.copies ? mine.potential : null) } : null,
+    weapon: w && wb ? { w, potential: wp, ranks: wb.levels, tuning: wb.tuning, stage: wb.stage, level: wb.level } : null,
     items: gear?.gear.items,
     sets: gear?.gear.sets,
   });
@@ -499,8 +594,9 @@ export function weaponDetail(opId: string, a: Analysis | null, redraw: () => voi
   const w = wikiFile<WikiWeaponFile>('weapons.json', redraw).data?.weapons[id];
   const mine = ownedOf(a, 'weap')?.get(id);
   const p = mine?.copies ? mine.potential : null;
-  const atk = w?.stats?.baseAtk.filter((x): x is number => x != null).at(-1);
-  const ranks = w ? (weaponRanksFor(id, w, p) ?? weaponRankCaps(w, p)) : undefined;
+  const wb = w ? weaponBuildOf(id, w, p, redraw) : undefined;
+  const atk = w?.stats ? (w.stats.baseAtk[w.stats.levels.indexOf(wb!.level)] ?? w.stats.baseAtk.filter((x): x is number => x != null).at(-1)) : undefined;
+  const ranks = wb?.levels;
   const tag = essenceTag(id, w, p);
   return html`<span class="card-weapon">
       ${w ? rarityArt(itemImg('weap', id, 'card-weapon-img'), w.rarity) : itemImg('weap', id, 'card-weapon-img')}

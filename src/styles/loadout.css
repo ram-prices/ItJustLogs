@@ -155,6 +155,10 @@ select option {
 .gear-art-pick:has(select:focus-visible) {
   outline: 2px solid var(--focus);
 }
+/* With its tuning and skills under it, the weapon's link sits by its top row. */
+.loadout-slot.has-extra .loadout-link {
+  top: 30px;
+}
 /* The weapon's page, from its slot. */
 .loadout-link {
   position: absolute;

@@ -1,5 +1,5 @@
 import { BUILD_MODES, type BuildMode, DEFAULT_HP, DEFAULT_LIMIT, DEFAULT_SECONDS, type Effort, ENEMIES, enemyById, type Goal, GOALS, type ReplayResult, type SimRequest, spGained, START_SP, type Style, styleOf, STYLES } from '../../domain/sim/team';
-import { artificeTops } from '../../domain/loadout';
+import { artificeTops, type WeaponTuningFile } from '../../domain/loadout';
 import { statArtifice } from '../../domain/sim/build';
 import type { WikiGearFile, WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { deleteSim, updateSim } from '../../store';
@@ -409,7 +409,9 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
   const ops = wikiFile<WikiOperatorFile>('operators.json', redraw);
   const weapons = wikiFile<WikiWeaponFile>('weapons.json', redraw);
   const gearFile = wikiFile<WikiGearFile>('gear.json', redraw);
-  if (!index.data || !ops.data || !weapons.data || !gearFile.data) {
+  // Weapon tuning (builds' skill levels): waited for, but the page goes on without it (each weapon fully tuned).
+  const tuning = wikiFile<WeaponTuningFile>('weapon-tuning.json', redraw, 'combat');
+  if (!index.data || !ops.data || !weapons.data || !gearFile.data || (!tuning.data && !tuning.failed)) {
     const failed = index.failed || ops.failed || weapons.failed || gearFile.failed;
     return html`${header}<main class="container fade-in"><p class="copy-14 secondary">${failed ? 'Couldn’t load the combat data. Try again later.' : 'Loading…'}</p></main>`;
   }

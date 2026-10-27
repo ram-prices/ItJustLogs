@@ -98,29 +98,81 @@ export function artificeState(levels: number[], tops: number[]): 'empty' | 'half
 }
 
 /**
- * A weapon's skill ranks with no essence infused: the two stat skills at 3
- * (a Flawless Essence adds the other 6), the last (Potential) skill at
- * 1 + the weapon's Potential (essence adds up to 3 more).
+ * Weapon skill bounds from ef-assets combat/weapon-tuning.json (its scripts/weapon-tuning.mjs): tuning templates
+ * (WeaponBreakThroughTemplateTable), Potential templates (WeaponTalentTemplateTable) and each weapon's two.
  */
-export function weaponBaseRanks(w: WikiWeapon, potential: number | null): number[] {
-  return w.skills.map((_, i) =>
-    i === w.skills.length - 1 && w.skills.length > 1
-      ? Math.min(WEAPON_SKILL_RANK, 1 + (potential ?? 0))
-      : WEAPON_SKILL_RANK - ESSENCE_STAT_LEVELS,
-  );
+export interface WeaponTuningFile {
+  templates: Record<string, { levels: number[]; bounds: [number, number][][] }>;
+  potentials: Record<string, [number, number][][]>;
+  weapons: Record<string, { tuning: string; potential: string; maxLevel: number }>;
 }
-/** Levels a Flawless Essence adds to a weapon's two stat skills. */
-const ESSENCE_STAT_LEVELS = 6;
+
+/** One weapon's tuning: what its skills' levels can be at each stage and Potential. */
+export interface WeaponTuning {
+  /** The weapon level each stage is tuned at (stage 0, untuned: 1; then 20, 40, 60, 80). */
+  levels: number[];
+  maxLevel: number;
+  /** Per stage, each skill's [lowest, highest] level at P0: the lowest with no essence, the highest essence reaches. */
+  bounds: [number, number][][];
+  /** Per Potential (P1 first), what it adds to each skill's [lowest, highest]. */
+  potential: [number, number][][];
+}
+
+export const tuningOf = (f: WeaponTuningFile | null | undefined, wpnId: string): WeaponTuning | undefined => {
+  const e = f?.weapons[wpnId];
+  const t = e ? f!.templates[e.tuning] : undefined;
+  return e && t ? { levels: t.levels, maxLevel: e.maxLevel, bounds: t.bounds, potential: f!.potentials[e.potential] ?? [] } : undefined;
+};
+
+/** Tuning stages: 0 (untuned) to 4 (tuned at levels 20, 40, 60 and 80). Saves from before tuning count as 4. */
+export const TUNING_MAX = 4;
+
+/** The highest level a weapon reaches at a tuning stage: the next stage's level, after the last its maxLv. */
+export const tuningMaxLevel = (t: WeaponTuning | undefined, stage: number): number =>
+  t ? (t.levels[stage + 1] ?? t.maxLevel) : ([20, 40, 60, 80][stage] ?? 90);
+
+/** The weapon's own skill (the last of two or three), the one Potential raises; the others are its stat skills. */
+const isOwnSkill = (w: Pick<WikiWeapon, 'skills'>, i: number): boolean => i === w.skills.length - 1 && w.skills.length > 1;
+
+/** The most levels an essence adds to each skill (GemPresetTable term levels): 6 to a stat skill, 3 to the weapon's own. */
+export const essenceMax = (w: Pick<WikiWeapon, 'skills'>): number[] => w.skills.map((_, i) => (isOwnSkill(w, i) ? ESSENCE_SKILL_MAX : ESSENCE_STAT_MAX));
+const ESSENCE_STAT_MAX = 6;
+const ESSENCE_SKILL_MAX = 3;
 
 /**
- * The highest rank each of a weapon's skills can reach: 9 for the stat
- * skills, and for the last (Potential) skill 4 + the weapon's Potential.
+ * Each skill's [lowest, highest] level at a tuning stage and Potential: the stage's bounds plus the Potential's (on
+ * the weapon's own skill both move up one per Potential). Without the table (not loaded yet) as fully tuned: the stat
+ * skills 3–9, the own skill (1–4) + Potential.
  */
-export function weaponRankCaps(w: WikiWeapon, potential: number | null): number[] {
-  return w.skills.map((_, i) =>
-    i === w.skills.length - 1 && w.skills.length > 1 ? Math.min(WEAPON_SKILL_RANK, POTENTIAL_SKILL_BASE_CAP + (potential ?? 0)) : WEAPON_SKILL_RANK,
-  );
+export function weaponBounds(w: Pick<WikiWeapon, 'skills'>, potential: number | null, t?: WeaponTuning, stage = TUNING_MAX): [number, number][] {
+  const p = Math.max(0, Math.floor(potential ?? 0));
+  if (!t) return w.skills.map((_, i) => (isOwnSkill(w, i) ? [Math.min(WEAPON_SKILL_RANK, 1 + p), Math.min(WEAPON_SKILL_RANK, POTENTIAL_SKILL_BASE_CAP + p)] : [3, WEAPON_SKILL_RANK]));
+  const row = t.bounds[Math.max(0, Math.min(t.bounds.length - 1, Math.floor(stage)))] ?? [];
+  const extra = p ? (t.potential[Math.min(p, t.potential.length) - 1] ?? []) : [];
+  return w.skills.map((_, i) => {
+    const [lo, hi] = row[i] ?? [1, 1];
+    const [a, b] = extra[i] ?? [0, 0];
+    return [lo + a, hi + b];
+  });
 }
+
+/** A skill's level: its lowest plus the essence's level for it, up to its highest. */
+export const skillLevel = ([lo, hi]: [number, number], essence: number): number => Math.max(lo, Math.min(hi, lo + Math.max(0, Math.floor(essence))));
+
+/** Each skill's level from its bounds (weaponBounds) and the essence's level per skill. */
+export const weaponSkillLevels = (bounds: [number, number][], essence: number[]): number[] => bounds.map((b, i) => skillLevel(b, essence[i] ?? 0));
+
+/** The essence levels (each 0 to essenceMax) that give these skill levels at these bounds: saves that held ranks. */
+export const essenceFromRanks = (ranks: number[], bounds: [number, number][], max: number[]): number[] =>
+  bounds.map(([lo], i) => Math.max(0, Math.min(max[i] ?? 0, Math.floor((ranks[i] ?? lo) - lo))));
+
+/** A weapon's skill ranks with no essence: each skill's lowest level (weaponBounds). */
+export const weaponBaseRanks = (w: Pick<WikiWeapon, 'skills'>, potential: number | null, t?: WeaponTuning, stage?: number): number[] =>
+  weaponBounds(w, potential, t, stage).map((b) => b[0]);
+
+/** The highest rank each of a weapon's skills can reach (weaponBounds). */
+export const weaponRankCaps = (w: Pick<WikiWeapon, 'skills'>, potential: number | null, t?: WeaponTuning, stage?: number): number[] =>
+  weaponBounds(w, potential, t, stage).map((b) => b[1]);
 
 /** The Artifice level each of a slot's stats counts at: as set, else each stat's highest. */
 export const artificeOf = (l: Loadout, slot: GearSlot, g: WikiGear): number[] => artificeLevels(l.artifice?.[slot], artificeTops(g));
@@ -142,7 +194,7 @@ export interface Bonus {
   sources: { from: string; flat: number; pct: number }[];
 }
 
-/** Ranks the weapon skills are counted at: the first two fully tuned, the last at its Potential's cap. */
+/** A weapon skill's highest level (fully tuned, or the own skill at P5). */
 export const WEAPON_SKILL_RANK = 9;
 const POTENTIAL_SKILL_BASE_CAP = 4;
 
@@ -178,8 +230,8 @@ export function statBonuses(text: string): { stats: string[]; value: number; pct
  * - Potentials up to `potential` (the player's copies; none without them);
  * - the weapon's base ATK at `level` (the card's level) and the plain stat
  *   part of each skill ("Intellect +{0}", "Secondary attribute +{0}%") at
- *   its rank: as set, else the highest it can reach (9, or 4 + Potential for
- *   the last skill);
+ *   its rank: as set, else the highest it can reach at its tuning stage and
+ *   Potential (weaponBounds); base ATK at the weapon's `level` when given;
  * - each gear piece's DEF and stats at its Artifice level (the highest
  *   unless set; values under 1 are fractions, so percents), and the stat
  *   part of 3-piece set effects ("Wearer's HP +1000").
@@ -191,8 +243,11 @@ export function operatorBonuses(
   opts: {
     potential?: number | null;
     loadout?: Loadout | null;
-    /** `ranks`: each skill's rank as set (missing: the highest it can reach, see weaponRankCaps). */
-    weapon?: { w: WikiWeapon; potential: number | null; ranks?: (number | null | undefined)[] } | null;
+    /**
+     * `ranks`: each skill's rank as set (missing: the highest it can reach, see weaponBounds), at tuning `stage` of
+     * `tuning` (unset: fully tuned); `level`: the weapon's level for its base ATK (else the operator's).
+     */
+    weapon?: { w: WikiWeapon; potential: number | null; ranks?: (number | null | undefined)[]; tuning?: WeaponTuning; stage?: number; level?: number } | null;
     items?: Record<string, WikiGear>;
     sets?: Record<string, WikiGearSet>;
     level?: number;
@@ -237,10 +292,10 @@ export function operatorBonuses(
 
   if (weapon) {
     const { w, potential: wp, ranks } = weapon;
-    const caps = weaponRankCaps(w, wp);
+    const caps = weaponRankCaps(w, wp, weapon.tuning, weapon.stage);
     const s = w.stats;
     if (s) {
-      let at = s.levels.indexOf(level);
+      let at = s.levels.indexOf(weapon.level ?? level);
       if (at < 0) at = s.levels.length - 1;
       const atk = s.baseAtk[at];
       if (atk != null) add('ATK', `${w.name} (base ATK)`, atk, 0);

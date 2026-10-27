@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bannerEnded } from './catalog';
-import { artificeLevels, artificeState, artificeTops, atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, weaponBaseRanks, weaponRankCaps, setCounts, statBonuses, wieldersOf, withArtifice, withSlot, type Loadout } from './loadout';
+import { artificeLevels, artificeState, artificeTops, atkTotal, defReduction, hpTotal, operatorBonuses, statTotal, TREATMENT_PER_WILL, essenceFromRanks, essenceMax, skillLevel, tuningMaxLevel, tuningOf, weaponBaseRanks, weaponBounds, weaponRankCaps, weaponSkillLevels, setCounts, statBonuses, wieldersOf, withArtifice, withSlot, type Loadout, type WeaponTuningFile } from './loadout';
 import { equip, type GearData } from './sim/build';
 import type { Schedule } from './schedule';
 import type { WikiGear, WikiWeapon } from './wiki';
@@ -83,6 +83,77 @@ describe('loadout bonuses', () => {
   it('starts weapons without essence: 3, 3 and 1 + Potential', () => {
     expect(weaponBaseRanks(weapon, null)).toEqual([3, 3, 1]);
     expect(weaponBaseRanks(weapon, 2)).toEqual([3, 3, 3]);
+  });
+
+  // ef-assets combat/weapon-tuning.json as the game has it: WeaponBreakThroughTemplateTable weapon_breakthrough_456star_*
+  // (every 4–6★ weapon's) and _3star_*, WeaponTalentTemplateTable wpn_potential_456star and _3star.
+  const tuningFile: WeaponTuningFile = {
+    templates: {
+      weapon_breakthrough_456star_B_2: { levels: [1, 20, 40, 60, 80], bounds: [[[1, 3], [1, 3], [1, 4]], [[2, 5], [1, 4], [1, 4]], [[2, 6], [2, 6], [1, 4]], [[3, 8], [2, 7], [1, 4]], [[3, 9], [3, 9], [1, 4]]] },
+      weapon_breakthrough_3star_A_1: { levels: [1, 20, 40, 60, 80], bounds: [[[1, 3], [1, 4], [0, 0]], [[2, 5], [1, 4], [0, 0]], [[3, 6], [1, 4], [0, 0]], [[4, 8], [1, 4], [0, 0]], [[5, 9], [1, 4], [0, 0]]] },
+    },
+    potentials: {
+      wpn_potential_456star: [1, 2, 3, 4, 5].map((p) => [[0, 0], [0, 0], [p, p]] as [number, number][]),
+      wpn_potential_3star: [1, 2, 3, 4, 5].map((p) => [[0, 0], [p, p], [0, 0]] as [number, number][]),
+    },
+    weapons: {
+      wpn_six: { tuning: 'weapon_breakthrough_456star_B_2', potential: 'wpn_potential_456star', maxLevel: 90 },
+      wpn_three: { tuning: 'weapon_breakthrough_3star_A_1', potential: 'wpn_potential_3star', maxLevel: 90 },
+    },
+  };
+  const six = tuningOf(tuningFile, 'wpn_six')!;
+  const caps = (stage: number, p = 0) => weaponBounds(weapon, p, six, stage).map((b) => b[1]);
+
+  it('raises the stat skills’ caps at each tuning, as the game’s table has them', () => {
+    expect([0, 1, 2, 3, 4].map((s) => caps(s))).toEqual([
+      [3, 3, 4],
+      // Tuned at 20 (to reach 40): skill 1 from 3 to 5, skill 2 from 3 to 4.
+      [5, 4, 4],
+      [6, 6, 4],
+      [8, 7, 4],
+      [9, 9, 4],
+    ]);
+    expect([0, 1, 2, 3, 4].map((s) => tuningMaxLevel(six, s))).toEqual([20, 40, 60, 80, 90]);
+    expect(tuningOf(tuningFile, 'nope')).toBeUndefined();
+  });
+
+  it('moves the own skill’s lowest and highest up one per Potential, tuning leaving it alone', () => {
+    expect(weaponBounds(weapon, 0, six, 0)[2]).toEqual([1, 4]);
+    expect(weaponBounds(weapon, 3, six, 2)[2]).toEqual([4, 7]);
+    expect(weaponBounds(weapon, 5, six, 4)[2]).toEqual([6, 9]);
+    // Unloaded table: as fully tuned, the same numbers.
+    expect(weaponBounds(weapon, 3)).toEqual(weaponBounds(weapon, 3, six, 4));
+  });
+
+  it('adds essence levels to each skill’s lowest, up to its cap', () => {
+    expect(essenceMax(weapon)).toEqual([6, 6, 3]);
+    // Fully tuned: 3 + 6 = 9 on the stat skills, 1 + 3 = 4 (+ Potential) on the own skill.
+    expect(weaponSkillLevels(weaponBounds(weapon, 0, six, 4), [6, 6, 3])).toEqual([9, 9, 4]);
+    expect(weaponSkillLevels(weaponBounds(weapon, 5, six, 4), [6, 6, 3])).toEqual([9, 9, 9]);
+    expect(weaponSkillLevels(weaponBounds(weapon, 0, six, 4), [0, 0, 0])).toEqual([3, 3, 1]);
+    // Tuned once: a full essence is held at 5/4; part of one, 2 + 2 = 4, 1 + 2 = 3.
+    expect(weaponSkillLevels(weaponBounds(weapon, 0, six, 1), [6, 6, 3])).toEqual([5, 4, 4]);
+    expect(weaponSkillLevels(weaponBounds(weapon, 0, six, 1), [2, 2, 0])).toEqual([4, 3, 1]);
+    expect(skillLevel([3, 9], 9)).toBe(9);
+    // A save that held ranks (fully tuned): rank less the lowest.
+    expect(essenceFromRanks([5, 9, 3], weaponBounds(weapon, 2, six, 4), essenceMax(weapon))).toEqual([2, 6, 0]);
+  });
+
+  it('reads a 3★ weapon’s two skills the same way (Potential on its second)', () => {
+    const w3 = { skills: weapon.skills.slice(0, 2) };
+    const three = tuningOf(tuningFile, 'wpn_three')!;
+    expect(essenceMax(w3)).toEqual([6, 3]);
+    expect(weaponBounds(w3, 0, three, 4)).toEqual([[5, 9], [1, 4]]);
+    expect(weaponBounds(w3, 2, three, 0)).toEqual([[1, 3], [3, 6]]);
+  });
+
+  it('counts weapon skills and base ATK at the tuning stage', () => {
+    const w = { ...weapon, stats: { levels: [1, 20, 40, 60, 80, 90], baseAtk: [50, 100, 200, 300, 400, 495] } };
+    const b = operatorBonuses(op, { loadout: { weapon: 'w' }, weapon: { w, potential: 0, tuning: six, stage: 1, level: tuningMaxLevel(six, 1), ranks: [9, 9, 9] } });
+    expect(b.get('ATK')?.flat).toBe(200);
+    // Rank 5 and 4: the caps tuned once.
+    expect(b.get('Intellect')?.flat).toBe(84);
+    expect(b.get('Treatment Efficiency')?.pct).toBe(4);
   });
 
   it('reads stat bonuses out of talent and Potential text', () => {

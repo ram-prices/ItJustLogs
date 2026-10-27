@@ -47,10 +47,11 @@ conversation.
 
 ## State (2026-10-27)
 
-- Live: the "Pull history label, shared tooltips, Home full art, 6★ weapon smoke" commit
-  (2026-10-27; its sha is in the pending-work memory).
+- Live: the "Weapon tuning and essence levels" commit (2026-10-27; sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: "Your pulls" → "Pull history" (Database and Home tooltip); one shared tooltip
+- Recently shipped: weapon tuning (0–4) and per-skill essence levels on the weapon page, Loadout and
+  builds (ef-assets `combat/weapon-tuning.json`), fixing weapon Potential counted twice in the sim;
+  "Your pulls" → "Pull history" (Database and Home tooltip); one shared tooltip
   and right-click menu style (`data-tip`, `tip`/`tipNote`/`tipRow`, `.tooltip`/`.ctx-menu` in
   `components.css`, tap opens tips on phones); Home character cards' "Full art" as the full
   operator art (ef-assets `operators/full/`) zoomed to each face (`FULL_ART_FACE`); Database

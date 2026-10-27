@@ -105,12 +105,18 @@ export interface Settings {
    */
   extras?: ExtraCopy[];
   /**
-   * Each weapon's skill ranks as the player built them (their essence), set
-   * on the weapon's page. A weapon not listed has no essence (3, 3 and
-   * 1 + Potential, see weaponBaseRanks), unless it's in `maxEssence`.
+   * Saves from before essence levels: each weapon's skill ranks as the player built them, counted fully tuned.
+   * Read as essence levels (rank less the lowest, see essenceFromRanks) until `weaponEssence` has the weapon.
    */
   weaponRanks?: Record<string, number[]>;
-  /** Weapons the player marked Maxed Essence: every skill at the highest rank it can reach (9; 4 + Potential for the last). */
+  /**
+   * Each weapon's essence: the levels it adds to each skill (0–6 on the stat skills, 0–3 on the weapon's own), set
+   * in loadouts or on the weapon's page. A weapon not listed has none, unless it's in `maxEssence`.
+   */
+  weaponEssence?: Record<string, number[]>;
+  /** Each weapon's tuning stage (0–4), when not fully tuned (4). */
+  weaponTuning?: Record<string, number>;
+  /** Weapons the player marked Maxed Essence: every skill at the highest level it can reach (6/6/3 essence levels). */
   maxEssence?: string[];
   /** Operator art the player removed (keys), so sync removes it on their other devices and in Drive too. */
   deletedArt?: string[];

@@ -134,6 +134,87 @@
 .slot-icon.kit {
   mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/kit.png);
 }
+/* A weapon skill's rank as the game's notches (`skillNotches`): slanted pills that overlap a little, the weapon's
+   own white, the essence's #FFF100 (the game's ProgressGem), still reachable dim, out of reach an outline crossed by
+   a slash. Masks of the game's white sprites, tinted here. */
+.skill-notches {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  vertical-align: middle;
+  --notch-own: var(--gray-1000);
+  --notch-gem: #fff100;
+  --notch-open: var(--gray-alpha-400);
+  --notch-shut: var(--gray-alpha-400);
+}
+:root[data-theme='light'] .skill-notches {
+  --notch-gem: #d9b800;
+}
+.notch {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  margin-right: -3px;
+  background: var(--notch-open);
+  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/weapon-skill/notch.png) center / contain no-repeat;
+}
+.notch:last-child {
+  margin-right: 0;
+}
+.notch.own {
+  background: var(--notch-own);
+}
+.notch.gem {
+  background: var(--notch-gem);
+}
+.notch.shut {
+  background: none;
+  mask: none;
+}
+.notch.shut::before,
+.notch.shut::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--notch-shut);
+  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/weapon-skill/notch-outline.png) center / contain no-repeat;
+}
+.notch.shut::after {
+  inset: 1px;
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/weapon-skill/notch-slash.png);
+}
+/* The essence's own grooves (`essenceNotches`): buttons, a little larger to hit. */
+.essence-notches .notch {
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.essence-notches .notch.open {
+  background: var(--gray-alpha-500);
+}
+.essence-notches .notch.open:hover {
+  background: var(--gray-alpha-600);
+}
+.essence-notches .notch:focus-visible {
+  outline: 2px solid var(--focus);
+}
+/* The weapon page's Skills: the ranks' notches by each name. */
+.wiki-acc .skill-notches {
+  margin-left: auto;
+  padding-left: 12px;
+}
+/* The same size as Essence's beside them. */
+.wiki-acc .skill-notches .notch {
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+}
+.wiki-acc .skill-notches .notch:last-child {
+  margin-right: 0;
+}
 .loadout-label .slot-icon {
   width: 14px;
   height: 14px;

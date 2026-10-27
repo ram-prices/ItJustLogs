@@ -1,4 +1,4 @@
-import { artificeOf, artificeState, artificeTops, GEAR_SLOTS, type Loadout } from '../../../domain/loadout';
+import { artificeOf, artificeState, artificeTops, GEAR_SLOTS, TUNING_MAX, tuningOf, weaponBaseRanks, weaponBounds, weaponRankCaps, weaponSkillLevels, type Loadout } from '../../../domain/loadout';
 import { statArtifice } from '../../../domain/sim/build';
 import { CHECKED, enemyById, FOODS, type SimBuild, type SimMember } from '../../../domain/sim/team';
 import { wikiId } from '../../../domain/wiki';
@@ -7,7 +7,7 @@ import { cachedBannerDb } from '../../../store';
 import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, iconOf, itemImg, slotIcon } from '../../components';
 import { html, type Html } from '../../html';
 import { infoHref, ownedOf } from '../info';
-import { gearStats, weaponRanksFor } from '../loadout';
+import { gearStats, tuningFile, weaponBuildOf } from '../loadout';
 import { type CombatIndex, page, settings, type Wiki } from './state';
 
 /** The page's fields. True if it was one of theirs. */
@@ -66,7 +66,12 @@ export function buildOf(m: SimMember, wiki: Wiki, index: CombatIndex): { build: 
     const w = wiki.weapons[l.weapon];
     const mine = ownedOf(a, 'weap')?.get(l.weapon);
     const wp = m.weaponPotential ?? (mine?.copies ? mine.potential : 0);
-    weapon = { id: l.weapon, potential: wp, skillLevels: w ? weaponRanksFor(l.weapon, w, wp) : undefined };
+    const b = w ? weaponBuildOf(l.weapon, w, wp) : undefined;
+    // The sim adds Potential to the levels itself: they go as at P0 (the same essence at the same stage). Maxed and fully
+    // tuned: unset (each at its cap).
+    weapon = { id: l.weapon, potential: wp };
+    if (b && !(b.maxed && b.stage === TUNING_MAX)) weapon.skillLevels = weaponSkillLevels(weaponBounds(w!, 0, b.tuning, b.stage), b.essence);
+    if (b && b.stage < TUNING_MAX) Object.assign(weapon, { tuning: b.stage, level: b.level });
   }
   const gear = GEAR_SLOTS.flatMap(({ slot }) => {
     const id = l[slot];
@@ -178,7 +183,7 @@ function weaponLine(weapon: NonNullable<SimBuild['weapon']>, wiki: Wiki, edit?: 
     // While a parsed run is edited: Potential, level and each skill's rank as fields in place, then the icon.
     const caps = essenceCaps(b);
     const ranks = skillRanks(b);
-    const maxed = !weapon.skillLevels?.some((x) => x !== null && x !== undefined);
+    const maxed = isMaxed(b);
     return html`<div class="sim-piece sim-weapon-line">${mark}<a class="sim-weapon-name min0 ellipsis" href="${infoHref('weap', weapon.id)}" title="${w?.name ?? weapon.id}’s page">${w?.name ?? weapon.id}</a><span class="sim-weapon-end secondary num">P${inl(edit, 'wpotential', weapon.potential, 0, 5, 'Weapon Potential')} Lv ${inl(edit, 'wlevel', weapon.level ?? 90, 1, 90, 'Weapon level')}
       <span>${caps.map((cap, k) => html`${k ? '/' : ''}${inl(edit, `rank${k}`, ranks[k], 1, cap + (k === caps.length - 1 ? (weapon.potential ?? 0) : 0), `Skill ${k + 1} rank`)}`)}</span>${noEssence(b) ? '' : html`<span class="${maxed ? 'essence-max' : 'essence-off'}">${essenceIcon()}</span>`}</span></div>`;
   }
@@ -187,10 +192,13 @@ function weaponLine(weapon: NonNullable<SimBuild['weapon']>, wiki: Wiki, edit?: 
   const ranks = skillRanks(b).join('/');
   const essence = noEssence(b)
     ? html`<span class="sim-weapon-ranks secondary num" title="Skill ranks">${ranks}</span>`
-    : !weapon.skillLevels?.some((x) => x !== null && x !== undefined)
+    : isMaxed(b) && (weapon.tuning ?? TUNING_MAX) === TUNING_MAX
       ? html`<span class="essence-max">${essenceIcon()}</span>`
-      : html`<span class="sim-weapon-ranks secondary num" title="Skill ranks">${ranks}</span><span class="essence-off">${essenceIcon(`Not maxed: skill ranks ${ranks}`)}</span>`;
-  const level = weapon.level && weapon.level !== 90 ? html`<span class="sim-weapon-ranks secondary num">Lv ${weapon.level}</span>` : '';
+      : html`<span class="sim-weapon-ranks secondary num" title="Skill ranks">${ranks}</span><span class="${isMaxed(b) ? 'essence-max' : 'essence-off'}">${essenceIcon(isMaxed(b) ? 'Maxed Essence' : `Not maxed: skill ranks ${ranks}`)}</span>`;
+  const level = [
+    weapon.tuning !== undefined && weapon.tuning < TUNING_MAX ? `Tuning ${weapon.tuning}` : '',
+    weapon.level && weapon.level !== 90 ? `Lv ${weapon.level}` : '',
+  ].filter(Boolean).map((t) => html`<span class="sim-weapon-ranks secondary num">${t}</span>`);
   return html`<div class="sim-piece sim-weapon-line">${mark}<a class="sim-weapon-name min0 ellipsis" href="${infoHref('weap', weapon.id)}" title="${w?.name ?? weapon.id}’s page">${w?.name ?? weapon.id}</a><span class="sim-weapon-end">${level}${essence}</span></div>`;
 }
 
@@ -244,21 +252,33 @@ export function foodPicker(value: string | undefined, allowed: boolean, attrs: H
 }
 
 /**
- * A weapon's skill level caps before Potential (the game data's: 9/9/4 for a three-skill weapon, 9/4 for a two-skill
- * one; an essence rank is the level less one, so 0–8/0–8/0–3) and each skill's rank in the sim: its level (the cap unless
- * set) plus, on the last skill, the weapon's Potential (+1 a level, as every weapon's potentialLevels has it).
+ * A weapon's skill level caps before Potential at its tuning stage (combat/weapon-tuning.json: 9/9/4 fully tuned for a
+ * three-skill weapon, 9/4 for a two-skill one) and each skill's rank in the sim: its level (the cap unless set) plus,
+ * on the last skill, the weapon's Potential (+1 a level, as every weapon's potentialLevels has it).
  */
 function essenceCaps(b: SimBuild): number[] {
-  const n = (b.weapon && page.wikiNow?.weapons[b.weapon.id]?.skills.length) || 3;
-  return n === 2 ? [9, 4] : [9, 9, 4];
+  const w = b.weapon && page.wikiNow?.weapons[b.weapon.id];
+  if (!w) return [9, 9, 4];
+  return weaponRankCaps(w, 0, tuningOf(tuningFile(), b.weapon!.id), b.weapon!.tuning);
 }
+/** Every skill at its cap (unset, or set there): Maxed Essence. */
+const isMaxed = (b: SimBuild): boolean => !b.weapon?.skillLevels || essenceCaps(b).every((c, k) => (b.weapon!.skillLevels![k] ?? c) >= c);
 function skillRanks(b: SimBuild): number[] {
   const caps = essenceCaps(b);
   return caps.map((cap, k) => (b.weapon?.skillLevels?.[k] ?? cap) + (k === caps.length - 1 ? (b.weapon?.potential ?? 0) : 0));
 }
 
-/** A weapon with no essence etched: each skill at level 1 (its Potential still adds to them, in build.ts). */
-const noEssence = (b: SimBuild): boolean => !!b.weapon?.skillLevels && b.weapon.skillLevels.length === 3 && b.weapon.skillLevels.every((x) => x === 1);
+/**
+ * A weapon with no essence etched: each skill at its lowest at its tuning stage, or (runs from before tuning) at level 1
+ * (its Potential still adds to them, in build.ts).
+ */
+function noEssence(b: SimBuild): boolean {
+  const l = b.weapon?.skillLevels;
+  if (!l) return false;
+  if (l.length === 3 && l.every((x) => x === 1)) return true;
+  const w = page.wikiNow?.weapons[b.weapon!.id];
+  return !!w && weaponBaseRanks(w, 0, tuningOf(tuningFile(), b.weapon!.id), b.weapon!.tuning).every((x, k) => l[k] === x);
+}
 
 /** A build's weapon and gear, as lines. */
 export function buildLines(b: SimBuild, wiki: Wiki, edit?: number): Html {

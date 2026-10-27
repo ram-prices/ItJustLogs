@@ -8,7 +8,6 @@ import { credit, infoHref, ownedOf, wikiFile } from './info';
 import { searchBox } from './search';
 import { subTabs } from './collections';
 import { isMaxEssence } from './loadout';
-import { weaponRankCaps } from '../../domain/loadout';
 
 /**
  * Essences: the player's essences (read from the game: ui/essenceReader.ts)
@@ -106,7 +105,7 @@ export function essencesPage(redraw: () => void): Html {
   // Weapons marked Maxed Essence already have their perfect essence: they're left out of both views.
   const weapons = Object.entries(file.data.weapons)
     .map(([id, w]) => ({ id, w, wants: wantsOf(w), mine: owned?.get(id)?.copies ? owned.get(id)! : null }))
-    .filter((x) => x.wants.length >= 2 && !isMaxEssence(x.id, weaponRankCaps(x.w, x.mine ? x.mine.potential : null)));
+    .filter((x) => x.wants.length >= 2 && !isMaxEssence(x.id, x.w, x.mine ? x.mine.potential : null));
   // Start from the weapons the player owns, if they own any (story extras alone own no weapons).
   const ownsSome = weapons.some((x) => x.mine);
   const shownWeapons = ownsSome ? (weaponsShown ?? 'owned') : 'all';

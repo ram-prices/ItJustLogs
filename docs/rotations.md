@@ -17,6 +17,10 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   that teaches button order. Four operators in team position order (position
   01 matters: e.g. Si's ultimate cuts its combo cooldown), each from their
   loadout and copies ("My loadouts") or with weapon and gear the sim picks
+  (a loadout's weapon: `skillLevels` as at P0 from its tuning and essence, `weaponBuildOf` then `weaponBounds(w, 0, …)`,
+  since `build.ts` adds the Potential; before 2026-10-27 loadout builds sent ranks with the Potential in them, so the
+  own skill got it twice: Xaihi's P3 Chivalric Virtues counted at 7 instead of 4, Yvonne/Tangtang/Xaihi/Arcane on
+  Alleikhreos Quick went 1:07.9 → 1:20.0; `tuning` and the stage's `level` ride along below 4)
   ("Optimal gear", `domain/sim/gearSearch.ts`: Maxed Essence, every stat at top Artifice,
   chosen by fights; weapons tried again on the second pass with the gear found; gear.json names a piece's slot
   "Body"/"Hand"/"EDC", `partOf`; a third start gives each operator their signature weapon, the Arsenal Issue that ran
@@ -230,7 +234,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   damage, Duration, Actions, Controlled and Not attributed as laid-out figures; then the loadouts' boxes, from the
   run's own reading, each with its operator's share (the percentage by the name, a bar under the breakdown's Total) and its damage
   by source with a Total pinned to the box's bottom; a loadout's weapon is a line like its gear's (`weaponLine`: its
-  picture, its name in the text's colour, at the right its level when not 90 and the essence icon: green when maxed,
+  picture, its name in the text's colour, at the right "Tuning n" below 4, its level when not 90 and the essence icon: green when maxed,
   dim with the skill ranks before it otherwise, none with no essence; its picture centred on the gear marks' column,
   its name a link to its Database page), every gear line's own Artifice node at the right edge (empty, half, full),
   the line a `<details>` that opens to its three stats with their marks and "+base » +artificed" (`gearLine`, its open
@@ -480,7 +484,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   CharGrowthTable's passive skill nodes, filtered in `equip`; a level with none, such as Xaihi's talent_2_2, is never
   given; `promotionOf`: the lowest stage whose level and skill-rank caps hold them, CharBreakStageTable; a level at a cap, 80, takes the lower stage). A
   parsed run keeps the loadouts it ran with in its request; while it's edited each box has fields for them plus
-  Potential, each gear stat's Artifice (0–3; `art<piece>:<stat>`, saved as a list) and each weapon skill's rank (its level, the data's caps 9/9/4, plus
+  Potential, each gear stat's Artifice (0–3; `art<piece>:<stat>`, saved as a list) and each weapon skill's rank (its level, the data's caps at its tuning, 9/9/4 fully tuned, plus
   the weapon's Potential on the last: `essenceCaps`, `skillRanks`) (`levelsEdit` in the top row, where the name gives way; `weaponLine`; `editBuild`),
   portraits square in the boxes, a box's food as a sixth line under its gear (`foodLine`: item icon and name, a choice in
   place while edited; only where the stage allows food),

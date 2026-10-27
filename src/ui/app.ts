@@ -27,7 +27,7 @@ import { applyListSearch, installListSearch, refocusListSearch } from './pages/s
 import { openSortPopup } from './pages/sorting';
 import { achievementsPage, archivesPage, collectionAction, collectionChange, readFindingsFrom, readMedalsFrom } from './pages/collections';
 import { eventOf, eventPage } from './pages/event';
-import { pickLoadoutSlot, setArtifice, setMaxEssence, setWeaponRank, toggleBonusSplit } from './pages/loadout';
+import { pickEssenceNotch, pickLoadoutSlot, pickTuning, setArtifice, setMaxEssence, toggleBonusSplit } from './pages/loadout';
 import { weaponInfoPage, weaponInfoTitle } from './pages/weapon';
 import { forgetSavedAvatars, getDataSteps, setConfirmingDelete, settingsPage } from './pages/settings';
 import { statsPage, togglePatch } from './pages/stats';
@@ -770,12 +770,15 @@ function installProfile(): void {
     if (el.dataset?.extraId) editExtra(Number(el.dataset.extraId), { id: el.value });
     // Loadout: one gear stat's Artifice level.
     if (el.dataset?.artificeOp) setArtifice(el.dataset.artificeOp, el.dataset.artificeSlot!, Number(el.dataset.artificeStat), Number(el.value));
-    // A weapon's page without Maxed Essence: its skill sliders are the player's ranks.
-    if (el.dataset?.saveWpn) setWeaponRank(el.dataset.saveWpn, Number(el.dataset.saveIndex), Number(el.value), (el.dataset.saveBase ?? '').split(',').map(Number));
   });
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLInputElement;
     if (e.key === 'Enter' && (el.dataset?.setting === 'displayName' || el.dataset?.extraNote || el.dataset?.extraCopies)) el.blur();
+    // A weapon page's tuning rows are buttons.
+    if ((e.key === 'Enter' || e.key === ' ') && el.dataset?.action === 'weapon-tuning') {
+      e.preventDefault();
+      el.click();
+    }
   });
 }
 
@@ -941,7 +944,13 @@ async function onClick(e: MouseEvent): Promise<void> {
       draw();
       break;
     case 'weapon-essence':
-      setMaxEssence(el.dataset.wpn!, el.getAttribute('aria-pressed') !== 'true', (el.dataset.caps ?? '').split(',').filter(Boolean).map(Number));
+      setMaxEssence(el.dataset.wpn!, el.getAttribute('aria-pressed') !== 'true');
+      break;
+    case 'essence-notch':
+      pickEssenceNotch(el.dataset.wpn!, Number(el.dataset.skill), Number(el.dataset.value));
+      break;
+    case 'weapon-tuning':
+      pickTuning(el.dataset.wpn!, Number(el.dataset.value));
       break;
     case 'attr-split':
       toggleBonusSplit();
