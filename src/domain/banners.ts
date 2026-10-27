@@ -104,10 +104,12 @@ export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${
  * Headhunting pools with art laid out from the game's own banner screen
  * (ef-assets banners/game/, made by its operator-banner.py). Add a pool here
  * once its file is there; the others keep their operator close-up.
+ * special_1_4_1 (Arcane) is left out: its file draws her about a third too
+ * wide (a stretched layer in operator-banner.py) until it's rebuilt.
  */
 const GAME_ART = new Set([
   'special_1_0_1', 'special_1_0_2', 'special_1_0_3', 'special_1_1_1', 'special_1_1_2', 'special_1_2_1',
-  'special_1_3_1', 'special_1_3_2', 'special_1_4_1', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1',
+  'special_1_3_1', 'special_1_3_2', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1',
   'rerun_chr_tangtang', 'rerun_chr_yvonne',
 ]);
 

@@ -78,3 +78,6 @@ conversation.
 8. The "SP at the start" field cap of 300: unverified whether it was fixed.
 9. Heat and Electric element icons have no backup mirror, so they sometimes load empty.
 10. Owner checks: parsed-run Drive sync on two devices; the first ef-assets schedule pull request.
+11. Arcane's game-screen banner (ef-assets banners/game/special_1_4_1.webp) draws her about 1.33x
+   too wide: `operator-banner.py` grows a stretch-anchored layer with its wider-than-16:9 screen.
+   The site uses her older banner art meanwhile (`GAME_ART` in banners.ts). Needs the game dump.
