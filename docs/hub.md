@@ -48,9 +48,10 @@ conversation.
 
 ## State (2026-10-28)
 
-- Live: the "Schedule snapshot with event sources" commit (sha in the pending-work memory).
+- Live: the "Drive sync: tokens from the Android app" commit (sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: schedule snapshot refresh with `ScheduleEvent.source` (Sanctuary of Ink dates
+- Recently shipped: Drive tokens from the Android app (`window.IJLAndroid`, `drive.ts`, `ui/sync.ts`);
+  schedule snapshot refresh with `ScheduleEvent.source` (Sanctuary of Ink dates
   via ef-assets `schedule-overrides.json`); built-site fix for the operator banner fade (`border-image-source: none`);
   operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on
   the operator page; banner art Custom/Auto and tall header for every banner art; art only as the

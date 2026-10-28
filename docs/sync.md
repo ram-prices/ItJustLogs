@@ -86,3 +86,13 @@ Read when touching `src/drive.ts`, `ui/sync.ts`, snapshots, operator art or the 
     in); Clients → Create client → Web application, Authorized JavaScript
     origins `https://itjustlogs.dev` and `http://localhost:5173` (no redirect
     URIs needed). Copy the client ID into `.env.local` and the repo variable.
+  - Android app (`C:\Users\Albert\Development\ItJustLogs Wrapper`, id
+    `dev.itjustlogs.web`): the site in a WebView, where Google refuses its
+    sign-in. The app signs in natively (`AuthorizationClient`, same scope)
+    and its bridge script defines `window.IJLAndroid` on the site's origin
+    only. When it exists, `drive.ts` takes tokens from it (`requestToken`,
+    `silentToken`), sign-out and refused (401) tokens go back to it, and the
+    GIS script is never loaded; sync needs no client ID or click there
+    (`refreshesSilently`). Everything else in sync is the same. Tested by
+    `src/drive.android.test.ts`. Google Cloud: an Android client for package
+    `dev.itjustlogs.web` + the signing SHA-1.

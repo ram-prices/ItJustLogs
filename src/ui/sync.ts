@@ -29,7 +29,7 @@ import { buildBackup, type Backup } from './io';
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'reconnect' | 'paused' | 'error';
 
 let meta = loadSyncMeta();
-let status: SyncStatus = !meta.on ? 'off' : drive.currentToken() ? 'idle' : 'reconnect';
+let status: SyncStatus = !meta.on ? 'off' : drive.currentToken() || drive.refreshesSilently() ? 'idle' : 'reconnect';
 let errorText = '';
 
 const listeners = new Set<() => void>();
@@ -357,6 +357,7 @@ async function runSync(interactive: boolean): Promise<void> {
   running = (async () => {
     try {
       let token = drive.currentToken();
+      if (!token && !interactive) token = await drive.silentToken(meta.email);
       if (!token) {
         if (!interactive) return setStatus('reconnect');
         token = await drive.requestToken({ email: meta.email });
@@ -425,7 +426,7 @@ export async function signIn(): Promise<void> {
 export const syncIsOn = (): boolean => meta.on;
 
 export function signOut(quiet = false): void {
-  drive.revoke();
+  drive.revoke(meta.email);
   clearTimeout(timer);
   queued = false;
   meta = { on: false, changed: meta.changed };
@@ -435,7 +436,7 @@ export function signOut(quiet = false): void {
 }
 
 /** Loads Google's sign-in script ahead of a click, so the sign-in window opens straight from it. */
-export const preloadSync = (): void => void drive.loadGis().catch(() => undefined);
+export const preloadSync = (): void => void (drive.refreshesSilently() || drive.loadGis().catch(() => undefined));
 
 /** Wires sync into the app. Does nothing (and never contacts Google) unless the site has a client ID and the player turns it on. */
 export function installSync(): void {
@@ -444,7 +445,7 @@ export function installSync(): void {
     if (applying) return;
     if (c === 'everything') {
       // Delete everything also signs this browser out; the Drive copy stays.
-      drive.revoke();
+      drive.revoke(meta.email);
       clearTimeout(timer);
       queued = false;
       meta = loadSyncMeta();
@@ -467,11 +468,11 @@ export function installSync(): void {
   });
   // Coming back to the tab: pick up what other devices synced meanwhile.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || !meta.on || meta.paused || !drive.currentToken()) return;
+    if (document.visibilityState !== 'visible' || !meta.on || meta.paused || !(drive.currentToken() || drive.refreshesSilently())) return;
     if (Date.now() - (meta.lastSynced ?? 0) > 60_000) schedule(0);
   });
   if (!meta.on) return;
   preloadSync();
   if (meta.paused) setStatus('paused');
-  else if (drive.currentToken()) schedule(0);
+  else if (drive.currentToken() || drive.refreshesSilently()) schedule(0);
 }

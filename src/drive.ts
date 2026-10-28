@@ -9,11 +9,15 @@
  * needs one click (Sync now or Sign in) to get a new one; Google skips the
  * consent screen after the first time. The token is kept in sessionStorage
  * so a reload doesn't need another click, and never in localStorage.
+ *
+ * In the Android app (a WebView, where Google refuses its sign-in) the app
+ * signs in natively and hands tokens over through `window.IJLAndroid`, also
+ * without a click once the player agreed; the rest is the same.
  */
 
 export const CLIENT_ID: string = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 /** Sync is only offered when the site was built with an OAuth client ID (and on https or localhost: it needs Web Crypto). */
-export const driveConfigured = (): boolean => !!CLIENT_ID && isSecureContext;
+export const driveConfigured = (): boolean => (!!CLIENT_ID || !!android()) && isSecureContext;
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE_NAME = 'itjustlogs-backup.json';
@@ -46,11 +50,21 @@ interface Gis {
     };
   };
 }
+/** The Android app's bridge (its bridge.js). Errors are already in words. */
+export interface AndroidBridge {
+  getDriveToken(opts: { interactive: boolean; email?: string }): Promise<{ access_token: string; expires_in: number }>;
+  clearDriveToken(token: string): void;
+  signOut(email?: string): void;
+}
 declare global {
   interface Window {
     google?: Gis;
+    IJLAndroid?: AndroidBridge;
   }
 }
+const android = (): AndroidBridge | undefined => (typeof window === 'undefined' ? undefined : window.IJLAndroid);
+/** The Android app gets tokens without a click, so sync can reconnect by itself. */
+export const refreshesSilently = (): boolean => !!android();
 
 let gisPromise: Promise<Gis> | null = null;
 
@@ -90,13 +104,7 @@ function tokenClient(gis: Gis): TokenClient {
       if (r.error || !r.access_token) return settle((p) => p.reject(new DriveAuthError(r.error_description || r.error || 'Sign-in failed.')));
       if (!gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE))
         return settle((p) => p.reject(new DriveAuthError('Allow ItJustLogs to use its own app data in Google Drive, or sync can\'t work.')));
-      const expires = Date.now() + (Number(r.expires_in) || 3600) * 1000 - 60_000;
-      try {
-        sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token: r.access_token, expires }));
-      } catch {
-        /* keep it in memory only */
-      }
-      memToken = { token: r.access_token, expires };
+      keep(r.access_token, r.expires_in);
       settle((p) => p.resolve(r.access_token!));
     },
     error_callback: (e) =>
@@ -113,6 +121,33 @@ function tokenClient(gis: Gis): TokenClient {
       ),
   });
   return client;
+}
+
+function keep(token: string, expiresIn: number | string | undefined): void {
+  const expires = Date.now() + (Number(expiresIn) || 3600) * 1000 - 60_000;
+  try {
+    sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token, expires }));
+  } catch {
+    /* keep it in memory only */
+  }
+  memToken = { token, expires };
+}
+
+async function androidToken(bridge: AndroidBridge, interactive: boolean, email?: string): Promise<string> {
+  let r;
+  try {
+    r = await bridge.getDriveToken({ interactive, email });
+  } catch (e) {
+    throw new DriveAuthError((e as Error).message || 'Sign-in failed.');
+  }
+  keep(r.access_token, r.expires_in);
+  return r.access_token;
+}
+
+/** Android app only: a token without any screen, if the player already agreed. Null elsewhere or when it can't. */
+export async function silentToken(email?: string): Promise<string | null> {
+  const bridge = android();
+  return bridge ? androidToken(bridge, false, email).catch(() => null) : null;
 }
 
 /** A still-valid token from this tab, if any. */
@@ -142,6 +177,8 @@ export function forgetToken(): void {
  * otherwise `email` is preselected and the window closes by itself.
  */
 export async function requestToken(opts: { chooseAccount?: boolean; email?: string } = {}): Promise<string> {
+  const bridge = android();
+  if (bridge) return androidToken(bridge, true, opts.chooseAccount ? undefined : opts.email);
   const c = tokenClient(window.google?.accounts?.oauth2 ? window.google : await loadGis());
   settle((p) => p.reject(new DriveAuthError('Sign-in was cancelled.')));
   return new Promise<string>((resolve, reject) => {
@@ -151,10 +188,12 @@ export async function requestToken(opts: { chooseAccount?: boolean; email?: stri
 }
 
 /** Signs out: withdraws ItJustLogs' access to Drive. The Drive copy stays. */
-export function revoke(): void {
+export function revoke(email?: string): void {
   const t = currentToken();
   forgetToken();
-  if (t && window.google) window.google.accounts.oauth2.revoke(t);
+  const bridge = android();
+  if (bridge) bridge.signOut(email);
+  else if (t && window.google) window.google.accounts.oauth2.revoke(t);
 }
 
 // --- Drive REST ------------------------------------------------------------
@@ -175,6 +214,7 @@ async function call(token: string, url: string, init: RequestInit = {}): Promise
   if (res.ok) return res;
   if (res.status === 401) {
     forgetToken();
+    android()?.clearDriveToken(token);
     throw new DriveAuthError('Your Google sign-in expired.');
   }
   if (res.status === 404) throw new DriveNotFound('Not found in Google Drive.');
