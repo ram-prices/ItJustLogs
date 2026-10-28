@@ -48,10 +48,10 @@ conversation.
 
 ## State (2026-10-27)
 
-- Live: the "Operator banner layers, Arsenal Skills, Loadout weapon slot, backups with runs" commit
-  (sha in the pending-work memory).
+- Live: the "Pull history: Copies, Potential and saved art boxes" commit (sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: full backups with saved runs (`Backup.sims`, `restoreSims`); Arcane back in
+- Recently shipped: Pull history on operator and weapon pages as three equal boxes (Copies,
+  Potential, saved art); full backups with saved runs (`Backup.sims`, `restoreSims`); Arcane back in
   `GAME_ART`; operator banner parallax (ef-assets `banners/game/layers/`) and the pinned operator
   hero with per-Potential face anchors; the Arsenal page's single Skills section (`grooveSlots`);
   the Loadout weapon slot with the skill 3 summary (ef-assets `wiki/weapon-summaries.json`); weapon tuning (0–4) and per-skill essence levels on the weapon page, Loadout and

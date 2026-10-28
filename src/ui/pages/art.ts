@@ -115,6 +115,33 @@ export function shuffleArt(opId: string, redraw: () => void): void {
 }
 
 /**
+ * The player's art for this operator, in Pull history (info.ts ownedSection):
+ * each picture with where it shows; any of them, or the button, opens the art
+ * dialog to add, place or remove pictures.
+ */
+export function artBox(opId: string, name: string, redraw: () => void): Html {
+  const all = artOf(opId, redraw);
+  const where = (id: string) =>
+    ART_PLACES.filter(({ place }) => placesOf(id).includes(place))
+      .map(({ label }) => label)
+      .join(' · ') || 'Not shown';
+  return html`<div class="card wiki-art-box">
+    <div class="metric-label"><span>Art</span>${all.length ? html`<span class="label-13 secondary">${all.length}</span>` : ''}</div>
+    ${all.length
+      ? html`<div class="wiki-art-list">
+          ${all.map(
+            (a) => html`<button type="button" class="wiki-art-item" data-action="art-manage" data-op="${opId}" data-name="${name}" title="Edit ${name}'s art">
+              <img src="${a.src}" alt="" decoding="async" />
+              <span class="copy-13 secondary">${where(a.id)}</span>
+            </button>`,
+          )}
+        </div>`
+      : html`<p class="copy-13 secondary">No art saved for ${name} yet.</p>`}
+    <button type="button" class="btn secondary sm" data-action="art-manage" data-op="${opId}" data-name="${name}">${icon('image')}${all.length ? 'Edit art' : 'Add art'}</button>
+  </div>`;
+}
+
+/**
  * The Gallery: the operator's slideshow pictures, crossfading every few
  * seconds (paused while hovered), with back and next buttons.
  */

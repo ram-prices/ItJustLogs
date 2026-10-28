@@ -4,7 +4,7 @@ import { state } from '../../state';
 import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } from '../../domain/skillmods';
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
-import { canShuffle, currentArt, gallerySection, positionOf } from './art';
+import { artBox, canShuffle, currentArt, gallerySection, positionOf } from './art';
 import { heroPotentialArt, potentialArtButton, potentialArtUrl } from './potentialArt';
 import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
@@ -526,7 +526,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
   return html`${backdrop ? html`<img class="op-backdrop" src="${backdrop.src}" alt="" decoding="async" />` : ''}
     ${hero(id, o, owned?.copies ? owned.potential : -1, redraw, !!backdrop)}
     <main class="container fade-in wiki-page${backdrop ? ' has-backdrop' : ''}">
-      ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined)}
+      ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined, artBox(id, o.name, redraw))}
       <div class="wiki-cols even">
         <div class="wiki-col">${statsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
         <div class="wiki-col">${loadoutSection(id, a, redraw, o.weapon, (label) => attributeTotal(o, bonuses, label))}</div>

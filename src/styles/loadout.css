@@ -649,20 +649,125 @@ a.six-item {
   align-items: center;
   gap: 8px;
 }
-/* Pull history: the copies, and beside them what each Potential does (info.ts ownedSection). */
+/* Pull history (info.ts ownedSection), with Potentials: Copies with the
+   copies listed under the count, the Potential with what each one does, and
+   the player's art for the page (art.ts artBox), side by side and equally
+   tall. 900–1200px: the art goes under the other two. Narrower: stacked. */
 .wiki-owned-body.with-pots {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
   gap: 16px;
-  align-items: start;
-  margin-top: 16px;
 }
-.wiki-owned-body.with-pots .wiki-pulls {
+.wiki-owned-body.with-pots.with-art {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr);
+}
+.wiki-owned-body.with-pots .metrics {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Each box is two parts read as one: the summary on top, its list under it. */
+.wiki-owned-box {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wiki-owned-box > .metrics {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.wiki-owned-box > .metrics .metric {
+  border: 0;
+}
+.wiki-owned-box > .metrics + .card {
+  flex: 1;
   margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.wiki-owned-box > .card:only-child {
+  flex: 1;
+}
+/* Copies and its copies list: one box in two parts. The list fills the box
+   and scrolls inside it, so a long history doesn't stretch the row. */
+.wiki-owned-pulls {
+  position: relative;
+  flex: 1;
+  min-height: 200px;
+}
+.wiki-owned-pulls > .wiki-pulls {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  max-height: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+@media (min-width: 901px) {
+  .wiki-owned-copies .wiki-pull {
+    grid-template-columns: 96px minmax(0, 1fr) auto auto 28px;
+    gap: 12px;
+    padding-inline: 16px;
+  }
+}
+/* The player's art (art.ts artBox): each picture with where it shows. */
+.wiki-art-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+.wiki-art-box > .btn {
+  align-self: flex-start;
+  margin-top: auto;
+}
+.wiki-art-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.wiki-art-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.wiki-art-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-border);
+  background: var(--gray-alpha-200);
+}
+.wiki-art-item:hover img {
+  box-shadow: var(--shadow-border), 0 0 0 2px var(--gray-alpha-400);
+}
+@media (max-width: 1200px) {
+  .wiki-owned-body.with-pots.with-art {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+  .wiki-owned-art {
+    grid-column: 1 / -1;
+  }
 }
 @media (max-width: 900px) {
-  .wiki-owned-body.with-pots {
+  .wiki-owned-body.with-pots,
+  .wiki-owned-body.with-pots.with-art {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .wiki-owned-pulls {
+    min-height: 0;
+  }
+  .wiki-owned-pulls > .wiki-pulls {
+    position: static;
+    max-height: 360px;
   }
 }
 .wiki-owned-empty {
@@ -770,17 +875,6 @@ a.six-item {
   }
   .wiki-pull-at {
     display: none;
-  }
-}
-.wiki-date {
-  font-size: 20px;
-  letter-spacing: -0.4px;
-  white-space: nowrap;
-}
-@media (max-width: 640px) {
-  .wiki-date {
-    font-size: 16px;
-    letter-spacing: -0.32px;
   }
 }
 /* Each copy's Potential step. The one that maxed it is gold; later ones are

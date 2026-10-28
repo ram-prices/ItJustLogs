@@ -1,5 +1,5 @@
 import type { Analysis } from '../../domain/analyze';
-import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type ExtraCopy, type Owned } from '../../domain/owned';
+import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type ExtraCopy, type Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
 import { canonicalPoolId } from '../../domain/banners';
 import { scheduleLinks, type Schedule } from '../../domain/schedule';
@@ -421,7 +421,7 @@ const OUTCOME: Record<string, Html> = {
  * each copy came from. `a` null = no import yet.
  */
 /** The player's copies of an item; `potentials` (what each Potential does) sits beside the list of copies. */
-export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, potentials?: Html): Html {
+export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, potentials?: Html, art?: Html): Html {
   const head = html`<div class="section-head"><h2 class="heading-20">Pull history</h2></div>`;
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
@@ -442,43 +442,30 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
     </section>`;
   }
 
-  const first = owned.acquisitions[0];
   const latest = owned.acquisitions[owned.acquisitions.length - 1];
   const level = potentialLevel(owned);
   const isMax = owned.copies >= MAX_COPIES;
   const toMax = MAX_COPIES - owned.copies;
   const fromRewards = owned.copies - owned.pulled - owned.extra;
   const lastSpare = owned.spare ? latest : null;
-  const via = (x: Acquisition) => (x.reward ? `${x.reward} · ${x.bannerName}` : x.bannerName);
-  // Extra copies have no date: they show as "Extra" with their note.
-  const when = (x: Acquisition) => html`<span class="wiki-date">${x.extra ? 'Extra' : fmtDate(x.ts)}</span>`;
 
-  return html`<section class="section">
-    ${head}
-    ${metrics([
-      metric({
-        label: 'Copies',
-        value: String(owned.copies),
-        sub: [`${owned.pulled} pulled`, fromRewards ? `${fromRewards} from rewards` : '', owned.extra ? `${owned.extra} extra` : ''].filter(Boolean).join(' · '),
-      }),
-      metric({
-        label: 'Potential',
-        value: html`${level}${isMax ? html` <small>Max</small>` : ''}`,
-        aside: potentialStar(owned.potential),
-        // Spare copies stay low-key: a count and when the latest one turned up.
-        sub: isMax
-          ? lastSpare
-            ? `${owned.spare} spare${lastSpare.extra ? '' : ` · latest ${fmtDate(lastSpare.ts)}`}`
-            : 'Fully upgraded'
-          : `${toMax} more cop${toMax > 1 ? 'ies' : 'y'} to P${MAX_POTENTIAL}`,
-      }),
-      metric({ label: 'First copy', value: when(first), sub: via(first) }),
-      owned.maxed
-        ? metric({ label: `Reached P${MAX_POTENTIAL}`, value: when(owned.maxed), sub: via(owned.maxed) })
-        : metric({ label: 'Latest copy', value: when(latest), sub: via(latest) }),
-    ])}
-    <div class="wiki-owned-body${potentials ? ' with-pots' : ''}">
-    <div class="card wiki-pulls">
+  const copies = metric({
+    label: 'Copies',
+    value: String(owned.copies),
+    sub: [`${owned.pulled} pulled`, fromRewards ? `${fromRewards} from rewards` : '', owned.extra ? `${owned.extra} extra` : ''].filter(Boolean).join(' · '),
+  });
+  const potentialBox = metric({
+    label: 'Potential',
+    value: html`${level}${isMax ? html` <small>Max</small>` : ''}`,
+    aside: potentialStar(owned.potential),
+    // Spare copies stay low-key: a count and when the latest one turned up.
+    sub: isMax
+      ? lastSpare
+        ? `${owned.spare} spare${lastSpare.extra ? '' : ` · latest ${fmtDate(lastSpare.ts)}`}`
+        : 'Fully upgraded'
+      : `${toMax} more cop${toMax > 1 ? 'ies' : 'y'} to P${MAX_POTENTIAL}`,
+  });
+  const pulls = html`<div class="card wiki-pulls">
       ${[...owned.acquisitions].reverse().map((x) => {
         const p = x.pull;
         const spare = x.copy > MAX_COPIES;
@@ -506,9 +493,20 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
           ${copyTag}
         </a>`;
       })}
-    </div>
-    ${potentials ? html`<div class="wiki-owned-pots">${potentials}</div>` : ''}
-    </div>
+    </div>`;
+
+  // With Potentials: Copies with the copies listed under the count, the
+  // Potential with what each one does, and the player's art for this page (if
+  // given), side by side (stacked on narrower screens).
+  return html`<section class="section">
+    ${head}
+    ${potentials
+      ? html`<div class="wiki-owned-body with-pots${art ? ' with-art' : ''}">
+          <div class="wiki-owned-box wiki-owned-copies">${metrics([copies])}<div class="wiki-owned-pulls">${pulls}</div></div>
+          <div class="wiki-owned-box wiki-owned-pots">${metrics([potentialBox])}${potentials}</div>
+          ${art ? html`<div class="wiki-owned-box wiki-owned-art">${art}</div>` : ''}
+        </div>`
+      : html`${metrics([copies, potentialBox])}${pulls}`}
     ${owned.selectors
       ? html`<p class="copy-13 secondary wiki-note">You also earned ${owned.selectors} Selector${owned.selectors > 1 ? 's' : ''} on banners featuring ${name}; any picked for ${name} aren't counted.</p>`
       : ''}
