@@ -355,6 +355,14 @@ select option {
 .bp-table td.bp-none {
   color: var(--gray-700);
 }
+/* Label and value rows (SP/s per chain) instead of a grid. */
+.bp-table.bp-list td:first-child {
+  width: auto;
+}
+.bp-table.bp-list td:last-child {
+  text-align: right;
+  padding-right: 20px;
+}
 .bp-note {
   line-height: 18px;
 }
@@ -708,7 +716,7 @@ a.six-item {
     padding-inline: 16px;
   }
 }
-/* The player's art (art.ts artBox): each picture with where it shows. */
+/* The operator's art box (art.ts artBox): a tile per kept item, which opens it. */
 .wiki-art-box {
   display: flex;
   flex-direction: column;
@@ -738,7 +746,14 @@ a.six-item {
   color: inherit;
   font: inherit;
 }
-.wiki-art-item img {
+.wiki-art-thumb {
+  position: relative;
+  display: block;
+}
+.wiki-art-item img,
+.wiki-art-item video,
+.wiki-art-link {
+  display: block;
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
@@ -746,8 +761,70 @@ a.six-item {
   box-shadow: var(--shadow-border);
   background: var(--gray-alpha-200);
 }
-.wiki-art-item:hover img {
+.wiki-art-link {
+  display: grid;
+  place-items: center;
+  color: var(--gray-900);
+}
+.wiki-art-item:hover img,
+.wiki-art-item:hover video,
+.wiki-art-item:hover .wiki-art-link {
   box-shadow: var(--shadow-border), 0 0 0 2px var(--gray-alpha-400);
+}
+a.wiki-art-item {
+  text-decoration: none;
+}
+.wiki-art-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  pointer-events: none;
+}
+.wiki-art-play .icon {
+  font-size: 32px;
+  padding: 6px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+}
+/* A picture full size, or a video playing (art.ts openArtViewer). */
+.art-viewer {
+  padding: 24px;
+}
+.art-viewer-frame {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: min(1400px, 100%);
+}
+.art-viewer-frame :is(img, video) {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-menu);
+  background: #000;
+}
+.art-viewer-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .art-viewer {
+    padding: 12px;
+  }
 }
 @media (max-width: 1200px) {
   .wiki-owned-body.with-pots.with-art {
@@ -1742,7 +1819,7 @@ a.six-item {
   }
 }
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
-  :root[data-motion='on'] :is(.wiki-hero-art, .op-backdrop, .style-banner .char-card-art img, .style-background .char-card-art img) {
+  :root[data-motion='on'] :is(.event-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img) {
     --shift: 2%;
     scale: 1.06;
   }
@@ -1769,7 +1846,7 @@ a.six-item {
     animation: weapon-float 5s ease-in-out infinite alternate;
     will-change: transform;
   }
-  :root[data-motion='on'] :is(.wiki-hero-art, .op-backdrop, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
+  :root[data-motion='on'] :is(.event-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
     translate: calc(var(--px, 0) * -1 * var(--shift)) calc(var(--py, 0) * -1 * var(--shift));
     /* Firefox puts a picture that's only moved (not tilted) on whole pixels,
        so these shifts of a pixel or two would twitch. A 3D tilt too small to

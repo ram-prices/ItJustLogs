@@ -248,7 +248,22 @@ export async function listArt(token: string): Promise<DriveArt[]> {
   return out;
 }
 
+/** Drive takes files up to 5 MB in one request; bigger ones (videos) go in a resumable upload. */
+const ONE_SHOT_BYTES = 5 * 1024 * 1024;
+
 export async function uploadArt(token: string, name: string, blob: Blob): Promise<void> {
+  if (blob.size > ONE_SHOT_BYTES) {
+    const type = blob.type || 'application/octet-stream';
+    const start = await call(token, `${UPLOAD}/files?uploadType=resumable&fields=id`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type },
+      body: JSON.stringify({ name, parents: ['appDataFolder'], mimeType: type }),
+    });
+    const session = start.headers.get('Location');
+    if (!session) throw new Error("Google Drive didn't start the upload.");
+    await call(token, session, { method: 'PUT', headers: { 'Content-Type': type }, body: blob });
+    return;
+  }
   const boundary = `ijl${crypto.randomUUID()}`;
   const meta = JSON.stringify({ name, parents: ['appDataFolder'], mimeType: blob.type || 'image/webp' });
   const body = new Blob([

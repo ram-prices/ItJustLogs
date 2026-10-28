@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { artChoiceOf, autoPicture, chosenPicture, potentialPictures, withArtChoice, type PotentialArtIndex } from './potentialArt';
+import { artChoiceOf, autoPicture, bannerShown, chosenPicture, potentialPictures, withArtChoice, type PotentialArtIndex } from './potentialArt';
 
 const index: PotentialArtIndex = {
   chr_0004_pelica: {
@@ -46,5 +46,21 @@ describe('potential art', () => {
     const map = withArtChoice(undefined, 'chr_0004_pelica', 'p5');
     expect(map).toEqual({ chr_0004_pelica: 'p5' });
     expect(withArtChoice(map, 'chr_0004_pelica', 'auto')).toEqual({});
+  });
+
+  it('auto shows the custom banner when there is one, else the highest Potential', () => {
+    expect(bannerShown(list, 'auto', 4, true)).toEqual({ kind: 'custom' });
+    expect(bannerShown(list, 'auto', 4, false)).toEqual({ kind: 'potential', picture: list.find((p) => p.key === 'p3') });
+    expect(bannerShown(list, 'auto', 0, false)).toEqual({ kind: 'base' });
+  });
+
+  it('custom shows the custom banner; once its picture is deleted it falls back like auto', () => {
+    expect(bannerShown(list, 'custom', 4, true)).toEqual({ kind: 'custom' });
+    expect(bannerShown(list, 'custom', 5, false)).toEqual({ kind: 'potential', picture: list.find((p) => p.key === 'p5') });
+  });
+
+  it('a Potential pick or base goes over the custom banner', () => {
+    expect(bannerShown(list, 'p1', 5, true)).toEqual({ kind: 'potential', picture: list.find((p) => p.key === 'p1') });
+    expect(bannerShown(list, 'base', 5, true)).toEqual({ kind: 'base' });
   });
 });

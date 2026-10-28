@@ -4,7 +4,7 @@ import { state } from '../../state';
 import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } from '../../domain/skillmods';
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
-import { artBox, canShuffle, currentArt, gallerySection, positionOf } from './art';
+import { artBox, canShuffle, positionOf } from './art';
 import { heroPotentialArt, potentialArtButton, potentialArtUrl } from './potentialArt';
 import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
@@ -146,28 +146,26 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
 
 /**
  * The page's header: the operator's facts over the banner art (or a soft
- * glow of their portrait), with the player's character picture in place of
- * the portrait when they picked one (pages/art.ts). The banner: a Potential's
+ * glow of their portrait). The banner: a Potential's
  * picture the player picked, else their own banner pictures, else the highest
  * Potential's picture they own (pages/potentialArt.ts), which makes the header
  * taller (`.tall`) and sits on the picture's focus point from ef-assets.
  */
-function hero(id: string, o: WikiOperator, potential: number, redraw: () => void, overBackdrop = false): Html {
+function hero(id: string, o: WikiOperator, potential: number, redraw: () => void): Html {
   const pot = heroPotentialArt(id, potential, redraw);
-  const own = pot.picked ? null : currentArt(id, 'banner', redraw);
-  const banner = own ?? (pot.shown && { id: `potential:${pot.shown.file}`, src: potentialArtUrl(pot.shown.file) });
-  // A Potential's picture (2:1) gets a taller header, with the operator's face
-  // (its focus point) placed in the band by CSS (database.css `.tall`).
-  const tall = !own && !!pot.shown;
-  const [x, y] = tall ? pot.shown!.focus : banner ? positionOf(banner.id) : [0, 0];
-  const place = tall ? `--fx:${x};--fy:${y}` : `object-position:${x}% ${y}%`;
-  const portrait = currentArt(id, 'portrait', redraw);
-  return html`<section class="wiki-hero${banner ? ' has-art' : ''}${tall ? ' tall' : ''}${overBackdrop ? ' over-backdrop' : ''}">
+  // The banner: the player's own picture (their position) or a Potential's
+  // (its face placed by CSS, database.css `.tall`); both get the tall header.
+  const own = pot.shown.kind === 'custom' ? pot.custom : null;
+  const potArt = pot.shown.kind === 'potential' ? pot.shown.picture : null;
+  const banner = own ?? (potArt && { id: `potential:${potArt.file}`, src: potentialArtUrl(potArt.file) });
+  const tall = !!banner;
+  const place = own ? `object-position:${positionOf(own.id).join('% ')}%` : potArt ? `--fx:${potArt.focus[0]};--fy:${potArt.focus[1]}` : '';
+  return html`<section class="wiki-hero${banner ? ' has-art' : ''}${tall ? ' tall' : ''}${own ? ' own-art' : ''}">
     ${banner
       ? html`<div class="wiki-hero-pin"><img class="wiki-hero-art" src="${banner.src}" data-art="${banner.id}" style="${place}" alt="" decoding="async" /></div>`
       : heroGlow('char', id)}
     <div class="container wiki-hero-inner">
-      ${portrait ? html`<img class="wiki-hero-portrait user-art" src="${portrait.src}" alt="" decoding="async" />` : itemImg('char', id, 'wiki-hero-portrait')}
+      ${itemImg('char', id, 'wiki-hero-portrait')}
       <div class="min0 wiki-hero-text">
         ${crumbs('char', o.name)}
         <div class="wiki-stars" style="color:var(--r${o.rarity})" aria-label="${o.rarity} star">${stars(o.rarity)}</div>
@@ -181,8 +179,8 @@ function hero(id: string, o: WikiOperator, potential: number, redraw: () => void
         ${o.tags.length ? html`<div class="wiki-tags">${o.tags.map((t) => badge(t, 'outline'))}</div>` : ''}
       </div>
       <div class="row wiki-hero-link">
-        ${pot.list.length ? potentialArtButton(id, potential, pot) : ''}
-        ${canShuffle(id, redraw) ? html`<button type="button" class="btn secondary sm" data-action="art-shuffle" data-op="${id}" title="Pick other pictures for the banner, picture and background">${icon('shuffle')}<span class="hide-sm">Shuffle</span></button>` : ''}
+        ${pot.list.length || pot.custom ? potentialArtButton(id, potential, pot) : ''}
+        ${canShuffle(id, redraw) ? html`<button type="button" class="btn secondary sm" data-action="art-shuffle" data-op="${id}" title="Pick another banner picture">${icon('shuffle')}<span class="hide-sm">Shuffle</span></button>` : ''}
         <button type="button" class="btn secondary sm" data-action="art-manage" data-op="${id}" data-name="${o.name}" title="Add pictures for this page's banner">${icon('image')}<span class="hide-sm">Art</span></button>
         ${copyLinkButton(id)}
         <a class="btn secondary sm" href="${o.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
@@ -261,11 +259,6 @@ function statsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> |
         <div class="minor"><dt>Critical rate</dt><dd class="num">${s.critRate != null ? withBonus(s.critRate * 100, bonuses?.get('Critical rate'), (n) => `${Math.round(n * 10) / 10}%`, true) : '–'}</dd></div>
         <div class="minor"><dt>Attack speed</dt><dd class="num">${s.attackSpeed ?? '–'}</dd></div>
         <div class="minor"><dt>Range</dt><dd>${s.range ?? '–'}</dd></div>
-        ${chain
-          ? html`<div class="minor"><dt>Basic attack chain</dt><dd class="num">${chain.hits} hits · ${chain.seconds.toFixed(2)} s</dd></div>
-              <div class="minor"><dt>Final Strike SP</dt><dd class="num">${Math.round(chain.sp)}</dd></div>
-              <div class="minor"><dt>SP/s per chain</dt><dd class="num">${spRate(chain).toFixed(2)}</dd></div>`
-          : ''}
         ${def ? html`<div class="minor loadout-only"><dt>DEF</dt><dd class="num"><span class="attr-note">${defReduction(def.flat).toFixed(1)}% less DMG taken</span>${loadoutOnly(def)}</dd></div>` : ''}
         ${treatment ? html`<div class="minor"><dt>Treatment received</dt><dd class="num" title="0.1% per point of Will">+${Math.round(treatment * 10) / 10}%</dd></div>` : ''}
         ${others.map(([k, b]) =>
@@ -274,6 +267,20 @@ function statsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> |
             : html`<div class="minor loadout-only"><dt>${k}</dt><dd class="num">${loadoutOnly(b)}</dd></div>`,
         )}
       </dl>
+      ${chain
+        ? html`<div class="bp-acc">${accordion(
+            'sp-chain',
+            html`<span class="wiki-acc-title min0"><span>SP/s per chain</span></span><span class="num bp-value">${spRate(chain).toFixed(2)}</span>`,
+            html`<div class="table-wrap">
+              <table class="table bp-table bp-list">
+                <tbody>
+                  <tr><td>Basic attack chain</td><td class="num">${chain.hits} hits · ${chain.seconds.toFixed(2)} s</td></tr>
+                  <tr><td>Final Strike SP</td><td class="num">${Math.round(chain.sp)}</td></tr>
+                </tbody>
+              </table>
+            </div>`,
+          )}</div>`
+        : ''}
       ${ult
         ? html`<div class="bp-acc">${accordion(
             'ult-breakpoints',
@@ -522,10 +529,8 @@ function breakpointsTable(o: WikiOperator, u: UltimateEnergy, uge: number): Html
 function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a: Analysis | null, redraw: () => void): Html {
   const owned = ownedOf(a, 'char')?.get(id);
   const bonuses = bonusesFor(id, o, a, redraw);
-  const backdrop = currentArt(id, 'background', redraw);
-  return html`${backdrop ? html`<img class="op-backdrop" src="${backdrop.src}" alt="" decoding="async" />` : ''}
-    ${hero(id, o, owned?.copies ? owned.potential : -1, redraw, !!backdrop)}
-    <main class="container fade-in wiki-page${backdrop ? ' has-backdrop' : ''}">
+  return html`${hero(id, o, owned?.copies ? owned.potential : -1, redraw)}
+    <main class="container fade-in wiki-page">
       ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined, artBox(id, o.name, redraw))}
       <div class="wiki-cols even">
         <div class="wiki-col">${statsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
@@ -544,7 +549,6 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
               <div class="wiki-col">${talentsSection(o)}</div>
               <div class="wiki-col">${baseSkillsSection(o)}</div>
             </div>`}
-      ${gallerySection(id, redraw)}
       ${profileSection(o)}
       ${credit(attribution, o.page)}
     </main>`;

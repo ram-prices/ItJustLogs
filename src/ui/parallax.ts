@@ -2,7 +2,7 @@
  * Pictures shift a little against the mouse while it's over them, like the
  * banner cards' glow follows it (Settings → Backgrounds; CSS turns it off for
  * Still and reduced motion). Sets --px/--py, -1 to 1 from the hovered area's
- * centre; a page background follows the mouse over the whole window.
+ * centre.
  *
  * The easing is done here, a step toward the mouse each frame, not with a CSS
  * transition, which would restart on every mouse move.
@@ -55,8 +55,6 @@ export function installParallax(): void {
     if (last && last !== el) aim(last, 0, 0);
     last = el;
     if (el) toward(el, e.clientX, e.clientY, el.getBoundingClientRect());
-    const backdrop = document.querySelector<HTMLElement>('.op-backdrop');
-    if (backdrop) toward(backdrop, e.clientX, e.clientY, new DOMRect(0, 0, innerWidth, innerHeight));
   });
   document.documentElement.addEventListener('pointerleave', () => {
     if (last) aim(last, 0, 0);

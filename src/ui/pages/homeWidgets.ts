@@ -718,7 +718,7 @@ function configDialog(id: string): void {
       const list = Object.entries(ops?.operators ?? {}).sort(
         ([ia, x], [ib, y]) => Number(!!mine.get(ib)?.copies) - Number(!!mine.get(ia)?.copies) || y.rarity - x.rarity || x.name.localeCompare(y.name),
       );
-      const art = draft.op ? artOf(draft.op, refresh) : [];
+      const art = draft.op ? artOf(draft.op, refresh).filter((x) => !x.video) : [];
       queueMicrotask(() => {
         const form = document.querySelector<HTMLFormElement>('.home-dialog');
         if (!form) return;

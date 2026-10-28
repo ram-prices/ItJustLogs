@@ -1,14 +1,16 @@
 import { EF_ASSETS_CDN } from '../../domain/banners';
-import { artChoiceOf, autoPicture, chosenPicture, potentialPictures, withArtChoice, type PotentialArtIndex, type PotentialPicture } from '../../domain/potentialArt';
+import { artChoiceOf, bannerShown, potentialPictures, withArtChoice, type BannerShown, type PotentialArtIndex, type PotentialPicture } from '../../domain/potentialArt';
 import { state, updateSettings } from '../../state';
 import { icon, itemImg } from '../components';
 import { html, render, type Html } from '../html';
+import { currentArt, type Art } from './art';
 import { wikiFile } from './info';
 
 /**
- * The operator page's banner art from Potentials (domain/potentialArt.ts):
- * the highest the player owns by default, or the one they pick in the
- * hero's Banner pop-up, locked ones included.
+ * The operator page's banner art (domain/potentialArt.ts): by default the
+ * player's own banner picture (art.ts, placed in Banner), else the highest
+ * Potential's picture they own; or what they pick in the hero's Banner
+ * pop-up: Custom, Base or any Potential's, locked ones included.
  */
 
 export const potentialArtUrl = (file: string): string => `${EF_ASSETS_CDN}/operators/potential/${file}`;
@@ -18,21 +20,20 @@ const indexOf = (redraw: () => void): PotentialArtIndex | null =>
 
 export interface HeroPotentialArt {
   list: PotentialPicture[];
-  /** What the banner shows; null = the base art. */
-  shown: PotentialPicture | null;
-  /** Picked by the player, so it goes over their own banner pictures. */
-  picked: boolean;
+  /** The player's own banner picture, if any. */
+  custom: Art | null;
+  /** What the banner shows. */
+  shown: BannerShown;
 }
 
 /** `potential`: the player's (−1 without a copy). */
 export function heroPotentialArt(opId: string, potential: number, redraw: () => void): HeroPotentialArt {
   const list = potentialPictures(indexOf(redraw), opId);
-  const choice = artChoiceOf(state.settings, opId);
-  const shown = chosenPicture(list, choice, potential);
-  return { list, shown, picked: choice !== 'auto' && choice !== 'base' && !!shown };
+  const custom = currentArt(opId, 'banner', redraw);
+  return { list, custom, shown: bannerShown(list, artChoiceOf(state.settings, opId), potential, !!custom) };
 }
 
-const labelOf = (p: PotentialPicture | null): string => (p ? `P${p.level}` : 'Base');
+const labelOf = (b: BannerShown): string => (b.kind === 'custom' ? 'Custom' : b.kind === 'potential' ? `P${b.picture.level}` : 'Base');
 
 /** The hero's button: what the banner shows. */
 export const potentialArtButton = (opId: string, potential: number, art: HeroPotentialArt): Html =>
@@ -41,16 +42,21 @@ export const potentialArtButton = (opId: string, potential: number, art: HeroPot
 export function openPotentialArtPicker(anchor: HTMLElement, opId: string, potential: number): void {
   document.querySelector('.pot-art-pop')?.remove();
   const list = potentialPictures(indexOf(() => {}), opId);
+  const custom = currentArt(opId, 'banner', () => {});
   const choice = artChoiceOf(state.settings, opId);
-  const auto = autoPicture(list, potential);
+  const auto = bannerShown(list, 'auto', potential, !!custom);
   const pop = document.createElement('div');
   pop.className = 'card pot-art-pop';
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', 'Banner art');
 
-  const thumb = (p: PotentialPicture | null): Html =>
-    p ? html`<img src="${potentialArtUrl(p.file)}" alt="" decoding="async" />` : itemImg('char', opId, 'pot-art-base');
-  const tile = (key: string, label: string, p: PotentialPicture | null, locked = false): Html =>
+  const thumb = (b: BannerShown): Html =>
+    b.kind === 'custom' && custom
+      ? html`<img src="${custom.src}" alt="" decoding="async" />`
+      : b.kind === 'potential'
+        ? html`<img src="${potentialArtUrl(b.picture.file)}" alt="" decoding="async" />`
+        : itemImg('char', opId, 'pot-art-base');
+  const tile = (key: string, label: string, p: BannerShown, locked = false): Html =>
     html`<button type="button" class="pot-art-tile${key === choice ? ' on' : ''}${locked ? ' locked' : ''}" data-pick="${key}" aria-pressed="${key === choice}">
       <span class="pot-art-thumb">${thumb(p)}</span>
       <span class="label-13">${locked ? icon('lock') : ''}${label}</span>
@@ -60,8 +66,9 @@ export function openPotentialArtPicker(anchor: HTMLElement, opId: string, potent
     html`<h2 class="heading-16">Banner art</h2>
       <div class="pot-art-grid">
         ${tile('auto', `Auto · ${labelOf(auto)}`, auto)}
-        ${tile('base', 'Base', null)}
-        ${list.map((p) => tile(p.key, labelOf(p), p, p.level > potential))}
+        ${custom ? tile('custom', 'Custom', { kind: 'custom' }) : ''}
+        ${tile('base', 'Base', { kind: 'base' })}
+        ${list.map((p) => tile(p.key, `P${p.level}`, { kind: 'potential', picture: p }, p.level > potential))}
       </div>`,
   );
   document.body.append(pop);

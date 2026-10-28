@@ -1,3 +1,4 @@
+import { withoutRetiredPlaces } from './domain/artMeta';
 import snapshot from './data/banners.snapshot.json';
 import scheduleSnapshot from './data/schedule.snapshot.json';
 import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
@@ -124,6 +125,10 @@ export interface Settings {
   deletedRuns?: number[];
   /** Where each operator picture shows (by its key); unset = the banner. See ui/pages/art.ts. */
   artPlaces?: Record<string, string[]>;
+  /** Where each operator picture came from (by its key): the link it was saved from. Uploads have none. */
+  artSources?: Record<string, string>;
+  /** Operator art kept as a link only (keys; the link is in `artSources`), when it couldn't be downloaded. */
+  artLinks?: string[];
   /** The operator and weapon lists' sort order (ui/pages/sorting.ts), when changed. */
   infoSort?: Partial<Record<'char' | 'weap', { key: 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'released' | 'element' | 'weapon' | 'class'; desc: boolean; off?: boolean }[]>>;
   /** Medals the player has (Achievements page), by medal id: when, Reforging tier, Trimmed. */
@@ -222,7 +227,7 @@ export async function saveHistory(h: PullHistory): Promise<void> {
   }
 }
 
-export const loadSettings = (): Settings => ({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) });
+export const loadSettings = (): Settings => withoutRetiredPlaces({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) });
 export const saveSettings = (s: Settings): void => writeJson(KEYS.settings, s);
 
 /** What changed when (ms), so Google Drive sync can tell which copy is newer. 0 = never changed here. */

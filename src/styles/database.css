@@ -438,41 +438,35 @@
   background: radial-gradient(ellipse 75% 120% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
 }
 /* An operator header's picture sits in .wiki-hero-pin (operator.ts), which
-   pinning moves; the picture itself keeps its own shift (ui/parallax.ts). */
+   pinning moves. It doesn't follow the mouse (event headers do, loadout.css). */
 .wiki-hero-pin {
   position: absolute;
   inset: 0;
   z-index: -2;
   pointer-events: none;
 }
-/* A header with a picture (not over the player's background picture, whose
-   page lets it show through): the picture stays put under the site header
-   while the operator's facts and the page scroll up over it, and it slowly
-   fades out as the page scrolls (a scroll-linked animation, no script). Its
+/* A header with a picture: the picture stays put under the site header
+   while the operator's facts and the page scroll up over it, and it fades
+   out as the page scrolls, gone once the page has moved 60% of the header's
+   height (a scroll-linked animation, no script). Its
    shades stay with it; only the shade behind the facts moves with them. The
    picture runs on under the top of the page (--pin-under), whose background
    is clear there and whose cards turn acrylic, so it shows behind them. The
    pinned picture is as tall as the header (--hero-h, app.ts). Browsers
-   without scroll-linked animations pin the whole header instead, under the
-   site header (--header-h, app.ts), the page covering it on its own
-   background, which spans the window (border-image adds no scrolling). */
+   without scroll-linked animations (Firefox) get the same fade from a
+   scroll handler (ui/heroFade.ts). With reduced motion the picture isn't
+   held: it scrolls away with the header, and doesn't fade. */
 :root {
   --pin-under: 220px;
 }
-.wiki-hero.has-art:not(.over-backdrop) {
+.wiki-hero.has-art {
   z-index: 0;
 }
-.wiki-hero.has-art:not(.over-backdrop) ~ :is(main, .site-footer) {
+.wiki-hero.has-art ~ :is(main, .site-footer) {
   position: relative;
   z-index: 1;
   background: var(--background-100);
   border-image: linear-gradient(var(--background-100) 0 0) fill 0 / 0 / 0 100vmax;
-}
-@supports not (animation-timeline: scroll()) {
-  .wiki-hero.has-art:not(.over-backdrop) {
-    position: sticky;
-    top: var(--header-h, 0px);
-  }
 }
 @keyframes pin-fade {
   to {
@@ -480,37 +474,43 @@
   }
 }
 @supports (animation-timeline: scroll()) {
-  .wiki-hero.has-art:not(.over-backdrop) {
+  @media (prefers-reduced-motion: no-preference) {
+    .wiki-hero.has-art .wiki-hero-pin {
+      animation: pin-fade linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 calc(var(--hero-h, 360px) * 0.6);
+    }
+  }
+}
+@media all {
+  .wiki-hero.has-art {
     padding-bottom: var(--pin-under);
     margin-bottom: calc(-1 * var(--pin-under));
   }
-  .wiki-hero.tall:not(.over-backdrop) {
+  .wiki-hero.tall.has-art {
     min-height: calc(var(--band) + var(--pin-under));
   }
-  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin {
+  .wiki-hero.has-art .wiki-hero-pin {
     position: fixed;
     top: var(--header-h, 0px);
     bottom: auto;
     height: var(--hero-h, 360px);
     overflow: hidden;
-    animation: pin-fade linear both;
-    animation-timeline: scroll(root);
-    animation-range: 0 70vh;
   }
   /* The picture's shades sit on it, so they stay and fade with it: a strong
      vignette in the page's colour, and its foot fading gradually (eased) into
      the page, from mid-band to the end of the strip under the page. */
-  .wiki-hero.has-art:not(.over-backdrop)::before,
-  .wiki-hero.has-art:not(.over-backdrop)::after {
+  .wiki-hero.has-art::before,
+  .wiki-hero.has-art::after {
     display: none;
   }
-  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin {
+  .wiki-hero.has-art .wiki-hero-pin {
     --fade-from: 45%;
   }
-  .wiki-hero.tall:not(.over-backdrop) .wiki-hero-pin {
+  .wiki-hero.tall.has-art .wiki-hero-pin {
     --fade-from: calc(var(--band) * 0.4);
   }
-  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin::after {
+  .wiki-hero.has-art .wiki-hero-pin::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -527,7 +527,7 @@
       var(--background-100)
     );
   }
-  .wiki-hero.has-art:not(.over-backdrop) .wiki-hero-pin::before {
+  .wiki-hero.has-art .wiki-hero-pin::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -545,7 +545,7 @@
      picture covers the whole header, so the picture's own box ends sooner,
      just enough (never above half the strip under the page), fading out. */
   @media (min-width: 641px) {
-    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-art {
+    .wiki-hero.tall.has-art:not(.own-art) .wiki-hero-art {
       bottom: auto;
       height: clamp(
         calc(var(--band) + var(--pin-under) / 2),
@@ -556,17 +556,17 @@
       mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
     }
   }
-  .wiki-hero.has-art:not(.over-backdrop) ~ main.wiki-page {
+  .wiki-hero.has-art ~ main.wiki-page {
     background: none;
     border-image: none;
   }
-  .wiki-hero.has-art:not(.over-backdrop) ~ main > .section:first-child {
+  .wiki-hero.has-art ~ main > .section:first-child {
     margin-top: 24px;
   }
-  .wiki-hero.has-art:not(.over-backdrop) ~ main .section-head {
+  .wiki-hero.has-art ~ main .section-head {
     text-shadow: 0 1px 8px var(--background-100);
   }
-  .wiki-hero.has-art:not(.over-backdrop) ~ main :is(.card, .metrics:not(.plain)) {
+  .wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
     background: color-mix(in srgb, var(--background-100) 65%, transparent);
     -webkit-backdrop-filter: blur(16px) saturate(1.3);
     backdrop-filter: blur(16px) saturate(1.3);
@@ -576,29 +576,36 @@
   :root {
     --pin-under: 96px;
   }
-  /* Phones: the whole picture across the top as before; no blur on the cards.
-     The facts carry a shade with them as they scroll up over the picture. */
-  @supports (animation-timeline: scroll()) {
-    .wiki-hero.tall:not(.over-backdrop) {
+  /* Phones: the whole picture across the top as before; no blur on the cards. */
+  @media all {
+    .wiki-hero.tall.has-art {
       min-height: 0;
     }
     /* The picture spans the top only (50vw): it fades out by its own foot. */
-    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-pin::after {
+    .wiki-hero.tall.has-art .wiki-hero-pin::after {
       display: none;
     }
-    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-pin::before {
+    .wiki-hero.tall.has-art .wiki-hero-pin::before {
       bottom: auto;
       height: 50vw;
     }
-    .wiki-hero.tall:not(.over-backdrop) .wiki-hero-art {
+    .wiki-hero.tall.has-art .wiki-hero-art {
       -webkit-mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
       mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
     }
-    .wiki-hero.has-art:not(.over-backdrop) ~ main :is(.card, .metrics:not(.plain)) {
+    .wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
       background: color-mix(in srgb, var(--background-100) 85%, transparent);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wiki-hero.has-art .wiki-hero-pin {
+    position: absolute;
+    top: 0;
+    height: auto;
+    bottom: 0;
   }
 }
 /* Text over the player's banner stays readable on bright art. */
@@ -619,7 +626,8 @@
 .wiki-hero.tall .wiki-hero-pin {
   container-type: inline-size;
 }
-/* The operator's eyes (--fx, --fy in %: the picture's focus point in
+/* The player's own banner picture (.own-art) keeps the position they set
+   (inline object-position). A Potential's: the operator's eyes (--fx, --fy in %: the picture's focus point in
    ef-assets, operator.ts) about 40% down the band, as near as the picture
    allows: 50cqw is the picture's height across the header's width (the
    pinned picture's box is the container), and the
@@ -672,11 +680,6 @@
   .wiki-hero.tall .wiki-hero-inner {
     padding-top: calc(50vw - 56px);
   }
-}
-/* The player's character picture, in place of the portrait. */
-.wiki-hero-portrait.user-art {
-  object-fit: cover;
-  object-position: center 20%;
 }
 /* Banner art pop-up (pages/potentialArt.ts): Auto, Base and each
    Potential's picture, locked ones dimmed. */
@@ -760,111 +763,7 @@
     gap: 10px;
   }
 }
-/* The player's background art: behind the whole page, vignetted, with
-   the page's cards turned acrylic so it shows through them. */
-.op-backdrop {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: -1;
-  opacity: 0.5;
-  pointer-events: none;
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%);
-  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%);
-}
-/* No fade-in here: an animating page can't blur what's behind its cards. */
-.wiki-page.has-backdrop {
-  animation: none;
-}
-.wiki-page.has-backdrop .card,
-.wiki-page.has-backdrop .metrics:not(.plain) {
-  background: color-mix(in srgb, var(--background-100) 70%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  backdrop-filter: blur(20px) saturate(1.3);
-}
-.wiki-page.has-backdrop .table th,
-.wiki-page.has-backdrop .card-footer {
-  background: color-mix(in srgb, var(--background-200) 45%, transparent);
-}
-/* Headings and notes between the cards stay readable over the art. */
-.wiki-page.has-backdrop .section-head {
-  text-shadow: 0 1px 8px var(--background-100);
-}
-/* The header lets the background through instead of fading to solid: a
-   light shade at the top for the text, gone by the bottom edge, so the
-   header melts into the wallpaper with no seam. */
-.wiki-hero.over-backdrop::after {
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--background-100) 35%, transparent), transparent);
-}
-.wiki-hero.over-backdrop .wiki-hero-glow {
-  display: none;
-}
-.wiki-hero.over-backdrop .wiki-hero-art {
-  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
-  mask-image: linear-gradient(to bottom, #000 55%, transparent);
-}
-/* Gallery: the player's slideshow pictures, crossfading. */
-.art-slideshow {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  max-height: 520px;
-  width: 100%;
-  overflow: hidden;
-  background: var(--background-200);
-}
-.art-slide {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  opacity: 0;
-  transition: opacity 0.8s var(--ease);
-}
-.art-slide.on {
-  opacity: 1;
-}
-.art-slide-nav {
-  position: absolute;
-  top: 50%;
-  translate: 0 -50%;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s var(--ease);
-}
-.art-slideshow:hover .art-slide-nav,
-.art-slide-nav:focus-visible {
-  opacity: 1;
-}
-.art-slide-nav.prev {
-  left: 12px;
-}
-.art-slide-nav.prev .icon {
-  transform: rotate(180deg);
-}
-.art-slide-nav.next {
-  right: 12px;
-}
-.art-slide-count {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-}
-/* A background picture's position sliders, under its spots. */
+/* A banner picture's position sliders, under its spots. */
 .art-pos {
   display: grid;
   gap: 2px;
@@ -997,6 +896,64 @@
 .art-upload.busy {
   opacity: 0.6;
   pointer-events: none;
+}
+.art-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A link kept without a copy: an icon in place of the picture. */
+.art-thumb-link {
+  display: grid;
+  place-items: center;
+  color: var(--gray-900);
+}
+.art-thumb-link > .icon {
+  font-size: 28px;
+}
+/* The link an item was saved from. */
+.art-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  color: var(--gray-900);
+  text-decoration: none;
+}
+.art-source .icon {
+  font-size: 14px;
+}
+.art-source:hover {
+  color: var(--gray-1000);
+  text-decoration: underline;
+}
+/* An X post's media to pick from. */
+.art-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+}
+.art-pick-item {
+  cursor: pointer;
+}
+.art-pick-item input {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gray-1000);
+}
+.art-pick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.art-warn {
+  color: var(--amber, var(--gray-900));
 }
 
 /* Attributes table */

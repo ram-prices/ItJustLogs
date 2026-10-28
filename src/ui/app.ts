@@ -16,13 +16,14 @@ import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMod
 import { copyText, focusScheduleItem, homePage, installCopyMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
 import { installParallax } from './parallax';
+import { installHeroFade } from './heroFade';
 import { syncVideoBackground } from './videoBackground';
 import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
-import { installSlideshows, openArtManager, resetArtPick, shuffleArt } from './pages/art';
+import { openArtManager, openArtViewer, resetArtPick, shuffleArt } from './pages/art';
 import { openPotentialArtPicker } from './pages/potentialArt';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
@@ -960,6 +961,9 @@ async function onClick(e: MouseEvent): Promise<void> {
       const now = state.settings.paidIncome ?? [];
       return updateSettings({ paidIncome: now.includes(v) ? now.filter((x) => x !== v) : PAID_INCOME.filter((x) => x === v || now.includes(x)) });
     }
+    case 'art-view':
+      openArtViewer(el.dataset.op!, el.dataset.art!);
+      break;
     case 'art-manage':
       openArtManager(el.dataset.op!, el.dataset.name!, draw);
       break;
@@ -1091,7 +1095,7 @@ export function mount(): void {
   installCardGlow();
   loadIcons(draw);
   installParallax();
-  installSlideshows();
+  installHeroFade();
   installTooltips();
   installImport();
   installTimelineLabels();

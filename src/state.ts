@@ -1,3 +1,4 @@
+import { withoutRetiredPlaces } from './domain/artMeta';
 import { analyze, type Analysis } from './domain/analyze';
 import { mergeHistories, parseTimestamp } from './domain/parse';
 import { guessServer, type Schedule, type Server } from './domain/schedule';
@@ -150,7 +151,7 @@ export function setSchedule(schedule: Schedule): void {
 export const currentServer = (): Server => state.settings.server ?? guessServer();
 
 export function updateSettings(patch: Partial<store.Settings>): void {
-  state.settings = { ...state.settings, ...patch };
+  state.settings = withoutRetiredPlaces({ ...state.settings, ...patch });
   store.saveSettings(state.settings);
   changed('settings');
   emit();

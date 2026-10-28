@@ -15,7 +15,11 @@ export interface PotentialArtIndex {
   [opId: string]: Record<string, string[]> | Record<string, [number, number]> | undefined;
 }
 
-/** A pick: 'auto' (the highest owned), 'base' (no Potential art), or a picture's key ("p3", "p1-ex01"). */
+/**
+ * A pick: 'auto' (the player's custom banner, else the highest Potential
+ * owned), 'base' (no art), 'custom' (the player's own banner picture), or a
+ * picture's key ("p3", "p1-ex01").
+ */
 export type ArtChoice = string;
 
 export interface PotentialPicture {
@@ -51,6 +55,21 @@ export function autoPicture(list: PotentialPicture[], potential: number): Potent
 export function chosenPicture(list: PotentialPicture[], choice: ArtChoice, potential: number): PotentialPicture | null {
   if (choice === 'base') return null;
   return list.find((p) => p.key === choice) ?? autoPicture(list, potential);
+}
+
+/** What the banner shows: the player's own banner picture, a Potential's, or the base art. */
+export type BannerShown = { kind: 'custom' } | { kind: 'potential'; picture: PotentialPicture } | { kind: 'base' };
+
+/**
+ * The banner for a choice. Auto and Custom show the player's own banner
+ * picture when they have one (`hasCustom`); without it (never set, or deleted)
+ * both fall back to the highest Potential owned, like a pick that's gone.
+ */
+export function bannerShown(list: PotentialPicture[], choice: ArtChoice, potential: number, hasCustom: boolean): BannerShown {
+  if (choice === 'base') return { kind: 'base' };
+  if ((choice === 'auto' || choice === 'custom') && hasCustom) return { kind: 'custom' };
+  const picture = chosenPicture(list, choice === 'custom' ? 'auto' : choice, potential);
+  return picture ? { kind: 'potential', picture } : { kind: 'base' };
 }
 
 /** The player's choice for an operator; old settings without one are Auto. */

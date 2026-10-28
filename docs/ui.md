@@ -36,8 +36,8 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `scripts/background-clip.py` from the owner's recordings (seamless loop,
     1280x720 WebM + MP4 + first-frame JPG, bottom strip with the player's UID
     always cut off). Settings → Backgrounds Still, reduced motion, phones and
-    Save-Data get the still frame only. Pictures (banner art, headers, the
-    Character card) shift a little against the mouse (`ui/parallax.ts`;
+    Save-Data get the still frame only. Pictures (banner art, event headers, the
+    Character card; not the operator page's header) shift a little against the mouse (`ui/parallax.ts`;
     Arsenal Issues in layers from ef-assets `banners/layers/`, the weapon
     floating; `GAME_ART` Headhunting cards as backdrop + operator from
     `banners/game/layers/<pool>-back|op.webp` (`operatorArt`, made by
@@ -60,11 +60,15 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     pictures P1, P3 and P5 unlock (ef-assets `operators/potential/<id>-p<n>.webp`
     and its `index.json`, from `scripts/potential-art.py` and the EndfieldDataDump
     checkout; Minghe has none in the game's table). An operator page's banner
-    shows the highest one the player owns (Auto); the hero's Banner art button
-    (`wallpaper`, labelled with what shows) opens a pop-up of Auto, Base and
-    every picture, locked ones dimmed with a lock and still pickable. A picked
-    picture goes over the player's own banner pictures; Auto and Base don't.
-    A Potential picture makes the hero taller (`.wiki-hero.tall`: a wide
+    (Auto) shows the player's own banner picture (art.ts, placed in Banner),
+    else the highest Potential picture they own (`bannerShown` in
+    domain/potentialArt.ts); the hero's Banner art button (`wallpaper`,
+    labelled with what shows) opens a pop-up of Auto, Custom (only with an
+    own banner picture), Base and every Potential picture, locked ones dimmed
+    with a lock and still pickable. Custom with its picture deleted falls back
+    like Auto; Base shows no picture. Any banner picture, the player's or a
+    Potential's, makes the hero taller (the player's keeps its own position,
+    `.own-art`) (`.wiki-hero.tall`: a wide
     band, 20vw between 260px and 320px, the picture cropped not stretched, facts on a stronger bottom
     fade; phones show the whole 2:1 picture across the top with the facts
     under its fading foot) with the operator's eyes about 40% down the band:
@@ -74,17 +78,18 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     face needs room; `potential-art.py` keeps them and leaves new
     pictures without one, which centres them). The player's own banner art
     keeps the usual height and their own position. A hero with a picture
-    (`.wiki-hero.has-art`, not over a background picture) pins only its
+    (`.wiki-hero.has-art`) pins only its
     picture (`.wiki-hero-pin`, `position: fixed` under the site header, as tall
-    as the header: `--hero-h`, app.ts `watchHero`), which fades out over the
-    first 70vh of scrolling (scroll-linked, no script); its shades sit on the
+    as the header: `--hero-h`, app.ts `watchHero`), which fades out fully once the page has
+    scrolled 60% of the header's height (scroll-linked, no script); its shades sit on the
     pin and fade with it: a strong vignette in the page's colour and an eased
     fade at its foot (from 40% of the band) into the page. The facts, page and footer scroll up over it; the
     page's background is clear and its cards acrylic. The picture runs on
     `--pin-under` (220px, phones 96px) under the top of the page. No shade
     behind the facts: the text keeps its halo (`.tall .wiki-hero-text`). Browsers without
-    scroll-linked animations (Firefox) pin the whole header under the site
-    header instead (`--header-h`, app.ts `watchHeader`), the page covering it. The picture is one flat file (Potential posters and the
+    scroll-linked animations (Firefox) get the same fade from a scroll handler
+    (`ui/heroFade.ts`, once per frame); the rest is plain CSS both share. With
+    reduced motion the picture isn't held or faded: it scrolls away with the header. The picture is one flat file (Potential posters and the
     player's art have no layers), so on the detail view it shifts as a whole.
     Built pages and Discord embeds keep the base art.
   - Oroberyl, wherever named, shows its game icon in red: `itemName` in
@@ -205,7 +210,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     version/banner/event timeline; works without an import; anything with
     `data-link` or `data-card-image` gets a right-click / long-press menu
     (`installCopyMenu`: Copy link, Copy banner card, or Share banner card on phones, via `ui/cardImage.ts`); `kind.ts` = operators/arsenal: every banner as a fixed-height card
-    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/banner/headhunting/<banner>` opens one), `operator.ts` / `weapon.ts` = `/database/operators[/<name>]` / `/database/arsenals[/<name>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts` (Pull history, `ownedSection`: three equally tall boxes side by side, each in two parts: Copies with the copies list (scrolls inside), the Potential with what each Potential does, and the player's art for the operator (`artBox` in art.ts: each picture with where it shows; opens the art dialog); 900–1200px the art box goes under the other two; stacked under 900px); works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`, `rotations.ts` with its parts in `rotations/` (docs/rotations.md)); shared pieces in
+    whose pull list scrolls; Expand (app.ts `toggleCard`) animates it to full height; `/banner/headhunting/<banner>` opens one), `operator.ts` / `weapon.ts` = `/database/operators[/<name>]` / `/database/arsenals[/<name>]`, info from the wiki data plus the player's copies and Potential (`domain/owned.ts`: pulls + Token/Issue reward copies, shown as P0–P5: P0 is the first copy, each duplicate adds one, P5 (6 copies) is max; the copy that reached P5 and later spare copies are dated; Selectors aren't counted; the Operators/Arsenal pages (breadcrumbs Operators › Headhunting, Arsenal › Issues) switch to them with `kindNav`, and without an import those tabs open them; "All banners" (setting `showAllBanners`) adds every opened banner the player never pulled on, from `domain/catalog.ts`); shared pieces in `info.ts` (Pull history, `ownedSection`: three equally tall boxes side by side, each in two parts: Copies with the copies list (scrolls inside), the Potential with what each Potential does, and the operator's art box (`artBox` in art.ts: a list of kept items, `BoxItem` (art and links now; notes or runs would be more kinds), each a tile: a picture or video opens in a viewer, `openArtViewer`, videos with controls; a link opens in a new tab; Edit art opens the art dialog, which takes uploads and X post links, sets which pictures can be the banner and shows each item's source, docs/sync.md); 900–1200px the art box goes under the other two; stacked under 900px); works without an import; operators and weapons the wiki doesn't have yet come from ef-assets `wiki/previews.json` (the official version guide: class, element, tags, kit summary, banner) as "Coming soon" pages and list rows (`previewPage`), until the wiki's entry replaces them; 6★ strip and ruler portraits link to it), `stats.ts`, `settings.ts`, `rotations.ts` with its parts in `rotations/` (docs/rotations.md)); shared pieces in
     `ui/components.ts` (metric, badge, toggleGroup, pageHeader...);
     import/export in `ui/io.ts`; charts in `ui/charts.ts`.
   - Popups: hover tips and the right-click menu share one dark panel (`.tooltip`, `.ctx-menu` in

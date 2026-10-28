@@ -81,7 +81,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   on its first hit each time, not once ever. Database shows each operator's basic attack chain (hits, seconds per
   chain, Final Strike SP, SP per second) from `src/data/final-strikes.json`, made by the sim with
   `GEN=1 npx vitest run scripts/final-strikes.test.ts` (COMBAT_DIR for a local ef-assets combat/; rerun for new
-  operators): a sortable table under the Operators list (`finalStrikeTable`) and rows in each page's Attributes. Ultimate Energy blocks (RefrainObtainUsp) last only
+  operators): a sortable table under the Operators list (`finalStrikeTable`) and an "SP/s per chain" accordion in each page's Attributes (chain and Final Strike SP inside, `bp-list`). Ultimate Energy blocks (RefrainObtainUsp) last only
   while their buff or skill does and let their tags through (Last Rite's own skills, Arcane's array); a
   DoOnceAction runs once per cast. An AuraAction's buffs come from its source (`buffSource` ActionSource: an entity's
   spawner) or, with ActionOwner, from the entity running it: Xaihi's crystal heals twice, as its heal checks the crystal
