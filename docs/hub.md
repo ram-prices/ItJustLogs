@@ -48,9 +48,10 @@ conversation.
 
 ## State (2026-10-27)
 
-- Live: the "Operator hero fade, banner art, X post art links, SP chain rows" commit (sha in the pending-work memory).
+- Live: the "Operator banner fade on the built site" commit (sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on
+- Recently shipped: built-site fix for the operator banner fade (`border-image-source: none`);
+  operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on
   the operator page; banner art Custom/Auto and tall header for every banner art; art only as the
   banner (box lists everything, plays videos); X post links download media (`domain/xpost.ts`,
   sources in `settings.artSources`, link-only `artLinks`; Drive resumable upload over 5 MB untested);

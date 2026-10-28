@@ -556,9 +556,11 @@
       mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
     }
   }
+  /* border-image-source, not the border-image shorthand: the CSS minifier
+     turns `border-image: none` into an empty value, which browsers drop. */
   .wiki-hero.has-art ~ main.wiki-page {
     background: none;
-    border-image: none;
+    border-image-source: none;
   }
   .wiki-hero.has-art ~ main > .section:first-child {
     margin-top: 24px;
