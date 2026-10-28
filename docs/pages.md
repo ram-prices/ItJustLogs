@@ -30,7 +30,10 @@ Discord timestamps. In the app a banner's path opens Home at that card, row
 or timeline bar (`focusScheduleItem`); an event's path opens its own page
 (`ui/pages/event.ts`): dates, details, phases and its rewards from ef-assets
 `wiki/events.json` (whose wiki end dates fill in events the notes leave
-open, `withWikiEnds`, on the event page and Home) (`scripts/event-rewards.mjs` there; totals as
+open, `withWikiEnds`, on the event page and Home; official changes the news
+feed lacks, such as notices posted only on X, go in ef-assets
+`schedule-overrides.json`, which `update-schedule.mjs` applies by event id
+until the feed changes, marking the event's `source`) (`scripts/event-rewards.mjs` there; totals as
 Headhunting pulls at 500 Oroberyl each, `domain/eventRewards.ts`; `partial`
 when the wiki names rewards without amounts). Home's event rows and
 timeline bars link to it, and Home's right-click menu has "Copy link".

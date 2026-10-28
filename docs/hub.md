@@ -46,11 +46,12 @@ conversation.
 - Reading a recording: a worker with "/parse-recording <path>" (follows `tools/ai-parser/README.md`).
   It only touches `tools/ai-parser/`, so it can run beside a Rotations worker.
 
-## State (2026-10-27)
+## State (2026-10-28)
 
-- Live: the "Operator banner fade on the built site" commit (sha in the pending-work memory).
+- Live: the "Schedule snapshot with event sources" commit (sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: built-site fix for the operator banner fade (`border-image-source: none`);
+- Recently shipped: schedule snapshot refresh with `ScheduleEvent.source` (Sanctuary of Ink dates
+  via ef-assets `schedule-overrides.json`); built-site fix for the operator banner fade (`border-image-source: none`);
   operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on
   the operator page; banner art Custom/Auto and tall header for every banner art; art only as the
   banner (box lists everything, plays videos); X post links download media (`domain/xpost.ts`,

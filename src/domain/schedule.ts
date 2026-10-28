@@ -54,6 +54,8 @@ export interface ScheduleEvent {
   /** Art from the official New Version Guide (ef-assets events/), when it had the event. */
   art?: string;
   needsReview?: boolean;
+  /** The official notice (an X post, say) whose dates ef-assets schedule-overrides.json applied. */
+  source?: string;
 }
 
 const DAILY = /\b(sign in|log in|every day|each day|daily)\b/i;
