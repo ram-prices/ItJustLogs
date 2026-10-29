@@ -23,7 +23,7 @@ import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed
 import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
-import { openArtManager, openArtViewer, resetArtPick, shuffleArt } from './pages/art';
+import { installStorage, openArtViewer, resetArtPick, shuffleArt, storageAction } from './pages/art';
 import { openPotentialArtPicker } from './pages/potentialArt';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
@@ -861,6 +861,7 @@ async function onClick(e: MouseEvent): Promise<void> {
   // Achievements and Archive handle their own buttons.
   if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el) || aic.mod?.aicAction(el.dataset.action ?? '', el) || rotations.mod?.simAction(el.dataset.action ?? '', el)) return draw();
   if (el.dataset.action === 'essence-read') return void import('./essenceReader').then((m) => m.readEssences());
+  if (el.dataset.action?.startsWith('store-')) return storageAction(el, draw);
   switch (el.dataset.action) {
     case 'import':
       return document.getElementById('fileInput')!.click();
@@ -962,10 +963,7 @@ async function onClick(e: MouseEvent): Promise<void> {
       return updateSettings({ paidIncome: now.includes(v) ? now.filter((x) => x !== v) : PAID_INCOME.filter((x) => x === v || now.includes(x)) });
     }
     case 'art-view':
-      openArtViewer(el.dataset.op!, el.dataset.art!);
-      break;
-    case 'art-manage':
-      openArtManager(el.dataset.op!, el.dataset.name!, draw);
+      openArtViewer(el.dataset.op!, el.dataset.art!, draw);
       break;
     case 'potential-art':
       openPotentialArtPicker(el, el.dataset.op!, Number(el.dataset.pot));
@@ -1096,6 +1094,7 @@ export function mount(): void {
   loadIcons(draw);
   installParallax();
   installHeroFade();
+  installStorage();
   installTooltips();
   installImport();
   installTimelineLabels();

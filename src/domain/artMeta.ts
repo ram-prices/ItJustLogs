@@ -1,7 +1,7 @@
 /**
  * What's kept about each operator picture besides the file (ui/pages/art.ts):
- * where it shows, its banner focus, the link it came from, and whether it's a
- * link only. All of it lives in settings, keyed by the picture's IndexedDB
+ * whether it can be the banner, its banner focus and the link it came from.
+ * (Links kept on their own are storage items now, domain/storage.ts.) All of it lives in settings, keyed by the picture's IndexedDB
  * key, so it syncs and goes in backups with the rest. Pictures saved before
  * sources were kept simply have none.
  */
@@ -10,7 +10,6 @@ export interface ArtMeta {
   artPlaces?: Record<string, string[]>;
   artPos?: Record<string, [number, number]>;
   artSources?: Record<string, string>;
-  artLinks?: string[];
   deletedArt?: string[];
 }
 
@@ -28,12 +27,11 @@ export function withoutRetiredPlaces<T extends ArtMeta>(s: T): T {
   return { ...s, artPlaces };
 }
 
-/** The settings change for a newly saved picture (or link only): its source and, if given, where it shows. */
-export function addedArt(s: ArtMeta, key: string, opts: { source?: string; places?: string[]; linkOnly?: boolean }): ArtMeta {
+/** The settings change for a newly saved picture: its source and, if given, where it shows. */
+export function addedArt(s: ArtMeta, key: string, opts: { source?: string; places?: string[] }): ArtMeta {
   const out: ArtMeta = {};
   if (opts.source) out.artSources = { ...s.artSources, [key]: opts.source };
   if (opts.places) out.artPlaces = { ...s.artPlaces, [key]: opts.places };
-  if (opts.linkOnly) out.artLinks = [...(s.artLinks ?? []), key];
   return out;
 }
 
@@ -47,14 +45,7 @@ export function removedArt(s: ArtMeta, key: string): ArtMeta {
     artPlaces,
     artPos,
     artSources,
-    artLinks: (s.artLinks ?? []).filter((k) => k !== key),
   };
-}
-
-/** Link-only art for one operator: its keys and links, minus any removed. */
-export function linkArtOf(s: ArtMeta, opId: string): { key: string; url: string }[] {
-  const removed = new Set(s.deletedArt ?? []);
-  return (s.artLinks ?? []).filter((k) => k.startsWith(`art:${opId}:`) && !removed.has(k) && s.artSources?.[k]).map((key) => ({ key, url: s.artSources![key] }));
 }
 
 /** A short name for a source link: its site, without "www." ("x.com"). */

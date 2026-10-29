@@ -657,65 +657,6 @@ a.six-item {
   align-items: center;
   gap: 8px;
 }
-/* Pull history (info.ts ownedSection), with Potentials: Copies with the
-   copies listed under the count, the Potential with what each one does, and
-   the player's art for the page (art.ts artBox), side by side and equally
-   tall. 900–1200px: the art goes under the other two. Narrower: stacked. */
-.wiki-owned-body.with-pots {
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  gap: 16px;
-}
-.wiki-owned-body.with-pots.with-art {
-  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr);
-}
-.wiki-owned-body.with-pots .metrics {
-  grid-template-columns: minmax(0, 1fr);
-}
-/* Each box is two parts read as one: the summary on top, its list under it. */
-.wiki-owned-box {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.wiki-owned-box > .metrics {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-.wiki-owned-box > .metrics .metric {
-  border: 0;
-}
-.wiki-owned-box > .metrics + .card {
-  flex: 1;
-  margin-top: 0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-.wiki-owned-box > .card:only-child {
-  flex: 1;
-}
-/* Copies and its copies list: one box in two parts. The list fills the box
-   and scrolls inside it, so a long history doesn't stretch the row. */
-.wiki-owned-pulls {
-  position: relative;
-  flex: 1;
-  min-height: 200px;
-}
-.wiki-owned-pulls > .wiki-pulls {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  max-height: none;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-@media (min-width: 901px) {
-  .wiki-owned-copies .wiki-pull {
-    grid-template-columns: 96px minmax(0, 1fr) auto auto 28px;
-    gap: 12px;
-    padding-inline: 16px;
-  }
-}
 /* The operator's art box (art.ts artBox): a tile per kept item, which opens it. */
 .wiki-art-box {
   display: flex;
@@ -723,15 +664,13 @@ a.six-item {
   gap: 12px;
   padding: 24px;
 }
-.wiki-art-box > .btn {
-  align-self: flex-start;
-  margin-top: auto;
-}
 .wiki-art-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-content: start;
   gap: 10px;
-  max-height: 320px;
+  max-height: 420px;
+  padding: 2px;
   overflow-y: auto;
 }
 .wiki-art-item {
@@ -788,6 +727,97 @@ a.wiki-art-item {
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.55);
 }
+/* Storage box rows (art.ts storageBox): a note or link across the box, with
+   Edit and Delete; edited in place, in the same row. */
+.store-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.store-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.store-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-border);
+  background: var(--gray-alpha-100);
+}
+.store-note-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--gray-1000);
+}
+textarea.store-note-text {
+  min-height: 96px;
+  resize: vertical;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: 20px;
+}
+.store-edit {
+  flex-direction: column;
+  align-items: stretch;
+}
+.store-edit:focus-within {
+  box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px color-mix(in srgb, var(--focus) 24%, transparent);
+}
+.store-edit :is(textarea, input):focus {
+  outline: none;
+}
+.store-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.store-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-self: flex-end;
+}
+.store-link-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.store-link-main > .min0 {
+  display: grid;
+}
+.store-link-main:hover .store-link-title {
+  text-decoration: underline;
+}
+.store-link-fields {
+  flex: none;
+  display: grid;
+  gap: 6px;
+}
+.store-link-fields input {
+  height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--background-100);
+  box-shadow: var(--shadow-border);
+  color: var(--gray-1000);
+}
 /* A picture full size, or a video playing (art.ts openArtViewer). */
 .art-viewer {
   padding: 24px;
@@ -806,6 +836,20 @@ a.wiki-art-item {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-menu);
   background: #000;
+}
+.art-viewer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  box-shadow: var(--shadow-menu);
+}
+.art-viewer-bar .art-pos {
+  width: 220px;
 }
 .art-viewer-close {
   position: absolute;
@@ -826,25 +870,123 @@ a.wiki-art-item {
     padding: 12px;
   }
 }
-@media (max-width: 1200px) {
-  .wiki-owned-body.with-pots.with-art {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+/* Pull history as a Potential ladder (info.ts ladderBox): the Potential,
+   P0–P5 in circles (lit once unlocked) beside the copies that unlocked them,
+   the further copies folded away. */
+.ladder {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.ladder-head {
+  display: grid;
+  gap: 6px;
+  padding: 24px 24px 18px;
+}
+.ladder-totals {
+  font: 600 24px/32px var(--font-sans);
+  letter-spacing: -0.48px;
+  font-variant-numeric: tabular-nums;
+}
+.ladder-rows > *,
+.ladder-spare,
+.ladder-note {
+  border-top: 1px solid var(--ring);
+}
+a.ladder-row,
+.ladder-row.solo,
+.ladder-row .wiki-acc > summary {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 0.8fr) minmax(0, 2fr) 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  color: inherit;
+  text-decoration: none;
+  font: 400 14px/20px var(--font-sans);
+}
+a.ladder-row:hover {
+  background: var(--gray-alpha-100);
+}
+/* Each Potential's number in a circle, lit once unlocked. */
+.ladder-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
+  color: var(--gray-900);
+  font: 600 12px/1 var(--font-sans);
+}
+.ladder-mark.on {
+  box-shadow: none;
+  background: var(--r5);
+  color: #000;
+}
+.ladder-level {
+  font: 600 13px/20px var(--font-sans);
+}
+.ladder-name {
+  font-weight: 500;
+}
+.ladder-copy {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+}
+.ladder-copy .wiki-pull-tag:empty {
+  display: none;
+}
+/* Locked: dimmed, its circle unlit; what it does still opens, at full strength. */
+.ladder-row.locked .ladder-mark,
+.ladder-row.locked .ladder-name {
+  opacity: 0.55;
+}
+.ladder-row.locked .wiki-acc-chev {
+  grid-column: -2;
+}
+.ladder-spare .wiki-acc > summary {
+  gap: 12px;
+  padding: 10px 20px;
+}
+.ladder-spare .wiki-acc > summary .ladder-level {
+  margin-right: auto;
+}
+.ladder-spare .wiki-acc-body {
+  padding: 0;
+}
+.ladder-spare .wiki-pulls {
+  margin: 0;
+  max-height: 320px;
+  border-top: 1px solid var(--ring);
+}
+.ladder-note {
+  padding: 14px 24px 18px;
+}
+/* A narrow ladder (a phone, or a column beside others): each copy on a second line. */
+@container (max-width: 560px) {
+  a.ladder-row,
+  .ladder-row.solo,
+  .ladder-row .wiki-acc > summary {
+    grid-template-columns: 30px minmax(0, 1fr) 16px;
+    row-gap: 4px;
+    padding: 10px 16px;
   }
-  .wiki-owned-art {
-    grid-column: 1 / -1;
+  .ladder-copy {
+    grid-column: 2 / 3;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 8px;
   }
 }
-@media (max-width: 900px) {
-  .wiki-owned-body.with-pots,
-  .wiki-owned-body.with-pots.with-art {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 640px) {
+  .ladder-copy .ladder-at {
+    display: none;
   }
-  .wiki-owned-pulls {
-    min-height: 0;
-  }
-  .wiki-owned-pulls > .wiki-pulls {
-    position: static;
-    max-height: 360px;
+  .ladder-head {
+    padding: 20px 16px 14px;
   }
 }
 .wiki-owned-empty {

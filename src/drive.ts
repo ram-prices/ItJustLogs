@@ -305,7 +305,7 @@ export async function uploadArt(token: string, name: string, blob: Blob): Promis
     return;
   }
   const boundary = `ijl${crypto.randomUUID()}`;
-  const meta = JSON.stringify({ name, parents: ['appDataFolder'], mimeType: blob.type || 'image/webp' });
+  const meta = JSON.stringify({ name, parents: ['appDataFolder'], mimeType: blob.type || 'application/octet-stream' });
   const body = new Blob([
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${blob.type || 'image/webp'}\r\n\r\n`,
     blob,

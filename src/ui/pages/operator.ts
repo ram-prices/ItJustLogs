@@ -4,7 +4,7 @@ import { state } from '../../state';
 import { applyMods, isGain, potentialSkillMods, skillDmgBonus, type ValueMod } from '../../domain/skillmods';
 import { requiredGain, rotationEnergy, TEAM_ENERGY_PER_BATTLE_SKILL, ultimateEnergy, type UltimateEnergy } from '../../domain/ultimate';
 import { atkTotal, defReduction, hpTotal, statTotal, TREATMENT_PER_WILL, type Bonus } from '../../domain/loadout';
-import { artBox, canShuffle, positionOf } from './art';
+import { canShuffle, positionOf, storageBox } from './art';
 import { heroPotentialArt, potentialArtButton, potentialArtUrl } from './potentialArt';
 import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
@@ -14,7 +14,7 @@ import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, p
 import { html, type Html } from '../html';
 import { tip, tipRow } from '../charts';
 import finalStrikes from '../../data/final-strikes.json';
-import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile } from './info';
+import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile, type LadderInfo } from './info';
 
 /**
  * Operator info pages (/database/operators and /database/operators/<name>): class,
@@ -181,7 +181,7 @@ function hero(id: string, o: WikiOperator, potential: number, redraw: () => void
       <div class="row wiki-hero-link">
         ${pot.list.length || pot.custom ? potentialArtButton(id, potential, pot) : ''}
         ${canShuffle(id, redraw) ? html`<button type="button" class="btn secondary sm" data-action="art-shuffle" data-op="${id}" title="Pick another banner picture">${icon('shuffle')}<span class="hide-sm">Shuffle</span></button>` : ''}
-        <button type="button" class="btn secondary sm" data-action="art-manage" data-op="${id}" data-name="${o.name}" title="Add pictures for this page's banner">${icon('image')}<span class="hide-sm">Art</span></button>
+        <button type="button" class="btn secondary sm" data-action="store-open" data-op="${id}" title="Add files, notes or links">${icon('image')}<span class="hide-sm">Art</span></button>
         ${copyLinkButton(id)}
         <a class="btn secondary sm" href="${o.page}" target="_blank" rel="noopener">${icon('open_in_new')}<span class="hide-sm">Wiki page</span></a>
       </div>
@@ -405,6 +405,19 @@ function skillsSection(id: string, o: WikiOperator, bonuses: Map<string, Bonus> 
   </section>`;
 }
 
+/** The Potentials' names and what each does, for Pull history's ladder (info.ts ladderBox). */
+function potentialLadder(o: WikiOperator): LadderInfo {
+  const byRank = (r: number) => o.potentials.find((p) => p.rank === r);
+  const ranks = [1, 2, 3, 4, 5];
+  return {
+    names: ranks.map((r) => byRank(r)?.name ?? ''),
+    details: ranks.map((r) => {
+      const p = byRank(r);
+      return p ? html`<p class="copy-14 secondary wiki-text">${rich(p.description)}</p>` : null;
+    }),
+  };
+}
+
 /** Potentials, with the ones the player's copies unlock marked. */
 function potentialsList(o: WikiOperator, owned: Owned | undefined, imported: boolean): Html {
   const have = owned?.potential ?? -1;
@@ -526,15 +539,22 @@ function breakpointsTable(o: WikiOperator, u: UltimateEnergy, uge: number): Html
       </p>`;
 }
 
+/**
+ * One operator: the header, then Pull history (the Potential ladder),
+ * Attributes and Loadout as three columns, skills and talents, the player's
+ * Storage (when they own the operator) and the profile.
+ */
 function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a: Analysis | null, redraw: () => void): Html {
   const owned = ownedOf(a, 'char')?.get(id);
   const bonuses = bonusesFor(id, o, a, redraw);
+  const stats = statsSection(id, o, bonuses, owned?.copies ? owned.potential : null);
+  const loadout = loadoutSection(id, a, redraw, o.weapon, (label) => attributeTotal(o, bonuses, label));
   return html`${hero(id, o, owned?.copies ? owned.potential : -1, redraw)}
     <main class="container fade-in wiki-page">
-      ${ownedSection('char', o.name, a, owned, o.potentials.length ? potentialsList(o, owned, true) : undefined, artBox(id, o.name, redraw))}
-      <div class="wiki-cols even">
-        <div class="wiki-col">${statsSection(id, o, bonuses, owned?.copies ? owned.potential : null)}</div>
-        <div class="wiki-col">${loadoutSection(id, a, redraw, o.weapon, (label) => attributeTotal(o, bonuses, label))}</div>
+      <div class="wiki-cols three">
+        <div class="wiki-col">${ownedSection('char', o.name, a, owned, potentialLadder(o))}</div>
+        <div class="wiki-col">${stats}</div>
+        <div class="wiki-col">${loadout}</div>
       </div>
       ${owned?.copies
         ? html`<div class="wiki-cols even">
@@ -549,6 +569,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
               <div class="wiki-col">${talentsSection(o)}</div>
               <div class="wiki-col">${baseSkillsSection(o)}</div>
             </div>`}
+      ${owned?.copies ? html`<section class="section wiki-storage">${storageBox(id, o.name, redraw)}</section>` : ''}
       ${profileSection(o)}
       ${credit(attribution, o.page)}
     </main>`;

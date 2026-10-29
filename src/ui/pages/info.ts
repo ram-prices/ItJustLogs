@@ -1,7 +1,8 @@
 import type { Analysis } from '../../domain/analyze';
-import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type ExtraCopy, type Owned } from '../../domain/owned';
+import { extrasOf, MAX_COPIES, MAX_POTENTIAL, ownedItems, type Acquisition, type ExtraCopy, type Owned } from '../../domain/owned';
 import type { Kind } from '../../domain/types';
-import { canonicalPoolId } from '../../domain/banners';
+import { canonicalPoolId, categoryOf } from '../../domain/banners';
+import { WEAPON_PITY_SETS } from '../../domain/analyze';
 import { scheduleLinks, type Schedule } from '../../domain/schedule';
 import { SITE_URL } from '../../domain/share';
 import {
@@ -20,7 +21,7 @@ import {
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
-import { badge, elementIcon, heroGlow, icon, iconOf, itemImg, metric, metrics, stars } from '../components';
+import { badge, elementIcon, heroGlow, icon, iconOf, itemImg, stars } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
 
 /**
@@ -421,7 +422,100 @@ const OUTCOME: Record<string, Html> = {
  * each copy came from. `a` null = no import yet.
  */
 /** The player's copies of an item; `potentials` (what each Potential does) sits beside the list of copies. */
-export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, potentials?: Html, art?: Html): Html {
+/** Hard pity where a copy was pulled: 80, 40 on New Horizons, and for weapons 4 sets. */
+const pityMax = (kind: Kind, poolId: string): number => (kind === 'weap' ? WEAPON_PITY_SETS : categoryOf(kind, poolId) === 'newHorizons' ? 40 : 80);
+
+/** Where a copy came from, as the pull list says it: "Pull 52 · 53/80", "Free", a reward, "Not a pull". */
+function copyAt(kind: Kind, x: Acquisition): string {
+  const p = x.pull;
+  if (x.extra) return 'Not a pull';
+  if (x.reward) return `${x.reward}${p?.bannerPull ? ` · ${kind === 'weap' ? `set ${Math.ceil(p.bannerPull / 10)}` : `pull ${p.bannerPull}`}` : ''}${x.estimated ? ' · estimated' : ''}`;
+  if (!p || p.bannerPull === null) return 'Free';
+  return `${kind === 'weap' ? `Set ${Math.ceil(p.bannerPull / 10)}` : `Pull ${p.bannerPull}`}${p.pity !== null ? ` · ${p.pity}/${pityMax(kind, x.poolId)}` : ''}`;
+}
+
+/** A copy's marker: Extra, Reward, Free, or how its 50/50 went ("Lost"). */
+function copyTag(x: Acquisition): Html | string {
+  const p = x.pull;
+  if (x.extra) return badge('Extra', 'outline');
+  return x.reward ? badge('Reward', 'outline') : p?.outcome ? OUTCOME[p.outcome] : p?.bannerPull === null ? badge('Free', 'outline') : '';
+}
+
+/** One copy as a row of the pull list: date, banner, pull and pity, marker, and the Potential it gave. */
+function pullRow(kind: Kind, x: Acquisition): Html {
+  const spare = x.copy > MAX_COPIES;
+  const cls = `wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}`;
+  const level = html`<span class="wiki-copy" title="Copy ${x.copy}">${spare ? `+${x.copy - MAX_COPIES}` : `P${x.copy - 1}`}</span>`;
+  return html`<a class="${cls}" href="${x.extra ? '/settings' : bannerHref(kind, x.poolId)}" ${raw(x.extra ? 'title="Extra copies are listed in Settings"' : '')}>
+    <span class="num secondary">${x.extra ? 'Extra' : fmtDate(x.ts)}</span>
+    <span class="ellipsis wiki-em">${x.bannerName}</span>
+    <span class="num secondary wiki-pull-at">${copyAt(kind, x)}</span>
+    <span class="wiki-pull-tag">${copyTag(x)}</span>
+    ${level}
+  </a>`;
+}
+
+/**
+ * Pull history as a Potential ladder: the Potential reached, then P0–P5,
+ * each in a circle (lit once unlocked) beside the copy that unlocked it,
+ * unlocked Potentials
+ * opening what they do, and the spare copies folded away under it.
+ */
+function ladderBox(kind: Kind, owned: Owned, info: LadderInfo): Html {
+  const level = potentialLevel(owned);
+  const byCopy = new Map(owned.acquisitions.map((x) => [x.copy, x]));
+  const spares = owned.acquisitions.filter((x) => x.copy > MAX_COPIES).reverse();
+  const when = (x: Acquisition) => (x.extra ? 'Extra' : fmtDate(x.ts));
+  const copyCells = (x: Acquisition) => html`<span class="ladder-copy">
+    <span class="num secondary">${when(x)}</span>
+    <span class="ellipsis wiki-em">${x.bannerName}</span>
+    <span class="num secondary ladder-at">${copyAt(kind, x)}</span>
+    <span class="wiki-pull-tag">${copyTag(x)}</span>
+  </span>`;
+  const rows = Array.from({ length: MAX_POTENTIAL + 1 }, (_, n) => {
+    const x = byCopy.get(n + 1);
+    const name = n === 0 ? 'Base' : info.names[n - 1] ?? '';
+    const detail = n > 0 ? info.details[n - 1] : null;
+    if (!x) {
+      // Locked: dimmed, but what it does still opens.
+      const lockedHead = html`<span class="ladder-mark">P${n}</span><span class="ellipsis ladder-name">${name}</span>`;
+      return detail
+        ? html`<div class="ladder-row locked">${accordion(`ladder-${kind}-${n}`, lockedHead, detail)}</div>`
+        : html`<div class="ladder-row locked solo">${lockedHead}</div>`;
+    }
+    const headRow = html`<span class="ladder-mark on">P${n}</span>
+      <span class="ellipsis ladder-name">${name}</span>
+      ${copyCells(x)}`;
+    return detail
+      ? html`<div class="ladder-row on">${accordion(`ladder-${kind}-${n}`, headRow, detail)}</div>`
+      : html`<a class="ladder-row on" href="${x.extra ? '/settings' : bannerHref(kind, x.poolId)}">${headRow}</a>`;
+  });
+  return html`<div class="card ladder">
+    <div class="ladder-head">
+      <div class="metric-label"><span>Potential</span>${potentialStar(owned.potential)}</div>
+      <div class="ladder-totals">${level}</div>
+    </div>
+    <div class="ladder-rows">${rows}</div>
+    ${spares.length
+      ? html`<div class="ladder-spare">${accordion(`ladder-${kind}-spare`, html`<span class="ladder-level">${spares.length} more</span>`, html`<div class="wiki-pulls">${spares.map((x) => pullRow(kind, x))}</div>`)}</div>`
+      : ''}
+    ${info.note ? html`<div class="ladder-note">${info.note}</div>` : ''}
+  </div>`;
+}
+
+/**
+ * What each Potential is, for the ladder: P1–P5's names (operators; empty for
+ * weapons, whose Potential is one text) and what each does (opened from its
+ * row), plus a note under the ladder (a weapon's Potential text).
+ */
+export interface LadderInfo {
+  names: string[];
+  details: (Html | null)[];
+  note?: Html;
+}
+
+/** Pull history: the Potential ladder (`ladderBox`), or what's missing to show it. */
+export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, ladder?: LadderInfo): Html {
   const head = html`<div class="section-head"><h2 class="heading-20">Pull history</h2></div>`;
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
@@ -442,71 +536,9 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
     </section>`;
   }
 
-  const latest = owned.acquisitions[owned.acquisitions.length - 1];
-  const level = potentialLevel(owned);
-  const isMax = owned.copies >= MAX_COPIES;
-  const toMax = MAX_COPIES - owned.copies;
-  const fromRewards = owned.copies - owned.pulled - owned.extra;
-  const lastSpare = owned.spare ? latest : null;
-
-  const copies = metric({
-    label: 'Copies',
-    value: String(owned.copies),
-    sub: [`${owned.pulled} pulled`, fromRewards ? `${fromRewards} from rewards` : '', owned.extra ? `${owned.extra} extra` : ''].filter(Boolean).join(' · '),
-  });
-  const potentialBox = metric({
-    label: 'Potential',
-    value: html`${level}${isMax ? html` <small>Max</small>` : ''}`,
-    aside: potentialStar(owned.potential),
-    // Spare copies stay low-key: a count and when the latest one turned up.
-    sub: isMax
-      ? lastSpare
-        ? `${owned.spare} spare${lastSpare.extra ? '' : ` · latest ${fmtDate(lastSpare.ts)}`}`
-        : 'Fully upgraded'
-      : `${toMax} more cop${toMax > 1 ? 'ies' : 'y'} to P${MAX_POTENTIAL}`,
-  });
-  const pulls = html`<div class="card wiki-pulls">
-      ${[...owned.acquisitions].reverse().map((x) => {
-        const p = x.pull;
-        const spare = x.copy > MAX_COPIES;
-        const copyTag = html`<span class="wiki-copy" title="Copy ${x.copy}">${spare ? `+${x.copy - MAX_COPIES}` : `P${x.copy - 1}`}</span>`;
-        if (x.extra) {
-          return html`<a class="wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}" href="/settings" title="Extra copies are listed in Settings">
-            <span class="num secondary">Extra</span>
-            <span class="ellipsis wiki-em">${x.bannerName}</span>
-            <span class="num secondary wiki-pull-at">Not a pull</span>
-            <span class="wiki-pull-tag">${badge('Extra', 'outline')}</span>
-            ${copyTag}
-          </a>`;
-        }
-        const at = x.reward
-          ? `${x.reward}${p?.bannerPull ? ` · ${kind === 'weap' ? `set ${Math.ceil(p.bannerPull / 10)}` : `pull ${p.bannerPull}`}` : ''}${x.estimated ? ' · estimated' : ''}`
-          : !p || p.bannerPull === null
-            ? 'Free'
-            : `${kind === 'weap' ? `Set ${Math.ceil(p.bannerPull / 10)}` : `Pull ${p.bannerPull}`}${p.pity !== null ? ` · pity ${p.pity}` : ''}`;
-        const tag = x.reward ? badge('Reward', 'outline') : p?.outcome ? OUTCOME[p.outcome] : p?.bannerPull === null ? badge('Free', 'outline') : '';
-        return html`<a class="wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}" href="${bannerHref(kind, x.poolId)}">
-          <span class="num secondary">${fmtDate(x.ts)}</span>
-          <span class="ellipsis wiki-em">${x.bannerName}</span>
-          <span class="num secondary wiki-pull-at">${at}</span>
-          <span class="wiki-pull-tag">${tag}</span>
-          ${copyTag}
-        </a>`;
-      })}
-    </div>`;
-
-  // With Potentials: Copies with the copies listed under the count, the
-  // Potential with what each one does, and the player's art for this page (if
-  // given), side by side (stacked on narrower screens).
   return html`<section class="section">
     ${head}
-    ${potentials
-      ? html`<div class="wiki-owned-body with-pots${art ? ' with-art' : ''}">
-          <div class="wiki-owned-box wiki-owned-copies">${metrics([copies])}<div class="wiki-owned-pulls">${pulls}</div></div>
-          <div class="wiki-owned-box wiki-owned-pots">${metrics([potentialBox])}${potentials}</div>
-          ${art ? html`<div class="wiki-owned-box wiki-owned-art">${art}</div>` : ''}
-        </div>`
-      : html`${metrics([copies, potentialBox])}${pulls}`}
+    ${ladderBox(kind, owned, ladder ?? { names: [], details: [] })}
     ${owned.selectors
       ? html`<p class="copy-13 secondary wiki-note">You also earned ${owned.selectors} Selector${owned.selectors > 1 ? 's' : ''} on banners featuring ${name}; any picked for ${name} aren't counted.</p>`
       : ''}

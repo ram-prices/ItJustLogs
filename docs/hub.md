@@ -46,11 +46,13 @@ conversation.
 - Reading a recording: a worker with "/parse-recording <path>" (follows `tools/ai-parser/README.md`).
   It only touches `tools/ai-parser/`, so it can run beside a Rotations worker.
 
-## State (2026-10-28)
+## State (2026-10-29)
 
-- Live: the "Drive sync: tokens from the Android app" commit (sha in the pending-work memory).
+- Live: the "Operator Storage box, Potential ladder, three-column operator page" commit (sha in the pending-work memory).
 - Local, not deployed: nothing. `.claude/launch.json` is never committed.
-- Recently shipped: Drive tokens from the Android app (`window.IJLAndroid`, `drive.ts`, `ui/sync.ts`);
+- Recently shipped: operator Storage box (`domain/storage.ts`, `settings.storeItems`), X post and
+  image-link downloading removed; Pull history as one Potential ladder; operator page in three
+  columns with Storage above Profile; Drive tokens from the Android app (`window.IJLAndroid`, `drive.ts`, `ui/sync.ts`);
   schedule snapshot refresh with `ScheduleEvent.source` (Sanctuary of Ink dates
   via ef-assets `schedule-overrides.json`); built-site fix for the operator banner fade (`border-image-source: none`);
   operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on

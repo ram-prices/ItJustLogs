@@ -217,7 +217,7 @@ function detailPage(id: string, w: WikiWeapon, attribution: WikiAttribution, a: 
   const owned = ownedOf(a, 'weap')?.get(id);
   return html`${hero(id, w)}
     <main class="container fade-in wiki-page">
-      ${ownedSection('weap', w.name, a, owned, w.potential ? potentialText(w) : undefined)}
+      ${ownedSection('weap', w.name, a, owned, w.potential ? { names: [], details: [], note: html`<p class="copy-13 secondary wiki-text">${rich(w.potential)}</p>` } : undefined)}
       ${wieldersSection(id, redraw)}
       <div class="wiki-cols">
         <div class="wiki-col">${statsSection(w)}${potentialSection(w, owned)}</div>

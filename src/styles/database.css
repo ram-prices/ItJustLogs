@@ -765,7 +765,7 @@
     gap: 10px;
   }
 }
-/* A banner picture's position sliders, under its spots. */
+/* A banner picture's position sliders, in the viewer (art.ts). */
 .art-pos {
   display: grid;
   gap: 2px;
@@ -786,134 +786,6 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
-/* The art dialog: each picture with where it shows. */
-.art-item {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.art-places {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.art-place {
-  padding: 2px 8px;
-  border: 0;
-  border-radius: 9999px;
-  background: none;
-  box-shadow: inset 0 0 0 1px var(--gray-alpha-400);
-  color: var(--gray-900);
-  font: 500 11px/16px var(--font-sans);
-  cursor: pointer;
-}
-.art-place[aria-pressed='true'] {
-  background: var(--gray-1000);
-  box-shadow: none;
-  color: var(--background-100);
-}
-
-/* The art dialog. */
-.art-dialog {
-  width: min(600px, 100%);
-  max-height: min(760px, calc(100dvh - 32px));
-  overflow-y: auto;
-}
-.art-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
-.art-thumb {
-  position: relative;
-  margin: 0;
-  aspect-ratio: 16 / 9;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--gray-alpha-100);
-  box-shadow: var(--shadow-border);
-}
-.art-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.art-kind {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  padding: 1px 6px;
-  border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font: 500 10px/16px var(--font-sans);
-}
-.art-remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  cursor: pointer;
-}
-.art-remove .icon {
-  font-size: 16px;
-}
-.art-remove:hover {
-  background: var(--red);
-}
-.art-add {
-  display: flex;
-  gap: 8px;
-}
-.art-add input {
-  flex: 1;
-  min-width: 0;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--background-200);
-  box-shadow: var(--shadow-border);
-  color: var(--gray-1000);
-  font: 400 13px/1 var(--font-sans);
-}
-.art-add input:focus {
-  outline: 2px solid var(--focus);
-}
-.art-error {
-  color: var(--red);
-}
-.art-upload {
-  margin-right: auto;
-  cursor: pointer;
-}
-.art-upload.busy {
-  opacity: 0.6;
-  pointer-events: none;
-}
-.art-thumb video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* A link kept without a copy: an icon in place of the picture. */
-.art-thumb-link {
-  display: grid;
-  place-items: center;
-  color: var(--gray-900);
-}
-.art-thumb-link > .icon {
-  font-size: 28px;
-}
-/* The link an item was saved from. */
 .art-source {
   display: inline-flex;
   align-items: center;
@@ -930,33 +802,6 @@
   text-decoration: underline;
 }
 /* An X post's media to pick from. */
-.art-pick {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--radius-md);
-  background: var(--gray-alpha-100);
-}
-.art-pick-item {
-  cursor: pointer;
-}
-.art-pick-item input {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 18px;
-  height: 18px;
-  accent-color: var(--gray-1000);
-}
-.art-pick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.art-warn {
-  color: var(--amber, var(--gray-900));
-}
 
 /* Attributes table */
 .wiki-stats th .wiki-promo {
@@ -1079,9 +924,23 @@
 .wiki-col {
   min-width: 0;
 }
+/* Operator pages: Pull history, Attributes and Loadout side by side (operator.ts
+   detailPage); narrower: Pull history on top, the other two under it. */
+.wiki-cols.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 1200px) {
+  .wiki-cols.three {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .wiki-cols.three > :first-child {
+    grid-column: 1 / -1;
+  }
+}
 @media (max-width: 900px) {
   .wiki-cols,
-  .wiki-cols.even {
+  .wiki-cols.even,
+  .wiki-cols.three {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -30,36 +30,31 @@ Read when touching `src/drive.ts`, `ui/sync.ts`, snapshots, operator art or the 
   them: each visit needs one click (header Sync button / Sync now). The token
   lives in sessionStorage only. Google's script is loaded only when the sync
   card is shown or sync is on; no other visitor ever contacts Google.
-  - Operator art (`ui/pages/art.ts`): pictures the player uploads or links
-    to on an operator's page (a link is downloaded once, never hotlinked;
-    sites that block cross-site downloads get an "upload it instead"
-    message). Stored in IndexedDB (`art:<op id>:<id>`), shrunk to 2560px
-    WebP. A picture can be the page's banner (`settings.artPlaces`: key →
-    `['banner']` or `[]`; a random one of several each visit); everything is
-    kept in the operator's art box. Art as page background, character picture
-    or Gallery slideshow was removed: `withoutRetiredPlaces`
-    (domain/artMeta.ts) keeps only `'banner'` in `artPlaces` when settings
-    load or change, so old saves and synced settings load fine and the next
-    save stops syncing the rest. Sync copies each picture to its own appData
-    file named by its key (`syncArt`), not into the backup file; removals
-    travel as `settings.deletedArt` tombstones. Downloaded full backups do
-    include it (`Backup.art`, data URLs; `buildBackup({ art: true })`), and
-    importing one restores pictures this browser lacks. An X post link
-    (x.com, twitter.com, fxtwitter/vxtwitter/fixupx; `domain/xpost.ts`) is read
-    through api.fxtwitter.com, then api.vxtwitter.com (both allow cross-site
-    requests, as do pbs/video.twimg.com) and its pictures, videos or GIFs
-    (MP4s) are downloaded; several media: the player picks. Videos are kept
-    as they are, the best MP4 under 15 MB and not below 720p (`pickVariant`),
-    asking first above 15 MB, are never a banner, and play in the art box's
-    viewer. Drive takes
-    files over 5 MB through a resumable upload (`uploadArt`; not tested end
-    to end). Each item's link is kept in `settings.artSources` (key → URL; the
-    post's x.com address for X), shown as a small site link in the art
-    dialog; uploads and older pictures have none. A link that can't be
-    downloaded (blocked site, deleted or private post, services down) can be
-    kept as a link only (`settings.artLinks`, a link tile, never shown in a
-    place). Both are settings, so they sync and go in backups
-    (`domain/artMeta.ts` adds/removes them).
+  - Operator storage (`ui/pages/art.ts`, the operator page's Storage box):
+    files the player uploads, kept exactly as uploaded (any type, no
+    resizing), in IndexedDB (`art:<op id>:<id>`). Nothing is fetched from
+    links. Sync copies each file to its own appData file named by its key
+    (`syncArt`, with its type), not into the backup file; removals travel as
+    `settings.deletedArt` tombstones. Drive takes files over 5 MB through a
+    resumable upload (`uploadArt`; not tested end to end). Downloaded full
+    backups include the files (`Backup.art`, data URLs; `buildBackup({ art:
+    true })`), and importing one restores those this browser lacks. A
+    picture can be the page's banner (`settings.artPlaces`: key →
+    `['banner']` or `[]`; new uploads start with `[]`, pictures saved before
+    the box have none and count as banner pictures; a random one of several
+    each visit); places other than the banner were removed
+    (`withoutRetiredPlaces`, domain/artMeta.ts). Items saved earlier from a
+    link keep it in `settings.artSources`, shown in the viewer.
+  - Storage box names, notes and links (`settings.storeItems`: key →
+    `{ kind: 'file', name, size }`, `{ kind: 'note', text }` or
+    `{ kind: 'link', url, title? }`, domain/storage.ts) are kept in settings,
+    not in a Drive file each: they're a few bytes, an edit needs no file
+    versioning, and they sync and go in backups with the rest. Every key has
+    the files' shape (`art:<op id>:<time><random>`), so the box sorts all
+    kinds newest first. Settings sync whole (the newer copy wins), so edits
+    on two devices before either syncs keep one side. Links kept before the
+    box (`artLinks` + `artSources`) become link items on load
+    (`withStorageItems`, same keys).
   - Banner art picks (`settings.potentialArt`: operator id → `'base'`,
     `'custom'` or a picture key like `'p3'`; Auto isn't stored, so older settings load as
     Auto) are plain settings: they sync and go in backups with the rest, and

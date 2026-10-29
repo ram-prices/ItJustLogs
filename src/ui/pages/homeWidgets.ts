@@ -7,7 +7,7 @@ import type { HomeWidget } from '../../store';
 import { bannerArtUrl, operatorFullUrl } from '../../domain/banners';
 import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars } from '../components';
 import { fmtDate, fmtInt, html, raw, render, type Html } from '../html';
-import { artOf, openArtManager } from './art';
+import { artOf, saveFiles } from './art';
 import { archiveProgress } from './collections';
 import { infoHref, potentialStar, wikiFile } from './info';
 import { loadoutStrip, weaponDetail } from './loadout';
@@ -718,7 +718,7 @@ function configDialog(id: string): void {
       const list = Object.entries(ops?.operators ?? {}).sort(
         ([ia, x], [ib, y]) => Number(!!mine.get(ib)?.copies) - Number(!!mine.get(ia)?.copies) || y.rarity - x.rarity || x.name.localeCompare(y.name),
       );
-      const art = draft.op ? artOf(draft.op, refresh).filter((x) => !x.video) : [];
+      const art = draft.op ? artOf(draft.op, refresh).filter((x) => x.type === 'image') : [];
       queueMicrotask(() => {
         const form = document.querySelector<HTMLFormElement>('.home-dialog');
         if (!form) return;
@@ -735,10 +735,12 @@ function configDialog(id: string): void {
           shadow.disabled = !!(e.target as HTMLSelectElement).value;
           if (shadow.disabled) shadow.checked = false;
         };
-        form.querySelector<HTMLButtonElement>('[data-art]')?.addEventListener('click', () => {
-          keep(form);
-          openArtManager(draft.op!, ops?.operators[draft.op!]?.name ?? '', refresh);
-        });
+        const files = form.querySelector<HTMLInputElement>('[data-art]');
+        if (files)
+          files.onchange = () => {
+            keep(form);
+            if (files.files?.length) void saveFiles(draft.op!, [...files.files], refresh);
+          };
       });
       return html`<label class="field"><span class="label-13">Operator</span>
           <select class="input" name="op">
@@ -752,7 +754,7 @@ function configDialog(id: string): void {
                 <label class="char-pic" title="Portrait"><input type="radio" name="pic" value="" ${raw(!draft.pic ? 'checked' : '')} />${itemImg('char', draft.op, 'char-pic-img')}</label>
                 <label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" data-fallback ${bannerArtOf(draft.op) ? raw(`data-alt="${bannerArtOf(draft.op)}" data-alt-class="stitched"`) : ''} /></label>
                 ${art.map((x) => html`<label class="char-pic"><input type="radio" name="pic" value="${x.id}" ${raw(draft.pic === x.id ? 'checked' : '')} /><img class="char-pic-img" src="${x.src}" alt="" /></label>`)}
-                <button type="button" class="btn secondary sm" data-art>${icon('add')}Add pictures</button>
+                <label class="btn secondary sm">${icon('add')}Add pictures<input type="file" accept="image/*" multiple hidden data-art /></label>
               </div>
             </div>`
           : ''}
