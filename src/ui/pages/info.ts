@@ -425,13 +425,18 @@ const OUTCOME: Record<string, Html> = {
 /** Hard pity where a copy was pulled: 80, 40 on New Horizons, and for weapons 4 sets. */
 const pityMax = (kind: Kind, poolId: string): number => (kind === 'weap' ? WEAPON_PITY_SETS : categoryOf(kind, poolId) === 'newHorizons' ? 40 : 80);
 
-/** Where a copy came from, as the pull list says it: "Pull 52 · 53/80", "Free", a reward, "Not a pull". */
-function copyAt(kind: Kind, x: Acquisition): string {
+/**
+ * Where a copy came from: its pull (or, for weapons, set) number in the pull
+ * list's grey (`pull-no`), and for 6★ its pity ("53/80"); "Free", a reward,
+ * "Not a pull". Pity only matters for 6★, so lower rarities don't show it.
+ */
+function copyAt(kind: Kind, x: Acquisition, sixStar: boolean): Html | string {
   const p = x.pull;
   if (x.extra) return 'Not a pull';
   if (x.reward) return `${x.reward}${p?.bannerPull ? ` · ${kind === 'weap' ? `set ${Math.ceil(p.bannerPull / 10)}` : `pull ${p.bannerPull}`}` : ''}${x.estimated ? ' · estimated' : ''}`;
   if (!p || p.bannerPull === null) return 'Free';
-  return `${kind === 'weap' ? `Set ${Math.ceil(p.bannerPull / 10)}` : `Pull ${p.bannerPull}`}${p.pity !== null ? ` · ${p.pity}/${pityMax(kind, x.poolId)}` : ''}`;
+  const n = kind === 'weap' ? Math.ceil(p.bannerPull / 10) : p.bannerPull;
+  return html`<span class="pull-no num" title="${kind === 'weap' ? 'Set' : 'Pull'} ${n}">${n}</span>${sixStar && p.pity !== null ? ` · ${p.pity}/${pityMax(kind, x.poolId)}` : ''}`;
 }
 
 /** A copy's marker: Extra, Reward, Free, or how its 50/50 went ("Lost"). */
@@ -442,14 +447,14 @@ function copyTag(x: Acquisition): Html | string {
 }
 
 /** One copy as a row of the pull list: date, banner, pull and pity, marker, and the Potential it gave. */
-function pullRow(kind: Kind, x: Acquisition): Html {
+function pullRow(kind: Kind, x: Acquisition, sixStar: boolean): Html {
   const spare = x.copy > MAX_COPIES;
   const cls = `wiki-pull${x.copy === MAX_COPIES ? ' max' : spare ? ' spare' : ''}`;
   const level = html`<span class="wiki-copy" title="Copy ${x.copy}">${spare ? `+${x.copy - MAX_COPIES}` : `P${x.copy - 1}`}</span>`;
   return html`<a class="${cls}" href="${x.extra ? '/settings' : bannerHref(kind, x.poolId)}" ${raw(x.extra ? 'title="Extra copies are listed in Settings"' : '')}>
     <span class="num secondary">${x.extra ? 'Extra' : fmtDate(x.ts)}</span>
     <span class="ellipsis wiki-em">${x.bannerName}</span>
-    <span class="num secondary wiki-pull-at">${copyAt(kind, x)}</span>
+    <span class="num secondary wiki-pull-at">${copyAt(kind, x, sixStar)}</span>
     <span class="wiki-pull-tag">${copyTag(x)}</span>
     ${level}
   </a>`;
@@ -463,13 +468,14 @@ function pullRow(kind: Kind, x: Acquisition): Html {
  */
 function ladderBox(kind: Kind, owned: Owned, info: LadderInfo): Html {
   const level = potentialLevel(owned);
+  const sixStar = (info.rarity ?? 6) === 6;
   const byCopy = new Map(owned.acquisitions.map((x) => [x.copy, x]));
   const spares = owned.acquisitions.filter((x) => x.copy > MAX_COPIES).reverse();
   const when = (x: Acquisition) => (x.extra ? 'Extra' : fmtDate(x.ts));
   const copyCells = (x: Acquisition) => html`<span class="ladder-copy">
     <span class="num secondary">${when(x)}</span>
     <span class="ellipsis wiki-em">${x.bannerName}</span>
-    <span class="num secondary ladder-at">${copyAt(kind, x)}</span>
+    <span class="num secondary ladder-at">${copyAt(kind, x, sixStar)}</span>
     <span class="wiki-pull-tag">${copyTag(x)}</span>
   </span>`;
   const rows = Array.from({ length: MAX_POTENTIAL + 1 }, (_, n) => {
@@ -497,7 +503,7 @@ function ladderBox(kind: Kind, owned: Owned, info: LadderInfo): Html {
     </div>
     <div class="ladder-rows">${rows}</div>
     ${spares.length
-      ? html`<div class="ladder-spare">${accordion(`ladder-${kind}-spare`, html`<span class="ladder-level">${spares.length} more</span>`, html`<div class="wiki-pulls">${spares.map((x) => pullRow(kind, x))}</div>`)}</div>`
+      ? html`<div class="ladder-spare">${accordion(`ladder-${kind}-spare`, html`<span class="ladder-level">${spares.length} more</span>`, html`<div class="wiki-pulls">${spares.map((x) => pullRow(kind, x, sixStar))}</div>`)}</div>`
       : ''}
     ${info.note ? html`<div class="ladder-note">${info.note}</div>` : ''}
   </div>`;
@@ -509,14 +515,16 @@ function ladderBox(kind: Kind, owned: Owned, info: LadderInfo): Html {
  * row), plus a note under the ladder (a weapon's Potential text).
  */
 export interface LadderInfo {
+  /** The item's rarity: pity shows for 6★ only. */
+  rarity?: number;
   names: string[];
   details: (Html | null)[];
   note?: Html;
 }
 
-/** Pull history: the Potential ladder (`ladderBox`), or what's missing to show it. */
+/** Potentials: the Potential ladder (`ladderBox`), or what's missing to show it. */
 export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, ladder?: LadderInfo): Html {
-  const head = html`<div class="section-head"><h2 class="heading-20">Pull history</h2></div>`;
+  const head = html`<div class="section-head"><h2 class="heading-20">Potentials</h2></div>`;
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
       <div class="card wiki-owned-empty">

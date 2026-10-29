@@ -909,6 +909,20 @@ a.ladder-row,
 a.ladder-row:hover {
   background: var(--gray-alpha-100);
 }
+a.ladder-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+/* The whole row opens it: its arrow sits in the middle of the row, not by
+   the copy's line. */
+.ladder-row .wiki-acc-chev {
+  grid-column: -2;
+  grid-row: 1 / -1;
+  align-self: center;
+}
+.ladder-copy .pull-no {
+  font-size: inherit;
+}
 /* Each Potential's number in a circle, lit once unlocked. */
 .ladder-mark {
   display: grid;
@@ -945,9 +959,6 @@ a.ladder-row:hover {
 .ladder-row.locked .ladder-name {
   opacity: 0.55;
 }
-.ladder-row.locked .wiki-acc-chev {
-  grid-column: -2;
-}
 .ladder-spare .wiki-acc > summary {
   gap: 12px;
   padding: 10px 20px;
@@ -980,11 +991,12 @@ a.ladder-row:hover {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     gap: 8px;
   }
+  .ladder-row.on .wiki-acc-chev {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }
 @media (max-width: 640px) {
-  .ladder-copy .ladder-at {
-    display: none;
-  }
   .ladder-head {
     padding: 20px 16px 14px;
   }

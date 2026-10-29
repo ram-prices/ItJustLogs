@@ -410,6 +410,7 @@ function potentialLadder(o: WikiOperator): LadderInfo {
   const byRank = (r: number) => o.potentials.find((p) => p.rank === r);
   const ranks = [1, 2, 3, 4, 5];
   return {
+    rarity: o.rarity,
     names: ranks.map((r) => byRank(r)?.name ?? ''),
     details: ranks.map((r) => {
       const p = byRank(r);
