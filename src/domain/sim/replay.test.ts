@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { World, type Bundle, type Stats } from './engine';
-import { chainFrames } from './team';
+import { chainFrames, runSim, type SimData } from './team';
 
 // One operator whose basic attack chain is a single attack, its Final Strike landing on frame 60 of it.
 const T = 'Beyond.Gameplay.Core';
@@ -129,6 +129,16 @@ describe('swaps and skill holds', () => {
     expect(w.can(1, 'swap')).toBe(true);
   });
 
+  it('cast by the controlled operator, the skipped mark leaves the hold to exclusiveFrame on the jumped timeline (373 from 300)', () => {
+    const w = new World([lockBundle(true)], [stats]);
+    expect(w.press(0, 'battle')).toBe(true);
+    for (let i = 0; i < 72; i++) w.tick();
+    expect(w.can(0, 'attack')).toBe(false);
+    w.tick();
+    w.tick();
+    expect(w.can(0, 'attack')).toBe(true);
+  });
+
   it('without the jump the mark still holds it until frame 51', () => {
     const w = new World([bundle, lockBundle(false)], [stats, stats]);
     w.swaps = true;
@@ -246,5 +256,23 @@ describe('Finishers', () => {
     const w = staggered('buff_talent');
     w.finishers = false;
     expect(firstStrike(w)?.finisher).toBe(false);
+  });
+});
+
+describe("the Simulator's result", () => {
+  it('carries the buffs the game shows, sampled in its shown fight', async () => {
+    // A passive that gives a buff with an icon for the whole fight.
+    const op = {
+      ...bundle,
+      skills: { ...bundle.skills, chr_test_passive: { skillId: 'chr_test_passive', castType: 'Passive', buffs: [{ buffId: 'buff_test_shown' }] } },
+      buffs: { buff_test_shown: { buffId: 'buff_test_shown', hasIcon: true, lifeType: 'Infinity' } },
+      base: { main: 'Str', sub: 'Agi', levels: { 90: { Atk: 1000 } } },
+    };
+    const data: SimData = { ops: { chr_test: op }, weapons: {}, gear: { items: {}, sets: {}, skills: {}, buffs: {}, patch: {} }, settings: {} };
+    const r = await runSim({ builds: [{ op: 'chr_test', potential: 0, gear: [] }], seconds: 5, style: 'basic', effort: 'quick' }, data);
+    const shown = r.buffs?.filter((b) => b.id === 'buff_test_shown') ?? [];
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toMatchObject({ slot: 0, from: 0, stacks: 1 });
+    expect(shown[0].to).toBeGreaterThan(4.5);
   });
 });

@@ -160,14 +160,32 @@ export function loadIcons(redraw: () => void): void {
       if (!data) return;
       icons = data;
       redraw();
+      probeMaskIcons(redraw);
     })
     .catch(() => {});
+}
+/** Mask icons (element, class, weapon type) are CSS backgrounds, so `data-fallback` can't see a failed load: probe them and use the other mirror for any that fail. */
+const mirrored = new Set<string>();
+function probeMaskIcons(redraw: () => void): void {
+  for (const kind of ['elements', 'classes', 'weapon-types'] as const) {
+    for (const file of Object.values(icons?.[kind] ?? {})) {
+      const url = `${EF_ASSETS_CDN}/icons/${file}`;
+      const probe = new Image();
+      probe.onerror = () => {
+        mirrored.add(url);
+        redraw();
+      };
+      probe.src = url;
+    }
+  }
 }
 /** A name's icon URL, if ef-assets has one (a plural "...Permits" finds "...Permit"). */
 export function iconOf(kind: IconKind, name: string): string | null {
   const files = icons?.[kind];
   const file = files?.[name] ?? files?.[name.replace(/s$/, '')];
-  return file ? `${EF_ASSETS_CDN}/icons/${file}` : null;
+  if (!file) return null;
+  const url = `${EF_ASSETS_CDN}/icons/${file}`;
+  return mirrored.has(url) ? mirrorUrl(url)! : url;
 }
 
 /** A banner HH Permit's main colour (from its icon), if ef-assets has one. */

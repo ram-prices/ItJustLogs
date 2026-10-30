@@ -39,6 +39,8 @@ export interface Base {
   nodes?: { stage: number; attrs: { attr: string; value: number }[] }[];
   /** Each talent level's promotion (CharGrowthTable); a level not listed isn't obtainable. */
   talentStages?: Record<string, number>;
+  /** The operator's skills by kind as the game groups them (CharGrowthTable skillGroupMap), the button's own first. */
+  skillGroups?: Record<string, string[]>;
 }
 
 export interface Build {
@@ -115,6 +117,7 @@ export function equip(op: Bundle & { base?: Base }, build: Build, weapon?: Weapo
   }
 
   merged.passives = [...(op.passives ?? []), ...passives];
+  if (base?.skillGroups) merged.skillGroups = base.skillGroups;
   merged.levels = { ...op.levels, ...levels };
   return { bundle: merged, stats: { level, main: base?.main ?? 'Str', sub: base?.sub ?? 'Agi', attributes, mods } };
 }

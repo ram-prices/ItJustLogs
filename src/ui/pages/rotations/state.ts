@@ -95,7 +95,7 @@ interface PageState {
   fitted: { of: ReplayResult; card: RecordingCard } | null;
   /** The open run's, while its timeline can play (paintPlay updates the loadout boxes from it). */
   liveDmg: LiveDamage | undefined;
-  /** The open parsed run's boss (the Enemy lane shows its picture). */
+  /** The shown run's boss: the open parsed run's or the Simulator result's (the Enemy lane and Buffs panel show its picture). */
   laneFoe: (typeof ENEMIES)[number] | undefined;
   /** The Parser tab's timeline: the recording's own (what happened) or the sim's (how it adds up). */
   view: 'recording' | 'sim';

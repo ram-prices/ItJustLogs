@@ -21,6 +21,8 @@
 export type Data = any;
 
 export const FPS = 30;
+/** Channel ticks keep fractional frames (an interval × FPS): this much float error is no frame. */
+const TICK_EPS = 1e-6;
 
 /**
  * The guard AI's Attacker roles (GroupAIConfig Default_GroupAITargetNotMain, Character): per mode, how many of the
@@ -68,6 +70,11 @@ export interface Bundle {
   levels?: Record<string, number>;
   /** Casting a skill keeps the basic attack chain where it was (CharacterTable dontInterruptCombo). */
   dontInterruptCombo?: boolean;
+  /**
+   * The operator's skills by kind (basic, normal, combo, ultimate) as the game groups them (ef-assets base.skillGroups,
+   * CharGrowthTable): the first is the button's own skill, and every skill in a group levels with it.
+   */
+  skillGroups?: Record<string, string[]>;
 }
 
 /** A blackboard that falls back to entities' (for EntityBB_ keys): the first that has the key. */
@@ -210,6 +217,8 @@ export interface Run {
   castBB?: Map<string, number>;
   /** Past its MarkCanInterrupt: the operator can act again. */
   canInterrupt?: boolean;
+  /** A JumpToAction skipped its MarkCanInterrupt while its operator was controlled: held to its exclusiveFrame. */
+  pastMark?: boolean;
   /** The world frame it was cast at. */
   castAt?: number;
   /** An operator's own press (a skill or basic attack), whose end OnSkillEnd reports. */
@@ -418,10 +427,11 @@ const FINAL_STRIKE = 2097152;
 /**
  * A hit's skill kind from its damage decorate mask, where it names one (basic attack 128, battle skill 256, ultimate
  * 512, combo 8192; across every kit's data): Zhuang Fangyi's Thunder Strikes come from a buff but are battle skill
- * damage. Without one, the skill's id decides.
+ * damage. A skill hit (4096) that names none is no kind of skill's (Mi Fu's World Splitter, 4096 + 16384: "not treated as
+ * Battle Skill DMG, but as Crush DMG"; the only such hit in the data). Without either, the skill's id decides.
  */
 const kindOfMask = (mask: number): string | undefined =>
-  mask & 256 ? 'normal' : mask & 8192 ? 'combo' : mask & 512 ? 'ultimate' : mask & 128 ? 'basic' : undefined;
+  mask & 256 ? 'normal' : mask & 8192 ? 'combo' : mask & 512 ? 'ultimate' : mask & 128 ? 'basic' : mask & 4096 ? 'other' : undefined;
 /**
  * The tags of the buffs Susceptibility and Amp are in the game (buff_common_affixes_vulnerable_* and
  * _enhance_*), which effects that watch for them check (Eternal Xiranite: "applies Amp, Protected,
@@ -514,16 +524,21 @@ export class World {
   controlled = 0;
   /** The enemy's rank (Mob, Elite, Boss...), for skills that check it. */
   enemyRank = 'Boss';
-  /** SP the last battle skill cost (its Ultimate Energy is worked out from it). */
-  private lastBattleCost = 0;
   /** Timed markers: entity → marker id → frame it ends. */
   private markers = new Map<Entity, Map<string, number>>();
   /** Global cooldown timers (internal cooldowns): entity → id → frame it's ready. */
   private cdTimers = new Map<Entity, Map<string, number>>();
+  /** Buffs a cast event made for the skill being cast (CreateBuffAttachingSkill), until its run starts. */
+  private attaching: { buff: Buff; skillId: string; owner: Entity }[] = [];
+  /** A press's skill whose switchToBuffConfig applies (set by press, used by cast). */
+  private switching: string | null = null;
   /** Combos that can be cast, by team slot: until when (TriggerComboSkillAction, or the trigger rules). */
   comboReady = new Map<number, number>();
-  /** What triggered each ready combo: the infliction and its stacks (the combo's consumed_type / consumed_layer). */
-  private comboCause = new Map<number, { element: string; stacks: number }>();
+  /**
+   * What triggered each ready combo: the Arts Infliction (`element`) or Physical Status (`status`) and its stacks (the
+   * combo's consumed_type / consumed_layer, combo_type / combo_index).
+   */
+  private comboCause = new Map<number, ComboCause>();
   /** How long a triggered combo stays castable, in seconds (not in the readable data yet). */
   comboWindow = 5;
   /** Combos need their trigger (false: any combo off cooldown can be cast). */
@@ -690,15 +705,20 @@ export class World {
     // A selector with a finder of its own is a search's (InstantSearch); left on a fixed source it does nothing. Camille's
     // combo heals "Source" with the controlled-operator search's filter on it, and he heals himself off the field too (wiki).
     if (spec.selectorData?.finderData) return list;
-    return this.validate(list, spec.selectorData?.validatorData ?? [], ctx);
+    return this.validate(list, spec.selectorData?.validatorData ?? [], ctx, spec.selectorOwner);
   }
 
-  /** A search's filters: the controlled operator only; everyone but the ability's owner (Xaihi's set: "other teammates"). */
-  private validate(list: Entity[], validators: Data[], ctx: Ctx): Entity[] {
+  /**
+   * A search's filters: the controlled operator only; everyone but the search's owner (Xaihi's set: "other teammates"),
+   * the entity running it unless its selectorOwner is ActionSource (the Endministrator's crystal on the enemy finds her
+   * teammates for P2, not her).
+   */
+  private validate(list: Entity[], validators: Data[], ctx: Ctx, selectorOwner?: string): Entity[] {
+    const owner = selectorOwner === 'ActionSource' ? ctx.source : ctx.owner;
     for (const v of validators) {
       const t = short(v.$type);
       if (t === 'Selector+MainCharacterValidator') list = list.filter((e) => e.side === 'team' && e.slot === this.controlled);
-      else if (t === 'Selector+ExcludeOwnerValidator') list = list.filter((e) => e !== ctx.owner && e !== ctx.owner.owner);
+      else if (t === 'Selector+ExcludeOwnerValidator') list = list.filter((e) => e !== owner && e !== owner.owner);
     }
     return list;
   }
@@ -739,7 +759,7 @@ export class World {
     else if (/FixedPointFinder|PointFinder|NavMesh/.test(t)) list = [];
     // Factions are the ability's source's (autoSetTargetFaction): a buff on the enemy from an operator still finds enemies.
     else list = anti === ((ctx.source.owner ?? ctx.source).side === 'team') ? [this.enemy] : this.team;
-    return this.validate(list, a.selectorData?.validatorData ?? [], ctx);
+    return this.validate(list, a.selectorData?.validatorData ?? [], ctx, a.selectorOwner);
   }
 
   // -------------------------------------------------------------------------
@@ -971,8 +991,9 @@ export class World {
       case 'Conditions.CheckOverHeal':
         return !!ctx.heal?.over;
       // The skill an event is about (OnSkillEnd).
+      // Its ids are written in, or values ({ value: id }: Yvonne's Barrage of Technology checks for attack5 this way).
       case 'Conditions.CheckSkillId':
-        return (c.skillIdList ?? []).includes(ctx.origin);
+        return (c.skillIdList ?? []).some((x: Data) => (typeof x === 'string' ? x : x?.useBlackboardKey ? undefined : x?.value) === ctx.origin);
       case 'Conditions.CheckSkillInterruptReason':
         return (c.reasonList ?? []).includes(ctx.reason);
       // A summon's time left (none: it stays until finished).
@@ -1118,8 +1139,9 @@ export class World {
       case 'ChannelingAction':
       case 'ChannelingActionV2':
       case 'TickIntervalAction':
+      case 'ExecuteIntervalAction':
       case 'AuraAction': {
-        const list = (a.actionOnTick ?? a.actionInAura)?.actionData;
+        const list = (a.actionOnTick ?? a.actionInAura ?? a.actionOnExecuting)?.actionData;
         // An aura reaches the whole fight here: allies or enemies (by its filter: relative to its source, or a side
         // named outright, Good = the team: Liino's stance ATK Boost), each given its buffs and actions; not its owner
         // if it excludes it.
@@ -1133,13 +1155,17 @@ export class World {
               ? this.targets(a.targetSettings, ctx)
               : [ctx.target ?? this.enemy];
         // A channel hits again every (target) interval while its timeline entry lasts, up to its count per target
-        // (Si's 4th basic attack: 6 hits, 0.1 s apart; Tangtang's 3rd: every 0.06 s for 8 frames).
+        // (Si's 4th basic attack: 6 hits, 0.1 s apart; Tangtang's 3rd: every 0.06 s for 8 frames, 5 hits).
         // A TickIntervalAction ticks every tickInterval for its span (Rossi's bleed, Zhuang Fangyi's fields), in a skill
-        // or a buff's own timeline.
-        const tick = t === 'TickIntervalAction';
+        // or a buff's own timeline. The interval is kept exact, in fractions of a frame: each tick lands on the first
+        // frame at or after its time, and one is due while its time is inside the span (rounding 0.06 s to 2 frames
+        // had lost Tangtang's 5th; 0.11 s to 3 gave Ardelia's Finisher an 11th, 0.12 s to 4 took Dapan's dash's 4th).
+        // An ExecuteIntervalAction is one too: its actions every executeInterval (or every frame) for its span, the first
+        // at once (Purrchena's Handicraft pulls in 4 times over 0–56 at 0.5 s, then its end hit: the wiki's 150%).
+        const tick = t === 'TickIntervalAction' || t === 'ExecuteIntervalAction';
         if ((t === 'ChannelingAction' || t === 'ChannelingActionV2' || tick) && (ctx.run || ctx.self) && (ctx.span ?? 0) > 0) {
-          const interval = tick ? this.val(a.tickInterval ?? { value: 0 }, ctx.bb) : Math.max(this.val(a.triggerInterval ?? { value: 0 }, ctx.bb), this.val(a.targetTriggerInterval ?? { value: 0 }, ctx.bb));
-          const every = Math.max(1, Math.round(interval * FPS));
+          const interval = tick ? (a.executeEachFrame ? 1 / FPS : this.val(a.tickInterval ?? a.executeInterval ?? { value: 0 }, ctx.bb)) : Math.max(this.val(a.triggerInterval ?? { value: 0 }, ctx.bb), this.val(a.targetTriggerInterval ?? { value: 0 }, ctx.bb));
+          const every = Math.max(1, interval * FPS);
           const max = tick ? -1 : Math.round(this.val(a.maxCountPerTarget ?? { value: 0 }, ctx.bb));
           // -1: every interval for the whole span (Tangtang's 3rd attack, her waterspouts); 0 or none: once.
           const left = max > 0 ? max - 1 : max < 0 ? Infinity : 0;
@@ -1152,7 +1178,11 @@ export class World {
             // From the action's source (ActionSource), as CreateBuffAction's are: an entity's aura gives its spawner's
             // buffs (Arcane's array marks check the ultimate's listener on him). ActionOwner: from the entity running it
             // (Xaihi's crystal, whose heal checks the crystal for finishball_04 after its second heal).
-            if (spec.buffId) this.addBuff(e, spec.buffId, a.buffSource === 'ActionOwner' ? ctx.owner : ctx.source, assigned);
+            const b = spec.buffId ? this.addBuff(e, spec.buffId, a.buffSource === 'ActionOwner' ? ctx.owner : ctx.source, assigned) : null;
+            // A buff with no end of its own lasts while the aura does (Gilberta's field: her ultimate's 5 s entity, whose
+            // aura gives the enemy a buff that never ends); one with its own duration keeps it (Tangtang's Whirlpool
+            // debuff: the data says nothing of it ending with the aura).
+            if (b && t === 'AuraAction' && b.end === Infinity) this.auraBuffs.push({ buff: b, run: ctx.run, self: ctx.run ? undefined : ctx.self, until: ctx.run ? this.frame + (ctx.span ?? 0) : Infinity });
           }
           this.exec(list, { ...ctx, target: e });
         }
@@ -1163,7 +1193,11 @@ export class World {
         return;
       case 'StoreAttributeValue': {
         const who = this.targets(a.targetSettings, ctx)[0] ?? ctx.owner;
-        const v = this.stat(who, a.attributeType);
+        // primaryAttributeType Main / Sub: the operator's main or secondary attribute (Akekuri's combo: her Intellect),
+        // attributeType then only its default.
+        const op = who.owner ?? who;
+        const attr = a.primaryAttributeType === 'Main' && op.stats ? op.stats.main : a.primaryAttributeType === 'Sub' && op.stats ? op.stats.sub : a.attributeType;
+        const v = this.stat(who, attr);
         const num = (f: Data, d: number) => (f == null ? d : typeof f === 'object' ? this.val(f, ctx.bb) : Number(f));
         const x = (v * num(a.multiplierValue, 1)) / (num(a.divisorValue, 1) || 1) + num(a.baseValue, 0);
         ctx.bb.set(a.key, a.useFloor ? Math.floor(x) : x);
@@ -1188,7 +1222,9 @@ export class World {
         const local = ctx.run?.origin && projectileKeys(this.bundles).has(a.key) ? (ctx.run.origin.projBB ??= new Map()) : null;
         const store = local ?? (a.key.startsWith('EntityBB_') ? (this.targets(a.calculationTarget, ctx)[0] ?? ctx.owner).bb : ctx.bb);
         const old = store.get(a.key) ?? 0;
-        store.set(a.key, a.operation === 'Add' ? old + v : a.operation === 'Multiply' ? old * v : v);
+        // Divide: the key by the value (Akekuri's combo: sub_ratio / rate, 1.5% per 10 Intellect); Floor: the value rounded
+        // down (Typhoeus's enemy_forward_num, its own key).
+        store.set(a.key, a.operation === 'Add' ? old + v : a.operation === 'Multiply' ? old * v : a.operation === 'Divide' ? (v ? old / v : 0) : a.operation === 'Floor' ? Math.floor(v) : v);
         return;
       }
       case 'SimpleCalcBBAction': {
@@ -1213,7 +1249,9 @@ export class World {
       case 'ObtainCostAction':
         // SP from a skill: gained, or returned (atbGainMethod).
         this.lastAtb = { type: 'Skill', method: a.atbGainMethod ?? 'Gain' };
-        return this.obtain(a.costType, this.val(a.costValue, ctx.bb) * this.val(a.coefficient ?? { value: 1 }, ctx.bb), ctx.owner, a.useUspRecoverTag ? Number(a.uspRecoverTag?.tagId) : undefined, !!a.ignoreUspGainScalar);
+        // To its `target` where it names one (the Endministrator's crystal on the enemy gives P3's Ultimate Energy to
+        // its Source, her), else to the entity running it.
+        return this.obtain(a.costType, this.val(a.costValue, ctx.bb) * this.val(a.coefficient ?? { value: 1 }, ctx.bb), (a.target ? this.targets(a.target, ctx)[0] : undefined) ?? ctx.owner, a.useUspRecoverTag ? Number(a.uspRecoverTag?.tagId) : undefined, !!a.ignoreUspGainScalar);
       // Skill kinds come from ids here ("Hunter Pursuit", chr_0033_camille_combo_skill_2, counts as a combo already).
       case 'ChangeSkillType':
         return;
@@ -1244,6 +1282,13 @@ export class World {
                 if (a.inheritSkillIdList?.length) b.inherit = a.inheritSkillIdList;
               }
               if (b && a.contextKey) ctx.groups.set(a.contextKey, [e]);
+              // CreateBuffAttachingSkill: the buff lasts as long as its skill does, the one a cast event is about
+              // (Yvonne's Barrage of Technology: +50% for the attack5 being cast, not for every attack after), else the
+              // one running it.
+              if (b && t === 'CreateBuffAttachingSkill' && !b.byRun) {
+                if (ctx.casting && ctx.origin) this.attaching.push({ buff: b, skillId: ctx.origin, owner: ctx.owner.owner ?? ctx.owner });
+                else if (ctx.run) b.byRun = ctx.run;
+              }
             }
           }
         return;
@@ -1289,9 +1334,14 @@ export class World {
         if (a.castSkillOnBlock && a.skillIdOnBlock && !ids.size) ids.add(a.skillIdOnBlock);
         // Its target; several spots (a point finder's) get a projectile each.
         const list = a.targetSettings ? this.targets(a.targetSettings, ctx) : [];
-        // A wave (WAVES) reaches everyone in range: each teammate and the enemy (no positions: all are in range).
-        const at = [...ids].some((x) => WAVES.test(x))
-          ? [...this.team, this.enemy]
+        // A wave (WAVES) reaches everyone in range: each teammate and the enemy (no positions: all are in range). Its
+        // healing projectile (named _heal) reaches only the team: Liino's Cosmovoice beat launches _soundwave and
+        // _soundwave_heal with the same hit skill (it heals a character, damages an enemy), the wiki's one 60% a beat.
+        const wave = [...ids].some((x) => WAVES.test(x));
+        const at = wave
+          ? /_heal$/.test(a.projectileId ?? '')
+            ? [...this.team]
+            : [...this.team, this.enemy]
           : list.length > 1 && list.every((x) => x === list[0])
             ? list
             : [list[0] ?? ctx.target ?? this.enemy];
@@ -1323,7 +1373,9 @@ export class World {
         this.entities.push(ent);
         if (a.saveToContext && a.contextKey) ctx.groups.set(a.contextKey, [ent]);
         this.abilityEvent(ent.owner ?? ent, 'OnAbilityEntitySpawned', ent);
-        if (a.abilityEntitySkillId) this.cast(a.abilityEntitySkillId, ent, ctx.owner, ctx.target ?? this.enemy, a.assignBlackboard ? ctx.bb : new Map());
+        // Its skill's source is its spawner's side too (Pogranichnik's Steel Oath on the enemy sends a Shieldguard at it,
+        // not at her).
+        if (a.abilityEntitySkillId) this.cast(a.abilityEntitySkillId, ent, ctx.owner.side === 'team' ? ctx.owner : by, ctx.target ?? this.enemy, a.assignBlackboard ? ctx.bb : new Map());
         return;
       }
       case 'CastSkill': {
@@ -1390,12 +1442,17 @@ export class World {
       case 'TriggerCustomAbilityEvent':
         for (const e of this.targets(a.targets, ctx)) this.abilityEvent(e, 'OnCustomAbilityEvent', ctx.owner, undefined, eventName(a.eventName));
         return;
-      // A battle skill's Ultimate Energy for the team: 6.5 per 100 SP spent (wiki), × the buff's ratio.
+      // Ultimate Energy for the team (buff_common_obtain_ultimate_sp, given by every battle skill and Si's combo): its
+      // blackboard's usp_everyone (6.5) to each operator and usp_self (0) more to its source, × the buff's ratio (0.5
+      // for Snowshine's and Catcher's battle skills). Fixed, whatever SP the skill cost: Liino's 25 SP battle skill gives
+      // 6.5 too, and Si's combo none spent (the owner's footage: Si +17.6, Arcane +8.0, Xaihi +6.2 at its banner).
       case 'ObtainUspInNormalSkill': {
-        const amount = ((6.5 * this.lastBattleCost) / 100) * (a.coefficient ? this.val(a.coefficient, ctx.bb) || 1 : 1);
+        const ratio = a.coefficient ? this.val(a.coefficient, ctx.bb) || 1 : 1;
+        const everyone = (ctx.bb.get('usp_everyone') ?? 6.5) * ratio;
+        const self = (ctx.bb.get('usp_self') ?? 0) * ratio;
         // The caster's own battle skill gets through its block (assumed: Last Rite gains "from her own battle skills").
         const from = ctx.source.owner ?? ctx.source;
-        for (const t of this.team) this.obtain('UltimateSp', amount, t, t === from ? REFRAIN_ANY : undefined);
+        for (const t of this.team) this.obtain('UltimateSp', everyone + (t === from ? self : 0), t, t === from ? REFRAIN_ANY : undefined);
         return;
       }
       // No Ultimate Energy while the buff (or skill) that says so lasts, but gains tagged with one of its tags (Last
@@ -1441,6 +1498,11 @@ export class World {
       }
       case 'MarkCanInterrupt':
         if (ctx.run) ctx.run.canInterrupt = true;
+        return;
+      // Sets off the targets' buffs that answer this kind of ignition (their igniteEventAction): the Endministrator's
+      // ultimate shatters her crystals (EndminUlt), as Vulnerability (NoGuard) and a Physical Status do.
+      case 'IgniteAction':
+        for (const e of this.targets(a.targetSettings, ctx)) this.ignite(e, a.igniteType, (a.igniteSource ? this.targets(a.igniteSource, ctx)[0] : undefined) ?? ctx.owner);
         return;
       case 'SaveBuffStackNum':
       case 'SaveBuffStackNumAdvanced': {
@@ -1703,8 +1765,17 @@ export class World {
           if (!id) continue;
           const left = Math.max(0, (this.readyAt.get(id) ?? 0) - this.clockNow);
           const v = this.val(a.value, ctx.bb);
+          if (e.side !== 'team') continue;
+          // Set: the cooldown left becomes the value (seconds, or a share of the skill's full cooldown), whether or not
+          // it was running: Wulfgard's P5 resets his combo (0), Yvonne's ultimate ends with 10 s left on it, Typhoeus's
+          // and Rossi's combos put each other on cooldown (100%).
+          if (a.functionType === 'Set') {
+            const full = this.param(id, 2, this.patchAt(id, op.slot)?.cooldown ?? 0) * FPS;
+            this.readyAt.set(id, this.clockNow + Math.max(0, Math.round(a.isPercentage ? full * v : v * FPS)));
+            continue;
+          }
           const cut = a.isPercentage ? left * v : v * FPS;
-          if (left > 0 && e.side === 'team') this.readyAt.set(id, this.clockNow + Math.max(0, Math.round(left - (a.functionType === 'Reduce' ? cut : -cut))));
+          if (left > 0) this.readyAt.set(id, this.clockNow + Math.max(0, Math.round(left - (a.functionType === 'Reduce' ? cut : -cut))));
         }
         return;
       }
@@ -1791,6 +1862,17 @@ export class World {
     // A "ToggleBuff" passive's effect is in toggleBuffs (its buffs list is a leftover: several gear sets name another set's buff there).
     const granted: Data[] = skill.castType === 'Passive' && skill.passiveSkillType === 'ToggleBuff' ? (skill.toggleBuffs ?? []).flatMap((g: Data) => g.buffs ?? []) : (skill.buffs ?? []);
     for (const b of granted) if (b?.buffId) this.addBuff(owner, b.buffId, owner, new Map(bb));
+    // Its switchToBuffConfig's buffs, when its press found their conditions held (press, `switching`).
+    if (this.switching === skillId) {
+      this.switching = null;
+      const sw = skill.switchToBuffConfig;
+      for (const e of this.targets(sw.buffSource, { owner, source, target: run.target, bb, groups: run.groups, skillId, run }))
+        for (const spec of sw.buffs) {
+          const assigned = new Map<string, number>();
+          if (spec.assignBlackboard) for (const it of spec.assignItems ?? []) assigned.set(it.targetKey, it.useDirectValue ? Number(it.numericValue) : (bb.get(it.inputValueKey) ?? 0));
+          this.addBuff(e, spec.buffId, owner, assigned);
+        }
+    }
     if (skill.castType === 'Passive') {
       for (const m of skill.cardAttributeModifier?.attributeModifiers ?? []) owner.mods.push({ attributeType: this.attrOf(m, owner), formulaItem: m.formulaItem, value: this.val(m.param, bb) });
       const events = skill.actionGroupData?.passiveEventActions ?? [];
@@ -1798,6 +1880,11 @@ export class World {
     }
     // What the owner's cut skill hands to this one goes on under it (inheritSkillIdList).
     for (const b of owner.buffs) if (b.byRun?.ended && b.byRun.owner === owner && b.inherit?.includes(skillId)) b.byRun = run;
+    // Buffs a cast event attached to this cast (CreateBuffAttachingSkill) end with it.
+    if (this.attaching.length) {
+      for (const x of this.attaching) if (x.owner === owner && x.skillId === skillId) x.buff.byRun = run;
+      this.attaching = this.attaching.filter((x) => !(x.owner === owner && x.skillId === skillId));
+    }
     this.runs.push(run);
     this.stepRun(run);
     return run;
@@ -1882,6 +1969,7 @@ export class World {
       } else if (/Enhance/.test(st.stackingType)) existing.stacks = Math.min(max, existing.stacks + 1);
       for (const [k, v] of assigned) existing.bb.set(k, v);
       if (existing.stacks !== before) this.buffEvent(existing, 'OnBuffEnhanceChanged');
+      this.buffEvent(existing, 'OnBuffAfterTryEnhanced');
       this.abilityEvent(by, 'OnOutputBuff', e, undefined, undefined, { buff: existing });
       this.abilityEvent(e, 'OnAddedBuff', by, undefined, undefined, { buff: existing });
       return existing;
@@ -1915,6 +2003,9 @@ export class World {
     // As it's enabled: once (Liino's ATK Boost on each teammate), and what lasts while it is.
     this.buffEvent(buff, 'OnBuffEnable');
     this.buffEvent(buff, 'DuringBuffEnable');
+    // After any add, a new buff's or another stack's (Vulnerability's ignites NoGuard: the Endministrator's crystals
+    // shatter).
+    this.buffEvent(buff, 'OnBuffAfterTryEnhanced');
     this.stepBuff(buff);
     this.abilityEvent(by, 'OnOutputBuff', e, undefined, undefined, { buff });
     this.abilityEvent(e, 'OnAddedBuff', by, undefined, undefined, { buff });
@@ -1947,6 +2038,19 @@ export class World {
       b.done.add(i);
       this.execBlock(ta._sequenceActionData ?? ta, { ...this.buffCtx(b), span: Math.max(0, (ta._endFrame ?? ta._startFrame ?? 0) - (ta._startFrame ?? 0)) });
     });
+  }
+
+  /**
+   * An ignition of a kind on an entity: each of its buffs with an igniteEventAction for it runs that (and may end), the
+   * one who set it off (igniteSource) as its Target (her crystal reads P3's Ultimate Energy off the Endministrator).
+   */
+  private ignite(e: Entity, type: string, by: Entity | null = null): void {
+    for (const b of [...e.buffs])
+      for (const ev of b.def.igniteEventAction ?? []) {
+        if (ev.igniteType !== type || !e.buffs.includes(b)) continue;
+        for (const a of ev.actions ?? []) this.execBlock(a, this.buffCtx(b, by));
+        if (ev.finishAfterIgnited) this.endBuff(b, b.stacks, true);
+      }
   }
 
   private buffEvent(b: Buff, event: string, target: Entity | null = null, damage?: Ctx['damage']): void {
@@ -2027,6 +2131,14 @@ export class World {
   /** The sum of an attribute's multipliers (0.1 = +10%). */
   multiplier(e: Entity, name: string): number {
     return this.modSum(e, name, true);
+  }
+
+  /**
+   * A battle skill's SP cost: the skill table's, plus the operator's AtbCostAddition (Zhuang Fangyi's ult_skill_free,
+   * −100: her first battle skill in her ultimate is free), never below 0.
+   */
+  private spCost(op: Entity, id: string, p: { cost?: number } | undefined): number {
+    return Math.max(0, this.param(id, 1, p?.cost ?? 100) + this.attribute(op, 'AtbCostAddition'));
   }
 
   /** A scalar attribute (…Scalar, 1 unless changed): the product of its multipliers' factors. */
@@ -2258,6 +2370,15 @@ export class World {
             else add(zone, v);
           }
         }
+    // The hit's own processors (its damage unit's DamageScaleProcessor, from the skill's values): as a buff's (Estella's
+    // P3 dmg_up on her battle skill's first hit).
+    for (const p of processors) {
+      if (short(p.$type) !== 'DamageScaleProcessor') continue;
+      const zone = p.zoneName ?? 'NormalCalcZone';
+      const v = this.val(p.addition, ctx.bb);
+      if (zone === 'NormalCalcZone' && p.side === 'Defender') taken += v;
+      else add(zone, v);
+    }
     // DMG bonuses add up (wiki: the multiplier group): the damage type's, Arts', the skill kind's, bursts' or reactions'.
     const SKILL: Record<string, string> = { basic: 'NormalAttackDamageIncrease', normal: 'NormalSkillDamageIncrease', combo: 'ComboSkillDamageIncrease', ultimate: 'UltimateSkillDamageIncrease' };
     const increases = [`${type}DamageIncrease`, type !== 'Physical' ? 'SpellDamageIncrease' : '', kind === 'skill' ? (SKILL[dmg.skillKind] ?? '') : '', kind === 'burst' ? `${type}BurstDamageIncrease` : '', kind === 'reaction' ? `${type}AbnormalDamageIncrease` : '', this.staggered(defender) ? 'DamageToBrokenUnitIncrease' : ''];
@@ -2412,8 +2533,13 @@ export class World {
     const attacker = ctx.source.owner ?? ctx.source;
     const about = { origin: ctx.skillId, physical: PHYSICAL_MASK[status] };
     this.abilityEvent(attacker, 'OnBeforeOutputPhysicalInfliction', e, undefined, undefined, about);
+    // And the enemy hears it's about to take one (Pogranichnik's Steel Oath aura: each Physical Status sends a Shieldguard).
+    this.abilityEvent(e, 'OnBeforeTakePhysicalInfliction', attacker, undefined, undefined, about);
     const vb = e.buffs.find((b) => b.id === VULNERABLE);
     const v = vb?.stacks ?? 0;
+    // The status itself is about to be applied (not just Vulnerability): OnBeforeOutput<status> as the data names it
+    // (Airborne, KnockDown: Lifeng's Subduer of Evil hears her Knock Downs; Chen's and Si's hear Lifts).
+    if (v || forced) this.abilityEvent(attacker, `OnBeforeOutput${PHYSICAL_MASK[status]}`, e, undefined, undefined, about);
     // Vulnerability's own start would shatter Solidification (buff_physical_handle_cryst_break) unless the game's code
     // says to skip it; it does unless the enemy is Solidified. The shatter happens here, once per status applied.
     const vulnerable = () => this.addBuff(e, VULNERABLE, attacker, new Map([['duration', -1], ['skip_handle_cryst_break', 1]]));
@@ -2439,6 +2565,9 @@ export class World {
       }
       this.comboEvent({ kind: 'physical', status, stacks: level, target: e });
     }
+    // A Physical Status sets off what answers it (PhysicalStatus: the Endministrator's crystals shatter); the game's code,
+    // as the statuses are. Vulnerability alone ignites through its own buff (NoGuard).
+    if (v || forced) this.ignite(e, 'PhysicalStatus', attacker);
     this.abilityEvent(attacker, 'OnAfterOutputPhysicalInfliction', e, undefined, undefined, about);
   }
 
@@ -2581,6 +2710,16 @@ export class World {
       return;
     }
     this.frame++;
+    // A combo's cooldown recovers × the operator's ComboSkillCooldownRecoveryScalar (Zhuang Fangyi's ult_base:
+    // combo_cd_rate 4, a quarter of it in her ultimate).
+    if (recoversCooldowns(this.bundles))
+      for (const op of this.team) {
+        const id = this.skillIdOf(op, 'combo');
+        const at = this.readyAt.get(id) ?? 0;
+        if (at <= this.clockNow) continue;
+        const rate = this.factor(op, 'ComboSkillCooldownRecoveryScalar');
+        if (rate !== 1) this.readyAt.set(id, Math.max(this.clockNow, at - (rate - 1)));
+      }
     for (const op of this.team) {
       const open = this.formOpen[op.slot];
       if (open === undefined && !this.modes.get(op)?.length) continue;
@@ -2615,17 +2754,23 @@ export class World {
     if (!this.holdSp && !slowed) this.sp = Math.min(this.spMax, this.sp + (this.foe.sp?.regen ?? 8) / FPS);
     // Summons whose time is up.
     for (const e of this.entities) if (e.alive && e.until !== undefined && e.until <= this.frame) this.finishEntity(e);
+    // An aura's buffs end with the aura.
+    if (this.auraBuffs.length) {
+      const over = (x: (typeof this.auraBuffs)[number]) => (x.run ? x.run.ended || this.frame >= x.until : !x.self || !x.self.owner.buffs.includes(x.self));
+      for (const x of this.auraBuffs) if (over(x) && x.buff.owner.buffs.includes(x.buff)) this.endBuff(x.buff, x.buff.stacks, true);
+      this.auraBuffs = this.auraBuffs.filter((x) => !over(x) && x.buff.owner.buffs.includes(x.buff));
+    }
     // Channels: their next hits, while their skill runs.
     if (this.channels.length) {
       // Its skill still runs, or its buff is still on.
       const on = (ch: (typeof this.channels)[number]) => (ch.run ? !ch.run.ended : !!ch.buff && ch.buff.owner.buffs.includes(ch.buff));
       for (const ch of this.channels)
-        while (on(ch) && ch.left > 0 && ch.at <= this.frame && ch.at < ch.until) {
+        while (on(ch) && ch.left > 0 && ch.at <= this.frame + TICK_EPS && ch.at < ch.until - TICK_EPS) {
           for (const e of ch.spec ? this.targets(ch.spec, ch.ctx) : [ch.ctx.target ?? this.enemy]) this.exec(ch.list, { ...ch.ctx, target: e });
           ch.at += ch.every;
           ch.left--;
         }
-      this.channels = this.channels.filter((ch) => on(ch) && ch.left > 0 && ch.at < ch.until);
+      this.channels = this.channels.filter((ch) => on(ch) && ch.left > 0 && ch.at < ch.until - TICK_EPS);
     }
     for (const r of [...this.runs])
       if (!r.ended) {
@@ -2685,6 +2830,9 @@ export class World {
         const m = /_potential_(\d+)$/.exec(id);
         return !!m && Number(m[1]) <= (potential[i] ?? 0);
       });
+      // Changes to skills and attributes first, then the skills and buffs they attach: a talent's skill cast before a
+      // Potential's change to it was registered missed it (Gilberta's talent_0 cast by talent_1_2 without P3's +0.05).
+      const later: Data[] = [];
       for (const id of [...[...best.values()].map((x) => x.id), ...potentials])
         for (const entry of b.talents[id]) {
           const d: Data = entry;
@@ -2692,7 +2840,8 @@ export class World {
           if (d.attachSkill?.skillId) attached.add(d.attachSkill.skillId);
           switch (enumOf('talent', d.modifyType)) {
             case 1:
-              if (d.attachSkill?.skillId) this.cast(d.attachSkill.skillId, op, op, this.enemy, new Map((d.attachSkill.blackboard ?? []).map((x: Data) => [x.key, Number(x.value)])));
+            case 5:
+              later.push(d);
               break;
             case 2: {
               const m = d.skillParamModifier;
@@ -2709,12 +2858,14 @@ export class World {
               if (name) op.attr[name] = (op.attr[name] ?? 0) + Number(d.attrModifier.attrValue);
               break;
             }
-            case 5: {
-              const bb = new Map<string, number>((d.attachBuff.blackboard ?? []).map((x: Data) => [x.key, Number(x.value)]));
-              if (d.attachBuff.buffId) this.addBuff(op, d.attachBuff.buffId, op, bb);
-              break;
-            }
           }
+        }
+      for (const d of later)
+        if (enumOf('talent', d.modifyType) === 1) {
+          if (d.attachSkill?.skillId) this.cast(d.attachSkill.skillId, op, op, this.enemy, new Map((d.attachSkill.blackboard ?? []).map((x: Data) => [x.key, Number(x.value)])));
+        } else {
+          const bb = new Map<string, number>((d.attachBuff.blackboard ?? []).map((x: Data) => [x.key, Number(x.value)]));
+          if (d.attachBuff.buffId) this.addBuff(op, d.attachBuff.buffId, op, bb);
         }
     });
     // Each operator's own passives (not those a talent attaches), then its weapon's and gear sets'.
@@ -2783,6 +2934,8 @@ export class World {
   }
   /** What was pressed, when (for showing a rotation). */
   log: { frame: number; op: number; input: Input }[] = [];
+  /** Buffs an aura gave, which end with it: its run's timeline entry, or the buff whose event runs it. */
+  private auraBuffs: { buff: Buff; run?: Run; self?: Buff; until: number }[] = [];
   /** Channels still to hit (ChannelingAction over its timeline entry). */
   /** Ultimate Energy blocks (RefrainObtainUsp): whose, while which buff or skill lasts, the tags let through. */
   private refrains: { op: Entity; buff?: Buff; run?: Run; tags: number[]; clear: boolean }[] = [];
@@ -2856,7 +3009,9 @@ export class World {
     const prev = this.main[slot];
     if (prev) this.endRun(prev, true);
     for (const r of this.runs) if (r.follow && !r.ended && r.owner === op) this.endRun(r, true);
-    this.abilityEvent(op, 'OnBeforeCastSkill', this.enemy, undefined, undefined, { origin: id, casting: true });
+    // The caster is a cast event's target, as for OnAfterSkillApplyCost (the gear sets' listeners check Target's skill;
+    // Yvonne's Barrage of Technology puts its +50% on Target, her).
+    this.abilityEvent(op, 'OnBeforeCastSkill', op, undefined, undefined, { origin: id, casting: true });
     this.main[slot] = this.cast(id, op, op, this.enemy);
     if (this.main[slot]) this.main[slot]!.main = true;
     this.chains[slot] = null;
@@ -2899,15 +3054,17 @@ export class World {
   }
 
   /**
-   * An operator's skill of a kind (skillSpecification Character<kind>): <id>_normal_skill / _combo_skill /
-   * _ultimate_skill / _power_attack as most are named, else its own of that kind (Mi Fu's _normalskill_1 and
-   * _powerattack, Typhoeus's _normal_skill_floating_start): a first step (_1, _start), else the shortest name.
+   * An operator's skill of a kind: its skill group's first (ef-assets base.skillGroups: Typhoeus's ultimate is
+   * ultimate_skillfloating, the only skill in her UltimateSkill group), else as most are named, <id>_normal_skill /
+   * _combo_skill / _ultimate_skill / _power_attack, else its own of that kind (skillSpecification Character<kind>: Mi
+   * Fu's _normalskill_1 and _powerattack): a first step (_1, _start), else the shortest name.
    */
   private ownSkill(op: Entity, kind: string): string {
     const key = `${op.id}|${kind}`;
     const known = this.ownSkills.get(key);
     if (known) return known;
-    const usual = `${op.id}_${{ NormalSkill: 'normal_skill', ComboSkill: 'combo_skill', UltimateSkill: 'ultimate_skill', PowerAttack: 'power_attack' }[kind] ?? kind}`;
+    const grouped = this.bundleOf(op)?.skillGroups?.[{ NormalSkill: 'normal', ComboSkill: 'combo', UltimateSkill: 'ultimate' }[kind] ?? '']?.[0];
+    const usual = grouped && this.skillOf.has(grouped) ? grouped : `${op.id}_${{ NormalSkill: 'normal_skill', ComboSkill: 'combo_skill', UltimateSkill: 'ultimate_skill', PowerAttack: 'power_attack' }[kind] ?? kind}`;
     let id = usual;
     if (!this.skillOf.has(usual)) {
       const list = [...this.skillOf.entries()].filter(([k, v]) => k.startsWith(`${op.id}_`) && v.skillSpecification === `Character${kind}` && !/projhit|abilityentity|_end$|_loop$/.test(k)).map(([k]) => k);
@@ -2992,13 +3149,23 @@ export class World {
 
   /** A run goes on from a frame of its timeline (JumpToAction). */
   private jumpTo(run: Run, dest: number): void {
+    // A channel lasts while its timeline entry does, so it ends where the jump leaves it (Ardelia's Dolly channels,
+    // 81–201, stop at her ultimate's jump from 171 to 201: 3 s of hits, the wiki's 10).
+    const shift = dest - (this.frame - run.start);
+    for (const ch of this.channels) if (ch.run === run) ch.until -= shift;
     run.start = this.frame - dest;
     (run.skill.actionGroupData?.timelineActions ?? []).forEach((ta: Data, i: number) => {
       if ((ta._startFrame ?? 0) >= dest || run.done.has(i)) return;
       run.done.add(i);
-      // A jump past the skill's MarkCanInterrupt skips the part it holds the operator for: Last Rite's battle skill
-      // cast off-field goes from frame 0 to 300, past its mark at 51, and the recording swaps to her 0.75 s in.
-      if ((ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'MarkCanInterrupt')) run.canInterrupt = true;
+      // A jump past the skill's MarkCanInterrupt skips it, so the mark never lets the controlled operator act: the skill
+      // holds them to its exclusiveFrame on the timeline, or a later mark (Pogranichnik's one-slash combo jumps 0 → 600
+      // and holds her to 649, past the slash at 623; Rossi's, Mi Fu's and Catcher's battle skills alike). Cast
+      // off-field it holds no one: Last Rite's battle skill goes from frame 0 to 300, past its mark at 51, and the
+      // recording swaps to her 0.75 s in.
+      if ((ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'MarkCanInterrupt')) {
+        if (run.owner.slot === this.controlled) run.pastMark = true;
+        else run.canInterrupt = true;
+      }
     });
   }
 
@@ -3105,7 +3272,7 @@ export class World {
     if (this.freeze && !(input === 'ultimate' && !this.strictUltimates)) return false;
     if (this.busy(run) && !((this.cancels || this.stance(run!)) && this.allowsNext(run!, id)) && !(input === 'ultimate' && this.stance(run!))) return false;
     const p = this.patchAt(id, slot);
-    if (input === 'battle') return this.sp >= this.param(id, 1, p?.cost ?? 100);
+    if (input === 'battle') return this.sp >= this.spCost(op, id, p);
     if (input === 'ultimate') return !this.strictUltimates || op.energy >= this.param(id, 1, p?.cost ?? 100) - 1e-6;
     if (input === 'combo' && this.strictCombos) return (this.comboReady.get(slot) ?? -1) >= this.frame;
     return true;
@@ -3137,12 +3304,7 @@ export class World {
     }
     const id = this.skillIdOf(op, input);
     const p = this.patchAt(id, slot);
-    if (input === 'battle') {
-      const cost = this.param(id, 1, p?.cost ?? 100);
-      this.sp -= cost;
-      // Its Ultimate Energy comes from the skill's own buff (ObtainUspInNormalSkill), from this cost.
-      this.lastBattleCost = cost;
-    }
+    if (input === 'battle') this.sp -= this.spCost(op, id, p);
     // An ultimate spends its cost (Arcane's second cast is free until its window ends).
     if (input === 'ultimate') op.energy = Math.max(0, op.energy - this.ultCost(op));
     if (input === 'combo') this.comboReady.delete(slot);
@@ -3157,18 +3319,35 @@ export class World {
     // Combo cooldowns × ComboSkillCooldownScalar (Qingbo and similar sets: 0.85).
     const cdScale = input === 'combo' ? this.factor(op, 'ComboSkillCooldownScalar') : 1;
     if (input === 'combo' || input === 'ultimate') this.readyAt.set(id, this.clockNow + Math.round(this.param(id, 2, p?.cooldown ?? 0) * cdScale * FPS));
-    this.abilityEvent(op, 'OnBeforeCastSkill', this.enemy, undefined, undefined, { origin: id, casting: true });
+    this.abilityEvent(op, 'OnBeforeCastSkill', op, undefined, undefined, { origin: id, casting: true });
+    // A skill's switchToBuffConfig: buffs it gives as it takes over from what the operator was doing, if its conditions
+    // hold then (they look at that skill: Last Rite's battle skill during her own basic attack, Liino's End Stance out of
+    // her stance; Camille's Hunter Pursuit casts its strike, combo_skill_2). Checked before the old skill is cut.
+    const sw = this.skillOf.get(id)?.switchToBuffConfig;
+    if (sw?.buffs?.length && this.check(sw.condition?.actionData, { owner: op, source: op, target: this.enemy, bb: new Map(), groups: new Map(), skillId: id })) this.switching = id;
     // A new press cuts the operator's previous skill or attack short.
     const prev = this.main[slot];
     if (prev) this.endRun(prev, true);
-    // A combo knows what triggered it (dynamic consumed_type, numbered Fire 0, Pulse 1, Cryst 2, Natural 3, and consumed_layer).
+    // A combo knows what triggered it, as the game's code hands it over (no data sets these): consumed_type and
+    // consumed_layer (the infliction, numbered Fire 0, Pulse 1, Cryst 2, Natural 3, and its stacks); combo_type (Arts
+    // 0, Physical 1) and combo_index (that number, or the Physical Status: Lift 0, Knock Down 1, Breach 2, Crush 3),
+    // which Fluorite's and Antal's combos switch on to pick their infliction.
     const cause = input === 'combo' ? this.comboCause.get(slot) : undefined;
-    const handed = cause ? new Map([['consumed_type', ['Fire', 'Pulse', 'Cryst', 'Natural'].indexOf(cause.element)], ['consumed_layer', cause.stacks]]) : undefined;
+    const handed = cause
+      ? new Map(
+          cause.element
+            ? [['consumed_type', COMBO_ELEMENTS.indexOf(cause.element)], ['consumed_layer', cause.stacks], ['combo_type', 0], ['combo_index', COMBO_ELEMENTS.indexOf(cause.element)]]
+            : [['consumed_layer', cause.stacks], ['combo_type', 1], ['combo_index', COMBO_STATUSES.indexOf(cause.status!)]],
+        )
+      : undefined;
     if (input === 'combo') this.comboCause.delete(slot);
     // The operator's entity holds them too (EntityBB_consumed_type), for what the combo leaves behind; Si's Ink Lung
     // reads the stacks as EntityBB_combo_count (the game's code sets it: no data does).
     for (const [k, v] of handed ?? []) op.bb.set(`EntityBB_${k}`, v);
     if (cause) op.bb.set('EntityBB_combo_count', cause.stacks);
+    // A combo with a buff per stack count (Pogranichnik's <combo>_count1..4) gets the one for the Vulnerability its
+    // trigger consumed: no data adds them, the combo checks and ends them (its noguard_count path: one to three slashes).
+    if (cause?.status && cause.stacks > 0 && this.buffOf.has(`buff_${id}_count${cause.stacks}`)) this.addBuff(op, `buff_${id}_count${cause.stacks}`, op, new Map());
     const run = this.cast(id, op, op, this.enemy, handed);
     if (run) run.main = true;
     this.main[slot] = run;
@@ -3228,7 +3407,7 @@ export class World {
     const prev = this.main[slot];
     if (prev) this.endRun(prev, true);
     for (const r of this.runs) if (r.follow && !r.ended && r.owner === op) this.endRun(r, true);
-    this.abilityEvent(op, 'OnBeforeCastSkill', this.enemy, undefined, undefined, { origin: id, casting: true });
+    this.abilityEvent(op, 'OnBeforeCastSkill', op, undefined, undefined, { origin: id, casting: true });
     this.main[slot] = this.cast(id, op, op, this.enemy);
     if (this.main[slot]) Object.assign(this.main[slot]!, { main: true, unseen });
     // The next attack's window: AllowNextSkillAction, else a ComboCacheAction taking the Attack input (Typhoeus's
@@ -3341,20 +3520,26 @@ export class World {
     // frame 28 and lets the next skill in at 29: an ultimate pressed right after it no longer cuts it off).
     if (!run || run.ended || (this.kindOfSkill(run.skillId) === 'basic' && !/_power_?attack$/.test(run.skillId))) return false;
     const marked = (run.skill.actionGroupData?.timelineActions ?? []).some((ta: Data) => (ta._sequenceActionData?.actionData ?? []).some((d: Data) => short(d.$type) === 'MarkCanInterrupt'));
-    return marked ? !run.canInterrupt : this.frame - run.start < (run.skill.exclusiveFrame ?? 0);
+    const exclusive = this.frame - run.start < (run.skill.exclusiveFrame ?? 0);
+    return marked ? !run.canInterrupt && (!run.pastMark || exclusive) : exclusive;
   }
 
   /** A combo becomes castable (if it's off cooldown) for the combo window. */
-  triggerCombo(slot: number, cause?: { element: string; stacks: number }): void {
+  triggerCombo(slot: number, cause?: { element?: string; status?: string; stacks: number }): void {
     const id = this.skillIdOf(this.team[slot], 'combo');
     if ((this.readyAt.get(id) ?? 0) > this.clockNow) return;
     this.comboReady.set(slot, this.frame + Math.round(this.comboWindow * FPS));
+    // A Physical Status: that status and its stacks.
+    const had = this.comboCause.get(slot);
+    if (cause?.status && !cause.element) {
+      if (!had || cause.stacks >= had.stacks) this.comboCause.set(slot, { status: cause.status, stacks: cause.stacks });
+      return;
+    }
     // Without an event, the enemy's infliction now.
     const el = cause?.element ?? ELEMENTS.find((x) => (this.enemy.bb.get(`inflict_${x}`) ?? 0) > 0);
     if (!el) return;
     // The most stacks while it's ready (Si's: "the highest stacks of Arts Infliction consumed or absorbed").
     const stacks = cause?.stacks ?? this.enemy.bb.get(`inflict_${el}`) ?? 0;
-    const had = this.comboCause.get(slot);
     if (!had || stacks >= had.stacks) this.comboCause.set(slot, { element: el, stacks });
   }
 
@@ -3362,7 +3547,7 @@ export class World {
   comboEvent(ev: ComboEvent): void {
     this.team.forEach((op, slot) => {
       const rule = COMBO_TRIGGERS[op.id];
-      if (rule && rule(ev, this, op)) this.triggerCombo(slot, 'element' in ev ? ev : undefined);
+      if (rule && rule(ev, this, op)) this.triggerCombo(slot, 'element' in ev ? ev : ev.kind === 'physical' ? ev : undefined);
     });
   }
 
@@ -3484,6 +3669,12 @@ export class World {
   private ownTagCache = new Map<string, number[]>();
 }
 
+/** What triggered a combo: an Arts Infliction or a Physical Status, and its stacks. */
+type ComboCause = { element?: string; status?: string; stacks: number };
+/** The game's numbering of what triggered a combo (consumed_type, combo_index). */
+const COMBO_ELEMENTS = ['Fire', 'Pulse', 'Cryst', 'Natural'];
+const COMBO_STATUSES = ['Lift', 'KnockDown', 'Breach', 'Crush'];
+
 /** Something that happened that a combo trigger can watch for. */
 export type ComboEvent =
   | { kind: 'inflict'; element: string; stacks: number; target: Entity }
@@ -3571,6 +3762,14 @@ export const COMBO_TRIGGERS: Record<string, (ev: ComboEvent, w: World, op: Entit
 
 /** A custom event's name: written in, or a value (Liino's liino_comboskill_end). */
 const eventName = (x: Data): string => (typeof x === 'string' ? x : x?.useBlackboardKey ? '' : String(x?.value ?? ''));
+
+/** Whether any buff in the bundles changes a cooldown's recovery (ComboSkillCooldownRecoveryScalar): ticks skip it otherwise. */
+const recoveryCache = new WeakMap<Bundle[], boolean>();
+function recoversCooldowns(bundles: Bundle[]): boolean {
+  let yes = recoveryCache.get(bundles);
+  if (yes === undefined) recoveryCache.set(bundles, (yes = bundles.some((b) => JSON.stringify(b.buffs).includes('CooldownRecoveryScalar'))));
+  return yes;
+}
 
 /** The action kinds in each skill or buff definition (World.has). */
 const actionKinds = new WeakMap<object, Set<string>>();

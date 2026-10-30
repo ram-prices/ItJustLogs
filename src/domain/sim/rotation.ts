@@ -128,9 +128,9 @@ export function scoreOf(f: Fight): number {
 
 /**
  * Plays a fight: `script` first (presses at their frames, holds), then the
- * policy from `from` on.
+ * policy from `from` on. `watch` sees the world at the start of every frame.
  */
-export function play(team: Team, policy: Policy, seconds: number, script: Step[] = [], from = 0): Fight {
+export function play(team: Team, policy: Policy, seconds: number, script: Step[] = [], from = 0, watch?: (w: World) => void): Fight {
   const w = worldOf(team, policy.main);
   const presses: Press[] = [];
   const end = Math.round(seconds * FPS);
@@ -144,6 +144,7 @@ export function play(team: Team, policy: Policy, seconds: number, script: Step[]
     return true;
   };
   while (w.frame < end && !defeated(team, w)) {
+    watch?.(w);
     let pressed = false;
     if (w.frame < from) {
       const due = (x: Step) => ('at' in x && x.at != null ? x.at === clock(w) : x.frame === w.frame);
@@ -791,6 +792,6 @@ export async function beam(team: Team, opts: BeamOptions = {}, runner: Runner = 
 }
 
 /** A fight replayed from its presses (the list fills in nothing: the presses are the whole of it). */
-export function fightOf(team: Team, policy: Policy, seconds: number, presses: Press[]): Fight {
-  return play(team, { ...policy, order: [] }, seconds, presses, Math.round(seconds * FPS) + 1);
+export function fightOf(team: Team, policy: Policy, seconds: number, presses: Press[], watch?: (w: World) => void): Fight {
+  return play(team, { ...policy, order: [] }, seconds, presses, Math.round(seconds * FPS) + 1, watch);
 }

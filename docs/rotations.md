@@ -111,7 +111,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   Its replay breaks Stagger early (video 57.8 / 129.6, the game 62.1 / 132.95), and that stays (owner, 2026-10-26).
   Every hit gives its data Stagger, but around Tangtang's battle skill (video 3.5, 22, 49) the footage's meter gains
   3–5 less: likely Whirlpool ticks missing the big moving boss, which the sim can't place. Alleikhreos shows the
-  full 10 per Whirlpool (5 ticks of 2, `targetTriggerInterval` 0.075 s kept at 2 frames).
+  full 10 per Whirlpool (5 ticks of 2, `targetTriggerInterval` 0.075 s, 2.25 frames: channel intervals are kept exact).
   `BLIGHTSHADE` is Echoes of War's "Glaiver File: Yinglung" boss, YSTF Captain Blightshade (eny_0124_kltdcap_tower016,
   template eny_0124_kltdcap: DEF 100, Resistance 20 Physical / 35 Electric / 0 the rest, Stagger 320 + 20 / 9 s with a
   node at half, Finisher ×1.5 / 50 SP, interrupt +20; Brutal/Hard/Normal = Lv 90/75/60). Its spawners
@@ -147,8 +147,8 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   A transcript step `swap` (Swap in) takes control of an operator where the recording shows it, for one who then makes
   no Final Strike (`ReplayStep`, the editor's Swap in; the controlled operator otherwise follows the strikes). The
   Last Rite run has them from the team bar's ring (stopwatch 8.89 Last Rite, 13.29 Arcane, 28.99 Si;
-  `tools/ai-parser/out/lastrite2/vA`). A skill that jumps past its MarkCanInterrupt no longer holds its operator
-  (`jumpTo`): Last Rite's battle skill cast off-field jumps from frame 0 to 300, past its mark at 51, and the recording
+  `tools/ai-parser/out/lastrite2/vA`). A skill cast off-field that jumps past its MarkCanInterrupt no longer holds its
+  operator (`jumpTo`; a controlled operator's is held to its exclusiveFrame, below): Last Rite's battle skill cast off-field jumps from frame 0 to 300, past its mark at 51, and the recording
   swaps to her 0.75 s in (her exclusiveFrame 373 had held her for the whole 4.3 s path). The replay's chain timing
   holds an operator for a press as `busy` does (`holdOf`: to the skill's MarkCanInterrupt where it has one, else its
   exclusiveFrame): her 373 frames had started Last Rite's own 13.09 Final Strike 12 s early, which made Arcane's 8.19
@@ -404,7 +404,9 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   no digits falls back on HUD blackouts of 3 s or more (`PHASE`), which take double-ultimate cut-ins for pauses.
   The HP series is the lowest reading so far, so readings while the bar fills in (the fight's start, after a refill)
   are skipped while one in the next `SETTLE_HP` seconds is higher: one such frame once held the Skydrummer at 35%.
-  Buffs (a replay's `ReplayResult.buffs`, `BuffSpan`: every 8 frames with the bars): the buffs the game shows an icon
+  Buffs (`SimResult.buffs`, `BuffSpan`: every 8 frames with the bars, by `buffRecorder` in team.ts; a replay samples
+  its fight, the Simulator plays its shown fight once more from its presses with `fightOf`'s `watch` and samples that,
+  so the search's fights keep none; Simulator runs saved before 2026-10-29 show buffs only once run again): the buffs the game shows an icon
   for (`buffShown`: the data's `hasIcon`), the enemy's elemental inflictions and the Susceptibility, Amp and Haste
   effects (`effectsShown`), as rows under each operator's lane and the Enemy lane (Buffs folds them, `fold.buffs`).
   Names: statuses and effects in the game's terms (the dump's HyperlinkTextTable ba.* names: Vulnerable, Cryo
@@ -416,7 +418,8 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   with `hasIcon`; `loadBuffIcons`), Susceptibility/Amp/Haste as icon_battle_affix_<kind>_vulnerable|enhance|speedup,
   inflictions as their element's orb; the images are ef-assets icons/buffs/<sprite>.webp on jsDelivr (its
   scripts/buff-icons.py exports them from the dump's ui/sprites/bufficon bundle; a letter shows until they load).
-  Under a parsed run's timeline, "Buffs at <time>" (`buffsPanel`) has a fixed row per operator and the boss: its
+  Under the timeline (a parsed run's and the Simulator's, whose lanes are portraits too and whose Enemy lane and row
+  show its request's boss, `page.laneFoe`, the training dummy when it names none), "Buffs at <time>" (`buffsPanel`) has a fixed row per operator and the boss: its
   face, its chips on one line that scrolls sideways, how many; a tapped chip's name and stacks show under it (a hover
   by its title). The chips are as the game draws them, the icon in a square whose outline is the timer, stacks as a number and an Arts
   Reaction's level (its buff's `count`, `BuffSpan.level`) as a Roman numeral in a corner box, an Arts Infliction as the
@@ -477,8 +480,8 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   Corrosion III lasted 28.15 s in the Skydrummer recording, each Stagger ~11.2 s). Found by the AI parser session; with
   both the Skydrummer replay went from 79% to 98% of its HP (full loadouts), Alleikhreos 92% to 96%.
   A build (`SimBuild`) can carry operator `level`, `ranks` (basic, normal, combo, ultimate: each of the
-  operator's skills by `kindOf`, only its own: bundles carry other operators' skills and levels are one map for the
-  team; a passive that levels with a skill follows its rank, `rankKind`: Tangtang's passive_0 holds Waterspout's tick;
+  operator's skills by its skill group (ef-assets `base.skillGroups`: an ultimate form's attacks are the ultimate's), else
+  `kindOf`, only its own: bundles carry other operators' skills and levels are one map for the team; a passive that levels with a skill follows its rank, `rankKind`: Tangtang's passive_0 holds Waterspout's tick;
   the World keeps skill levels by team position, `<slot>|<skill id>`, since weapons share attribute skills)
   and `weapon.level`; `teamFromSpec` passes them on (90 / 12 / 90 unless set), with the promotion they imply (it unlocks attribute nodes and talent levels: ef-assets combat bundles' `base.talentStages`,
   CharGrowthTable's passive skill nodes, filtered in `equip`; a level with none, such as Xaihi's talent_2_2, is never
@@ -500,6 +503,168 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   `strictCombos`/`strictUltimates` off). The page keeps the last reading (`simVideo` in IndexedDB) for runs saved without one, and
   each replay goes in History as a Recording. Scratch tests `src/domain/sim/dbg*.test.ts` and `dbgTeam.ts` (gitignored, run with `DBG=1 npx vitest run <file>`)
   read a local ef-assets clone: never commit them.
+
+## Rule tests per operator
+
+`src/domain/sim/rules.test.ts` pins what the engine does for each operator to the game data, so an engine change
+can't quietly break an operator nobody replays. Its harness is `testkit.ts`: a `Probe` puts one operator on a dummy
+that never Staggers (no gear, a skill rank, a Potential), plays a script (by default the whole chain with 2 s between
+attacks, `chainGrace`, then battle skill, combo, ultimate; Standard style, no cancels) and records, per press, every
+hit (ATK multiplier, element, skill kind), Stagger, SP, Ultimate Energy, buff, infliction, the SP cost, the cooldown and
+when the operator could attack again. An operator is a table (`OperatorRules`: id, name, named `setups`, `rules`)
+built from `rules` (chain steps, Final Strike, multipliers, Stagger, cooldowns, costs, energy, SP returns, element,
+skill kind, MarkCanInterrupt, buffs, inflictions, a Potential's DMG Dealt); each row names its source (ef-assets
+`wiki/operators.json` labels at ranks 1 and 12, the combat bundle's `patch`, skills, buffs and talents) and asserts
+against it, never against a number the sim produced. Multipliers allow half a point per hit (the skill table's
+rounding). `footage` marks a documented rule the engine takes from the recordings (Arcane's doubles Staggering once);
+`finding` (testkit `finding(rule, note)`) marks a gap waiting on the owner, run as an expected failure (it turns red once the engine matches the data:
+then drop it). Data comes from GitHub, or from a local ef-assets clone at `EF_ASSETS_DIR` (its root). To add an
+operator: write its table and add it to `OPERATORS`.
+
+Batch 1 (2026-10-29): Arcane 37, Tangtang 44, Si 38, Typhoeus 38, Last Rite 41, Yvonne 42, Liino 41, Zhuang Fangyi
+38 tests (Si 39, Liino 43 with the team's Ultimate Energy rows), no open findings. The team's Ultimate Energy
+(buff_common_obtain_ultimate_sp, ObtainUspInNormalSkill) is its blackboard's usp_everyone (6.5) to every operator and
+usp_self (0) more to its source, × the ratio its creator assigns, whatever SP was spent: it had been 6.5 per 100 SP of
+the last battle skill (an assumption from the wiki), which under-gave Liino's 25 SP battle skill (1.63), Si's 15 SP
+Brushwork and Mi Fu's 50 SP steps, and gave Si's combo nothing before any battle skill. Every battle skill creates it
+(every operator's, and Xaihi's crystal; ratio 0.5 for Snowshine's and Catcher's, both 100 SP) and of the combos only Si's (ratio
+1), so her combo gives 10 + 6.5: the wiki's 10 is hers alone. The footage agrees (shared notes si-combo-energy.md: Last
+Rite run 1 video 11.55 s, Si +17.6, Arcane +8.0, Xaihi +6.2; run 2 agrees); Arcane's combo's +16.7 in another clip has
+no such buff in her data. Rows check Si's own and a teammate's (`Setup.team`), her combo with no battle skill before it,
+and Liino's 25 SP battle skill. The saved runs don't move (every battle skill in them is 100 SP). A hold never outlasts its skill: a
+skill runs to the later of its durationFrame and its last timeline entry's start, and an ended skill holds no one
+(`stepRun`, `busy`; the rules' `freeFrame`), so Typhoeus's ultimate_skillfloating (exclusiveFrame 105, durationFrame 92,
+last entry at 100) frees her at 100. Typhoeus's P5 is checked on her ultimate (DMG Dealt × 1.2, one more Hunting Arrow).
+Fixed the same day (the owner's call), from the data:
+- Channel ticks keep the interval exact, in fractions of a frame (`TICK_EPS`): a tick lands on the first frame at or
+  after its time and is due while that time is inside its timeline entry. Tangtang's 3rd attack 4 → 5 ticks (0.06 s
+  over 8 frames; display_atk_scale 0.79). Every channel in ef-assets combat/ (operators, weapons, gear) checked: also
+  Dapan's dash attack 3 → 4 (0.12 s over 11 frames) and Ardelia's Finisher ticks 11 → 10 (0.11 s over 32 frames).
+- The operators' skill groups (ef-assets `base.skillGroups`, from CharGrowthTable skillGroupMap, added 2026-10-29 by
+  combat-bundle.mjs): an operator's skill of a kind is its group's first (`ownSkill`: Typhoeus's ultimate is
+  ultimate_skillfloating, the only skill in her UltimateSkill group, so P4's −15% and P5 apply; her floatingmode buff's
+  own swap to it is switched off in the data), and every skill in a group takes that group's rank (`rankKind`: Yvonne's
+  _ult_attack#_# and ult_attack_end and Zhuang Fangyi's _attack#_ult level with the ultimate).
+- A wave's projectile named `_heal` reaches only the team (`LaunchProjectile`): Liino's Cosmovoice beat launches
+  _soundwave and _soundwave_heal, both casting soundwave_projhit (heal a character, damage an enemy), and dealt 0.6
+  twice; now once, the wiki's 60% a beat. The dump has no projectile table, so the projectile's name is the only data
+  that says where it flies (no other _heal projectile exists).
+Replays: Skydrummer 3,569,029 → 3,574,833 and Alleikhreos 4,434,405 → 4,445,576 (Tangtang's 5th tick on her 3rd
+attack, all of each change); Last Rite 4,076,698 unchanged. Not covered yet: Zhuang Fangyi's battle skill hold (it jumps
+from 16 to 116, then frees her at 47), Electrification and Sunderblade counts, stack-dependent combos (Si, Zhuang
+Fangyi), Yvonne's Additional ATK, talents with conditions.
+
+Batch 2 (2026-10-29): `src/domain/sim/rules2.test.ts`, every other operator in combat/ops (Endministrator m and f,
+Perlica, Chen Qianyu, Wulfgard, Arclight, Ember, Xaihi, Avywenna, Gilberta, Snowshine, Lifeng, Laevatain, Da Pan,
+Akekuri, Catcher, Estella, Fluorite, Antal, Alesh, Ardelia, Rossi, Pogranichnik, Mi Fu, Camille, Purrchena), plus the
+rows batch 1 left out for its eight (Si's combo on 3 and 4 stacks, Zhuang Fangyi's Electrification, Sunderblades and
+form, Yvonne's Additional ATK and Barrage of Technology, Force of Nature, Proxy's Patronage, Hypothermia, Starry
+Boost). 1179 tests, 54 of them `finding` rows (36 findings, waiting on the owner; list in the shared notes
+rule-tests-batch2.md). Its tables run through testkit's `runTables`, each section in its own block so helpers can't
+clash; testkit also exports the table helpers (`first`, `TEAM_USP`, `inflictOn`, `potentials`...). A combo's trigger
+is set with `w.triggerCombo(0, { element, stacks })` before the press. Shared causes among the findings: the common
+reaction buffs ship only in some ops bundles (Arclight or Estella alone can't Electrify or Solidify); entity
+blackboard keys the game sets from the trigger (`EntityBB_combo_index`, `_noguard_count`: Fluorite, Antal,
+Pogranichnik); unread actions and attributes (AtbCostAddition, ComboSkillCooldownRecoveryScalar, IgniteAction,
+CreateGlobalBuffAction, SetSkillCdAtOnce "Set", switchToBuffConfig); a channel outliving a jump (Ardelia);
+Endministrator f's bundle has no potential talents (both had none; fixed below, group F). Rows once marked `footage` (a jump past MarkCanInterrupt freeing
+the operator at once: Rossi, Mi Fu, Pogranichnik's combo) follow the data since group D below. Not covered yet (the
+harness would need it): an enemy that attacks, enemy HP and several
+enemies, forced random rolls, teammates' damage for team-wide Potentials. Replays unchanged.
+
+Engine fixes from batch 2's findings (2026-10-29, the owner's groups A–D; group C and the rest further down as they
+land). Rows that now match the data lost their `finding` mark.
+- A. The Arts Burst and reaction buffs the game's code applies (buff_common_<on>_<applied>_triggered, its try_ form,
+  Solidification's cryst_cryst_frozen: 32 buffs and what they reach) are in every ops bundle (ef-assets f43b5ba,
+  combat-bundle.mjs `CODE_BUFFS`); before, a bundle had them only when one of its skills named them, so Arclight alone
+  never Electrified and Estella alone never Solidified (combo 3.6 → 6.3). A same-element Heat or Nature Burst now
+  comes from its buff in any team (it fell back to the engine's own 1.6 × hit before): the rule tests' multipliers
+  leave a press's buff_common_ hits out (`rules.mult`), since they're the status's damage, not the skill's.
+- B. A combo knows what triggered it as the game's code hands it over (`press`, `comboCause`): consumed_type and
+  consumed_layer as before, and EntityBB_combo_type (Arts 0, Physical 1) and EntityBB_combo_index (Fire 0, Pulse 1,
+  Cryst 2, Natural 3; Lift 0, Knock Down 1, Breach 2, Crush 3), which Fluorite's and Antal's combos switch on to pick
+  their infliction (Fluorite on 2 Cryo adds Cryo; Antal had always applied Heat). A Physical Status trigger now
+  records its status and stacks (`triggerCombo`'s `status`). A combo with a buff per stack count gets the one for the
+  Vulnerability its trigger consumed (`buff_<combo>_count<n>`: Pogranichnik's; no data adds them, her combo checks
+  and ends them): after 4 consumed she does all three slashes, 5.14 and SP 35 (was 0.95 and 5).
+- D. A JumpToAction past a skill's MarkCanInterrupt skips the mark, so it never frees the controlled operator: the skill
+  holds them to its exclusiveFrame on the jumped timeline, or a later mark (`Run.pastMark`, `busy`). Pogranichnik's
+  one-slash combo (0 → 600) holds her to 649, past the slash at 623 (was 1 frame); Rossi's battle skill on
+  Vulnerability (→ 215) to 272, Mi Fu's Cloudtrapper (→ 105) to 125, Catcher's stance when not attacked (45 → 255) to
+  285, 75 frames after the press (was 45; a recording would still confirm it). An operator cast off-field holds no one
+  at a skipped mark (Last Rite's battle skill, 0 → 300, swaps to her 0.75 s in, as the recording shows). A channel
+  ends with its timeline entry when the skill jumps (`jumpTo` moves its end): Ardelia's Dolly channels (81–201) stop at
+  her ultimate's 171 → 201, 10 hits as the wiki's 3 s (were 14). The harness follows jumps too: a press records the
+  JumpToActions its skill took (`Probe.presses[].jumps`, the timeline frame left and the one gone on from) and
+  `freeFrame(skill, jumps)` walks them, so Zhuang Fangyi's battle-skill hold is tested (it waits at 16–116 for her
+  Sunderblades, EntityBB_SwordNum 0, then exclusiveFrame 135: 47 frames with one, more on Electrification).
+Replays after A, B and D: Skydrummer 3,574,833 and Last Rite 4,076,698 unchanged; Alleikhreos 4,445,576 → 4,437,145
+(Tangtang −8,431: a dive at 130.67 s cuts her ultimate's stare from 34 to 128, past its channel's end at 120, so the
+channel's last 5 ticks no longer land).
+- C, one operator at a time (general rules each; the operator is where it showed):
+  - Zhuang Fangyi: AtbCostAddition adds to a battle skill's SP cost (`spCost`; ult_skill_free −100: her first battle
+    skill in the ultimate is free); ComboSkillCooldownRecoveryScalar speeds a running combo cooldown (the factor of its
+    multipliers, ult_base combo_cd_rate 4: 17 s → 4.25 s; ticks skip it unless a bundle has one, `recoversCooldowns`).
+  - Endministrator: IgniteAction sets off the targets' buffs that answer its igniteType (`ignite`, a buff's
+    igniteEventAction, finishAfterIgnited ends it; the igniteSource is its Target): her ultimate's EndminUlt shatters
+    the crystals (talent ATK, P3's 15 Ultimate Energy), Vulnerability's own buff ignites NoGuard (OnBuffAfterTryEnhanced,
+    raised after every add, new or stacked) and a Physical Status ignites PhysicalStatus (game code, in `physical`): the
+    400% Crystal Shattering. ObtainCostAction gives to its `target` where it names one (the crystal on the enemy gives
+    P3's energy to its Source; also Arcane's ultimate aura buff, below). A search's ExcludeOwnerValidator leaves out its
+    selectorOwner (ActionSource: the crystal's P2 share finds her teammates, not her). Her Potentials (both appearances)
+    are under a shared id in PotentialTalentEffectTable, chr_9000_endmin_potential_1..5: ef-assets 91d2c58 bundles them
+    (group F; P4's ×1.2 applies). P1's 50 SP stays open: its buff's atb_return isn't read by anything in the data.
+  - Wulfgard (and every SetSkillCdAtOnce "Set"): sets the cooldown left to its value (seconds, or a share of the full
+    cooldown), running or not; it had added it, and only to a running one. P5 resets his combo; Yvonne's ultimate end
+    sets 10 s; Typhoeus's and Rossi's two combos share a cooldown.
+  - Camille: a skill's switchToBuffConfig gives its buffs as the press takes over from what the operator was doing, if
+    its conditions hold then (they check that skill, `checkTargetCurSkill`; `switching`, applied in `cast` before its
+    first frame): Hunter Pursuit casts combo_skill_2 (5.0, SP 40); Last Rite's battle skill during her own attack gets
+    normal_skill_inattack; Si's Final Stroke bursts the Inksoul on its frame 0 (xianjing_inkboom, Unique, so the
+    timeline's frame-12 one adds nothing). Her Vesperwings explosion stays open: the passive that makes it
+    (passive_normal_skill_ability_entity) is given to the entity by nothing in the data, only its name.
+  - Lifeng: OnBeforeOutput<status> before a Physical Status itself (not Vulnerability) is applied (Airborne,
+    KnockDown, Crush, Fracture as the data names them): Subduer of Evil's 100% per Knock Down, P5's +250% every 15 s.
+    The 600% on consuming a Link stays open: her passive sets EntityBB_isCombo when buff_common_affixes_skillimbue_atk is
+    added, the game's Link buff, whose bonus is code-set; the engine gives the Link's bonus from the wiki (`linked`).
+  - Pogranichnik: the enemy hears OnBeforeTakePhysicalInfliction (Steel Oath's aura buff sends a Shieldguard per
+    Physical Status); an entity a buff on the enemy spawns casts as its spawner's (it had the enemy as its skill's
+    source, so its "Anti" search hit Pogranichnik): 4 × 1.0 + 4.5 = 8.5.
+  - Gilberta: a buff with no end of its own that an aura gives ends with the aura (`auraBuffs`: the run's entry, or the
+    buff whose event runs it): her field ends with its 5 s entity. A buff with its own duration keeps it (Tangtang's
+    Whirlpool debuff; the data says nothing of it leaving with the aura). Arcane's ultimate aura buff (Infinity) ends
+    with her aura too. Talents and Potentials register their skill and attribute changes before any attaches a skill or
+    buff (`start`): her talent_0, cast by talent_1_2, had missed P3's +0.05 (10.7 → 11.2).
+  - Antal stays open: Focus is created with buffSource InputTarget (the hit enemy) and puts its Susceptibility on its
+    Source, but taking buffSource as a buff's source makes the enemy the attacker of other buffs made so (Yvonne's battle
+    skill projectile: Skydrummer −199k; Xaihi's heal): the data keeps a buff's source (its targets) apart from its
+    creator (its damage), the engine has one. A redesign; tried and reverted.
+  - Purrchena: ExecuteIntervalAction runs its actions every executeInterval (or frame) over its span, the first at once
+    (Handicraft's pull-in: 4 × 0.25 + 0.5 = 1.5).
+  - Xaihi: the engine was right (her crystal treats twice within its 20 s); the row's script had the second Final Strike
+    at 22 s.
+  - Avywenna stays open: the lance search's TagValidator tag (1447025331) is given to no lance in the data; the combo's
+    three landing spots are FixedPointFinder groups with no positions, and making each a spot at the enemy (as random
+    points are) gives Arcane's 4th basic attack 1.2 against the wiki's 0.8. Tried and reverted.
+  - Estella: a damage unit's own DamageScaleProcessor applies, as a buff's does (they had been skipped, in every kit):
+    P3's dmg_up on her battle skill's first hit (×1.4); also Tangtang's Whirlpool hits in her ultimate,
+    dmg_up_water_ult +60%. P5 (+5 for Solidification) came with ObtainCostAction's target.
+  - Akekuri: ModifyDynamicBlackboard Divide (the key by the value) and Floor (the value rounded down); StoreAttributeValue
+    with primaryAttributeType Main/Sub stores the operator's main or secondary attribute (attributeType is then only a
+    default, "Level"): Cheer of Victory, 1.5% per 10 Intellect: 17.40.
+  - Yvonne: CheckSkillId's ids are values ({ value: id }), not only strings (every such check had failed); a cast event's
+    target is its caster, as OnAfterSkillApplyCost's (the gear sets' listeners check Target's skill); a buff
+    CreateBuffAttachingSkill makes lasts as long as its skill (in a cast event the skill being cast, `attaching`; else
+    the running one): Barrage of Technology's +50% on the attack5 it's cast for, not every attack after.
+  - Mi Fu: a skill hit (mask 4096) whose mask names no kind of skill counts as none (`kindOfMask`): World Splitter
+    (4096 + 16384, the only such hit) isn't Battle Skill DMG.
+  - Liino's Starry Boost stays open: global_buff_liino_combo_atb_return (CreateGlobalBuffAction) has no definition in
+    the dump.
+Replays after C: Skydrummer 3,574,833 → 3,588,467 (Yvonne +13,634: Barrage of Technology's +50% on her queued Final
+Strikes), Alleikhreos 4,437,145 → 4,463,252 (Yvonne +17,323, the same; Tangtang +14,335: her Whirlpools' +60% in her
+ultimate; Arcane −5,552: her ultimate's aura buff ends with her aura, and its Ultimate Energy goes to her now), Last Rite
+4,076,698 → 4,071,541 (Si −5,157: her Final Stroke bursts the Inksoul 0.4 s earlier, at 4.13 s). 21 finding rows
+remain: group E (Arclight, Perlica, Rossi, Purrchena's hold) and the ones left open above.
 
 ## Current state and next steps (2026-10-25 handoff)
 
@@ -528,12 +693,12 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
     Susceptibility at 137.3 likewise follow the replay's own timing. The fit's 306k was that second scaled.
   - Arts Amp from Xaihi's crystal heal is given even at full HP (the sim's team takes no damage).
 - Engine gaps from the audit (multipliers 189 exact, 95 rounding, 77 conditional untested, 35 off; costs all match):
-  Purrchena's ultimate ticks (ExecuteIntervalAction), counter skills never fire (TakeDownAction: no enemy attacks),
+  Purrchena's ultimate ticks (ExecuteIntervalAction, done 2026-10-29), counter skills never fire (TakeDownAction: no enemy attacks),
   CreateGlobalBuffAction (Akekuri, Liino), buff_common_try_pulse_cryst_triggered (Arclight, Liino),
   CheckSkillCameraMotionFree, CheckSkillHasHit, Typhoeus's three. Not audited: conditional rows, buff durations and
   stacks, weapons and gear.
 - Next, in order:
   1. The Skydrummer's meter filling ~3.4% faster than the video's (the gap above).
   2. Done: the second Finisher's delay (a talent's waiting attack took the Finisher's place).
-  3. Rule tests that run for every operator (skill levels per operator, aura sources, SP regen, durations).
+  3. Rule tests that run for every operator: batch 1 done (Rule tests per operator, above); the rest in batches.
   4. The audit's engine gaps above, then audit conditional rows, buffs, weapons and gear.

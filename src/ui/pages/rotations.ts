@@ -1,4 +1,4 @@
-import { BUILD_MODES, type BuildMode, DEFAULT_HP, DEFAULT_LIMIT, DEFAULT_SECONDS, type Effort, ENEMIES, enemyById, type Goal, GOALS, type ReplayResult, type SimRequest, spGained, START_SP, type Style, styleOf, STYLES } from '../../domain/sim/team';
+import { BUILD_MODES, type BuildMode, DEFAULT_HP, DEFAULT_LIMIT, DEFAULT_SECONDS, type Effort, ENEMIES, enemyById, type Goal, GOALS, knownEnemy, type ReplayResult, type SimRequest, spGained, START_SP, type Style, styleOf, STYLES } from '../../domain/sim/team';
 import { artificeTops, type WeaponTuningFile } from '../../domain/loadout';
 import { statArtifice } from '../../domain/sim/build';
 import type { WikiGearFile, WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
@@ -402,6 +402,12 @@ const HOW: [string, string][] = [
   ['Not simulated', 'Enemy attacks, positions and distances (counters, shields, attacks landing on random spots), and inputs timed by the player (perfect timing).'],
 ];
 
+/** A saved Simulator run's boss, from its request (the training dummy when it names none). */
+const foeOf = (key: string) => {
+  const enemy = (JSON.parse(key) as Partial<SimRequest>).enemy;
+  return enemy ? knownEnemy(enemy) : ENEMIES[0];
+};
+
 /** Rotations: the Simulator (/rotations) and the Parser (/rotations/parser: a gameplay recording's rotation), as side tabs. */
 export function rotationsPage(redraw: () => void, view?: string): Html {
   const header = pageHeader('Rotations', 'The whole sim is still very much a work in progress: expect bugs and results that don’t make sense.');
@@ -538,7 +544,7 @@ export function rotationsPage(redraw: () => void, view?: string): Html {
         ${page.failed ? html`<p class="copy-14 sim-error">${page.failed}</p>` : ''}
       </div></section>
       ${historyView(names, page.result?.at)}
-      ${page.result ? resultsView(page.result.result, page.result.names, page.result.ids, page.picked ? !!page.running : page.result.key !== key || !!page.running) : ''}
+      ${page.result ? ((page.laneFoe = foeOf(page.result.key)), resultsView(page.result.result, page.result.names, page.result.ids, page.picked ? !!page.running : page.result.key !== key || !!page.running)) : ''}
       ${CREDIT}`,
   );
 }

@@ -1,5 +1,5 @@
 import { FPS } from '../../../domain/sim/engine';
-import { type BuffSpan, ENEMIES, INPUT_NAME, type ReplayResult, type SimResult } from '../../../domain/sim/team';
+import { type BuffSpan, ENEMIES, INPUT_NAME, type SimResult } from '../../../domain/sim/team';
 import { icon, itemImg, metric, metrics } from '../../components';
 import { EF_ASSETS_CDN } from '../../../domain/banners';
 import { html, type Html } from '../../html';
@@ -125,11 +125,17 @@ function lanes(r: Track, names: string[], dpsMax: number, buffs?: BuffSpan[], id
   </div></div>`;
 }
 
+/** The Buffs eye over the timeline, when the run has buffs. */
+const buffsFold = (r: SimResult) => (r.buffs?.length ? html`<span class="sim-play-extra">${foldButton('buffs', 'Buffs', true)}</span>` : undefined);
+/** "Buffs at <time>" under the timeline: a row per operator, then the boss (`page.laneFoe`). */
+const panelOf = (r: SimResult, names: string[], ids: string[]) =>
+  buffsPanel(r.buffs, [...names.map((name, slot) => ({ slot, name, face: itemImg('char', ids[slot], 'sim-lane-face') })), { slot: -1, name: page.laneFoe ? foeName(page.laneFoe) : 'Enemy', face: page.laneFoe ? foeFace(page.laneFoe, 'sim-lane-face sim-foe-face') : html`<span class="label-12">Enemy</span>` }]);
+
 /** The sim's timeline with the player around it (a run that isn't a recording's: one timeline). */
-function timeline(r: SimResult, names: string[]): Html {
+function timeline(r: SimResult, names: string[], ids: string[]): Html {
   const t = simTrack(r);
   page.tlStart = startOf(t, r);
-  return html`${(preparePlay(r), '')}${playControls()}${lanes(t, names, Math.max(...t.dps, 0), undefined, undefined, r)}<div class="sim-player">${bossRow('Boss', 'sim')}</div>`;
+  return html`${(preparePlay(r), '')}${playControls(buffsFold(r))}${lanes(t, names, Math.max(...t.dps, 0), r.buffs, ids, r)}<div class="sim-player">${bossRow('Boss', 'sim')}</div>${panelOf(r, names, ids)}`;
 }
 
 export const foldButton = (what: keyof typeof page.fold, label: string, iconOnly = false) =>
@@ -175,15 +181,15 @@ export function resultsView(r: SimResult, names: string[], ids: string[], stale:
         </div>`,
       )}
     </div></section>`}
-    <section class="card"><div class="card-body sim-card${rec ? ' sim-faces' : ''}${rec && page.fold.buffs ? ' sim-buff-names' : ''}">
+    <section class="card"><div class="card-body sim-card sim-faces${page.fold.buffs && r.buffs?.length ? ' sim-buff-names' : ''}">
       ${rec ? '' : html`<div class="sim-fold-head"><h2 class="heading-16">Timeline</h2></div>`}
       ${r.order
         ? html`<p class="copy-14">Control ${names[r.main]}. Combo skills as they come up, ultimates when charged, and these battle skills in turn, over and over:</p>
             <ol class="sim-order copy-14">${r.order.map(([slot, input]) => html`<li>${names[slot]} · ${INPUT_NAME[input]}</li>`)}</ol>`
         : ''}
       ${shown
-        ? html`${((page.tlStart = startOf(rec, extra.simTrack, extra.timeline ?? r)), preparePlay(extra.timeline ?? r), '')}${playControls(rec && (r as ReplayResult).buffs?.length ? html`<span class="sim-play-extra">${foldButton('buffs', 'Buffs', true)}</span>` : undefined)}${lanes(shown, names, extra.dpsMax ?? Math.max(...shown.dps, 0), (r as ReplayResult).buffs, rec ? ids : undefined, extra.timeline ?? r)}${page.view === 'recording' ? html`${bossRow('', 'video')}${spRow('video')}` : html`${bossRow('', 'sim')}${spRow('sim')}`}${rec ? buffsPanel((r as ReplayResult).buffs, [...names.map((name, slot) => ({ slot, name, face: itemImg('char', ids[slot], 'sim-lane-face') })), { slot: -1, name: page.laneFoe ? foeName(page.laneFoe) : 'Enemy', face: page.laneFoe ? foeFace(page.laneFoe, 'sim-lane-face sim-foe-face') : html`<span class="label-12">Enemy</span>` }]) : ''}`
-        : timeline(r, names)}
+        ? html`${((page.tlStart = startOf(rec, extra.simTrack, extra.timeline ?? r)), preparePlay(extra.timeline ?? r), '')}${playControls(buffsFold(r))}${lanes(shown, names, extra.dpsMax ?? Math.max(...shown.dps, 0), r.buffs, ids, extra.timeline ?? r)}${page.view === 'recording' ? html`${bossRow('', 'video')}${spRow('video')}` : html`${bossRow('', 'sim')}${spRow('sim')}`}${panelOf(r, names, ids)}`
+        : timeline(r, names, ids)}
       ${rec && page.view !== 'sim' ? '' : (extra.underTimeline ?? '')}
       ${extra.editor
         ? extra.editor(shown ?? simTrack(r))

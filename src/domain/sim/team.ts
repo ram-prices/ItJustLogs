@@ -183,6 +183,11 @@ export interface SimResult {
   /** The builds fought with (Optimal gear: the ones chosen). */
   builds: SimBuild[];
   ms: number;
+  /**
+   * The buffs the game would show on each operator and the enemy, as stretches on the fight's clock: `BuffSpan`. A
+   * replay's, and the Simulator's shown fight (played once more with `buffRecorder`; runs saved before have none).
+   */
+  buffs?: BuffSpan[];
 }
 
 /** The ef-assets combat files a fight needs. */
@@ -518,9 +523,13 @@ export async function runSim(req: SimRequest, data: SimData, progress?: (p: SimP
     // The press-by-press search starts from the list; keep whichever is better (the list's can be, with few fights).
     if (minGap > 0 || scoreOf(fight) >= scoreOf(list.fight)) found = fight;
   }
-  // Fights from other threads come without their hits: the one found is played again here, from its presses.
-  const f = found.hits.length ? found : fightOf(team, list.policy, req.seconds, found.presses);
-  return { ...summary(f, req, start), ...(simple ? { order: list.policy.order } : {}) };
+  // The one found is played again here, from its presses, sampling its buffs with the bars (every 8 frames): fights
+  // from other threads come without their hits, and no fight in the search keeps buffs.
+  const { buffs, note } = buffRecorder();
+  const f = fightOf(team, list.policy, req.seconds, found.presses, (w) => {
+    if (w.frame % 8 === 0) note(w, Math.round((w.frame / FPS) * 100) / 100);
+  });
+  return { ...summary(f, req, start), buffs, ...(simple ? { order: list.policy.order } : {}) };
 }
 
 /** A fight as the page shows it: totals, damage by operator and by source. */
@@ -619,8 +628,6 @@ export interface ReplayResult extends SimResult {
   actionSp?: { presses: number[]; strikes: number[]; pressesAfter?: number[]; strikesAfter?: number[] };
   /** SP (0–300) every 8 frames on the fight's clock: [seconds, SP]. */
   spTrack?: [number, number][];
-  /** The buffs the game would show on each operator and the enemy, as stretches on the fight's clock: `BuffSpan`. */
-  buffs?: BuffSpan[];
   /** Damage each second of the fight by `<operator>|<source>`, so the recording's own damage can be split the same way. */
   perSecond?: Record<string, number>[];
   /**
@@ -679,6 +686,56 @@ export interface BuffSpan {
   stacks: number;
   /** An Arts Reaction's level (1–4) in place of stacks. */
   level?: boolean;
+}
+
+/**
+ * The buffs shown on each operator and the enemy (`BuffSpan`), sampled as a fight goes (`note` at each sample, seconds
+ * on the fight's clock): stretches still open by key. A replay and the Simulator's shown fight both keep them.
+ */
+export function buffRecorder(): { buffs: BuffSpan[]; note: (w: World, t: number) => void } {
+  const buffs: BuffSpan[] = [];
+  const holding = new Map<string, BuffSpan>();
+  const note = (w: World, t: number) => {
+    const now = new Set<string>();
+    const hold = (slot: number, id: string, stacks: number, status?: string, level?: boolean) => {
+      const key = `${slot}|${id}`;
+      now.add(key);
+      const o = holding.get(key);
+      // A new stretch each time its stacks change, so the stacks shown are the ones at that moment.
+      if (o && o.stacks === stacks) o.to = t;
+      else {
+        if (o) o.to = t;
+        const s: BuffSpan = { slot, id, ...(status ? { status } : {}), from: t, to: t, stacks, ...(level ? { level } : {}) };
+        holding.set(key, s);
+        buffs.push(s);
+      }
+    };
+    w.team.forEach((e, slot) => {
+      for (const b of e.buffs) {
+        const s = buffShown(b);
+        if (s) hold(slot, s.id, b.stacks, s.status);
+      }
+    });
+    for (const b of w.enemy.buffs) {
+      const s = buffShown(b);
+      if (s) hold(-1, s.id, s.level ?? b.stacks, s.status, s.level !== undefined);
+    }
+    for (const x of ELEMENTS) {
+      const n = w.enemy.bb.get(`inflict_${x}`) ?? 0;
+      if (n > 0) hold(-1, `inflict_${x}`, n, INFLICTION_NAME[x]);
+    }
+    // Susceptibility, Amp and Haste: effects, not buffs, but the game shows each as an icon too.
+    w.team.forEach((e, slot) => {
+      for (const x of effectsShown(e, w.frame)) hold(slot, x.id, 1, x.name);
+    });
+    for (const x of effectsShown(w.enemy, w.frame)) hold(-1, x.id, 1, x.name);
+    for (const [key, o] of holding)
+      if (!now.has(key)) {
+        o.to = t;
+        holding.delete(key);
+      }
+  };
+  return { buffs, note };
 }
 
 /** A video's stopwatch: when it stopped and the stretches it stood still (a phase change), seconds into the fight. */
@@ -758,6 +815,9 @@ export function promotionOf(b: SimBuild): number {
  * with her battle skill, which its keys name; found against the Skydrummer recording's numbers.
  */
 function rankKind(id: string, bundle: Bundle): string {
+  // The game's skill groups (CharGrowthTable): an ultimate form's attacks level with the ultimate (Yvonne's
+  // _ult_attack#_# and ult_attack_end, Zhuang Fangyi's _attack#_ult), whatever their names say.
+  for (const [k, ids] of Object.entries(bundle.skillGroups ?? {})) if (ids.includes(id)) return k;
   const kind = kindOf(id);
   if (kind !== 'other') return kind;
   const keys = Object.keys(bundle.patch[id]?.[0]?.values ?? {});
@@ -878,58 +938,17 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   const pressAfter: number[] = [];
   const strikeAfter: number[] = [];
   let pendingSp: { i: number; before: number } | null = null;
-  // The buffs shown on each operator and the enemy, sampled with the bars: stretches still open by key.
-  const buffs: BuffSpan[] = [];
   const freezes: [number, number][] = [];
   const staggerLeft: [number, number][] = [];
-  const holding = new Map<string, BuffSpan>();
-  const noteBuffs = (t: number) => {
-    const now = new Set<string>();
-    const hold = (slot: number, id: string, stacks: number, status?: string, level?: boolean) => {
-      const key = `${slot}|${id}`;
-      now.add(key);
-      const o = holding.get(key);
-      // A new stretch each time its stacks change, so the stacks shown are the ones at that moment.
-      if (o && o.stacks === stacks) o.to = t;
-      else {
-        if (o) o.to = t;
-        const s: BuffSpan = { slot, id, ...(status ? { status } : {}), from: t, to: t, stacks, ...(level ? { level } : {}) };
-        holding.set(key, s);
-        buffs.push(s);
-      }
-    };
-    w.team.forEach((e, slot) => {
-      for (const b of e.buffs) {
-        const s = buffShown(b);
-        if (s) hold(slot, s.id, b.stacks, s.status);
-      }
-    });
-    for (const b of w.enemy.buffs) {
-      const s = buffShown(b);
-      if (s) hold(-1, s.id, s.level ?? b.stacks, s.status, s.level !== undefined);
-    }
-    for (const x of ELEMENTS) {
-      const n = w.enemy.bb.get(`inflict_${x}`) ?? 0;
-      if (n > 0) hold(-1, `inflict_${x}`, n, INFLICTION_NAME[x]);
-    }
-    // Susceptibility, Amp and Haste: effects, not buffs, but the game shows each as an icon too.
-    w.team.forEach((e, slot) => {
-      for (const x of effectsShown(e, w.frame)) hold(slot, x.id, 1, x.name);
-    });
-    for (const x of effectsShown(w.enemy, w.frame)) hold(-1, x.id, 1, x.name);
-    for (const [key, o] of holding)
-      if (!now.has(key)) {
-        o.to = t;
-        holding.delete(key);
-      }
-  };
+  // The buffs shown on each operator and the enemy, sampled with the bars.
+  const { buffs, note: noteBuffs } = buffRecorder();
   while (clock() < end) {
     if (clock() % 8 === 0 && !paused(clock())) {
       track.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
       spTrack.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.sp)]);
       const left = w.staggerLeft();
       if (left !== undefined) staggerLeft.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(left * 1000) / 1000]);
-      noteBuffs(Math.round((game(clock()) / FPS) * 100) / 100);
+      noteBuffs(w, Math.round((game(clock()) / FPS) * 100) / 100);
     }
     clockAt[w.frame] ??= clock();
     while (resumed < pauses.length && clock() >= pauses[resumed][1]) {
