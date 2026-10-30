@@ -31,6 +31,7 @@ conversation.
   small UI or wording tasks go to Sonnet at low effort.
 - `start_session` may not switch the model. Check with `get_session`, switch with
   `set_session_model`. If the turn already started on the wrong model, stop it and resend the brief.
+- Sonnet workers run at high effort at least; a Sonnet-low worker broke the event page layout (2026-10-30).
 
 ## Practical rules
 
@@ -58,7 +59,7 @@ conversation.
 
 ## State (2026-10-29)
 
-- Live: ab0049e (Potentials ladder tweaks).
+- Live: d39e6f2 (sim engine fixes, rule tests, result buff rows).
 - Local, not deployed: rule tests batch 1 (`src/domain/sim/rules.test.ts`, `testkit.ts`, docs). `.claude/launch.json` is never committed.
 - Recently shipped: Potentials ladder tweaks (whole-row open, centred arrow, grey pull number,
   pity only for 6★); operator Storage box (`domain/storage.ts`, `settings.storeItems`), X post and

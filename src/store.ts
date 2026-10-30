@@ -154,6 +154,9 @@ export interface Settings {
   loadouts?: Record<string, Loadout>;
   /** The profile picture rises above its circle (its top half isn't cropped), for cut-out pictures: cat ears. */
   avatarPop?: boolean;
+  /** Header tabs hidden unless ticked in Settings. */
+  showEssences?: boolean;
+  showAic?: boolean;
   /** How far that picture reaches beside its circle on each side, in circle widths (cropper.ts). */
   avatarBox?: AvatarBox;
   /** Home's widgets in order; unset = the schedule (homeWidgets.ts DEFAULT_HOME). */

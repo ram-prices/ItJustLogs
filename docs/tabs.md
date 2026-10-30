@@ -86,3 +86,5 @@ Read when working on one of these tabs or their screen readers.
   screen: find the stat column once, then read only that area every 0.1s
   (`scan` focus option); a new essence each time the stats change and hold
   two frames.
+
+Essences and AIC are hidden tabs by default: Settings → Tabs (`showEssences`, `showAic`) shows them. The routes always work.

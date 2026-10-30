@@ -171,7 +171,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `#/...`) are moved to today's (`currentPath`), and their folders are
     still built, so old links keep working.
     Header tabs: Home, Pulls, Database, Rotations (WIP), Essences, AIC (WIP), Achievements, Archive, Story,
-    Settings. Database (`/database/...`) and Pulls (`/banner/...`) are
+    Settings. Essences and AIC are hidden until ticked in Settings → Tabs (`showEssences`, `showAic`); their routes still open when typed. Database (`/database/...`) and Pulls (`/banner/...`) are
     sections picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/banner` open the page last used there.
     Side-tab pages show no title or summary line (the top and side tabs say
@@ -226,3 +226,5 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `ui/html.ts` (`raw()` only for trusted markup).
   - Signature features of the old site (6★ portrait strip, pity ruler, luck
     curves, profile header) are being re-added one at a time in Geist style.
+
+- Event page header (`.event-hero.has-art`, collections.css): the art is capped (`clamp(260px, 30vw, 340px)`, 220px on phones), full width, `object-fit: cover` anchored at the bottom, in a grid cell shared with the text container; its own vignette runs into the page, plus a 56px `--background-100` fade (`::after`) and a local scrim behind the text.

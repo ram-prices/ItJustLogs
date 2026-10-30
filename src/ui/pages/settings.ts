@@ -6,7 +6,7 @@ import { loadAvatarHistory, MAX_DRIVE_SNAPSHOTS, MAX_SNAPSHOTS, type AvatarBox }
 import { EXPORTER_SOURCE } from '../guide';
 import { avatar, badge, icon, itemImg, pageHeader, toggleGroup, withStars } from '../components';
 import { wikiFile } from './info';
-import { fmtDate, fmtInt, html, type Html } from '../html';
+import { fmtDate, fmtInt, html, raw, type Html } from '../html';
 import { driveConfigured } from '../../drive';
 import { driveSnapshots, preloadSync, syncPending, syncView } from '../sync';
 import { clipChoices } from '../videoBackground';
@@ -286,6 +286,11 @@ export function settingsPage(redraw: () => void): Html {
             <p class="copy-14">Home plays a game clip behind it, and pictures move a little with your mouse.</p>
             ${toggleGroup('motion', [['on', 'Animated'], ['off', 'Still']], s.motion === false ? 'off' : 'on')}
             ${clipPicker(s.homeClip, redraw)}
+          </div>
+          <div>
+            <h3 class="heading-16">Tabs</h3>
+            <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showEssences" ${raw(s.showEssences ? 'checked' : '')} />Show the Essences tab</label>
+            <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showAic" ${raw(s.showAic ? 'checked' : '')} />Show the AIC tab</label>
           </div>
         </div>
       </section>

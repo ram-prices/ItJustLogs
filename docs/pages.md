@@ -39,3 +39,5 @@ when the wiki names rewards without amounts). Home's event rows and
 timeline bars link to it, and Home's right-click menu has "Copy link".
 and the Monthly Pass. All pages are kept; if their number ever becomes a problem, drop old
 ones then.
+
+Event page header: capped-height key art (bottom-anchored cover) fading into the page background (see `docs/ui.md`, `.event-hero.has-art`).

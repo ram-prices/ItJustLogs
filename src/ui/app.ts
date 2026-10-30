@@ -297,7 +297,7 @@ function header(route: Route): Html {
       ${has ? syncButton() : html`<button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>`}
     </div>
     <nav class="tabs" aria-label="Sections">
-      ${TABS.map(([tab, label]) => {
+      ${TABS.filter(([tab]) => (tab !== 'essences' || state.settings.showEssences) && (tab !== 'aic' || state.settings.showAic)).map(([tab, label]) => {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
         const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
@@ -794,6 +794,7 @@ function installProfile(): void {
     // Rotations: the team and fight options.
     if (rotations.mod?.simChange(el)) return;
     if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
+    if (el.dataset?.setting === 'showEssences' || el.dataset?.setting === 'showAic') updateSettings({ [el.dataset.setting]: el.checked });
     // Extra copies (Settings): edit one entry's copies or note.
     const editExtra = (i: number, patch: Partial<ExtraCopy>) =>
       updateSettings({ extras: extrasOf(state.settings).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
