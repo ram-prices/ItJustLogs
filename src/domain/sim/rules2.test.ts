@@ -1156,17 +1156,22 @@ const SLICE_B: OperatorRules[] = (() => {
         skill: /abentity/,
         data: (d) => d.value('Ultimate', 'SEQ 1 Stagger') + d.value('Ultimate', 'SEQ 2 Stagger'),
       }),
-      // The default script's combo grants a Link (ComboAction) the ultimate consumes: its entity's third hit
-      // (ultimate_skill_abentity frame 121, atk_scale3) runs when EntityBB_isCombo is 1, which the game's code sets.
-      ...finding(
-        r.mult('ultimate', 'Additional ATK DMG Multiplier', {
-          skill: /ultimate_skill/,
-          pick: ownThen(nthHit(2)),
-          what: 'Ultimate "Additional ATK DMG Multiplier" when it consumes a Link',
-        }),
-        'data 6.0 (wiki; patch atk_scale3), sim 0: the engine consumes the Link (its DMG multiplier) but never sets EntityBB_isCombo, so ultimate_skill_abentity skips its third hit. Left open (2026-10-29): her passive sets isCombo when buff_common_affixes_skillimbue_atk is added, the game’s Link buff (its damageModifier is the Link’s bonus, imbue_scale set by the game’s code); the engine gives the Link’s bonus itself from the wiki (`linked`), so this needs Link rebuilt on that buff. Data right.',
-        [1, 12],
-      ),
+      // The default script's combo grants a Link (ComboAction) the ultimate consumes: the game's Link buff
+      // (buff_common_affixes_skillimbue_atk) is added to her, her passive hears it and sets EntityBB_isCombo, and her
+      // entity's third hit (ultimate_skill_abentity frame 121, atk_scale3) runs.
+      {
+        what: 'Ultimate after consuming 1 Link: × 1.2 in the Link’s zone (imbue_scale 0.2, an ultimate’s)',
+        source:
+          'combat/ops buffs.buff_common_affixes_skillimbue_atk damageModifier (ComboCalcZone, mask 768; × 1.5 for mask 256 only); imbue_scale by Links is game code (SkillAffixAction): endfield.wiki.gg Link, an ultimate +20/30/40/50%',
+        sim: (p) => p.hitsOf(p.nth('ultimate'), /ultimate_skill/).find((h) => h.kind === 'skill')?.other ?? NaN,
+        data: () => 1.2,
+        tol: 1e-9,
+      },
+      r.mult('ultimate', 'Additional ATK DMG Multiplier', {
+        skill: /ultimate_skill/,
+        pick: ownThen(nthHit(2)),
+        what: 'Ultimate "Additional ATK DMG Multiplier" when it consumes a Link',
+      }),
       // Subduer of Evil (talent_2_2: atk_scale_talent2 1): each Knock Down applied deals 100% ATK (OnBeforeOutputKnockDown).
       {
         what: 'Talent Subduer of Evil: 100% ATK per Knock Down (the ultimate’s two)',
@@ -1828,15 +1833,17 @@ const SLICE_C: OperatorRules[] = (() => {
       r.mult('battle', 'DMG Multiplier'),
       // Focus: normal_skill's CreateBuffAction puts buff_normal_skill on its owner (him); its Susceptibility is the enemy's.
       r.buff('battle', /antal_normal_skill$/, '', 'Duration (s)', { what: 'Battle Skill Focus "Duration (s)"' }),
-      ...(['Electric', 'Heat'] as const).flatMap((el): Rule[] =>
-        finding({
+      // Focus is created with buffSource InputTarget: it's on Antal, from the enemy he hit (Buff.from), and puts its
+      // Susceptibility (buff_tageffect) on its Source, that enemy.
+      ...(['Electric', 'Heat'] as const).map(
+        (el): Rule => ({
           what: `Battle Skill "${el} Susceptibility" on the enemy`,
           source: `${WIKI} Battle Skill "${el} Susceptibility"`,
           ranks: BOTH,
           sim: (p) =>
             Math.max(0, ...(p.w.enemy.vulnerable ?? []).filter((v) => v.kind === (el === 'Electric' ? 'Pulse' : 'Fire')).map((v) => v.rate)),
           data: (d, rank) => d.value('Battle Skill', `${el} Susceptibility`, rank),
-        }, 'data 10% (5% at rank 1), sim 0 (his combo after it hits with susceptibility 1): normal_skill puts buff_normal_skill on its Owner, which creates buff_tageffect (its VulnerableAction) on its Source; the engine resolves both to Antal, so Focus and its Susceptibility never reach the enemy. The game must resolve Owner there to the hit enemy. Left open (2026-10-29): the skill’s CreateBuffAction has buffSource InputTarget (the hit enemy), and the Focus then puts its Susceptibility on its Source; but taking buffSource as the buff’s source makes the enemy the attacker of other buffs made that way (Yvonne’s battle-skill projectile: Skydrummer −199k, Xaihi’s heal), so the data seems to keep a buff’s source (for its targets) apart from its creator (its damage), which the engine has as one: a redesign. Data (wiki) right.', BOTH),
+        }),
       ),
       r.kind('battle', /normal_skill/),
       r.free('battle'),

@@ -435,7 +435,12 @@ main {
   font: 500 12px/1 var(--font-sans);
   white-space: nowrap;
   color: var(--gray-1000);
-  background: var(--gray-alpha-200);
+  background: var(--badge-bg, var(--gray-alpha-200));
+}
+/* Light theme: the tint sits on a light backing, so a badge reads over art as
+   well as on the page. */
+:root[data-theme='light'] .badge:not(.outline) {
+  background: linear-gradient(var(--badge-bg, var(--gray-alpha-200)), var(--badge-bg, var(--gray-alpha-200))), var(--badge-backing);
 }
 /* Rotations: how it works. */
 .sim-how > summary {
@@ -474,27 +479,27 @@ main {
 }
 .badge.green {
   color: var(--green);
-  background: var(--green-bg);
+  --badge-bg: var(--green-bg);
 }
 .badge.amber {
   color: var(--amber);
-  background: var(--amber-bg);
+  --badge-bg: var(--amber-bg);
 }
 .badge.red {
   color: var(--red);
-  background: var(--red-bg);
+  --badge-bg: var(--red-bg);
 }
 .badge.purple {
   color: var(--op-text);
-  background: var(--op-bg);
+  --badge-bg: var(--op-bg);
 }
 .badge.teal {
   color: var(--ars-text);
-  background: var(--ars-bg);
+  --badge-bg: var(--ars-bg);
 }
 .badge.blue {
   color: var(--blue);
-  background: var(--blue-bg);
+  --badge-bg: var(--blue-bg);
 }
 .badge.outline {
   background: none;

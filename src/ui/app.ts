@@ -18,7 +18,7 @@ import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
 import { installParallax } from './parallax';
 import { installHeroFade } from './heroFade';
 import { syncVideoBackground } from './videoBackground';
-import { bannerBodyFor, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
+import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
@@ -370,7 +370,8 @@ function page(route: Route): Html {
     case 'arsenal': {
       const kind: Kind = route.page === 'operators' ? 'char' : 'weap';
       if (route.id && `${route.page}/${route.id}` !== lastKey) setExpanded(`${kind}:${route.id}`, true);
-      return listPage(kind, a, { db: state.db, schedule: state.schedule, server: currentServer(), showAll: !!state.settings.showAllBanners });
+      const opts = { db: state.db, schedule: state.schedule, server: currentServer(), showAll: !!state.settings.showAllBanners };
+      return route.id ? bannerPage(kind, route.id, a, opts) : listPage(kind, a, opts);
     }
     case 'stats':
       return statsPage(a, draw);
@@ -485,10 +486,7 @@ function draw(): void {
   restoreTabRows(tabRows);
   if (searching) refocusListSearch();
   if (key !== lastKey) {
-    // /banner/headhunting/<banner> opens that banner's card and scrolls to it.
-    const target = route.id && !route.info && document.getElementById(`banner-${route.id}`);
-    if (target) target.scrollIntoView({ block: 'start' });
-    else scrollTo({ top: 0 });
+    scrollTo({ top: 0 });
     if (route.page === 'home') scrollTimelineToNow();
     // /banners/<name>, /event/<id>: that item's card, row or timeline bar.
     if (route.focus) focusScheduleItem(route.focus);

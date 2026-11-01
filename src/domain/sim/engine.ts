@@ -198,6 +198,13 @@ export interface Buff {
   stackEnds?: number[];
   /** Its DoOnceActions that have run. */
   once?: Set<Data>;
+  /**
+   * The entity its creating action's buffSource names (ActionOwner, InputTarget, ContextTarget), where that isn't its
+   * creator: what "Source" means to its own targets and checks. `source` stays its creator: the attacker of its
+   * damage, whose stats and blackboard it reads, the source of what it creates. Antal's Focus is on him, from the
+   * enemy he hit, so its Susceptibility goes on its Source, the enemy.
+   */
+  from?: Entity;
 }
 
 /** A skill (or a projectile's or entity's skill) running on someone. */
@@ -276,6 +283,8 @@ export interface Hit {
 }
 
 interface Ctx {
+  /** A buff's `from`: what targetSource "Source" resolves to in its actions (else `source`). */
+  from?: Entity;
   /** OnBeforeOutputBuff: the kind of skill whose cast is giving the buff (CheckSkillCastId). */
   eventCastKind?: string;
   owner: Entity;
@@ -686,7 +695,7 @@ export class World {
         list = [ctx.owner];
         break;
       case 'Source':
-        list = [ctx.source];
+        list = [ctx.from ?? ctx.source];
         break;
       case 'Context':
         list = ctx.groups.get(spec.targetGroupKey) ?? [];
@@ -814,13 +823,19 @@ export class World {
   }
 
   /** Whether every condition in a list holds. */
-  check(list: Data[] | undefined, ctx: Ctx): boolean {
+  check(list: Data[] | undefined, ctx: Ctx, actions = false): boolean {
     // NotNextCheckAction: the next condition must fail instead.
     let not = false;
     for (const c of list ?? []) {
       if (!c || c.isEnable === false) continue;
       if (short(c.$type) === 'NotNextCheckAction') {
         not = !not;
+        continue;
+      }
+      // A damage modifier's condition may work out a value first: its actions run, in order (the Link buff's IfElseAction
+      // sets real_imbue_scale). Elsewhere an action in a condition list is passed over.
+      if (actions && !isCondition(c)) {
+        this.act(c, ctx);
         continue;
       }
       if (this.cond(c, ctx) === not) return false;
@@ -1269,7 +1284,7 @@ export class World {
             for (let i = 0; i < count; i++) {
               const was = this.creating;
               this.creating = this.castKindOf(ctx);
-              const b = this.addBuff(e, id, ctx.source, assigned, a.inheritSourceSkillCastInfo || a.passTargetGroupsToBuff ? ctx.groups : undefined);
+              const b = this.addBuff(e, id, ctx.source, assigned, a.inheritSourceSkillCastInfo || a.passTargetGroupsToBuff ? ctx.groups : undefined, this.buffFrom(a, ctx));
               this.creating = was;
               if (b && a.inheritSourceSkillCastInfo) b.castBB = ctx.castBB ?? ctx.bb;
               if (b) b.castKind ??= this.castKindOf(ctx);
@@ -1281,7 +1296,8 @@ export class World {
                 b.end = Math.min(b.end, this.frame + (ctx.span ?? 0));
                 if (a.inheritSkillIdList?.length) b.inherit = a.inheritSkillIdList;
               }
-              if (b && a.contextKey) ctx.groups.set(a.contextKey, [e]);
+              // Its holder saved under contextKey, unless that key names its buffSource's group (ContextTarget).
+              if (b && a.contextKey && a.buffSource !== 'ContextTarget') ctx.groups.set(a.contextKey, [e]);
               // CreateBuffAttachingSkill: the buff lasts as long as its skill does, the one a cast event is about
               // (Yvonne's Barrage of Technology: +50% for the attack5 being cast, not for every attack after), else the
               // one running it.
@@ -1929,7 +1945,7 @@ export class World {
   // Buffs
   // -------------------------------------------------------------------------
 
-  addBuff(e: Entity, id: string, source: Entity, assigned: Map<string, number>, groups?: Map<string, Entity[]>): Buff | null {
+  addBuff(e: Entity, id: string, source: Entity, assigned: Map<string, number>, groups?: Map<string, Entity[]>, from?: Entity): Buff | null {
     const def = this.buffOf.get(id);
     if (!def) {
       this.note(`missing buff ${id}`);
@@ -1977,7 +1993,7 @@ export class World {
     const interval = this.val(def.triggerInterval, bb);
     // Ticks every interval: the first after one interval (waitFirstTriggerInterval) or right away.
     const first = interval > 0 ? this.frame + (def.waitFirstTriggerInterval ? Math.round(interval * FPS) : 0) : Infinity;
-    const buff: Buff = { id, def, owner: e, source, stacks: 1, start: this.frame, end, bb, nextTrigger: first, triggers: 0, done: new Set(), groups: new Map(groups ?? []), ...(this.creating ? { castKind: this.creating } : {}) };
+    const buff: Buff = { id, def, owner: e, source, stacks: 1, start: this.frame, end, bb, nextTrigger: first, triggers: 0, done: new Set(), groups: new Map(groups ?? []), ...(this.creating ? { castKind: this.creating } : {}), ...(from && from !== source ? { from } : {}) };
     e.buffs.push(buff);
     // While a buff starts, counts of buffs leave it out: its own OnBuffStart sees the ones before it (Laevatain's
     // combo energy: 25 for the first of its buffs, 5 after).
@@ -2027,7 +2043,7 @@ export class World {
   }
 
   private buffCtx(b: Buff, target: Entity | null = null): Ctx {
-    return { owner: b.owner, source: b.source, target: target ?? (b.owner.side === 'team' ? this.enemy : b.owner), bb: b.bb, groups: b.groups, skillId: b.id, castBB: b.castBB, self: b };
+    return { owner: b.owner, source: b.source, ...(b.from ? { from: b.from } : {}), target: target ?? (b.owner.side === 'team' ? this.enemy : b.owner), bb: b.bb, groups: b.groups, skillId: b.id, castBB: b.castBB, self: b };
   }
 
   /** Runs a buff's own timeline up to now. */
@@ -2051,6 +2067,17 @@ export class World {
         for (const a of ev.actions ?? []) this.execBlock(a, this.buffCtx(b, by));
         if (ev.finishAfterIgnited) this.endBuff(b, b.stacks, true);
       }
+  }
+
+  /**
+   * Who a CreateBuffAction's buffSource names (Buff.from): ActionOwner the entity running it, InputTarget its target,
+   * ContextTarget the first of its contextKey group; ActionSource (the default, nearly every buff) none: the creator.
+   */
+  private buffFrom(a: Data, ctx: Ctx): Entity | undefined {
+    if (a.buffSource === 'ActionOwner') return ctx.owner;
+    if (a.buffSource === 'InputTarget') return ctx.target ?? undefined;
+    if (a.buffSource === 'ContextTarget') return ctx.groups.get(a.contextKey)?.[0];
+    return undefined;
   }
 
   private buffEvent(b: Buff, event: string, target: Entity | null = null, damage?: Ctx['damage']): void {
@@ -2358,7 +2385,7 @@ export class World {
       for (const b of who.buffs)
         for (const m of b.def.damageModifier ?? []) {
           if (m.enableSide !== side) continue;
-          if (!this.check(m.condition?.actionData, { ...this.buffCtx(b), damage: dmg })) continue;
+          if (!this.check(m.condition?.actionData, { ...this.buffCtx(b), damage: dmg }, true)) continue;
           for (const p of m.damageProcessors ?? []) {
             if (short(p.$type) === 'InstantModifyAttribute') {
               instant(p, b.bb, b.stacks);
@@ -3308,13 +3335,19 @@ export class World {
     // An ultimate spends its cost (Arcane's second cast is free until its window ends).
     if (input === 'ultimate') op.energy = Math.max(0, op.energy - this.ultCost(op));
     if (input === 'combo') this.comboReady.delete(slot);
-    // The next battle skill or ultimate consumes every active Link: +30/45/60/75% for a battle skill, +20/30/40/50%
-    // for an ultimate (1-4 Links; endfield.wiki.gg Link, game code: not in the data).
+    // The next battle skill or ultimate consumes every active Link (1-4). The game's code gives the operator its Link
+    // buff, buff_common_affixes_skillimbue_atk, with imbue_scale for the count (LINK_IMBUE); the buff's own
+    // damageModifier does the rest: that cast's battle skill hits (mask 256) take imbue_scale × 1.5, its ultimate hits
+    // (512) imbue_scale, in their own zone (ComboCalcZone), until the operator's next such cast. Lifeng's passive hears
+    // it added (EntityBB_isCombo: her ultimate's 600% hit). Without the buff in the data, the same numbers as a
+    // multiplier (`linked`).
     if (input === 'battle' || input === 'ultimate') {
       const n = Math.min(4, this.links.filter((f) => f > this.frame).length);
       this.links = [];
-      if (n) this.linked.set(op, { kind: input === 'battle' ? 'normal' : 'ultimate', mul: 1 + (input === 'battle' ? 0.15 : 0.1) * (n + 1) });
-      else this.linked.delete(op);
+      for (const b of op.buffs.filter((x) => x.id === LINK_BUFF)) this.endBuff(b, b.stacks, true);
+      this.linked.delete(op);
+      if (n && this.buffOf.has(LINK_BUFF)) this.addBuff(op, LINK_BUFF, op, new Map([['imbue_scale', LINK_IMBUE[n - 1]], ['count', n]]));
+      else if (n) this.linked.set(op, { kind: input === 'battle' ? 'normal' : 'ultimate', mul: 1 + LINK_IMBUE[n - 1] * (input === 'battle' ? 1.5 : 1) });
     }
     // Combo cooldowns × ComboSkillCooldownScalar (Qingbo and similar sets: 0.85).
     const cdScale = input === 'combo' ? this.factor(op, 'ComboSkillCooldownScalar') : 1;
@@ -3668,6 +3701,14 @@ export class World {
   }
   private ownTagCache = new Map<string, number[]>();
 }
+
+/**
+ * The Link's buff (game code gives it on consuming Links) and its imbue_scale by Links consumed, 1-4: the game's code
+ * sets it (SkillAffixAction, not in the readable data); endfield.wiki.gg Link: an ultimate +20/30/40/50%, a battle skill
+ * +30/45/60/75% (the buff's own × 1.5 for mask 256).
+ */
+const LINK_BUFF = 'buff_common_affixes_skillimbue_atk';
+const LINK_IMBUE = [0.2, 0.3, 0.4, 0.5];
 
 /** What triggered a combo: an Arts Infliction or a Physical Status, and its stacks. */
 type ComboCause = { element?: string; status?: string; stacks: number };

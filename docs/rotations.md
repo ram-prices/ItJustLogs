@@ -625,8 +625,7 @@ channel's last 5 ticks no longer land).
     (passive_normal_skill_ability_entity) is given to the entity by nothing in the data, only its name.
   - Lifeng: OnBeforeOutput<status> before a Physical Status itself (not Vulnerability) is applied (Airborne,
     KnockDown, Crush, Fracture as the data names them): Subduer of Evil's 100% per Knock Down, P5's +250% every 15 s.
-    The 600% on consuming a Link stays open: her passive sets EntityBB_isCombo when buff_common_affixes_skillimbue_atk is
-    added, the game's Link buff, whose bonus is code-set; the engine gives the Link's bonus from the wiki (`linked`).
+    The 600% on consuming a Link: see the Link, below (fixed 2026-10-31).
   - Pogranichnik: the enemy hears OnBeforeTakePhysicalInfliction (Steel Oath's aura buff sends a Shieldguard per
     Physical Status); an entity a buff on the enemy spawns casts as its spawner's (it had the enemy as its skill's
     source, so its "Anti" search hit Pogranichnik): 4 × 1.0 + 4.5 = 8.5.
@@ -635,10 +634,7 @@ channel's last 5 ticks no longer land).
     Whirlpool debuff; the data says nothing of it leaving with the aura). Arcane's ultimate aura buff (Infinity) ends
     with her aura too. Talents and Potentials register their skill and attribute changes before any attaches a skill or
     buff (`start`): her talent_0, cast by talent_1_2, had missed P3's +0.05 (10.7 → 11.2).
-  - Antal stays open: Focus is created with buffSource InputTarget (the hit enemy) and puts its Susceptibility on its
-    Source, but taking buffSource as a buff's source makes the enemy the attacker of other buffs made so (Yvonne's battle
-    skill projectile: Skydrummer −199k; Xaihi's heal): the data keeps a buff's source (its targets) apart from its
-    creator (its damage), the engine has one. A redesign; tried and reverted.
+  - Antal: see a buff's source and creator, below (fixed 2026-10-31).
   - Purrchena: ExecuteIntervalAction runs its actions every executeInterval (or frame) over its span, the first at once
     (Handicraft's pull-in: 4 × 0.25 + 0.5 = 1.5).
   - Xaihi: the engine was right (her crystal treats twice within its 20 s); the row's script had the second Final Strike
@@ -665,6 +661,29 @@ Strikes), Alleikhreos 4,437,145 → 4,463,252 (Yvonne +17,323, the same; Tangtan
 ultimate; Arcane −5,552: her ultimate's aura buff ends with her aura, and its Ultimate Energy goes to her now), Last Rite
 4,076,698 → 4,071,541 (Si −5,157: her Final Stroke bursts the Inksoul 0.4 s earlier, at 4.13 s). 21 finding rows
 remain: group E (Arclight, Perlica, Rossi, Purrchena's hold) and the ones left open above.
+
+Two more (2026-10-31), the owner's call, no replay moved (Skydrummer 3,588,467, Alleikhreos 4,463,252, Last Rite
+4,071,541):
+- A buff's source and creator. A buff keeps `source`, its creator (the attacker of its damage, whose stats and
+  blackboard it reads, the source of what it creates, as before), and gets `from` when its CreateBuffAction's
+  buffSource names someone else (`buffFrom`: ActionOwner the entity running it, InputTarget the action's target,
+  ContextTarget the first of its contextKey group; ActionSource, 3,686 of 3,993 creations in the data, none): what
+  "Source" means to the buff's own targets and checks (`Ctx.from`, `targets`). Antal's Focus is on him, from the enemy
+  he hit, and puts its Electric and Heat Susceptibility (5% / 10%) on that enemy. A ContextTarget buff's contextKey
+  names its source's group, so its holder isn't saved under it. The first try (2026-10-29) took buffSource as the
+  creator and resolved ContextTarget to the action's target: Xaihi's crystal heal (ContextTarget group "seraph",
+  empty there) became the enemy's, so its Arts Amp never reached Yvonne: Skydrummer −199k. Taking buffSource as the
+  creator alone, with the group read right, moves nothing either; the split keeps the attacker the creator.
+- The Link. Consuming Links gives the operator the game's Link buff, buff_common_affixes_skillimbue_atk (ef-assets
+  4d2582f puts it in every ops bundle), with imbue_scale for the count, which only the game's code sets
+  (`LINK_IMBUE` 0.2/0.3/0.4/0.5, endfield.wiki.gg Link's ultimate figures); its own damageModifier gives that cast's
+  ultimate hits (mask 512) imbue_scale and its battle skill hits (256) × 1.5 (the wiki's +30/45/60/75%), in its own
+  zone, until the operator's next battle skill or ultimate. A damage modifier's condition list runs its actions in
+  order (the buff's IfElseAction works out real_imbue_scale; `check(…, actions)`, only there: Si's Inksoul burst
+  buff's enable list has actions that mustn't run). Lifeng's passive hears the buff added (EntityBB_isCombo): her
+  ultimate's 600% Additional ATK lands. Without the buff in the data, the same numbers as before (`linked`).
+Findings left (15 rows): group E (Arclight's third slash, Perlica's Cycle Protocol, Rossi's combo SEQ 1, Purrchena's
+hold), Endministrator P1 (game code), Avywenna's lances (6), Camille's Vesperwings, Liino's Starry Boost.
 
 ## Current state and next steps (2026-10-25 handoff)
 

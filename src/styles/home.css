@@ -344,6 +344,13 @@ a.sched-next:hover {
 .tl-bar.refactorIssue {
   background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0 6px, transparent 6px 12px);
 }
+/* Light theme: fuller fills, so the white labels read. */
+:root[data-theme='light'] .tl-bar:not(.evt) {
+  background-color: color-mix(in srgb, var(--op) 85%, transparent);
+}
+:root[data-theme='light'] .tl-bar.weap {
+  background-color: color-mix(in srgb, var(--ars) 85%, transparent);
+}
 .tl-bar.ended {
   opacity: 0.55;
 }
@@ -498,6 +505,9 @@ a.sched-next:hover {
   margin-right: 3px;
   vertical-align: -0.32em;
   object-fit: contain;
+}
+img.trait-icon {
+  filter: var(--white-icon-filter);
 }
 .trait-mask {
   background: currentColor;

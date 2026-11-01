@@ -1973,7 +1973,7 @@ a.ladder-row:focus-visible {
   }
 }
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
-  :root[data-motion='on'] :is(.event-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img) {
+  :root[data-motion='on'] :is(.art-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img) {
     --shift: 2%;
     scale: 1.06;
   }
@@ -2000,7 +2000,7 @@ a.ladder-row:focus-visible {
     animation: weapon-float 5s ease-in-out infinite alternate;
     will-change: transform;
   }
-  :root[data-motion='on'] :is(.event-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
+  :root[data-motion='on'] :is(.art-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
     translate: calc(var(--px, 0) * -1 * var(--shift)) calc(var(--py, 0) * -1 * var(--shift));
     /* Firefox puts a picture that's only moved (not tilted) on whole pixels,
        so these shifts of a pixel or two would twitch. A 3D tilt too small to

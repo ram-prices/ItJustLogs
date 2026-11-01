@@ -1,13 +1,13 @@
 import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPull, type Analysis, type BannerSummary, type LuckTier } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId, cdnUrl, itemIconUrl, lookupBanner } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, CATEGORY_LABEL, cdnUrl, itemIconUrl, lookupBanner, patchOf } from '../../domain/banners';
 import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
-import type { Schedule, Server } from '../../domain/schedule';
+import { SERVER_LABEL, timeOn, type Schedule, type Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
 import { badge, heat, icon, layeredArt, withStars, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
-import { infoHref, ownedOf, pullsTabs } from './info';
+import { bannerHref, infoHref, ownedOf, pullsTabs } from './info';
 import { state } from '../../state';
 import { MAX_COPIES } from '../../domain/owned';
 import { wikiId } from '../../domain/wiki';
@@ -403,6 +403,51 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
 // ---------------------------------------------------------------------------
 // Banner sections: a summary row that expands into the banner's pull history
 // ---------------------------------------------------------------------------
+
+/**
+ * /banner/headhunting/<banner>, /banner/arsenal/<banner>: one banner, its art
+ * as the header (like an event's page) over its name, dates and rate-up, then
+ * its card opened.
+ */
+export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOptions): Html {
+  const k = KIND[kind];
+  const pool = canonicalPoolId(id);
+  const b = a.banners.find((x) => x.kind === kind && canonicalPoolId(x.poolId) === pool);
+  const c = b ? undefined : unpulledBanners(kind, a.banners, opts.db, opts.schedule, opts.server).find((x) => x.poolId && canonicalPoolId(x.poolId) === pool);
+  const name = b?.name ?? c?.name;
+  if (!name)
+    return html`<div class="page-header"><div class="container page-header-inner"><div class="min0"><h1 class="heading-32">Banner not found</h1>
+        <p class="copy-16">There's no banner with that link. <a href="${bannerHref(kind)}">All banners</a>.</p></div></div></div>`;
+  const s = opts.schedule.banners.find((x) => x.poolId && canonicalPoolId(x.poolId) === pool) ?? opts.schedule.banners.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const start = s ? timeOn(s.start, opts.server) : (c?.start ?? null);
+  const end = s ? timeOn(s.end, opts.server) : (c?.end ?? null);
+  const when = start ? `${fmtDate(start, true)} – ${end ? fmtDate(end, true) : 'end TBA'}` : null;
+  const version = s?.version ?? (patchOf(pool).major >= 0 ? patchOf(pool).key : null);
+  const rateUps = b?.info?.rateUpNames ?? c?.rateUpNames ?? [];
+  const rateUpIds = b?.info?.rateUpIds ?? c?.rateUpIds ?? [];
+  const schedArt = s?.art ? cdnUrl(s.art) : '';
+  // Headhunting: the game's banner layout; Issues: the text-free Issue art. Each falls back to the other.
+  const [art, alt] = kind === 'weap' && schedArt ? [schedArt, bannerArtUrl(pool) ?? ''] : [bannerArtUrl(pool) ?? schedArt, schedArt];
+  const fallback = alt && alt !== art ? raw(`data-alt="${alt.replace(/"/g, '&quot;')}" data-alt-class="alt"`) : '';
+  const category = b ? CATEGORY_LABEL[b.category] : k.title;
+  return html`<section class="wiki-hero art-hero banner-hero${art ? ' has-art' : ''}">
+      ${art ? html`<img class="wiki-hero-art" src="${art}" alt="" decoding="async" data-fallback ${fallback} />` : ''}
+      <div class="container wiki-hero-inner">
+        <div class="min0 wiki-hero-text">
+          <nav class="breadcrumb wiki-crumbs" aria-label="Breadcrumb"><a href="${bannerHref(kind)}">${k.title}</a>${icon('chevron_right')}<span class="wiki-em">${category}</span></nav>
+          <h1 class="heading-32">${name}</h1>
+          <div class="wiki-facts">
+            <span class="wiki-fact"><span class="wiki-fact-label">When (${SERVER_LABEL[opts.server]})</span>${when ?? 'Permanent'}</span>
+            ${version ? html`<span class="wiki-fact"><span class="wiki-fact-label">Version</span>${version}</span>` : ''}
+            ${rateUps.length ? html`<span class="wiki-fact"><span class="wiki-fact-label">Rate-up</span><span class="banner-hero-rateup">${rateUps.join(', ')}${rateUpPotential(kind, rateUpIds, pool)}</span></span>` : ''}
+          </div>
+        </div>
+      </div>
+    </section>
+    <main class="container fade-in banner-page">
+      <div class="banner-list">${b ? bannerSection(b, bannerEnded(opts.schedule, opts.server)(b)) : unpulledCard(c!)}</div>
+    </main>`;
+}
 
 const expanded = new Set<string>();
 

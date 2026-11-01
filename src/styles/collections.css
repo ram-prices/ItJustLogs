@@ -66,7 +66,7 @@
   z-index: 950;
   width: min(380px, calc(100vw - 16px));
   padding: 16px;
-  box-shadow: var(--shadow-border), 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-border), var(--shadow-pop);
 }
 .sort-pop-head {
   display: flex;
@@ -207,13 +207,13 @@
    its bottom-left, in the same grid cell. The art's own dark vignette runs
    into the page; a short fade in the page colour (::after) covers where it
    doesn't reach, so no edge shows. A scrim behind the text keeps it legible. */
-.event-hero.has-art {
+.art-hero.has-art {
   display: grid;
 }
-.event-hero.has-art > * {
+.art-hero.has-art > * {
   grid-area: 1 / 1;
 }
-.event-hero.has-art .wiki-hero-art {
+.art-hero.has-art .wiki-hero-art {
   position: static;
   inset: auto;
   height: clamp(260px, 30vw, 340px);
@@ -221,7 +221,7 @@
   object-fit: cover;
   object-position: center bottom;
 }
-.event-hero.has-art .wiki-hero-inner {
+.art-hero.has-art .wiki-hero-inner {
   align-self: end;
   justify-self: stretch;
   width: 100%;
@@ -229,10 +229,10 @@
   position: relative;
   z-index: 0;
 }
-.event-hero.has-art .wiki-hero-text {
+.art-hero.has-art .wiki-hero-text {
   position: relative;
 }
-.event-hero.has-art .wiki-hero-text::before {
+.art-hero.has-art .wiki-hero-text::before {
   content: '';
   position: absolute;
   inset: -24px -48px -8px -48px;
@@ -240,7 +240,7 @@
   background: radial-gradient(ellipse at 20% 60%, rgba(0, 0, 0, 0.55), transparent 75%);
   pointer-events: none;
 }
-.event-hero.has-art::after {
+.art-hero.has-art::after {
   display: block;
   grid-area: 1 / 1;
   /* Past the cell's foot: the art's parallax scale overshoots it. */
@@ -252,38 +252,59 @@
   pointer-events: none;
   background: linear-gradient(to bottom, transparent, var(--background-100));
 }
-.event-hero.has-art .evt-tag-note {
+.art-hero.has-art .evt-tag-note {
   color: rgba(255, 255, 255, 0.72);
 }
-:root[data-theme='light'] .event-hero.has-art::after {
+:root[data-theme='light'] .art-hero.has-art::after {
   height: 120px;
 }
-:root[data-theme='light'] .event-hero.has-art .wiki-hero-inner {
+:root[data-theme='light'] .art-hero.has-art .wiki-hero-inner {
   padding-bottom: 64px;
 }
+/* Light theme: the text sits low, where the art fades toward white, so a stronger scrim. */
+:root[data-theme='light'] .art-hero.has-art .wiki-hero-text::before {
+  background: radial-gradient(ellipse at 20% 60%, rgba(0, 0, 0, 0.7), transparent 78%);
+}
+:root[data-theme='light'] .art-hero.has-art .wiki-hero-text {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
 @media (max-width: 640px) {
-  .event-hero.has-art .wiki-hero-art {
+  .art-hero.has-art .wiki-hero-art {
     height: 220px;
   }
-  .event-hero.has-art .wiki-hero-inner {
+  .art-hero.has-art .wiki-hero-inner {
     padding-top: 16px;
   }
 }
-.event-hero.has-art .wiki-hero-text,
-.event-hero.has-art .wiki-em,
-.event-hero.has-art .heading-32 {
+.art-hero.has-art .wiki-hero-text,
+.art-hero.has-art .wiki-em,
+.art-hero.has-art .heading-32 {
   color: #fff;
 }
-.event-hero.has-art .wiki-crumbs a,
-.event-hero.has-art .wiki-crumbs .icon,
-.event-hero.has-art .wiki-fact-label {
+.art-hero.has-art .wiki-crumbs a,
+.art-hero.has-art .wiki-crumbs .icon,
+.art-hero.has-art .wiki-fact-label {
   color: rgba(255, 255, 255, 0.72);
 }
-.event-hero.has-art .wiki-crumbs a:hover {
+.art-hero.has-art .wiki-crumbs a:hover {
   color: #fff;
 }
-.event-hero.has-art .wiki-hero-inner {
+.art-hero.has-art .wiki-hero-inner {
   padding-bottom: 20px;
+}
+/* A banner's page (kind.ts bannerPage): its card under the header. */
+.banner-page .banner-list {
+  margin-top: 16px;
+  grid-template-columns: minmax(0, 720px);
+}
+/* The game's banner layouts put the operator's face high. */
+.banner-hero.has-art .wiki-hero-art {
+  object-position: center 30%;
+}
+.banner-hero-rateup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .event-details {
   margin-top: 8px;

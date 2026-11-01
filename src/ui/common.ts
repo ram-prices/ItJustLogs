@@ -26,6 +26,10 @@ export function installImageFallback(): void {
         delete img.dataset.retried;
         img.classList.add(img.dataset.altClass ?? 'weapon');
         img.src = alt;
+      } else if (img.matches('.art-hero > .wiki-hero-art')) {
+        // A page header whose art is missing: a plain header, no empty band.
+        img.parentElement!.classList.remove('has-art');
+        img.remove();
       } else {
         img.classList.add('missing');
       }

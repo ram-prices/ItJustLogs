@@ -37,6 +37,11 @@
   --shadow-card: 0 0 0 1px var(--ring), 0 2px 2px rgba(0, 0, 0, 0.32), 0 8px 8px -8px rgba(0, 0, 0, 0.32);
   --shadow-card-hover: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 2px 2px rgba(0, 0, 0, 0.4), 0 8px 16px -8px rgba(0, 0, 0, 0.5);
   --shadow-menu: 0 0 0 1px var(--ring), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.45);
+  /* Under a badge's tint (light theme only). */
+  --badge-backing: transparent;
+  /* Game icons drawn white (class, weapon type): as they are. */
+  --white-icon-filter: none;
 
   /* Meaning */
   --op: #8e4ec6;
@@ -98,6 +103,9 @@
   --shadow-card: 0 0 0 1px var(--ring), 0 2px 2px rgba(0, 0, 0, 0.04), 0 8px 8px -8px rgba(0, 0, 0, 0.04), 0 0 0 1px #fafafa;
   --shadow-card-hover: 0 0 0 1px rgba(0, 0, 0, 0.14), 0 2px 2px rgba(0, 0, 0, 0.06), 0 8px 16px -8px rgba(0, 0, 0, 0.1), 0 0 0 1px #fafafa;
   --shadow-menu: 0 0 0 1px var(--ring), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --badge-backing: color-mix(in srgb, var(--background-100) 85%, transparent);
+  --white-icon-filter: brightness(0.3);
 
   --op: #8e4ec6;
   --op-text: #7d3db5;

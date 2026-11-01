@@ -237,6 +237,8 @@ export interface TraceHit {
   operator: string;
   amount: number;
   atk: number;
+  /** Its multiplier zones other than the DMG bonus (a Link's ComboCalcZone among them). */
+  other: number;
 }
 export interface TraceEvent {
   frame: number;
@@ -362,6 +364,7 @@ export class Probe {
           operator: h.operator,
           amount: h.amount,
           atk: h.parts?.atk ?? 0,
+          other: h.parts?.other ?? 1,
         });
       return out;
     };

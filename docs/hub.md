@@ -59,7 +59,7 @@ conversation.
 
 ## State (2026-10-29)
 
-- Live: d39e6f2 (sim engine fixes, rule tests, result buff rows).
+- Live: fcdef42 (hidden Essences/AIC tabs, event header fade).
 - Local, not deployed: rule tests batch 1 (`src/domain/sim/rules.test.ts`, `testkit.ts`, docs). `.claude/launch.json` is never committed.
 - Recently shipped: Potentials ladder tweaks (whole-row open, centred arrow, grey pull number,
   pity only for 6★); operator Storage box (`domain/storage.ts`, `settings.storeItems`), X post and
@@ -101,13 +101,13 @@ conversation.
    groups from ef-assets 9e15d56, Liino's heal projectile); finding 2 settled by footage (Si's combo gives
    10 + 6.5 to the team); no open findings. Batch 2 done (local, not deployed): `rules2.test.ts`, the other 26
    operators plus batch 1's gap rows, 1179 tests; 36 findings, run as expected failures. Engine fixes
-   for groups A–D, C and F done (local, not deployed; ef-assets f43b5ba reaction buffs in every bundle,
-   91d2c58 the Endministrators' Potentials, both pushed): docs/rotations.md "Engine fixes from batch 2's
-   findings", shared notes engine-fixes.md. 21 finding rows left: group E (Arclight's third slash,
-   Perlica's Cycle Protocol, Rossi's combo SEQ 1, Purrchena's hold; Catcher's free frame now follows the
-   jump rule) and open ones with reasons (Endministrator P1, Avywenna's lances, Lifeng's Link hit, Antal's
-   Focus, Camille's Vesperwings, Liino's Starry Boost). Replays: Skydrummer 3,574,833 → 3,588,467,
-   Alleikhreos 4,445,576 → 4,463,252, Last Rite 4,076,698 → 4,071,541.
+   for groups A–D, C and F shipped in d39e6f2 (ef-assets f43b5ba, 91d2c58). Then (local, not deployed;
+   ef-assets 4d2582f pushed): a buff's source split from its creator (Antal's Focus) and the Link rebuilt
+   on the game's Link buff (Lifeng's 600% hit); replays unchanged (Skydrummer 3,588,467, Alleikhreos
+   4,463,252, Last Rite 4,071,541). docs/rotations.md "Engine fixes from batch 2's findings", shared notes
+   engine-fixes.md. 15 finding rows left: group E (Arclight's third slash, Perlica's Cycle Protocol,
+   Rossi's combo SEQ 1, Purrchena's hold) and open ones with reasons (Endministrator P1, Avywenna's
+   lances, Camille's Vesperwings, Liino's Starry Boost).
 6. Done (local, not deployed): the Simulator's result has buff rows, the boss face and the Buffs
    panel; its shown fight is replayed once with `buffRecorder`. Old saved runs need Run again.
 7. Done (already fixed): the "SP at the start" field max and clamp follow the enemy's `sp.max`.
