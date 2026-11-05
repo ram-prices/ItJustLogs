@@ -1225,6 +1225,41 @@
      "description": "**SKILL DESCRIPTION:** Purrchena opens 3 ⟦key|Big Feline's Prezzies⟧. Each ⟦key|Big Feline's Prezzie⟧ randomly reveals a ⟦key|Bomb⟧ or a piece of ⟦key|Handicraft⟧.\nThere is a chance that the Prezzie reveals ⟦key|Ambassador's Special⟧ that applies ⟦key|Arts Susceptibility⟧ and deals ⟦phys|Physical DMG⟧ as well as additional Stagger to enemies."
     }
    ]
+  },
+  "chr_0037_minghe": {
+   "name": "Argent Flow",
+   "rarity": 6,
+   "class": "Guard",
+   "element": "Electric",
+   "weapon": "Sword",
+   "faction": "Hongshan Academy of Sciences (HAS)",
+   "tags": [
+    "Electrify",
+    "Crush"
+   ],
+   "page": "https://endfield.wiki.gg/wiki/Argent_Flow",
+   "skills": [
+    {
+     "name": "Dust Resplendent",
+     "type": "Basic Attack",
+     "description": "**BASIC ATTACK:**\nAn attack with up to 5 sequences that deals ⟦phys|Physical DMG⟧. As the controlled operator, ⟦key|Final Strike⟧ also deals ⟦stagger|23⟧ Stagger.\n**DIVE ATTACK:**\nBasic attack performed in mid-air becomes a dive attack that deals ⟦phys|Physical DMG⟧ to nearby enemies.\n**FINISHER:**\nBasic attack performed near a Staggered enemy becomes a finisher attack that deals massive ⟦phys|Physical DMG⟧ and recovers some SP."
+    },
+    {
+     "name": "Darkness Cowed",
+     "type": "Battle Skill",
+     "description": "**SKILL DESCRIPTION:** Argent Flow sweeps his lance and deals ⟦phys|Physical DMG⟧ to nearby enemies and applies ⟦key|Lift⟧ to target(s) in front of him.\nAfter Argent Flow casts his combo skill, his battle skill is temporarily changed to ⟦key|Bolt Rush⟧.\n⟦key|Bolt Rush⟧: Argent Flow mounts his galloper Nuli to leap into mid-air, powers up quickly, and then charges at the target to forcibly apply ⟦key|Electrification⟧ and deal ⟦elec|Electric DMG⟧ to enemies within a large area in front of him. When this ⟦key|Electrification⟧ is applied on a target with ⟦key|Electric Infliction⟧, it ⟦key|consumes⟧ all ⟦key|Electric Infliction⟧ stacks from the target and grants ⟦key|Electrification⟧ ⟦key|Status Level +1⟧ per 1 stack consumed. After ⟦key|consuming⟧ the target's ⟦key|Electric Infliction⟧, Argent Flow also applies 1 stack of ⟦key|Vulnerability⟧."
+    },
+    {
+     "name": "Stars Shifted",
+     "type": "Combo Skill",
+     "description": "**COMBO TRIGGER:** When an enemy becomes ⟦key|Vulnerable⟧.\n**SKILL DESCRIPTION:** Argent Flow wields his blade with lightning speed to unleash a multi-sequence attack that deals ⟦elec|Electric DMG⟧ to enemies along his path. When the final sequence scores a hit, it also applies ⟦key|Electric Infliction⟧. Argent Flow's battle skill is then temporarily changed to ⟦key|Bolt Rush⟧."
+    },
+    {
+     "name": "Heavens Sundered",
+     "type": "Ultimate",
+     "description": "**SKILL DESCRIPTION:** Argent Flow mounts Nuli and charges with his lance, dealing continuous ⟦elec|Electric DMG⟧ to targets in front of him while impaling and carrying weak enemies before him throughout the charge. After the charge ends, Argent Flow leaps into the air and unleashes a Cleansing Cleave at the ground. The slash deals ⟦elec|Electric DMG⟧ and applies 1 stack of ⟦key|Electric Infliction⟧. Argent Flow then pierces the ground with his lance, applying ⟦key|Crush⟧ and dealing ⟦elec|Electric DMG⟧ to enemies within a large area.\n⟦muted|If Argent Flow's ultimate charges into a non-weak enemy (that cannot be impaled and pushed), his charge will end early.⟧"
+    }
+   ]
   }
  },
  "weapons": {

@@ -59,7 +59,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
   - Potential art (`domain/potentialArt.ts`, `ui/pages/potentialArt.ts`): the
     pictures P1, P3 and P5 unlock (ef-assets `operators/potential/<id>-p<n>.webp`
     and its `index.json`, from `scripts/potential-art.py` and the EndfieldDataDump
-    checkout; Minghe has none in the game's table). An operator page's banner
+    checkout). An operator page's banner
     (Auto) shows the player's own banner picture (art.ts, placed in Banner),
     else the highest Potential picture they own (`bannerShown` in
     domain/potentialArt.ts); the hero's Banner art button (`wallpaper`,
