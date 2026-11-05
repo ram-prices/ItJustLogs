@@ -1024,11 +1024,6 @@ select.input {
   .ruler-mark:hover {
     transform: translateX(-50%) !important;
   }
-  .op-card-fx,
-  .op-card-sweep,
-  .op-card-rainbow {
-    display: none;
-  }
   .ruler-pin:hover :is(.ruler-tick, .ruler-dot) {
     transform: none !important;
   }

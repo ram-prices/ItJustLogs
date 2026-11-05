@@ -1071,158 +1071,6 @@
   overflow: hidden;
   background: var(--gray-100);
 }
-/* The game's results-screen strip behind the portrait (ef-assets ui/gacha/, from bg_gacha_color_N):
-   the glow bright at the top, the colour pooled at the foot, the band over the full height.
-   One URL per piece, so the browser fetches each once; probeGachaStrips (components.ts) swaps in
-   the other mirror if one fails. */
-:root {
-  --gacha-6-glow: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-6-glow-sm.webp);
-  --gacha-6-foot: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-6-sm.webp);
-  --gacha-6-band: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-6-2-sm.webp);
-  --gacha-5-glow: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-5-glow-sm.webp);
-  --gacha-5-foot: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-5.webp);
-  --gacha-5-band: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-5-2-sm.webp);
-  --gacha-4-glow: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-4-glow-sm.webp);
-  --gacha-4-foot: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/strip-4.webp);
-  --gacha-rainbow: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/particle-rainbow.webp);
-  --gacha-band: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/particle-band.webp);
-  --gacha-sweep: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/ui/gacha/particle-sweep.webp);
-}
-.op-card.r6 {
-  --strip-glow: var(--gacha-6-glow);
-  --strip-foot: var(--gacha-6-foot);
-  --strip-band: var(--gacha-6-band);
-}
-.op-card.r5 {
-  --strip-glow: var(--gacha-5-glow);
-  --strip-foot: var(--gacha-5-foot);
-  --strip-band: var(--gacha-5-band);
-}
-.op-card.r4 {
-  --strip-glow: var(--gacha-4-glow);
-  --strip-foot: var(--gacha-4-foot);
-}
-.op-card-art::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    var(--strip-glow, none) 50% 0 / 117% 80% no-repeat,
-    var(--strip-foot, none) 50% 100% / 100% 150% no-repeat,
-    var(--strip-band, none) 50% 100% / 100% 100% no-repeat;
-}
-/* What moves on the strip: the game's result cell, flat layers with scrolling UVs (ef-assets
-   ui/gacha/README.md). On 6★ and 5★ two bands in the rarity's tint pass each other every 2 s; on every
-   rarity a slow 10 s sweep; on 6★ a rainbow ribbon over the art, 10 s. All in phase, as in the game.
-   Only transform animates, so the compositor does it: a band is a static masked picture that hops whole
-   dot rows at a time (steps), which keeps its dots on the grid and leaves nothing to repaint. */
-.op-card {
-  --dot: rgba(255, 228, 206, 0.62);
-  --band: rgba(255, 117, 122, 0.3);
-  --sweep-dot: rgba(255, 228, 206, 0.28);
-  --dot-pitch: 7px;
-  --dot-steps: 70;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 230px;
-}
-.op-card.r5 {
-  --dot: rgba(255, 246, 190, 0.62);
-  --band: rgba(255, 235, 122, 0.3);
-  --sweep-dot: rgba(255, 246, 190, 0.28);
-}
-.op-card.r4 {
-  --sweep-dot: rgba(214, 196, 255, 0.42);
-}
-.op-card-fx,
-.op-card-sweep {
-  position: absolute;
-  inset: 0;
-}
-.op-card-fx::before,
-.op-card-fx::after,
-.op-card-sweep::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 231px;
-  background:
-    radial-gradient(circle, var(--dot) 30%, transparent 44%) 0 0 / var(--dot-pitch) var(--dot-pitch),
-    linear-gradient(var(--band), var(--band));
-  /* The game samples a 35% wide slice of the band. */
-  mask: var(--gacha-band) 50% 50% / 286% 100% no-repeat luminance;
-  will-change: transform;
-  animation: strip-dots 2s steps(var(--dot-steps)) infinite;
-}
-.op-card-fx::after {
-  animation-direction: reverse;
-}
-.op-card.r4 .op-card-fx {
-  display: none;
-}
-.op-card-sweep::before {
-  background: radial-gradient(circle, var(--sweep-dot) 30%, transparent 44%) 0 0 / var(--dot-pitch) var(--dot-pitch);
-  mask: var(--gacha-sweep) 0 0 / 100% 100% luminance;
-  animation-duration: 10s;
-}
-@keyframes strip-dots {
-  from {
-    transform: translateY(259px);
-  }
-  to {
-    transform: translateY(-231px);
-  }
-}
-/* 6★: the ribbon over the art. The mask stays still, the colour scrolls under it. The game stretches a
-   16% wide slice of the texture sideways. Only the vertical half of its diagonal scroll, and no warp.
-   The mask is matched to the footage: the game's own, read literally, covers the face in grey. */
-.op-card-rainbow {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  mask: linear-gradient(140deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.9) 14%, rgba(0, 0, 0, 0.9) 22%, transparent 36%);
-  pointer-events: none;
-}
-.op-card-rainbow::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 200%;
-  background: var(--gacha-rainbow) 18% 0 / 625% 50%;
-  will-change: transform;
-  animation: strip-rainbow 10s linear infinite;
-}
-@keyframes strip-rainbow {
-  to {
-    transform: translateY(-50%);
-  }
-}
-@media (max-width: 640px) {
-  .op-card {
-    --dot-pitch: 5px;
-    --dot-steps: 98;
-  }
-}
-/* When the page opens the cards start overexposed and settle, as on the results screen (0.8 s),
-   not on a redraw of the page already open. No flash with reduced motion (components.css). */
-.op-card-art::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  opacity: 0;
-  pointer-events: none;
-}
-.op-grid.settle .op-card-art::after {
-  animation: op-settle 0.8s ease-out calc(var(--i, 0) * 30ms) backwards;
-}
-@keyframes op-settle {
-  from {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 0;
-  }
-}
 .op-card-img {
   position: relative;
   display: block;
@@ -1294,19 +1142,11 @@
   font: 600 15px/20px var(--font-sans);
 }
 .op-card.unowned .op-card-img,
-.op-card.unowned .op-card-strip,
-.op-card.unowned .op-card-art::before,
-.op-card.unowned .op-card-fx,
-.op-card.unowned .op-card-sweep,
-.op-card.unowned .op-card-rainbow {
+.op-card.unowned .op-card-strip {
   opacity: 0.45;
 }
 .op-card.unowned:hover .op-card-img,
-.op-card.unowned:hover .op-card-strip,
-.op-card.unowned:hover .op-card-art::before,
-.op-card.unowned:hover .op-card-fx,
-.op-card.unowned:hover .op-card-sweep,
-.op-card.unowned:hover .op-card-rainbow {
+.op-card.unowned:hover .op-card-strip {
   opacity: 1;
 }
 @media (max-width: 640px) {

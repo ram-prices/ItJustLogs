@@ -10,7 +10,7 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, pageHeader, stars, trait, withStars, emptyState, probeGachaStrips } from '../components';
+import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, pageHeader, stars, trait, withStars, emptyState } from '../components';
 import { html, type Html } from '../html';
 import { tip, tipRow } from '../charts';
 import finalStrikes from '../../data/final-strikes.json';
@@ -89,12 +89,6 @@ export const operatorInfoHref = (id?: string): string => infoHref('char', id);
 // Index: every operator
 // ---------------------------------------------------------------------------
 
-/** The cards settle in (database.css) on the grid's first draw after opening the page, not on redraws. */
-let settleNext = true;
-export const resetOpSettle = (): void => {
-  settleNext = true;
-};
-
 function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html {
   // Endministrator is two ids on one wiki page; list each page once.
   const seen = new Set<string>();
@@ -111,9 +105,6 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
     ...ops.map(([id, o]) => ({ id, name: o.name, rarity: o.rarity, class: o.class, element: o.element, weapon: o.weapon, soon: false })),
     ...soon.map(([id, p]) => ({ id, name: p.name, rarity: p.rarity, class: p.class, element: p.element, weapon: p.weapon, soon: true })),
   ];
-  probeGachaStrips();
-  const settle = settleNext;
-  settleNext = false;
   const groups = sortGroups('char', rows, (r) => ({ rarity: r.rarity, name: r.name, owned: owned?.get(r.id), element: r.element, weapon: r.weapon, class: r.class, unreleased: r.soon }));
   return html`<main class="container fade-in">${databaseTabs(
       'char',
@@ -122,12 +113,12 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
       ${groups.map(
         (g) => html`<section class="section wiki-type">
           <div class="section-head"><h2 class="heading-20">${g.label ? withStars(g.label) : 'All operators'}</h2><span class="label-13 secondary wiki-count">${g.items.length}</span></div>
-          <div class="op-grid${settle ? ' settle' : ''}">
-            ${g.items.map((r, i) => {
+          <div class="op-grid">
+            ${g.items.map((r) => {
               const mine = owned?.get(r.id);
-              return html`<a class="op-card card r${r.rarity}${owned && (r.soon || !mine?.copies) ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}" style="--i:${Math.min(i, 8)}" data-search-item>
+              return html`<a class="op-card card r${r.rarity}${owned && (r.soon || !mine?.copies) ? ' unowned' : ''}" href="${operatorInfoHref(r.id)}" data-search-item>
                 <span class="op-card-art">
-                  <span class="op-card-sweep"></span><span class="op-card-fx"></span>${operatorCard(r.id)}${r.rarity === 6 ? html`<span class="op-card-rainbow"></span>` : ''}
+                  ${operatorCard(r.id)}
                   <span class="op-card-tags">${r.soon ? badge('Unreleased', 'amber') : ownedTag(mine)}</span>
                 </span>
                 <span class="op-card-strip min0">
