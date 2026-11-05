@@ -903,6 +903,9 @@ code {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px 32px;
 }
+.settings-wide {
+  grid-column: 1 / -1;
+}
 .settings-split p {
   color: var(--gray-900);
   margin-bottom: 14px;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import scheduleSnapshot from '../data/schedule.snapshot.json';
 import snapshot from '../data/wiki-share.snapshot.json';
+import type { Season } from './contracts';
 import { legacyEventLinks, scheduleLinks, type Schedule } from './schedule';
 import { itemShortLinks, itemSlugs, nameSlug, operatorShortLinks, RESERVED_PATHS, shortLinkOf } from './wiki';
 import {
@@ -16,6 +17,8 @@ import {
   operatorEmbed,
   scheduleEmbed,
   schedulePreview,
+  seasonEmbed,
+  seasonPreview,
   operatorPreview,
   previewTags,
   utf8Bytes,
@@ -262,5 +265,39 @@ describe('banner and event pages', () => {
     expect(text).toContain('**Americas / Europe**\nOpens <t:');
     expect(text).toContain('**Asia**\nOpens <t:');
     expect(walk(e.component as Node).some((n) => n.type === 12)).toBe(true);
+  });
+});
+
+describe('Contingency Contract previews', () => {
+  const on = (d: string) => ({ asia: `${d}T12:00:00+08:00`, americas: `${d}T12:00:00-05:00` });
+  const season = {
+    id: 'indigo',
+    name: 'Indigo Experimental Operation',
+    shortName: 'Indigo',
+    fullName: 'Contingency Contract: Indigo Experimental Operation',
+    desc: 'x'.repeat(500),
+    start: on('2026-11-05'),
+    batch2: on('2026-11-12'),
+    end: on('2026-11-24'),
+    shopClose: on('2026-12-02'),
+    art: 'cc/art/indigo/key.webp',
+    criteria: 39,
+  } as Season;
+
+  it("fit Discord's limits, with every date on both servers and the key art", () => {
+    const p = seasonPreview(season, '/contracts/indigo');
+    expect(p.title).toBe(season.fullName);
+    expect(p.url).toBe('https://itjustlogs.dev/contracts/indigo');
+    expect(p.image).toMatch(/cc\/art\/indigo\/key\.webp$/);
+    expect(utf8Bytes(p.description)).toBeLessThanOrEqual(PREVIEW_BYTES);
+    const e = seasonEmbed(season, p);
+    expect(embedBytes(e)).toBeLessThanOrEqual(EMBED_BYTES);
+    const text = walk(e.component as Node).map((n) => n.content ?? '').join('\n');
+    for (const label of ['Opens', 'New criteria', 'Combat ends', 'Shop closes']) expect(text.match(new RegExp(`${label} <t:`, 'g'))).toHaveLength(2);
+    expect(walk(e.component as Node).some((n) => n.type === 12)).toBe(true);
+  });
+
+  it('title /contracts with the mode', () => {
+    expect(seasonPreview(season, '/contracts').title).toBe('Contingency Contract');
   });
 });

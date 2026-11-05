@@ -5,6 +5,7 @@
  * can use it too (imports carry .ts extensions for Vite's config loader).
  */
 import { EF_ASSETS_CDN } from './banners.ts';
+import type { Season } from './contracts.ts';
 import { isScheduleBanner, isWeaponBanner, KIND_LABEL, SERVER_LABEL, timeOn, type ScheduleItem, type Server, type ServerTimes } from './schedule.ts';
 import { fmtSkillValue, parseMarkup, splitPlaceholders, wikiId, type WikiOperator, type WikiWeapon, type WikiWeaponSkill } from './wiki.ts';
 
@@ -433,6 +434,46 @@ export function scheduleEmbed(i: ScheduleItem, p: Preview): ComponentEmbed {
       textDisplay('-# Times are shown in your time zone'),
     ]),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Contingency Contract: /contracts, /contracts/<season>
+// ---------------------------------------------------------------------------
+
+const CONTRACT_TITLE = 'Contingency Contract';
+
+/** `path` /contracts shows the season the page leads with, under the mode's name. */
+export function seasonPreview(s: Season, path: string): Preview {
+  const lines = [
+    s.shortName,
+    ...SERVERS.map((v) => `${SERVER_LABEL[v]}: ${serverClock(s.start[v])} – ${serverClock(s.end[v])} (${UTC_LABEL[v]})`),
+    s.desc,
+  ];
+  return {
+    title: clip(path === '/contracts' ? CONTRACT_TITLE : s.fullName, TITLE_BYTES, utf8Bytes),
+    description: clip(lines.join('\n'), PREVIEW_BYTES, utf8Bytes),
+    image: `${EF_ASSETS_CDN}/${s.art}`,
+    url: `${SITE_URL}${path}`,
+    color: '#e5484d',
+  };
+}
+
+/** The season, its key art, then every date on both servers. */
+export function seasonEmbed(s: Season, p: Preview): ComponentEmbed {
+  const date = (label: string, t: ServerTimes | null, v: Server) => {
+    const ms = timeOn(t, v);
+    return ms == null ? '' : `${label} ${stamp(ms, 'F')} (${stamp(ms, 'R')})`;
+  };
+  const dates = SERVERS.map((v) =>
+    [`**${SERVER_LABEL[v]}**`, date('Opens', s.start, v), date('New criteria', s.batch2, v), date('Combat ends', s.end, v), date('Shop closes', s.shopClose, v)].filter(Boolean).join('\n'),
+  );
+  return container(p, [
+    textDisplay(`## ${md(s.fullName)}\n${s.criteria} Test Criteria`),
+    ...(p.image ? [{ type: 12, items: [{ media: { url: p.image } }] }] : []),
+    separator,
+    textDisplay(dates.join('\n\n')),
+    textDisplay('-# Times are shown in your time zone'),
+  ]);
 }
 
 /** The <head> tag carrying a component embed, or nothing if it's still too big. */

@@ -543,7 +543,7 @@ select option {
   position: absolute;
   inset: auto 0 2.5px;
   height: 29.6px;
-  background: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/effects/six-star/smoke-loop-3.webp) 0 0 / 100% 100%;
+  background: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/effects/six-star/smoke-loop-3.webp) 0 0 / 100% 100%;
 }
 .rarity-art.smoke > img {
   position: relative;
@@ -1234,10 +1234,12 @@ a.ladder-row:focus-visible {
   align-items: start;
   position: relative;
 }
-/* Settings → Backgrounds: Home's clip, by its first frame (Random and None as plain buttons). */
+/* Settings → Backgrounds: Home's clip, by its first frame (Random and None as plain buttons).
+   The tiles share the card's width; equal rows keep a plain tile as tall as a picture one. */
 .clip-picks {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  grid-auto-rows: 1fr;
   gap: 8px;
   margin-top: 12px;
 }
@@ -1254,14 +1256,13 @@ a.ladder-row:focus-visible {
   box-shadow: var(--shadow-border);
 }
 .clip-pick img {
-  width: 120px;
+  width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--radius-sm);
 }
 .clip-pick.plain {
   justify-content: center;
-  min-width: 72px;
   padding: 8px 12px;
 }
 .clip-pick[aria-pressed='true'] {

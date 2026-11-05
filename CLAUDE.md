@@ -23,7 +23,7 @@ event gets a built page with its Discord embed (`pageCopies` in
 - `docs/sync.md`: Google Drive sync, version history, operator art, profile
   picture, Google Cloud setup.
 - `docs/tabs.md`: Achievements, Archive, Story, AIC, Essences (and their
-  screen readers).
+  screen readers), Contracts.
 - `docs/income.md`: Stats → By patch free pull income.
 - `docs/pages.md`: built pages, Discord embeds, event pages, legacy links.
 - `docs/hub.md`: the coordinator/deployer hub session, its rules and the current task queue.
@@ -119,7 +119,10 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
 - ef-assets pictures (portraits, gear, banner art and layers, item icons,
   schedule art via `cdnUrl`, backgrounds) load from jsDelivr
   (`EF_ASSETS_CDN`: browsers keep them a week; a changed file reaches the CDN
-  within 12 hours, or purge `https://purge.jsdelivr.net/gh/ram-prices/ef-assets@main/<path>`),
+  within 12 hours, or purge `https://purge.jsdelivr.net/gh/ram-prices/ef-assets@<branch>/<path>`).
+  jsDelivr refuses refs over 50 MB, so they come from ef-assets branches under it, not main:
+  `cdn`, `cdn-full` and `cdn-potential`, rebuilt from main by its `scripts/cdn-branches.sh`
+  (fails over 45 MB; a new branch also needs `cdnBase` in banners.ts). The rest:
   data files (`schedule.json`, `banners.json`, `wiki/*`, `icons/index.json`)
   from raw.githubusercontent (`EF_ASSETS`, fresh within minutes). A failed
   load tries the other mirror once (`mirrorUrl`, `data-fallback` images).

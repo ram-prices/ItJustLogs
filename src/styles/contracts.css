@@ -1,0 +1,420 @@
+/* Contingency Contract (pages/contracts.ts): the seasons, and a season's board, which is also the picker. */
+.cc-hero .wiki-fact .badge {
+  align-self: flex-start;
+}
+.cc-hero-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cc-lead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 32px;
+}
+.cc-text {
+  max-width: 80ch;
+  white-space: pre-line;
+}
+.cc-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 80ch;
+  margin: 0;
+  padding-left: 18px;
+}
+.cc-rules-card summary {
+  padding: 12px 16px;
+  cursor: pointer;
+}
+.cc-rules-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 16px 16px;
+}
+.cc-rules-body h3 {
+  margin-bottom: 8px;
+}
+.cc-seasons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.cc-season {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+}
+.cc-season-art {
+  width: 100%;
+  aspect-ratio: 29 / 10;
+  object-fit: cover;
+  background: var(--gray-alpha-200);
+}
+.cc-season-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+}
+.cc-season-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cc-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+.cc-stage {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cc-stage .wiki-facts {
+  margin-top: 0;
+}
+:is(#cc-criteria, #cc-enemies, #cc-missions, #cc-shop, #cc-medal) {
+  scroll-margin-top: 120px;
+}
+
+/* The picker's row: the total, the code, its buttons. */
+.cc-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+.cc-total {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 0 6px;
+  min-width: 96px;
+}
+.cc-total .wiki-fact-label {
+  grid-column: 1 / -1;
+}
+.cc-total b {
+  font: 600 24px/32px var(--font-sans);
+}
+.cc-code {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cc-code .input {
+  width: 200px;
+  font-family: var(--font-mono);
+}
+.cc-code .input[aria-invalid='true'] {
+  box-shadow: 0 0 0 1px var(--red);
+}
+.cc-code-error {
+  flex-basis: 100%;
+  color: var(--red);
+}
+
+/* The board: the game's columns and rows; scrolls sideways inside its card. */
+.cc-board-card {
+  overflow-x: auto;
+  padding: 12px;
+}
+.cc-board {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 120px);
+  grid-template-rows: auto repeat(var(--rows), auto);
+  gap: 8px;
+  width: max-content;
+}
+/* The Criteria Sets: a label over the columns each total opens. */
+.cc-set {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 6px;
+  box-shadow: inset 0 -1px 0 var(--gray-alpha-400);
+  color: var(--gray-1000);
+  font: 500 13px/20px var(--font-sans);
+}
+/* The label stays in view while the board scrolls under it. */
+.cc-set > span {
+  position: sticky;
+  left: 8px;
+}
+.cc-set.locked {
+  color: var(--gray-900);
+}
+.cc-set .icon {
+  font-size: 15px;
+}
+.cc-tag {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+  box-shadow: var(--shadow-border);
+  cursor: pointer;
+  transition:
+    background 150ms,
+    box-shadow 150ms,
+    opacity 150ms;
+}
+@media (hover: hover) {
+  .cc-tag:hover {
+    background: var(--gray-alpha-200);
+  }
+}
+.cc-tag:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.cc-tag.on {
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--amber);
+}
+.cc-tag.blocked {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cc-board.relating .cc-tag:not(.related) {
+  opacity: 0.32;
+}
+.cc-board.relating .cc-tag.related {
+  opacity: 1;
+}
+.cc-tag-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+.cc-tag-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  filter: var(--white-icon-filter);
+}
+.cc-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cc-clear img {
+  width: 16px;
+  height: 16px;
+}
+.cc-tag-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.cc-points {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-200);
+  font: 600 12px/20px var(--font-sans);
+}
+.cc-points.p2 {
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+  color: var(--amber);
+}
+.cc-points.p3 {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+  color: var(--red);
+}
+.cc-tag-name {
+  flex: 1;
+  font: 500 13px/18px var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.cc-tag-name.unknown {
+  color: var(--gray-900);
+  font-weight: 400;
+}
+.cc-tag-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 18px;
+}
+.cc-tag-marks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cc-mark {
+  display: inline-flex;
+}
+.cc-mark .icon,
+.cc-legend .icon {
+  font-size: 15px;
+}
+.cc-mark-text {
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: var(--gray-alpha-200);
+  color: var(--gray-1000);
+  font: 500 11px/16px var(--font-sans);
+}
+.cc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 12px;
+  padding: 0 4px;
+}
+.cc-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cc-picked {
+  margin-top: 12px;
+}
+.cc-picked-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 220px) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 16px;
+}
+.cc-picked-row + .cc-picked-row {
+  box-shadow: inset 0 1px 0 var(--gray-alpha-200);
+}
+.cc-picked-row b {
+  font-weight: 500;
+}
+
+.cc-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cc-reward img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.cc-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.cc-variant {
+  margin: 20px 0 10px;
+}
+.section-head + .cc-variant {
+  margin-top: 0;
+}
+.cc-enemies .cc-wave th {
+  padding-block: 10px;
+  background: var(--gray-alpha-100);
+  text-align: left;
+}
+.cc-enemies td {
+  padding-block: 10px;
+}
+.cc-enemy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cc-enemy b {
+  font-weight: 500;
+}
+.cc-enemy-art {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--gray-alpha-200);
+}
+.cc-abilities {
+  white-space: normal;
+}
+.cc-mission {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+.cc-shop-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.cc-shop-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.cc-medal {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, auto) minmax(220px, 1fr));
+  align-items: center;
+  gap: 16px 20px;
+  padding: 20px;
+}
+.cc-medal p {
+  margin-top: 6px;
+}
+.cc-medal-art {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+@media (max-width: 640px) {
+  .cc-mission {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .cc-picked-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .cc-picked-row .copy-14 {
+    grid-column: 2;
+  }
+  .cc-medal {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+  }
+  .cc-medal-art {
+    width: 64px;
+    height: 64px;
+  }
+  .cc-code {
+    flex: 1 1 100%;
+  }
+  .cc-code .input {
+    width: 100%;
+  }
+}

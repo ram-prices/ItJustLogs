@@ -274,7 +274,7 @@ export function settingsPage(redraw: () => void): Html {
             <p class="copy-14">Banners open at the same local time on each server, 13 hours apart.${s.server ? '' : ' Guessed from your time zone for now.'}</p>
             ${toggleGroup('server', [['americas', SERVER_LABEL.americas], ['asia', SERVER_LABEL.asia]], currentServer())}
           </div>
-          <div>
+          <div class="settings-wide">
             <h3 class="heading-16">Backgrounds</h3>
             <p class="copy-14">Home plays a game clip behind it, and pictures move a little with your mouse.</p>
             ${toggleGroup('motion', [['on', 'Animated'], ['off', 'Still']], s.motion === false ? 'off' : 'on')}
@@ -285,6 +285,7 @@ export function settingsPage(redraw: () => void): Html {
       ${group('Tabs', html`<div class="card-body settings-checks">
         <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showEssences" ${raw(s.showEssences ? 'checked' : '')} />Show the Essences tab</label>
         <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showAic" ${raw(s.showAic ? 'checked' : '')} />Show the AIC tab</label>
+        <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showContracts" ${raw(s.showContracts !== false ? 'checked' : '')} />Show the Contracts tab</label>
         </div>`)}
 
       ${group('Data', html`<div class="settings-part">

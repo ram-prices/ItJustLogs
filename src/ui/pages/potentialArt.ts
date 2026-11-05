@@ -1,4 +1,4 @@
-import { EF_ASSETS_CDN } from '../../domain/banners';
+import { EF_ASSETS_POTENTIAL_CDN } from '../../domain/banners';
 import { artChoiceOf, bannerShown, potentialPictures, withArtChoice, type BannerShown, type PotentialArtIndex, type PotentialPicture } from '../../domain/potentialArt';
 import { state, updateSettings } from '../../state';
 import { icon, itemImg } from '../components';
@@ -13,7 +13,7 @@ import { wikiFile } from './info';
  * pop-up: Custom, Base or any Potential's, locked ones included.
  */
 
-export const potentialArtUrl = (file: string): string => `${EF_ASSETS_CDN}/operators/potential/${file}`;
+export const potentialArtUrl = (file: string): string => `${EF_ASSETS_POTENTIAL_CDN}/operators/potential/${file}`;
 
 const indexOf = (redraw: () => void): PotentialArtIndex | null =>
   wikiFile<PotentialArtIndex>('index.json', redraw, 'operators/potential').data;

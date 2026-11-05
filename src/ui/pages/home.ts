@@ -43,7 +43,7 @@ const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'num
 const when = (ms: number) => dateFmt.format(ms);
 
 /** "16d 4h", "5h 20m", "12m". */
-function span(ms: number): string {
+export function span(ms: number): string {
   const m = Math.max(0, Math.round(ms / 60000));
   const d = Math.floor(m / 1440);
   const h = Math.floor((m % 1440) / 60);

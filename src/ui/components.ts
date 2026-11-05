@@ -343,6 +343,7 @@ export const TAB_ICON: Record<string, Html> = {
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
   essences: raw(`<svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${ESSENCE_PATH}"/></svg>`),
   aic: raw('<span class="tab-icon icon filled" aria-hidden="true">factory</span>'),
+  contracts: raw('<span class="tab-icon icon filled" aria-hidden="true">gavel</span>'),
   achievements: raw('<span class="tab-icon icon filled" aria-hidden="true">military_tech</span>'),
   archives: raw('<span class="tab-icon icon filled" aria-hidden="true">history_edu</span>'),
   settings: raw('<span class="tab-icon icon filled" aria-hidden="true">settings</span>'),

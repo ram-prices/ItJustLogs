@@ -171,8 +171,8 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     paths (`/operators/info/<chr id>`, `/arsenal/<poolId>`, `/stats`, `/pulls`,
     `#/...`) are moved to today's (`currentPath`), and their folders are
     still built, so old links keep working.
-    Header tabs: Home, Pulls, Database, Rotations (WIP), Essences, AIC (WIP), Achievements, Archive, Story,
-    Settings. The current tab has a `--gray-alpha-200` pill and the underline. On phones (`max-width: 640px`) the tabs share the row, icons only (`TAB_ICON`, every tab needs one; the label is `aria-label` and `title`), so all ten fit without scrolling; the WIP badge shrinks to the icon's corner. Essences and AIC are hidden until ticked in Settings → Tabs (`showEssences`, `showAic`); their routes still open when typed. Database (`/database/...`) and Pulls (`/banner/...`) are
+    Header tabs: Home, Pulls, Database, Rotations (WIP), Contracts, Essences, AIC (WIP), Achievements, Archive, Story,
+    Settings. The current tab has a `--gray-alpha-200` pill and the underline. On phones (`max-width: 640px`) the tabs share the row, icons only (`TAB_ICON`, every tab needs one; the label is `aria-label` and `title`), so all eleven fit without scrolling; the WIP badge shrinks to the icon's corner. Essences and AIC are hidden until ticked in Settings → Tabs (`showEssences`, `showAic`); their routes still open when typed. Database (`/database/...`) and Pulls (`/banner/...`) are
     sections picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/banner` open the page last used there.
     Side-tab pages show no title or summary line (the top and side tabs say

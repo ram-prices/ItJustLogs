@@ -1,7 +1,13 @@
 import type { BannerDb, BannerDbEntry, Category, Kind } from './types.ts';
 
 export const EF_ASSETS = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
-export const EF_ASSETS_CDN = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main';
+const JSDELIVR = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets';
+/** The pictures, on jsDelivr. Its limit is 50 MB per ref and main is over it, so ef-assets publishes them to branches under it (scripts/cdn-branches.sh). */
+export const EF_ASSETS_CDN = `${JSDELIVR}@cdn`;
+export const EF_ASSETS_FULL_CDN = `${JSDELIVR}@cdn-full`;
+export const EF_ASSETS_POTENTIAL_CDN = `${JSDELIVR}@cdn-potential`;
+/** Data files on jsDelivr, the fallback when raw.githubusercontent fails. */
+export const EF_ASSETS_DATA_CDN = `${JSDELIVR}@main`;
 
 /** The game spells weapon pools "weponbox_" for limited issues but "weaponbox_" for constant ones. */
 export function canonicalPoolId(poolId: string): string {
@@ -95,7 +101,7 @@ export function itemIconUrl(kind: Kind, itemId: string): string {
 export const operatorCardUrl = (id: string): string => itemIconUrl('char', id).replace('/operators/', '/operators/bust-3/');
 
 /** An operator's full art: the game's character portrait, the operator in their splash motif on a transparent background (ef-assets operators/full/, from operator-full.py, at the game's own size since cards zoom it). */
-export const operatorFullUrl = (id: string): string => itemIconUrl('char', id).replace('/operators/', '/operators/full/');
+export const operatorFullUrl = (id: string): string => itemIconUrl('char', id).replace(`${EF_ASSETS_CDN}/operators/`, `${EF_ASSETS_FULL_CDN}/operators/full/`);
 
 /** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
 export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
@@ -153,10 +159,17 @@ export function operatorLayerUrls(poolId: string): { back: string; op: string } 
  * until the CDN has it, the load fails and the other mirror is tried.
  */
 export function mirrorUrl(url: string): string | null {
-  if (url.startsWith(EF_ASSETS)) return EF_ASSETS_CDN + url.slice(EF_ASSETS.length);
-  if (url.startsWith(EF_ASSETS_CDN)) return EF_ASSETS + url.slice(EF_ASSETS_CDN.length);
+  if (url.startsWith(EF_ASSETS)) return cdnBase(url.slice(EF_ASSETS.length + 1)) + url.slice(EF_ASSETS.length);
+  if (url.startsWith(`${JSDELIVR}@`)) return EF_ASSETS + url.slice(url.indexOf('/', JSDELIVR.length));
   return null;
 }
 
+/** Where jsDelivr serves an ef-assets path from: the same split as ef-assets scripts/cdn-branches.sh. */
+function cdnBase(path: string): string {
+  if (path.startsWith('operators/full/')) return EF_ASSETS_FULL_CDN;
+  if (path.startsWith('operators/potential/')) return EF_ASSETS_POTENTIAL_CDN;
+  return !path.includes('/') || /^(combat|story|wiki|scripts)\//.test(path) ? EF_ASSETS_DATA_CDN : EF_ASSETS_CDN;
+}
+
 /** A picture URL the schedule gives (raw.githubusercontent) as its jsDelivr one. */
-export const cdnUrl = (url: string): string => (url.startsWith(EF_ASSETS) ? EF_ASSETS_CDN + url.slice(EF_ASSETS.length) : url);
+export const cdnUrl = (url: string): string => (url.startsWith(EF_ASSETS) ? mirrorUrl(url)! : url);

@@ -2,7 +2,8 @@ import { withoutRetiredPlaces } from './domain/artMeta';
 import { withStorageItems } from './domain/storage';
 import snapshot from './data/banners.snapshot.json';
 import scheduleSnapshot from './data/schedule.snapshot.json';
-import { EF_ASSETS, EF_ASSETS_CDN } from './domain/banners';
+import { EF_ASSETS, EF_ASSETS_DATA_CDN } from './domain/banners';
+import type { Selection } from './domain/contracts';
 import type { PaidIncome } from './domain/income';
 import type { Loadout } from './domain/loadout';
 import type { ExtraCopy } from './domain/owned';
@@ -23,6 +24,7 @@ const KEYS = {
   schedule: 'ijl.schedule',
   sync: 'ijl.sync',
   tabViews: 'ijl.tabViews',
+  contracts: 'ijl.contracts',
 } as const;
 
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -157,6 +159,8 @@ export interface Settings {
   /** Header tabs hidden unless ticked in Settings. */
   showEssences?: boolean;
   showAic?: boolean;
+  /** Contracts shows unless switched off. */
+  showContracts?: boolean;
   /** How far that picture reaches beside its circle on each side, in circle widths (cropper.ts). */
   avatarBox?: AvatarBox;
   /** Home's widgets in order; unset = the schedule (homeWidgets.ts DEFAULT_HOME). */
@@ -466,7 +470,7 @@ export const refreshSchedule = (): Promise<Schedule | null> => refreshFile<Sched
 
 /** Fetches an ef-assets file and caches it; resolves null if offline or unchanged. */
 async function refreshFile<T>(file: string, key: string): Promise<T | null> {
-  for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
+  for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
     try {
       const res = await fetch(`${base}/${file}`, { signal: AbortSignal.timeout(6000), cache: 'no-cache' });
       if (!res.ok) continue;
@@ -499,7 +503,7 @@ export function loadWikiFile<T>(file: string, dir = 'wiki'): Promise<T> {
   let p = wikiFiles.get(key) as Promise<T> | undefined;
   if (!p) {
     p = (async () => {
-      for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
+      for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
         try {
           const res = await fetch(`${base}/${key}`, { signal: AbortSignal.timeout(10000) });
           if (res.ok) return (await res.json()) as T;
@@ -514,6 +518,10 @@ export function loadWikiFile<T>(file: string, dir = 'wiki'): Promise<T> {
   }
   return p;
 }
+
+/** Contingency Contract selections, by season. Small: a few numbers each. */
+export const loadContractPicks = (): Record<string, Selection> => readJson(KEYS.contracts) ?? {};
+export const saveContractPicks = (picks: Record<string, Selection>): void => writeJson(KEYS.contracts, picks);
 
 // ---------------------------------------------------------------------------
 // IndexedDB: "data" holds pull history, "images" holds avatar/header blobs

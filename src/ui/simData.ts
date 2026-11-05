@@ -5,7 +5,7 @@
  * fight workers (each fetches its own copy; the browser's cache serves the
  * repeats).
  */
-import { EF_ASSETS, EF_ASSETS_CDN } from '../domain/banners';
+import { EF_ASSETS, EF_ASSETS_DATA_CDN } from '../domain/banners';
 import type { GearData, WeaponData } from '../domain/sim/build';
 import type { SimData, SimRequest } from '../domain/sim/team';
 
@@ -16,7 +16,7 @@ function get<T>(path: string): Promise<T> {
   let p = files.get(path) as Promise<T> | undefined;
   if (!p) {
     p = (async () => {
-      for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
+      for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
         try {
           const res = await fetch(`${base}/combat/${path}`);
           if (res.ok) return (await res.json()) as T;

@@ -43,19 +43,20 @@ import { installTint, tintAmbients, tintHeroes, tintSixStrip, tintWeaponCards } 
  * the page body. Routes are hash-based so every banner page has its own URL.
  */
 
-type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'aic' | 'rotations' | 'stats' | 'achievements' | 'archives' | 'story' | 'settings' | 'event';
+type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'aic' | 'rotations' | 'contracts' | 'stats' | 'achievements' | 'archives' | 'story' | 'settings' | 'event';
 /**
  * The header's tabs. Database (every operator and weapon) and Pulls (the
  * player's banners and Stats) hold several pages, picked with side tabs;
  * their pages live under /database and /banner (/database/operators,
  * /banner/arsenal, /banner/stats...).
  */
-type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'aic' | 'rotations' | 'achievements' | 'archives' | 'story' | 'settings';
+type Tab = 'home' | 'database' | 'pulls' | 'essences' | 'aic' | 'rotations' | 'contracts' | 'achievements' | 'archives' | 'story' | 'settings';
 const TABS: [Tab, string][] = [
   ['home', 'Home'],
   ['pulls', 'Pulls'],
   ['database', 'Database'],
   ['rotations', 'Rotations'],
+  ['contracts', 'Contracts'],
   ['essences', 'Essences'],
   ['aic', 'AIC'],
   ['achievements', 'Achievements'],
@@ -64,7 +65,7 @@ const TABS: [Tab, string][] = [
   ['settings', 'Settings'],
 ];
 /** Paths that are pages of their own. */
-const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'aic', 'rotations', 'stats', 'achievements', 'archives', 'story', 'settings']);
+const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'aic', 'rotations', 'contracts', 'stats', 'achievements', 'archives', 'story', 'settings']);
 /** Where Database and Pulls open first: the operator list, the Headhunting banners. */
 const SECTION_HOME = { database: '/database/operators', pulls: '/banner/headhunting' } as const;
 /** The path each section answers to (/database, /banner). */
@@ -219,6 +220,7 @@ const essences = lazy(() => import('./pages/essences'));
 const story = lazy(() => import('./pages/story'));
 const aic = lazy(() => import('./pages/aic'));
 const rotations = lazy(() => import('./pages/rotations'));
+const contracts = lazy(() => import('./pages/contracts'));
 
 /** A Story mission opened at one of its lines (/story/<mission>#l-3-12, from the search): scroll there once it's drawn, and mark it; or the list at a section (/story#s-…). */
 let lineShown = '';
@@ -297,7 +299,7 @@ function header(route: Route): Html {
       ${has ? syncButton() : html`<button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>`}
     </div>
     <nav class="tabs" aria-label="Sections">
-      ${TABS.filter(([tab]) => (tab !== 'essences' || state.settings.showEssences) && (tab !== 'aic' || state.settings.showAic)).map(([tab, label]) => {
+      ${TABS.filter(([tab]) => (tab !== 'essences' || state.settings.showEssences) && (tab !== 'aic' || state.settings.showAic) && (tab !== 'contracts' || state.settings.showContracts !== false)).map(([tab, label]) => {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
         const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
@@ -360,6 +362,8 @@ function page(route: Route): Html {
   if (route.page === 'aic') return aic.get()?.aicPage(draw) ?? loadingPage('AIC planner');
   // Rotations: game data and the player's loadouts; no import needed.
   if (route.page === 'rotations') return rotations.get()?.rotationsPage(draw, route.id) ?? loadingPage('Rotations');
+  // Contingency Contract: game data, no import needed.
+  if (route.page === 'contracts') return contracts.get()?.contractsPage(route.id, draw) ?? loadingPage('Contingency Contract');
   // The game's story text: no import needed.
   if (route.page === 'story') return story.get()?.storyPage(route.id, draw) ?? loadingPage('Story');
   if (route.page === 'event') return eventPage(route.id, draw);
@@ -520,6 +524,8 @@ function draw(): void {
       ? eventOf(route.id)?.name
       : route.page === 'story'
         ? (story.mod?.storyTitle(route.id) ?? 'Story')
+        : route.page === 'contracts'
+          ? (contracts.mod?.contractsTitle(route.id) ?? 'Contingency Contract')
         : (PULLS_TITLE[route.page] ?? TABS.find(([t]) => t === route.page)?.[1]);
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
 }
@@ -794,7 +800,9 @@ function installProfile(): void {
     // Rotations: the team and fight options.
     if (rotations.mod?.simChange(el)) return;
     if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
-    if (el.dataset?.setting === 'showEssences' || el.dataset?.setting === 'showAic') updateSettings({ [el.dataset.setting]: el.checked });
+    if (el.dataset?.setting === 'showEssences' || el.dataset?.setting === 'showAic' || el.dataset?.setting === 'showContracts') updateSettings({ [el.dataset.setting]: el.checked });
+    // Contingency Contract: a share code typed or pasted.
+    if (contracts.mod?.contractsChange(el)) return draw();
     // Extra copies (Settings): edit one entry's copies or note.
     const editExtra = (i: number, patch: Partial<ExtraCopy>) =>
       updateSettings({ extras: extrasOf(state.settings).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
@@ -860,7 +868,7 @@ async function onClick(e: MouseEvent): Promise<void> {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
   // Achievements and Archive handle their own buttons.
-  if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el) || aic.mod?.aicAction(el.dataset.action ?? '', el) || rotations.mod?.simAction(el.dataset.action ?? '', el)) return draw();
+  if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el) || aic.mod?.aicAction(el.dataset.action ?? '', el) || rotations.mod?.simAction(el.dataset.action ?? '', el) || contracts.mod?.contractsAction(el.dataset.action ?? '', el)) return draw();
   if (el.dataset.action === 'essence-read') return void import('./essenceReader').then((m) => m.readEssences());
   if (el.dataset.action?.startsWith('store-')) return storageAction(el, draw);
   switch (el.dataset.action) {

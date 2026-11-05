@@ -40,4 +40,6 @@ timeline bars link to it, and Home's right-click menu has "Copy link".
 and the Monthly Pass. All pages are kept; if their number ever becomes a problem, drop old
 ones then.
 
+Contingency Contract: `/contracts/<season>` is `contracts/<id>.html` and `/contracts` is `contracts/index.html` (over its plain `PAGES` copy, showing the season it leads with), from ef-assets `cc/index.json` (`seasonPreview`, `seasonEmbed` in `domain/share.ts`): key art, and every date on both servers as Discord timestamps. If `cc/index.json` can't be fetched they keep the site's own preview, and a new season gets its embed on the next build.
+
 Event and banner page header: art (cover) filling the header and fading into the page background (see `docs/ui.md`, `.art-hero.has-art`). A banner's page (`/banner/headhunting/<banner>`, `/banner/arsenal/<banner>`, `bannerPage` in kind.ts) shows its art (Headhunting: the game's layout, `bannerArtUrl`; Issues: the schedule's Issue art; each falls back to the other), category, name, dates, version and rate-up, then its card opened. Its built page (`banners/<name>.html`) is unchanged: in the app that path still opens Home at the banner.

@@ -12,6 +12,8 @@ import {
   previewTags,
   scheduleEmbed,
   schedulePreview,
+  seasonEmbed,
+  seasonPreview,
   SITE_URL,
   weaponEmbed,
   weaponPreview,
@@ -20,6 +22,7 @@ import {
   type ShareOperator,
   type ShareWeapon,
 } from './src/domain/share.ts';
+import { seasonsInOrder, type SeasonIndex } from './src/domain/contracts.ts';
 import { isScheduleBanner, isWeaponBanner, legacyEventLinks, scheduleLinks, type Schedule } from './src/domain/schedule.ts';
 import { itemShortLinks, itemSlugs, WIKI_ALIASES } from './src/domain/wiki.ts';
 
@@ -38,6 +41,7 @@ const PAGES = [
   'banner/stats',
   'essences',
   'aic',
+  'contracts',
   'rotations',
   'rotations/parser',
   'rotations/sim',
@@ -140,6 +144,16 @@ async function loadSchedule(): Promise<Schedule> {
   }
 }
 
+/** Contingency Contract seasons from ef-assets; without them the pages keep the site's own preview. */
+async function loadSeasons(): Promise<SeasonIndex['seasons']> {
+  try {
+    return (await fetchAsset<SeasonIndex>('cc/index.json')).seasons;
+  } catch (e) {
+    console.warn(`[item-pages] ef-assets contract seasons unavailable (${e})`);
+    return [];
+  }
+}
+
 const PREVIEW_TAG = /\s*<meta\s+(?:property|name)="(?:og:[^"]+|twitter:[^"]+|description|theme-color)"[^>]*>/g;
 
 /**
@@ -189,7 +203,7 @@ function pageCopies(): Plugin {
       copyFileSync(indexFile, join(outDir, '404.html'));
 
       const index = readFileSync(indexFile, 'utf8');
-      const [wiki, schedule] = await Promise.all([loadWiki(), loadSchedule()]);
+      const [wiki, schedule, seasons] = await Promise.all([loadWiki(), loadSchedule(), loadSeasons()]);
       const ops = Object.entries(wiki.operators);
       // Game ids the wiki files under another id get the same page.
       for (const [game, wikiKey] of Object.entries(WIKI_ALIASES)) if (wiki.operators[wikiKey]) ops.push([game, wiki.operators[wikiKey]]);
@@ -234,6 +248,12 @@ function pageCopies(): Plugin {
         const to = links.get(e)!;
         if (to !== path) pages.push({ dir, id, name: e.name, p: schedulePreview(e, to), embed: (p: Preview) => scheduleEmbed(e, p), fromWiki: false });
       }
+      // Contingency Contract: /contracts/<season>, and /contracts itself with the season it leads with.
+      const seasonPage = (dir: string, id: string, s: (typeof seasons)[number], path: string, name: string) =>
+        pages.push({ dir, id, name, p: seasonPreview(s, path), embed: (p: Preview) => seasonEmbed(s, p), fromWiki: false });
+      for (const s of seasons) seasonPage('contracts', s.id, s, `/contracts/${s.id}`, s.fullName);
+      const lead = seasonsInOrder(seasons, Date.now(), 'americas')[0];
+      if (lead) seasonPage('contracts', 'index', lead, '/contracts', 'Contingency Contract');
       const missing: string[] = [];
       let largest = 0;
       await Promise.all(

@@ -775,7 +775,7 @@ input.sim-run-value-edit {
   height: 17px;
   transform: translate(-50%, -50%);
   background: var(--gray-1000);
-  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/stagger/poise-node.png) center / contain no-repeat;
+  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/stagger/poise-node.png) center / contain no-repeat;
   pointer-events: none;
 }
 .sim-boss-row.folded {

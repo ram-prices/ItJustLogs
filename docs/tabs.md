@@ -1,4 +1,4 @@
-# Achievements, Archive, Story, AIC and Essences
+# Achievements, Archive, Story, AIC, Essences and Contracts
 
 Read when working on one of these tabs or their screen readers.
 
@@ -87,4 +87,6 @@ Read when working on one of these tabs or their screen readers.
   (`scan` focus option); a new essence each time the stats change and hold
   two frames.
 
-Essences and AIC are hidden tabs by default: Settings → Tabs (`showEssences`, `showAic`) shows them. The routes always work.
+- Contracts tab (`/contracts`, `/contracts/<season>`; `ui/pages/contracts.ts`, `domain/contracts.ts`, `styles/contracts.css`; loaded on first use): the Contingency Contract seasons, from ef-assets `cc/` (its `README.md` has the schema; `scripts/update-cc.py` there, a local rerun from the dump). `/contracts` leads with the running season (status and next date on the player's server, `seasonsInOrder`, `nextDate`), the mode from the rules' Event Rules, then the other seasons. A season's page: stage facts and the rules folded, the Test Criteria board, Enemies per wave (the stage's own waves, then each wave file's `note`; HP with `hpBonus`, base in the tip), Missions, Shop, Medal and rewards, then the wiki credit (`attribution`; a name or description may be wiki text, null ones read "Not yet known"). The board is the game's grid (`col`, `row`, scrolling sideways in its card) under its Criteria Sets (the columns each `unlockTotal` opens); hovering or focusing a tile lifts its conflict group and key/lock partners (`relate`). It is also the picker: `toggle`, `blockOf` and `isLegal` follow the game's `CheckJoinedTagListValid`; a tile replaces the rest of its conflict group, dropping a key drops what it unlocked, phase 2 waits for `batch2`. The site can't know the player's best cleared total, so `Selection.best` stands in for it: the highest total the selection has reached, so sets open as it grows. A pasted code isn't checked against it, as a code's total depends on the player. The share code (`encodeShareCode`, `decodeShareCode`) is the game's, so it pastes both ways, and takes the game's chat text (`...<CODE>...`). Selections are in localStorage (`ijl.contracts`), this browser only.
+
+Essences and AIC are hidden tabs by default: Settings → Tabs (`showEssences`, `showAic`) shows them. Contracts shows until switched off there (`showContracts`). The routes always work.

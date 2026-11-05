@@ -130,13 +130,13 @@
   mask-repeat: no-repeat;
 }
 .slot-icon.armor {
-  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/armor.png);
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/gear-slots/armor.png);
 }
 .slot-icon.gloves {
-  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/gloves.png);
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/gear-slots/gloves.png);
 }
 .slot-icon.kit {
-  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/gear-slots/kit.png);
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/gear-slots/kit.png);
 }
 /* A weapon skill's levels as the game's notches (`baseNotches`, `essenceNotches`): slanted pills that overlap a little,
    the weapon's own white, the essence's #FFF100 (the game's ProgressGem), still reachable dim, out of reach an outline
@@ -160,7 +160,7 @@
   height: 12px;
   margin-right: -3px;
   background: var(--notch-open);
-  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/weapon-skill/notch.png) center / contain no-repeat;
+  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/weapon-skill/notch.png) center / contain no-repeat;
 }
 .notch:last-child {
   margin-right: 0;
@@ -185,11 +185,11 @@
   position: absolute;
   inset: 0;
   background: var(--notch-shut);
-  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/weapon-skill/notch-outline.png) center / contain no-repeat;
+  mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/weapon-skill/notch-outline.png) center / contain no-repeat;
 }
 .notch.shut::after {
   inset: 1px;
-  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/icons/weapon-skill/notch-slash.png);
+  mask-image: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/weapon-skill/notch-slash.png);
 }
 /* The essence's own grooves (`essenceNotches`): buttons, a little larger to hit. */
 .essence-notches .notch {
