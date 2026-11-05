@@ -21,7 +21,7 @@ import {
 } from '../../domain/wiki';
 import { state } from '../../state';
 import { loadWikiFile } from '../../store';
-import { badge, elementIcon, heroGlow, icon, iconOf, itemImg, stars } from '../components';
+import { badge, elementIcon, heroGlow, icon, iconOf, itemImg, stars, emptyState } from '../components';
 import { fmtDate, html, raw, type Html } from '../html';
 
 /**
@@ -527,20 +527,14 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
   const head = html`<div class="section-head"><h2 class="heading-20">Potentials</h2></div>`;
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
-      <div class="card wiki-owned-empty">
-        <p class="copy-14 secondary">Import your pull history to see how many copies of ${name} you have and their Potential.</p>
-        <button class="btn secondary sm" data-action="import">${icon('upload_file')}Import</button>
-      </div>
+      <div class="card">${emptyState('inbox', `Import your pull history to see how many copies of ${name} you have and their Potential.`, {
+        action: html`<button class="btn secondary sm" data-action="import">${icon('upload_file')}Import</button>`,
+      })}</div>
     </section>`;
   }
   if (!owned || !owned.copies) {
     return html`<section class="section">${head}
-      <div class="card wiki-owned-empty">
-        <p class="copy-14 secondary">
-          No copies of ${name} in your pull history yet.
-          ${owned?.selectors ? `You earned ${owned.selectors} Selector${owned.selectors > 1 ? 's' : ''} on banners featuring ${name}; if you picked ${name}, that copy isn't counted here.` : ''}
-        </p>
-      </div>
+      <div class="card">${emptyState('inventory_2', html`No copies of ${name} in your pull history yet. ${owned?.selectors ? `You earned ${owned.selectors} Selector${owned.selectors > 1 ? 's' : ''} on banners featuring ${name}; if you picked ${name}, that copy isn't counted here.` : ''}`)}</div>
     </section>`;
   }
 

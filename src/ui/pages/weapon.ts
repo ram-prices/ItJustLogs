@@ -1,7 +1,7 @@
 import type { Analysis } from '../../domain/analyze';
 import { MAX_POTENTIAL, type Owned } from '../../domain/owned';
 import type { PreviewWeapon, WikiAttribution, WikiPreviewFile, WikiWeapon, WikiWeaponFile, WikiWeaponSkill } from '../../domain/wiki';
-import { badge, essenceIcon, heroGlow, icon, itemImg, pageHeader, baseNotches, essenceNotches, stars, tileArt, trait, withStars } from '../components';
+import { badge, essenceIcon, heroGlow, icon, itemImg, pageHeader, baseNotches, essenceNotches, stars, tileArt, trait, withStars, emptyState } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { essenceTag, weaponBuildOf, wieldersSection, type WeaponBuild } from './loadout';
 import { grooveSlots, skillStat, weaponBounds } from '../../domain/loadout';
@@ -57,7 +57,7 @@ function indexPage(f: WikiWeaponFile, owned: Map<string, Owned> | null): Html {
           </div>
         </section>`;
       })}
-      <p class="copy-14 secondary list-search-empty" hidden>No weapons match your search.</p>`,
+      ${emptyState('search_off', 'No weapons match your search.', { cls: 'list-search-empty', hidden: true })}`,
     )}
       ${credit(f.attribution)}
     </main>`;

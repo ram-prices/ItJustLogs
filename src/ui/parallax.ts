@@ -19,6 +19,7 @@ interface Move {
 }
 
 export function installParallax(): void {
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
   const moving = new Map<HTMLElement, Move>();
   let frame = 0;
   const aim = (el: HTMLElement, tx: number, ty: number) => {
@@ -50,7 +51,7 @@ export function installParallax(): void {
 
   let last: HTMLElement | null = null;
   document.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || still.matches) return;
     const el = (e.target as Element | null)?.closest?.<HTMLElement>(AREAS) ?? null;
     if (last && last !== el) aim(last, 0, 0);
     last = el;

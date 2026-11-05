@@ -7,7 +7,7 @@ import type { Server } from '../domain/schedule';
 import { clearEverything, clearHistory, currentServer, restoreCopy, restoreSnapshot, setImage, state, subscribe, updateSettings } from '../state';
 import { deleteAvatarEdit, loadAvatarEdit, loadAvatarHistory, loadImage, loadTabViews, saveAvatarEdit, saveAvatarHistory, saveTabView, type AvatarBox, type AvatarEdit, type ThemePref } from '../store';
 import { installTooltips } from './charts';
-import { installImageFallback, toast } from './common';
+import { installImageFallback, installImageReady, toast } from './common';
 import { LOGO, TAB_ICON, avatar, icon, loadIcons, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
 import { fmtInt, html, raw, render, type Html } from './html';
@@ -301,7 +301,7 @@ function header(route: Route): Html {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
         const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
-        return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span>${tab === 'rotations' || tab === 'aic' ? html`<span class="badge amber tab-wip">WIP</span>` : ''}</a>`;
+        return html`<a class="tab tab-${tab}" href="${href}" aria-label="${label}" title="${label}" ${raw(current === tab ? 'aria-current="page"' : '')} ${raw(disabled ? 'aria-disabled="true" tabindex="-1"' : '')}>${TAB_ICON[tab] ?? ''}<span>${label}</span>${tab === 'rotations' || tab === 'aic' ? html`<span class="badge amber tab-wip">WIP</span>` : ''}</a>`;
       })}
     </nav>
   </div></header>`;
@@ -606,7 +606,7 @@ function toggleCard(card: HTMLElement): void {
   };
   card.addEventListener('transitionend', done);
   setTimeout(done, 600);
-  if (!opening && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (!opening && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 // ---------------------------------------------------------------------------
@@ -1088,6 +1088,7 @@ async function onClick(e: MouseEvent): Promise<void> {
 
 export function mount(): void {
   installImageFallback();
+  installImageReady();
   installTint();
   installCardGlow();
   loadIcons(draw);

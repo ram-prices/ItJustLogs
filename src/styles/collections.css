@@ -209,15 +209,16 @@
    doesn't reach, so no edge shows. A scrim behind the text keeps it legible. */
 .art-hero.has-art {
   display: grid;
+  min-height: clamp(260px, 30vw, 340px);
+  /* Unlike an operator header, nothing runs on under the page. */
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 .art-hero.has-art > * {
   grid-area: 1 / 1;
 }
+/* Fills the header, however tall its text makes it, so no empty band shows under the art. */
 .art-hero.has-art .wiki-hero-art {
-  position: static;
-  inset: auto;
-  height: clamp(260px, 30vw, 340px);
-  align-self: start;
   object-fit: cover;
   object-position: center bottom;
 }
@@ -235,16 +236,18 @@
 .art-hero.has-art .wiki-hero-text::before {
   content: '';
   position: absolute;
-  inset: -24px -48px -8px -48px;
+  /* Reaches nothing before its box ends, so it leaves no edge. */
+  top: -64px;
+  bottom: -56px;
+  left: -160px;
+  width: min(1040px, calc(100% + 320px));
   z-index: -1;
-  background: radial-gradient(ellipse at 20% 60%, rgba(0, 0, 0, 0.55), transparent 75%);
+  background: radial-gradient(ellipse closest-side, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.42) 45%, rgba(0, 0, 0, 0.14) 78%, transparent);
   pointer-events: none;
 }
 .art-hero.has-art::after {
   display: block;
   grid-area: 1 / 1;
-  /* Past the cell's foot: the art's parallax scale overshoots it. */
-  margin-bottom: -20px;
   position: static;
   align-self: end;
   height: 56px;
@@ -255,22 +258,33 @@
 .art-hero.has-art .evt-tag-note {
   color: rgba(255, 255, 255, 0.72);
 }
+/* Light theme: art often ends dark, so a long eased fade: a short one reads as a grey band. */
 :root[data-theme='light'] .art-hero.has-art::after {
-  height: 120px;
+  height: 56%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 18%,
+    rgba(255, 255, 255, 0.18) 36%,
+    rgba(255, 255, 255, 0.42) 54%,
+    rgba(255, 255, 255, 0.72) 72%,
+    rgba(255, 255, 255, 0.93) 88%,
+    #fff 100%
+  );
 }
 :root[data-theme='light'] .art-hero.has-art .wiki-hero-inner {
   padding-bottom: 64px;
 }
 /* Light theme: the text sits low, where the art fades toward white, so a stronger scrim. */
 :root[data-theme='light'] .art-hero.has-art .wiki-hero-text::before {
-  background: radial-gradient(ellipse at 20% 60%, rgba(0, 0, 0, 0.7), transparent 78%);
+  background: radial-gradient(ellipse closest-side, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0.16) 78%, transparent);
 }
 :root[data-theme='light'] .art-hero.has-art .wiki-hero-text {
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
 }
 @media (max-width: 640px) {
-  .art-hero.has-art .wiki-hero-art {
-    height: 220px;
+  .art-hero.has-art {
+    min-height: 220px;
   }
   .art-hero.has-art .wiki-hero-inner {
     padding-top: 16px;
@@ -300,6 +314,10 @@
 /* The game's banner layouts put the operator's face high. */
 .banner-hero.has-art .wiki-hero-art {
   object-position: center 30%;
+}
+/* Basic Headhunting's text-free art: faces on the right, room for the text on the left. */
+.banner-hero.has-art .wiki-hero-art.faces {
+  object-position: 30% center;
 }
 .banner-hero-rateup {
   display: inline-flex;
@@ -1080,13 +1098,8 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
 .wiki-tile[hidden],
 .wiki-type[hidden],
 [data-search-item][hidden],
-[data-search-section][hidden],
-.list-search-empty[hidden] {
+[data-search-section][hidden] {
   display: none;
-}
-.list-search-empty {
-  padding: 32px 0;
-  text-align: center;
 }
 
 /* Weapons list: whether the player's copy has max essence. */

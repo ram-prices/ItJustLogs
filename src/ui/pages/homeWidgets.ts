@@ -5,7 +5,7 @@ import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import type { HomeWidget } from '../../store';
 import { bannerArtUrl, operatorFullUrl } from '../../domain/banners';
-import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars } from '../components';
+import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars, emptyState } from '../components';
 import { fmtDate, fmtInt, html, raw, render, type Html } from '../html';
 import { artOf, saveFiles } from './art';
 import { archiveProgress } from './collections';
@@ -376,7 +376,7 @@ export function widgetGrid(parts: ScheduleParts, a: Analysis | null, redraw: () 
   redrawNow = redraw;
   const c: Ctx = { parts, a, redraw };
   const bodyOf = (w: HomeWidget): Html | null =>
-    WIDGETS[w.type].pulls && !a ? html`<p class="copy-14 secondary widget-empty">Import your pulls to see this.</p>` : WIDGETS[w.type].render(w, c);
+    WIDGETS[w.type].pulls && !a ? emptyState('inbox', 'Import your pulls to see this.') : WIDGETS[w.type].render(w, c);
   // A column's widgets take its top widget's width and place; a lone one is itself the grid's item,
   // at the row and column `gridPlaces` gives it.
   const place = (head: HomeWidget, at: { row: number; start: number }) =>
@@ -384,7 +384,7 @@ export function widgetGrid(parts: ScheduleParts, a: Analysis | null, redraw: () 
   const cell = (w: HomeWidget, body: Html | null, head: HomeWidget, at: { row: number; start: number } | null): Html =>
     html`<section class="widget${w.hideTitle ? ' no-title' : ''}" data-widget="${w.id}" data-type="${w.type}" ${at ? place(head, at) : raw(`data-size="${head.size}"`)}>
       ${editing ? toolbar({ ...w, size: head.size, align: head.align }, WIDGETS[w.type]) : ''}
-      <div class="widget-body">${body ?? html`<p class="copy-14 secondary widget-empty">Nothing to show right now.</p>`}</div>
+      <div class="widget-body">${body ?? emptyState('inbox', 'Nothing to show right now.')}</div>
       ${editing && w.type === 'spacer' ? html`<span class="spacer-edge" title="Drag to make it taller or shorter"></span>` : ''}
     </section>`;
   if (isPhone()) {
@@ -397,7 +397,7 @@ export function widgetGrid(parts: ScheduleParts, a: Analysis | null, redraw: () 
       .map(
         ({ w, body }) => html`<section class="widget${w.hideTitle ? ' no-title' : ''}${hidden.has(w.id) ? ' phone-hidden' : ''}" data-widget="${w.id}" data-type="${w.type}" data-size="12">
           ${editing ? phoneToolbar(w, WIDGETS[w.type], hidden.has(w.id)) : ''}
-          <div class="widget-body">${body ?? html`<p class="copy-14 secondary widget-empty">Nothing to show right now.</p>`}</div>
+          <div class="widget-body">${body ?? emptyState('inbox', 'Nothing to show right now.')}</div>
         </section>`,
       );
     return html`${tools()}<div class="home-grid phone${editing ? ' editing' : ''}">${cells}</div>`;

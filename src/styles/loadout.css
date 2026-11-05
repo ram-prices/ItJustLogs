@@ -311,9 +311,6 @@ select option {
   font: 400 12px/16px var(--font-sans);
   color: var(--gray-900);
 }
-.picker-none {
-  padding: 16px 12px;
-}
 .picker-clear {
   margin-right: auto;
 }
@@ -537,7 +534,7 @@ select option {
    (m_fx_sixstar_bg_w), as ef-assets renders it into a 10 s loop
    (effects/six-star/smoke-loop-3.webp, scripts/six-star-smoke.py). The game's
    box is 74 of the slot's 120 px, 6.3 px up: 29.6 and 2.5 on this 48px tile. */
-/* Weapons show no rarity glow (just the line); 6★ get the smoke instead. */
+/* Tiles show no rarity glow (just the line); 6★ get the smoke instead. */
 .rarity-art.weap {
   background: var(--gray-100);
 }
@@ -1001,14 +998,6 @@ a.ladder-row:focus-visible {
     padding: 20px 16px 14px;
   }
 }
-.wiki-owned-empty {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 20px 24px;
-}
 .wiki-pulls {
   margin-top: 16px;
   max-height: 360px;
@@ -1190,6 +1179,16 @@ a.ladder-row:focus-visible {
 :root[data-theme='light'] .banner::before,
 :root[data-theme='light'] .sched-card::before {
   mix-blend-mode: normal;
+}
+/* Home's cards lift a little under a mouse; touch screens have no hover, so they stay put. */
+@media (hover: hover) {
+  .home-grid:not(.editing) .sched-card:not(.capturing) {
+    transition: box-shadow 0.15s var(--ease), transform 0.15s var(--ease), --banner-tint 1.2s ease;
+  }
+  .home-grid:not(.editing) .sched-card:not(.capturing):hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover), 0 14px 36px -12px rgb(from var(--banner-tint, transparent) r g b / 0.38);
+  }
 }
 /* Copy image: the card at rest, with square corners, and nothing mid-transition. */
 .capturing,
@@ -1426,9 +1425,6 @@ a.ladder-row:focus-visible {
   height: 22px;
   padding: 0 7px;
   font-size: 12px;
-}
-.widget-empty {
-  padding: 16px;
 }
 .widget-card {
   padding: 4px 0;

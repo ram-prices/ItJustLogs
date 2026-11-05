@@ -2,7 +2,7 @@ import { removedArt, sourceSite } from '../../domain/artMeta';
 import { itemKey, itemsOf, newestFirst, removedItem, savedItem, type StoredItem } from '../../domain/storage';
 import { artChanged, state, updateSettings } from '../../state';
 import { deleteArt, loadArt, saveArt } from '../../store';
-import { icon } from '../components';
+import { icon, emptyState } from '../components';
 import { html, render, type Html } from '../html';
 
 /**
@@ -271,7 +271,7 @@ export function storageBox(opId: string, name: string, redraw: () => void): Html
       ? html`<div class="wiki-art-list">${entries.map((e) => entryTile(opId, e))}</div>`
       : open?.isNew || busy
         ? ''
-        : html`<p class="copy-13 secondary">Nothing kept for ${name} yet.</p>`}
+        : emptyState('inventory_2', `Nothing kept for ${name} yet.`)}
   </div>`;
 }
 
@@ -334,7 +334,7 @@ export function storageAction(el: HTMLElement, redraw: () => void): void {
     // The header's Art button: the box's Add menu, scrolled into view.
     adding = el.dataset.op!;
     redraw();
-    document.querySelector('.wiki-art-box')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    document.querySelector('.wiki-art-box')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     return;
   } else if (action === 'store-new') {
     adding = null;

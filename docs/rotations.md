@@ -685,7 +685,9 @@ Two more (2026-10-31), the owner's call, no replay moved (Skydrummer 3,588,467, 
 Findings left (15 rows): group E (Arclight's third slash, Perlica's Cycle Protocol, Rossi's combo SEQ 1, Purrchena's
 hold), Endministrator P1 (game code), Avywenna's lances (6), Camille's Vesperwings, Liino's Starry Boost.
 
-## Current state and next steps (2026-10-25 handoff)
+## State at the 2026-10-25 handoff
+
+History only. What's next is in `docs/hub.md`, Open items.
 
 - Nothing of the sim/Parser work is uncommitted: the last batch is 41db3bf (ultimate forms). Scratch only, never
   committed: `src/domain/sim/dbgAudit*.test.ts` (the all-operator audit; it reads an ef-assets clone at a hard-coded

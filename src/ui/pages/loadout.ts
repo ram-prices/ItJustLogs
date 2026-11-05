@@ -3,7 +3,7 @@ import { gearIconUrl } from '../../domain/banners';
 import { GEAR_SLOTS, SET_PIECES, TUNING_MAX, artificeOf, artificeState, artificeTops, atkTotal, essenceFromRanks, essenceMax, fillTemplate, hpTotal, isLoadoutSlot, skillStat, summaryLines, tuningMaxLevel, tuningOf, weaponBounds, weaponSkillLevels, withArtifice, type GearSlot, operatorBonuses, setCounts, wieldersOf, withSlot, type Bonus, type Loadout, type LoadoutSlot, type WeaponSummaryFile, type WeaponTuning, type WeaponTuningFile } from '../../domain/loadout';
 import type { WikiGear, WikiGearFile, WikiOperator, WikiOperatorFile, WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
-import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon } from '../components';
+import { artificeIcon, badge, essenceIcon, gearArtificeIcon, icon, itemImg, rarityArt, slotIcon, tileArt, weaponTypeIcon, emptyState } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { tip, tipNote, tipRow } from '../charts';
 import { infoHref, ownedOf, rich, wikiFile } from './info';
@@ -419,7 +419,7 @@ function pick(title: string, options: Option[], current: string | undefined): Pr
             ${o.id === current ? icon('check') : ''}
           </button>`,
         )}
-        <p class="picker-none copy-13 secondary" hidden>Nothing matches.</p>
+        ${emptyState('search_off', 'Nothing matches.', { cls: 'picker-none', hidden: true })}
       </div>
       <div class="dialog-actions">
         ${current ? html`<button class="btn secondary sm picker-clear" data-choice="clear">Empty this slot</button>` : ''}

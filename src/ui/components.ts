@@ -252,6 +252,13 @@ export const avatar = (src: string | undefined, pop: boolean, lg = false, box?: 
   return html`<span class="avatar framed${pop ? ' pop' : ''}${size}" style="--l:${box.l};--r:${box.r}"><img src="${src}" alt="" /></span>`;
 };
 
+/**
+ * A panel with nothing in it yet: a Material icon (or an icon of the site's own) and one line, the same everywhere.
+ * `cls` adds a class, `hidden` starts it hidden (a search shows it), `action` is a button under the line.
+ */
+export const emptyState = (mark: string | Html, text: string | Html, o: { cls?: string; hidden?: boolean; action?: Html } = {}): Html =>
+  html`<div class="empty-state${o.cls ? ` ${o.cls}` : ''}" ${raw(o.hidden ? 'hidden' : '')}>${typeof mark === 'string' ? icon(mark) : mark}<p class="copy-14">${text}</p>${o.action ?? ''}</div>`;
+
 /** `plain` is the borderless page-level stat row; the default is a bordered panel. */
 export const metrics = (items: Html[], variant: '' | 'plain' = ''): Html =>
   html`<div class="metrics${variant ? ` ${variant}` : ''}">${items}</div>`;
@@ -284,9 +291,9 @@ export const RARITY_COLOR: Record<number, string> = { 6: 'var(--r6)', 5: 'var(--
 export const rarityArt = (img: Html, r: number, cls = ''): Html =>
   html`<span class="rarity-art r${r}${cls ? ` ${cls}` : ''}" role="img" aria-label="${r}★" title="${r}★">${img}</span>`;
 
-/** A Database list tile's picture with its rarity on it; weapons skip the glow, and 6★ ones get the game's rainbow smoke. */
+/** A Database list tile's picture with its rarity on it: no glow, and 6★ ones get the game's rainbow smoke. */
 export const tileArt = (kind: Kind, id: string, r: number): Html =>
-  rarityArt(itemImg(kind, id, 'wiki-tile-portrait'), r, kind !== 'weap' ? 'wiki-tile-art' : r === 6 ? 'wiki-tile-art weap smoke' : 'wiki-tile-art weap');
+  rarityArt(itemImg(kind, id, 'wiki-tile-portrait'), r, r === 6 ? 'wiki-tile-art weap smoke' : 'wiki-tile-art weap');
 
 export const rarity = (r: number): Html =>
   html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}${stars(1)}</span>`;
@@ -332,11 +339,12 @@ export const TAB_ICON: Record<string, Html> = {
   database: raw('<span class="tab-icon icon filled" aria-hidden="true">menu_book</span>'),
   pulls: raw('<span class="tab-icon icon filled" aria-hidden="true">inventory_2</span>'),
   story: raw('<span class="tab-icon icon filled" aria-hidden="true">auto_stories</span>'),
+  rotations: raw('<span class="tab-icon icon filled" aria-hidden="true">swords</span>'),
   stats: raw('<span class="tab-icon icon filled" aria-hidden="true">bar_chart</span>'),
   essences: raw(`<svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${ESSENCE_PATH}"/></svg>`),
   aic: raw('<span class="tab-icon icon filled" aria-hidden="true">factory</span>'),
   achievements: raw('<span class="tab-icon icon filled" aria-hidden="true">military_tech</span>'),
-  archives: raw('<span class="tab-icon icon filled" aria-hidden="true">auto_stories</span>'),
+  archives: raw('<span class="tab-icon icon filled" aria-hidden="true">history_edu</span>'),
   settings: raw('<span class="tab-icon icon filled" aria-hidden="true">settings</span>'),
 };
 

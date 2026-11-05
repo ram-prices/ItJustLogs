@@ -1,7 +1,7 @@
 import { areaCapacity, areaNodes, makeable, type AicData, type AicSettings, type AicRegion, type Objective, type Plan, type PlanInput, type PlanStep, type Site } from '../../domain/aic';
 import { state, updateSettings } from '../../state';
 import { toast } from '../common';
-import { badge, icon, itemName, pageHeader, toggleGroup } from '../components';
+import { badge, icon, itemName, pageHeader, toggleGroup, emptyState } from '../components';
 import { html, type Html } from '../html';
 import { tip, tipNote } from '../charts';
 import { subTabs } from './collections';
@@ -276,7 +276,7 @@ function results(data: AicData, input: PlanInput, key: string): Html {
           const cap = p.capacity[i];
           return html`<section class="aic-section">
             <h3 class="heading-14">${siteName(i)} <span class="label-12 secondary">${regionName(site.region)} · Protocol Capacity ${fmt(cap?.used ?? 0, 0)}${cap?.max != null ? ` / ${cap.max}` : ''}</span></h3>
-            ${steps.length ? stepsTable(data, steps, input.whole) : html`<p class="copy-13 secondary">Nothing to build here.</p>`}
+            ${steps.length ? stepsTable(data, steps, input.whole) : emptyState('factory', 'Nothing to build here.')}
           </section>`;
         })}
     ${!calc && input.power

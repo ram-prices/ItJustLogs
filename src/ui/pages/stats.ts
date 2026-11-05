@@ -16,7 +16,7 @@ import {
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
 import { tip, tipNote, tipRow, weeklyChart } from '../charts';
-import { OROBERYL_ICON, TAB_ICON, badge, colorOf, icon, iconOf, itemName, metric, metrics, pageHeader, withStars } from '../components';
+import { OROBERYL_ICON, TAB_ICON, badge, colorOf, icon, iconOf, itemName, metric, metrics, pageHeader, stars, withStars } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { bannerHref, credit, external, pullsTabs, wikiFile } from './info';
 
@@ -57,7 +57,7 @@ function amount(k: string, n: number): Html {
   const src = k === 'Oroberyl' ? OROBERYL_ICON : iconOf('items', k);
   const own = !CURRENCY[k] && colorOf(k);
   if (src && (CURRENCY[k] || own))
-    return html`<span class="amt${CURRENCY[k] ? ` amt-${CURRENCY[k]}` : ''}" ${own ? html`style="--amt:${own}"` : ''} title="${k}" aria-label="${fmtInt(n)} ${k}"><img src="${src}" alt="" />${fmtInt(n)}</span>`;
+    return html`<span class="amt${CURRENCY[k] ? ` amt-${CURRENCY[k]}` : ''}" ${own ? html`style="--amt:${own}"` : ''} data-tip="${tip(k, [])}" aria-label="${fmtInt(n)} ${k}"><img src="${src}" alt="" />${fmtInt(n)}</span>`;
   return html`${fmtInt(n)} ${itemName(n !== 1 && /(Permit|Ticket)$/.test(k) ? `${k}s` : k)}`;
 }
 
@@ -102,8 +102,8 @@ const bullets = (items: (Html | string | false | null | undefined)[]): Html =>
   html`<ul class="patch-income-bullets">${items.filter(Boolean).map((x) => html`<li>${x}</li>`)}</ul>`;
 
 /** Marks on an amount that isn't the game's own figure; hover says why. */
-const ESTIMATED = html`<span title="No amounts on the wiki: what others of its kind give">≈</span>`;
-const PARTIAL = html`<span title="The wiki lists some of its rewards without amounts">*</span>`;
+const ESTIMATED = html`<span data-tip="${tip('', [tipNote('No amounts on the wiki: what others of its kind give')])}">≈</span>`;
+const PARTIAL = html`<span data-tip="${tip('', [tipNote('The wiki lists some of its rewards without amounts')])}">*</span>`;
 
 /**
  * An opened patch's earned pulls in sections, in this order: Daily Missions,
@@ -282,8 +282,8 @@ function patchBanners(p: PatchStats, inc: PatchIncome | undefined, tickets: Tick
         <span class="patch-banner-when secondary">${b.start ? fmtDate(b.start) : kind}</span>
         <span class="patch-banner-pulls num${s?.paidPulls ? '' : ' tertiary'}">${s?.paidPulls ? `${fmtInt(s.paidPulls)} pulls` : 'No pulls'}</span>`;
       return s?.paidPulls && b.poolId
-        ? html`<a class="patch-banner ${b.kind}" href="${bannerHref(b.kind, b.poolId)}" title="${kind}">${inner}</a>`
-        : html`<div class="patch-banner ${b.kind} unpulled" title="${kind}">${inner}</div>`;
+        ? html`<a class="patch-banner ${b.kind}" href="${bannerHref(b.kind, b.poolId)}" data-tip="${tip(kind, [])}">${inner}</a>`
+        : html`<div class="patch-banner ${b.kind} unpulled" data-tip="${tip(kind, [])}">${inner}</div>`;
     })}
   </div>${inc?.lines.length ? patchIncomeList(inc, tickets, bond, dossiers) : ''}</td></tr>`;
 }
@@ -481,7 +481,7 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
           <div class="legend">
             <span><i style="background:var(--op)"></i>Operators</span>
             <span><i style="background:var(--ars)"></i>Arsenal</span>
-            <span><i class="round" style="background:var(--r6)"></i>${withStars('Week with a 6★')}</span>
+            <span><span class="legend-star">${stars(1)}</span>${withStars('Week with a 6★')}</span>
           </div>
         </div>
         <div class="card-body">${weeklyChart(weeks)}</div>
@@ -522,8 +522,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
             ? html`<tfoot>
                 <tr class="patch-total">
                   <td class="label-14">In all<div class="label-12 secondary">To today</div></td>
-                  <td title="Patch banners only (not the Permanent row)">${totalCell(total.charMade, total.charEarned, 'var(--op)')}</td>
-                  <td title="Patch Issues, and Constant Issues by the patch you pulled them in">${totalCell(total.weapMade, total.weapEarned, 'var(--ars)')}</td>
+                  <td data-tip="${tip('', [tipNote('Patch banners only (not the Permanent row)')])}">${totalCell(total.charMade, total.charEarned, 'var(--op)')}</td>
+                  <td data-tip="${tip('', [tipNote('Patch Issues, and Constant Issues by the patch you pulled them in')])}">${totalCell(total.weapMade, total.weapEarned, 'var(--ars)')}</td>
                 </tr>
               </tfoot>`
             : ''}

@@ -1,11 +1,11 @@
 import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPull, type Analysis, type BannerSummary, type LuckTier } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId, CATEGORY_LABEL, cdnUrl, itemIconUrl, lookupBanner, patchOf } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, CATEGORY_LABEL, cdnUrl, EF_ASSETS_CDN, itemIconUrl, lookupBanner, patchOf } from '../../domain/banners';
 import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
 import { SERVER_LABEL, timeOn, type Schedule, type Server } from '../../domain/schedule';
 import type { BannerDb, Kind } from '../../domain/types';
-import { badge, heat, icon, layeredArt, withStars, itemImg, metric, metrics, pageHeader, toggleGroup } from '../components';
+import { badge, heat, icon, layeredArt, stars, withStars, itemImg, metric, metrics, pageHeader, toggleGroup, emptyState } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
 import { bannerHref, infoHref, ownedOf, pullsTabs } from './info';
 import { state } from '../../state';
@@ -404,6 +404,9 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
 // Banner sections: a summary row that expands into the banner's pull history
 // ---------------------------------------------------------------------------
 
+/** Banners whose flat art has lettering beside the faces: a text-free crop for the page's header (ef-assets banners/game/). */
+const HERO_ART: Record<string, string> = { standard: `${EF_ASSETS_CDN}/banners/game/standard.webp` };
+
 /**
  * /banner/headhunting/<banner>, /banner/arsenal/<banner>: one banner, its art
  * as the header (like an event's page) over its name, dates and rate-up, then
@@ -427,11 +430,12 @@ export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOption
   const rateUpIds = b?.info?.rateUpIds ?? c?.rateUpIds ?? [];
   const schedArt = s?.art ? cdnUrl(s.art) : '';
   // Headhunting: the game's banner layout; Issues: the text-free Issue art. Each falls back to the other.
-  const [art, alt] = kind === 'weap' && schedArt ? [schedArt, bannerArtUrl(pool) ?? ''] : [bannerArtUrl(pool) ?? schedArt, schedArt];
+  const faces = HERO_ART[pool];
+  const [art, alt] = faces ? [faces, bannerArtUrl(pool) ?? ''] : kind === 'weap' && schedArt ? [schedArt, bannerArtUrl(pool) ?? ''] : [bannerArtUrl(pool) ?? schedArt, schedArt];
   const fallback = alt && alt !== art ? raw(`data-alt="${alt.replace(/"/g, '&quot;')}" data-alt-class="alt"`) : '';
   const category = b ? CATEGORY_LABEL[b.category] : k.title;
   return html`<section class="wiki-hero art-hero banner-hero${art ? ' has-art' : ''}">
-      ${art ? html`<img class="wiki-hero-art" src="${art}" alt="" decoding="async" data-fallback ${fallback} />` : ''}
+      ${art ? html`<img class="wiki-hero-art${faces ? ' faces' : ''}" src="${art}" alt="" decoding="async" data-fallback ${fallback} />` : ''}
       <div class="container wiki-hero-inner">
         <div class="min0 wiki-hero-text">
           <nav class="breadcrumb wiki-crumbs" aria-label="Breadcrumb"><a href="${bannerHref(kind)}">${k.title}</a>${icon('chevron_right')}<span class="wiki-em">${category}</span></nav>
@@ -725,7 +729,7 @@ function pityRuler(b: BannerSummary, ended = false): Html {
           ];
           // Ticks sit at the exact spot (no clamping); dots keep clear of the edges.
           const left = CROWDED_STYLE === 'tick' ? pct(posOf(p)) : clamp(pct(posOf(p)));
-          return html`<div class="ruler-pin ${side} pin-${CROWDED_STYLE}" style="left:${left}%" data-tip="${tip(p.name, rows)}" aria-label="${p.name}"><span class="ruler-${CROWDED_STYLE}" style="${CROWDED_STYLE === 'tick' && p.pity !== null ? `background:${heat(p.pity, sets ? WEAPON_PITY_SETS : b.pity.max)}` : ''}"></span></div>`;
+          return html`<div class="ruler-pin ${side} pin-${CROWDED_STYLE}" style="left:${left}%" data-tip="${tip(p.name, rows)}" aria-label="${p.name}"><span class="ruler-${CROWDED_STYLE}" style="${CROWDED_STYLE === 'tick' && p.pity !== null ? `color:${heat(p.pity, sets ? WEAPON_PITY_SETS : b.pity.max)}` : ''}">${CROWDED_STYLE === 'tick' ? stars(1) : ''}</span></div>`;
         }),
       ];
     }
@@ -803,7 +807,7 @@ function bannerBody(b: BannerSummary): Html {
         ).map(([v, label]) => html`<button type="button" data-action="filter" data-value="${v}" aria-pressed="${String(f.has(v))}" aria-label="${label}">${withStars(label)}</button>`)}
       </div>
     </div>
-    <div class="banner-scroll">${shown.length ? pullTable(b, shown) : html`<div class="table-empty">No pulls match this filter.</div>`}</div>`;
+    <div class="banner-scroll">${shown.length ? pullTable(b, shown) : emptyState('search_off', 'No pulls match this filter.')}</div>`;
 }
 
 /** Luck column is hidden for now; flip this to bring it back (analyze.ts still computes `luck`). */

@@ -1,6 +1,6 @@
 import { ARCHIVE_CATEGORIES, FINDING_CATEGORIES, MEDAL_CATEGORIES, medalImage, type Finding, type FindingFile, type Medal, type MedalFile, type MedalProgress } from '../../domain/collections';
 import { state, updateSettings } from '../../state';
-import { icon, pageHeader, toggleGroup } from '../components';
+import { icon, pageHeader, toggleGroup, emptyState } from '../components';
 import { html, raw, render, type Html } from '../html';
 import { credit } from './info';
 import { searchBox } from './search';
@@ -231,7 +231,7 @@ export function achievementsPage(redraw: () => void): Html {
             const shown = inCat.filter(keep);
             return html`<section class="collection-pane${cat === tab.medals ? ' active' : ''}" data-pane>
               <div class="section-head collection-pane-head"><h2 class="heading-20">${cat}</h2><span class="label-13 secondary">${count(cat)}</span></div>
-              ${shown.length ? '' : html`<p class="copy-14 secondary">${show.medals === 'have' ? 'None acquired here yet.' : 'All acquired here.'}</p>`}
+              ${shown.length ? '' : emptyState('military_tech', show.medals === 'have' ? 'None acquired here yet.' : 'All acquired here.')}
               ${groups.map((g) => {
                 const rows = shown.filter((m) => m.group === g);
                 return rows.length
@@ -243,7 +243,7 @@ export function achievementsPage(redraw: () => void): Html {
               })}
             </section>`;
           })}
-          <p class="copy-14 secondary list-search-empty" hidden>No medals match your search.</p>
+          ${emptyState('search_off', 'No medals match your search.', { cls: 'list-search-empty', hidden: true })}
         </div>
       </div>
       ${credit(data.attribution, 'https://endfield.wiki.gg/wiki/Path_of_Glory')}
@@ -313,10 +313,10 @@ export function archivesPage(redraw: () => void): Html {
               <div class="section-head collection-pane-head"><h2 class="heading-20">${cat}</h2><span class="label-13 secondary">${count(cat)}</span></div>
               ${shown.length
                 ? html`<div data-search-section><div class="finding-grid">${shown.map((f) => findingTile(f, owned.has(f.id)))}</div></div>`
-                : html`<p class="copy-14 secondary">${show.findings === 'have' ? 'None collected here yet.' : 'All collected here.'}</p>`}
+                : emptyState('explore', show.findings === 'have' ? 'None collected here yet.' : 'All collected here.')}
             </section>`;
           })}
-          <p class="copy-14 secondary list-search-empty" hidden>Nothing matches your search.</p>
+          ${emptyState('search_off', 'Nothing matches your search.', { cls: 'list-search-empty', hidden: true })}
         </div>
       </div>
       ${credit(data.attribution, 'https://endfield.wiki.gg/wiki/Intel_Archives')}

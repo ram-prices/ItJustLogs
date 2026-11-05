@@ -2,7 +2,7 @@ import { flowLines, lineAnchor, sectionAnchor, storyOrder, storySlugs, type Stor
 import { loadWikiFile } from '../../store';
 import { endministratorOf, extrasOf } from '../../domain/owned';
 import { state } from '../../state';
-import { icon, itemImg, pageHeader } from '../components';
+import { icon, itemImg, pageHeader, emptyState } from '../components';
 import { html, render, type Html } from '../html';
 import { rich, wikiFile } from './info';
 import { fold, searchField } from './search';
@@ -108,7 +108,7 @@ function listPage(ix: StoryIndex): Html {
           )}
         </section>`,
       )}
-      <p class="copy-14 secondary list-search-empty" hidden>No missions match your search.</p>
+      ${emptyState('search_off', 'No missions match your search.', { cls: 'list-search-empty', hidden: true })}
       ${credit(ix)}
     </main>`;
 }

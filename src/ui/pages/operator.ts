@@ -10,7 +10,7 @@ import { searchBox } from './search';
 import { sortBar, sortGroups } from './sorting';
 import { atkValue, bonusesFor, hpValue, isSplit, loadoutOnly, loadoutSection, splitToggle, withBonus } from './loadout';
 import { skillSets, wikiId, type PreviewOperator, type WikiAttribution, type WikiOperator, type WikiOperatorFile, type WikiPreviewFile, type WikiSkill } from '../../domain/wiki';
-import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, pageHeader, stars, trait, withStars } from '../components';
+import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, pageHeader, stars, trait, withStars, emptyState } from '../components';
 import { html, type Html } from '../html';
 import { tip, tipRow } from '../charts';
 import finalStrikes from '../../data/final-strikes.json';
@@ -133,7 +133,7 @@ function indexPage(f: WikiOperatorFile, owned: Map<string, Owned> | null): Html 
           </div>
         </section>`,
       )}
-      <p class="copy-14 secondary list-search-empty" hidden>No operators match your search.</p>
+      ${emptyState('search_off', 'No operators match your search.', { cls: 'list-search-empty', hidden: true })}
       ${finalStrikeTable(ops.map(([id, o]) => ({ id, name: o.name })))}`,
     )}
       ${credit(f.attribution)}

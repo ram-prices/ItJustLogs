@@ -19,16 +19,15 @@ conversation.
   involved; what done looks like; test servers 5175/5176 only (never 5173/5174, real data);
   quiet test output; update the area doc; don't commit; a 2–3 line report.
 - Deploying: only when the owner says "deploy". The hub messages the deploy worker, "[IJL]
-  Deployer" (`local_0cd06d44-1fd1-4c95-9450-2536716085ff`), which follows CLAUDE.md → Deploying
-  and updates the Live line in memory. If it is gone, start a new deploy worker with the same
-  brief.
+  Deployer" (`local_0cd06d44-1fd1-4c95-9450-2536716085ff`), which follows CLAUDE.md → Deploying.
+  If it is gone, start a new deploy worker with the same brief.
 - ef-assets (images, game data) may be pushed directly by workers as `ram-prices` /
   `celestriad@pm.me`. Site changes stay local until deploy.
 
 ## Models and tokens
 
 - Ideal: hub on Fable 5.1; workers on Opus 5.5 at medium effort. While weekly tokens are short,
-  small UI or wording tasks go to Sonnet at low effort.
+  small UI or wording tasks go to Sonnet at high effort.
 - `start_session` may not switch the model. Check with `get_session`, switch with
   `set_session_model`. If the turn already started on the wrong model, stop it and resend the brief.
 - Sonnet workers run at high effort at least; a Sonnet-low worker broke the event page layout (2026-10-30).
@@ -36,8 +35,10 @@ conversation.
 ## Practical rules
 
 - Sim engine, Parser and `ui/pages/rotations*` work: one worker at a time (shared files).
+- One task per worker: start a new one rather than reusing a worker above about 300K tokens of
+  context.
 - When the owner is on Remote Control, `start_session` is refused. Give the task to an idle
-  worker of the right model with SendMessage instead, and say so.
+  worker of the right model, under that limit, with SendMessage instead, and say so.
 - No cloud sessions: they can't report back to the hub.
 - Name every recording event with its video time (e.g. Mirage 1, video 12.95 s).
 - Engine rules come from game data (EndfieldData dump, ef-assets). Footage only confirms
@@ -59,8 +60,7 @@ conversation.
 
 ## State (2026-10-29)
 
-- Live: fcdef42 (hidden Essences/AIC tabs, event header fade).
-- Local, not deployed: rule tests batch 1 (`src/domain/sim/rules.test.ts`, `testkit.ts`, docs). `.claude/launch.json` is never committed.
+- Live commit: `git rev-parse origin/main`.
 - Recently shipped: Potentials ladder tweaks (whole-row open, centred arrow, grey pull number,
   pity only for 6★); operator Storage box (`domain/storage.ts`, `settings.storeItems`), X post and
   image-link downloading removed; Pull history as one Potential ladder; operator page in three
@@ -96,19 +96,19 @@ conversation.
 3. Yvonne's Final Strikes read 1.15–1.45× high in the owner's runs (crowded readings); they need
    a clean read before any engine change.
 4. Last Rite's battle skill gave 17–27 SP in footage vs the sim's 30.
-5. Rule tests per operator: batch 1 done (local, not deployed): Arcane, Tangtang, Si, Typhoeus,
+5. Rule tests per operator: batch 1 done: Arcane, Tangtang, Si, Typhoeus,
    Last Rite, Yvonne, Liino, Zhuang Fangyi. Findings 1, 3, 4, 5 fixed in the engine (channel ticks, skill
    groups from ef-assets 9e15d56, Liino's heal projectile); finding 2 settled by footage (Si's combo gives
-   10 + 6.5 to the team); no open findings. Batch 2 done (local, not deployed): `rules2.test.ts`, the other 26
+   10 + 6.5 to the team); no open findings. Batch 2 done: `rules2.test.ts`, the other 26
    operators plus batch 1's gap rows, 1179 tests; 36 findings, run as expected failures. Engine fixes
-   for groups A–D, C and F shipped in d39e6f2 (ef-assets f43b5ba, 91d2c58). Then (local, not deployed;
-   ef-assets 4d2582f pushed): a buff's source split from its creator (Antal's Focus) and the Link rebuilt
+   for groups A–D, C and F shipped in d39e6f2 (ef-assets f43b5ba, 91d2c58). Then (73fb42c, ef-assets
+   4d2582f): a buff's source split from its creator (Antal's Focus) and the Link rebuilt
    on the game's Link buff (Lifeng's 600% hit); replays unchanged (Skydrummer 3,588,467, Alleikhreos
    4,463,252, Last Rite 4,071,541). docs/rotations.md "Engine fixes from batch 2's findings", shared notes
    engine-fixes.md. 15 finding rows left: group E (Arclight's third slash, Perlica's Cycle Protocol,
    Rossi's combo SEQ 1, Purrchena's hold) and open ones with reasons (Endministrator P1, Avywenna's
    lances, Camille's Vesperwings, Liino's Starry Boost).
-6. Done (local, not deployed): the Simulator's result has buff rows, the boss face and the Buffs
+6. Done: the Simulator's result has buff rows, the boss face and the Buffs
    panel; its shown fight is replayed once with `buffRecorder`. Old saved runs need Run again.
 7. Done (already fixed): the "SP at the start" field max and clamp follow the enemy's `sp.max`.
 8. Done: element, class and weapon-type icons are CSS masks, so `data-fallback` never covered them; `probeMaskIcons` (`ui/components.ts`) now swaps a failed one to the other mirror.

@@ -338,7 +338,7 @@
   position: relative;
   height: calc(var(--track) + 64px);
 }
-/* Two stacked 3px lines inside an 8px track: pulls made on top, the
+/* Two stacked 2px lines inside a 5px track: pulls made on top, the
    current pity run underneath. */
 .ruler-track,
 .ruler-fill,
@@ -347,18 +347,18 @@
   position: absolute;
   top: var(--track);
   left: 0;
-  height: 3px;
-  border-radius: 2px;
+  height: 2px;
+  border-radius: 1px;
 }
 .ruler-track {
   right: 0;
-  height: 8px;
+  height: 5px;
   background: var(--gray-alpha-200);
   border-radius: 3px;
 }
 .ruler-run,
 .ruler-ahead {
-  top: calc(var(--track) + 5px);
+  top: calc(var(--track) + 3px);
 }
 .ruler-ahead {
   opacity: 0.3;
@@ -375,7 +375,7 @@
   position: absolute;
   top: calc(var(--track) - 3px);
   width: 2px;
-  height: 14px;
+  height: 11px;
   border-radius: 1px;
   background: var(--gray-1000);
   /* a faint glow so "you are here" reads at a glance */
@@ -442,7 +442,7 @@
 /* Under-track milestones (Arsenal Selectors): tip points up at the track,
    label underneath, and drawn behind the 6★ pins that share that row. */
 .ruler-mark.below {
-  top: calc(var(--track) + 19px);
+  top: calc(var(--track) + 16px);
   z-index: 0;
 }
 .ruler-mark.below .ruler-mark-label {
@@ -501,7 +501,7 @@
   top: 2px;
 }
 .ruler-pin.below {
-  top: calc(var(--track) + 10px);
+  top: calc(var(--track) + 7px);
   flex-direction: column-reverse;
 }
 .ruler-pin-label {
@@ -590,7 +590,7 @@
   top: calc(var(--track) - 18px);
 }
 .ruler-pin.pin-dot.below {
-  top: calc(var(--track) + 12px);
+  top: calc(var(--track) + 9px);
 }
 .ruler-dot {
   width: 7px;
@@ -601,31 +601,33 @@
   box-shadow: 0 0 0 1px var(--gray-alpha-600);
   transition: transform 0.12s var(--ease);
 }
-/* Crowded rows as tick marks: a thin line hanging off the track (down for
-   off-banner 6★, up for rate-ups). The hover target is wider than the line. */
+/* Crowded rows as small rarity emblems off the track (down for off-banner 6★, up for rate-ups). */
 .ruler-pin.pin-tick {
-  width: 8px;
+  width: 10px;
   height: 16px;
   display: flex;
   justify-content: center;
   cursor: default;
 }
 .ruler-pin.pin-tick.below {
-  top: calc(var(--track) + 8px);
+  top: calc(var(--track) + 6px);
   align-items: flex-start;
 }
 .ruler-pin.pin-tick.above {
-  top: calc(var(--track) - 16px);
+  top: calc(var(--track) - 17px);
   align-items: flex-end;
 }
 .ruler-tick {
-  /* Coloured by pity heat inline (green/amber/red, like the list); gray is the
-     fallback. Short enough to stop before the Selector teardrops' pointers. */
-  width: 1.5px;
-  height: 8px;
-  border-radius: 1px;
-  background: var(--gray-700);
-  transition: height 0.12s var(--ease), width 0.12s var(--ease), background 0.12s var(--ease);
+  /* Coloured by pity heat inline (green/amber/red, like the list); gray is the fallback. */
+  width: 10px;
+  height: 10px;
+  color: var(--gray-700);
+  transition: transform 0.12s var(--ease);
+}
+.ruler-tick svg.rarity-star {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .ruler-pin.pin-tick:hover,
 .ruler-pin.pin-tick.hovered {
@@ -633,8 +635,7 @@
 }
 .ruler-pin.pin-tick:hover .ruler-tick,
 .ruler-pin.pin-tick.hovered .ruler-tick {
-  width: 2.5px;
-  height: 12px;
+  transform: scale(1.4);
 }
 .ruler-pin.pin-dot:hover .ruler-dot,
 .ruler-pin.pin-dot.hovered .ruler-dot {
@@ -744,6 +745,29 @@
 }
 
 /* ---------- Empty state -------------------------------------------------- */
+/* A panel with no data yet (components.ts emptyState): icon, one line, centred. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--gray-900);
+}
+.empty-state[hidden] {
+  display: none;
+}
+.empty-state > .icon,
+.empty-state > .essence-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+  color: var(--gray-700);
+}
+.empty-state p {
+  max-width: 440px;
+}
 .empty {
   display: flex;
   flex-direction: column;
@@ -842,14 +866,23 @@ code {
   gap: 32px;
   max-width: 1000px;
 }
-.settings .card-body h2 {
+.settings .card-body > :is(h2, h3) {
   margin-bottom: 8px;
 }
 .settings .card-body > p {
   color: var(--gray-900);
   margin-bottom: 20px;
 }
-/* A second part of a Settings card (getting your pulls; theme and server). */
+/* A Settings card's parts: one under the other, a line between. */
+.settings-part + .settings-part {
+  border-top: 1px solid var(--ring);
+}
+.settings-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* A second part of a Settings card (getting your pulls). */
 .settings .settings-sub {
   border-top: 1px solid var(--ring);
 }
@@ -954,6 +987,13 @@ code {
   fill: var(--gray-700);
   font: 400 12px var(--font-sans);
 }
+.chart svg.chart-star {
+  color: var(--r6);
+}
+.legend-star {
+  margin-right: 6px;
+  color: var(--r6);
+}
 .chart .hit {
   fill: transparent;
 }
@@ -970,9 +1010,6 @@ code {
   height: 8px;
   border-radius: 2px;
   margin-right: 6px;
-}
-.legend i.round {
-  border-radius: 50%;
 }
 .bar-cell {
   display: flex;
@@ -1164,24 +1201,50 @@ code {
   .section {
     margin-top: 40px;
   }
+  /* Every tab shares the row, icons only, so all ten fit without scrolling. */
   .tabs {
     gap: 0;
+    margin: 0 -4px;
   }
   .tab {
-    padding: 0 7px;
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: 0;
   }
-  .tab-icon {
-    margin-right: 5px;
-  }
-  svg.tab-icon {
-    margin-right: 6px;
-  }
-  /* Five tabs don't fit a phone: Home shows just its icon. */
-  .tab-home > span:not(.tab-icon) {
+  .tab > span:not(.tab-icon, .tab-wip) {
     display: none;
   }
-  .tab-home .tab-icon {
-    margin-right: 0;
+  .tab-icon,
+  svg.tab-icon {
+    margin: 0;
+  }
+  svg.tab-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .tab-icon.icon {
+    font-size: 20px;
+  }
+  .tab-settings .tab-icon.icon {
+    font-size: 17px;
+  }
+  .tab::before {
+    inset: 7px 1px;
+  }
+  .tab[aria-current='page']::after {
+    left: 6px;
+    right: 6px;
+  }
+  .tab .tab-wip {
+    position: absolute;
+    top: 3px;
+    right: 0;
+    margin: 0;
+    padding: 0 3px;
+    font-size: 8px;
+    line-height: 12px;
+    height: 12px;
   }
   .metrics {
     grid-template-columns: 1fr 1fr;

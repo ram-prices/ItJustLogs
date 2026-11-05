@@ -2,7 +2,7 @@ import { ALL_STATS, STAT_ALIASES, byFit, fitOf, parseEssenceKey, type EssenceSta
 import type { WikiWeapon, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import { toast } from '../common';
-import { icon, itemImg, pageHeader, rarityArt, toggleGroup } from '../components';
+import { icon, itemImg, pageHeader, rarityArt, toggleGroup, emptyState, essenceIcon } from '../components';
 import { html, type Html } from '../html';
 import { credit, infoHref, ownedOf, wikiFile } from './info';
 import { searchBox } from './search';
@@ -91,7 +91,7 @@ export function essencesPage(redraw: () => void): Html {
   if (!kinds.length)
     return html`${headerWith(null)}<main class="container fade-in">
         <section class="card"><div class="card-body">
-          <h2 class="heading-20">No essences yet</h2>
+          ${emptyState(essenceIcon('Essences'), 'No essences yet')}
           <p class="copy-14">Record the game while you go through your essences, then paste, drop or pick the recording here. It's read in this browser; nothing is uploaded.</p>
           <ol class="copy-14 essence-how">
             <li><b>Valuables → Essences:</b> select each essence in turn (arrow keys work), so its Essence Stats panel shows.</li>
@@ -139,7 +139,7 @@ export function essencesPage(redraw: () => void): Html {
             </div>`;
           })}
       </div>
-      <p class="copy-14 secondary list-search-empty" hidden>No weapons match your search.</p>`;
+      ${emptyState('search_off', 'No weapons match your search.', { cls: 'list-search-empty', hidden: true })}`;
 
   const byEssence = () => {
     const rows = kinds
@@ -164,7 +164,7 @@ export function essencesPage(redraw: () => void): Html {
           </div>`,
         )}
       </div>
-      <p class="copy-14 secondary list-search-empty" hidden>No essences match your search.</p>`;
+      ${emptyState('search_off', 'No essences match your search.', { cls: 'list-search-empty', hidden: true })}`;
   };
 
   return html`<main class="container fade-in">

@@ -163,6 +163,7 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule, r?: EventRewards): Html {
   // Each event opens its own page (rewards and dates): pages/event.ts.
   return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`data-tip="${tip(e.name, [tipNote(e.details)])}"` : ''}>
+    ${e.art ? html`<img class="evt-strip" src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback />` : ''}
     ${e.art
       ? html`<div class="sched-thumb evt-art"><img src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback /><span class="evt-art-type" data-tip="${tip(e.type, [])}">${icon(eventIcon(e))}</span></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}

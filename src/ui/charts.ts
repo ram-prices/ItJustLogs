@@ -72,9 +72,7 @@ export function weeklyChart(buckets: TimelineBucket[]): Html {
       marks.push(`<path d="${column(x0, yTop, bw, charTop - yTop - gap)}" fill="var(--ars)"/>`);
     }
     if (b.sixStars.length) {
-      marks.push(
-        `<circle cx="${x0 + bw / 2}" cy="${y(total) - 9}" r="4" fill="var(--r6)" stroke="var(--background-100)" stroke-width="2"/>`,
-      );
+      marks.push(STAR_SVG.replace('class="rarity-star"', `class="rarity-star chart-star" x="${x0 + bw / 2 - 6.5}" y="${y(total) - 16}" width="13" height="13"`));
     }
     if (i % labelEvery === 0) marks.push(`<text x="${x0 + bw / 2}" y="${H - 8}" text-anchor="middle">${fmtWeek(b.start)}</text>`);
 

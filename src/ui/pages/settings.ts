@@ -4,7 +4,7 @@ import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { currentServer, state } from '../../state';
 import { loadAvatarHistory, MAX_DRIVE_SNAPSHOTS, MAX_SNAPSHOTS, type AvatarBox } from '../../store';
 import { EXPORTER_SOURCE } from '../guide';
-import { avatar, badge, icon, itemImg, pageHeader, toggleGroup, withStars } from '../components';
+import { avatar, badge, icon, itemImg, pageHeader, toggleGroup, withStars, emptyState } from '../components';
 import { wikiFile } from './info';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
 import { driveConfigured } from '../../drive';
@@ -55,15 +55,15 @@ function syncCard(): Html {
   preloadSync();
   const v = syncView();
   if (v.status === 'off')
-    return html`<section class="card">
+    return html`<div class="settings-part">
       <div class="card-body">
-        <h2 class="heading-20">Sync with Google Drive</h2>
+        <h3 class="heading-16">Sync with Google Drive</h3>
         <p class="copy-14">Keep your pulls, settings and pictures in your own Google Drive and use them on any device. ItJustLogs can only see a hidden folder of its own there, not your files.</p>
         ${syncParts()}
       </div>
       <div class="card-footer"><span>Optional. Nothing leaves this browser until you sign in.</span>
         <button class="btn primary sm" data-action="sync-signin">${icon('cloud')}Sign in with Google</button></div>
-    </section>`;
+    </div>`;
   const line =
     v.status === 'syncing'
       ? html`${badge('Syncing', 'blue')}`
@@ -76,9 +76,9 @@ function syncCard(): Html {
             : syncPending()
               ? html`${badge('Waiting', 'amber')} <span>Your latest changes go to Drive in a moment.</span>`
               : html`${badge('Synced', 'green')}`;
-  return html`<section class="card">
+  return html`<div class="settings-part">
     <div class="card-body">
-      <h2 class="heading-20">Sync with Google Drive</h2>
+      <h3 class="heading-16">Sync with Google Drive</h3>
       <p class="copy-14">Signed in as <b>${v.email ?? 'your Google account'}</b>. Imports and changes are saved to your Drive and shared with your other devices:</p>
       ${syncParts()}
       <div class="sync-status">${line}${v.lastSynced ? html`<span class="tertiary">Last synced ${fmtDate(v.lastSynced, true)}</span>` : ''}</div>
@@ -88,7 +88,7 @@ function syncCard(): Html {
         <button class="btn tertiary sm" data-action="sync-signout">Sign out</button>
         <button class="btn secondary sm" data-action="sync-now" ${v.status === 'syncing' ? 'disabled' : ''}>${icon('sync')}Sync now</button>
       </div></div>
-  </section>`;
+  </div>`;
 }
 
 /**
@@ -131,9 +131,9 @@ function extrasCard(redraw: () => void): Html {
           <option value="chr_0002_endminm" ${x.id === 'chr_0002_endminm' ? 'selected' : ''}>Endministrator (male)</option>
         </select>`
       : html`<span class="extra-name ellipsis">${nameOf(x.id)}</span>`;
-  return html`<section class="card" id="extras">
+  return html`<div class="settings-part" id="extras">
     <div class="card-body">
-      <h2 class="heading-20">Extra copies</h2>
+      <h3 class="heading-16">Extra copies</h3>
       <p class="copy-14">Operators and weapons you got without pulling: story operators and event gifts. They count toward copies and Potential on the info pages. Your pull history stays exactly as the game exported it.</p>
       ${extras.length
         ? html`<div class="extras">${extras.map(
@@ -145,7 +145,7 @@ function extrasCard(redraw: () => void): Html {
               <button class="btn tertiary sm" data-action="extra-remove" data-value="${i}" aria-label="Remove ${nameOf(x.id)}">${icon('close')}</button>
             </div>`,
           )}</div>`
-        : html`<p class="copy-13 secondary versions-empty">None yet.</p>`}
+        : emptyState('inbox', 'None yet.')}
       <div class="extra-add">
         <label class="field extra-add-item"><span>Operator or weapon</span>
           <select class="input" id="extraItem" ${ops && weps ? '' : 'disabled'}>
@@ -169,7 +169,7 @@ function extrasCard(redraw: () => void): Html {
       </div>
     </div>
     <div class="card-footer"><span>Saved with your settings: included in exports of everything and Google Drive sync, never in your pull history. Copies 1 = P0, 6 = max.</span></div>
-  </section>`;
+  </div>`;
 }
 
 /** Saved profile pictures as object URLs, loaded once (and again after a change). */
@@ -220,6 +220,10 @@ function clipPicker(current: string | undefined, redraw: () => void): Html {
   </div>`;
 }
 
+/** A Settings card: a short title over its parts. */
+const group = (title: string, parts: Html): Html =>
+  html`<section class="card"><div class="card-head"><h2 class="heading-16">${title}</h2></div>${parts}</section>`;
+
 export function settingsPage(redraw: () => void): Html {
   const s = state.settings;
   const h = state.history;
@@ -229,24 +233,10 @@ export function settingsPage(redraw: () => void): Html {
     ${pageHeader('Settings', synced ? 'Everything is stored in this browser and synced to your Google Drive.' : 'Everything is stored in this browser only.')}
     <main class="container fade-in"><div class="settings">
 
-      <section class="card">
+      ${group('Account and sync', html`<div class="settings-part">
         <div class="card-body">
-          <h2 class="heading-20">Pull history</h2>
-          <p class="copy-14">${count ? `${fmtInt(count)} records saved. ` : ''}Each import is merged into what's saved, so pulls the game no longer shows are kept. You can also drop a file anywhere, or press <kbd>Ctrl</kbd> <kbd>V</kbd>.</p>
-        </div>
-        <div class="card-body settings-sub">
-          <h3 class="heading-16">Get your pull history</h3>
-          <p class="copy-14">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. It needs no admin rights, changes no settings and downloads nothing else.</p>
-          ${getDataSteps()}
-        </div>
-        <div class="card-footer"><span>Exports from the PowerShell script, EF Tracker or track.py all work.</span>
-          <button class="btn primary sm" data-action="import">${icon('upload_file')}Import file</button></div>
-      </section>
-
-      <section class="card">
-        <div class="card-body">
-          <h2 class="heading-20">Personalization</h2>
-          <p class="copy-14">Your name and picture at the top of every page, how the site looks, and your game server.</p>
+          <h3 class="heading-16">Personalization</h3>
+          <p class="copy-14">Your name and picture at the top of every page.</p>
           <div class="profile-edit">
             ${avatar(state.images.avatar, !!s.avatarPop, true, s.avatarBox)}
             <label class="field">
@@ -270,7 +260,10 @@ export function settingsPage(redraw: () => void): Html {
             : ''}
           ${savedPictures(redraw)}
         </div>
-        <div class="card-body settings-sub settings-split">
+      </div>
+      ${syncCard()}`)}
+
+      ${group('Display', html`<div class="card-body settings-split">
           <div>
             <h3 class="heading-16">Theme</h3>
             <p class="copy-14">Follow your device, or pick one.</p>
@@ -287,21 +280,30 @@ export function settingsPage(redraw: () => void): Html {
             ${toggleGroup('motion', [['on', 'Animated'], ['off', 'Still']], s.motion === false ? 'off' : 'on')}
             ${clipPicker(s.homeClip, redraw)}
           </div>
-          <div>
-            <h3 class="heading-16">Tabs</h3>
-            <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showEssences" ${raw(s.showEssences ? 'checked' : '')} />Show the Essences tab</label>
-            <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showAic" ${raw(s.showAic ? 'checked' : '')} />Show the AIC tab</label>
-          </div>
-        </div>
-      </section>
+        </div>`)}
 
-      ${extrasCard(redraw)}
+      ${group('Tabs', html`<div class="card-body settings-checks">
+        <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showEssences" ${raw(s.showEssences ? 'checked' : '')} />Show the Essences tab</label>
+        <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showAic" ${raw(s.showAic ? 'checked' : '')} />Show the AIC tab</label>
+        </div>`)}
 
-      ${syncCard()}
-
-      <section class="card">
+      ${group('Data', html`<div class="settings-part">
         <div class="card-body">
-          <h2 class="heading-20">Export</h2>
+          <h3 class="heading-16">Pull history</h3>
+          <p class="copy-14">${count ? `${fmtInt(count)} records saved. ` : ''}Each import is merged into what's saved, so pulls the game no longer shows are kept. You can also drop a file anywhere, or press <kbd>Ctrl</kbd> <kbd>V</kbd>.</p>
+        </div>
+        <div class="card-body settings-sub">
+          <h3 class="heading-16">Get your pull history</h3>
+          <p class="copy-14">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. It needs no admin rights, changes no settings and downloads nothing else.</p>
+          ${getDataSteps()}
+        </div>
+        <div class="card-footer"><span>Exports from the PowerShell script, EF Tracker or track.py all work.</span>
+          <button class="btn primary sm" data-action="import">${icon('upload_file')}Import file</button></div>
+      </div>
+      ${extrasCard(redraw)}
+      <div class="settings-part">
+        <div class="card-body">
+          <h3 class="heading-16">Export</h3>
           <p class="copy-14">Export a copy of your pulls, or of everything (pulls, settings and your operator pictures), into a JSON file to keep or to move to another browser.</p>
         </div>
         <div class="card-footer"><span>Bring an export back in with Import file.</span>
@@ -309,9 +311,8 @@ export function settingsPage(redraw: () => void): Html {
             <button class="btn secondary sm" data-action="export-history" ${count ? '' : 'disabled'}>${icon('download')}Pulls</button>
             <button class="btn secondary sm" data-action="export-backup">${icon('download')}Everything</button>
           </div></div>
-      </section>
-
-      ${versionHistory(synced)}
+      </div>
+      ${versionHistory(synced)}`)}
 
       ${count
         ? html`<section class="card danger">
@@ -349,9 +350,9 @@ function versionHistory(synced: boolean): Html {
   const drive = driveSnapshots();
   const inDrive = new Set(drive.map((s) => s.id));
   const list = [...state.snapshots.map((s) => ({ ...s, local: true })), ...drive.filter((s) => !here.has(s.id)).map((s) => ({ ...s, local: false }))].sort((a, b) => b.at - a.at);
-  return html`<section class="card">
+  return html`<div class="settings-part">
     <div class="card-body">
-      <h2 class="heading-20">Version history</h2>
+      <h3 class="heading-16">Version history</h3>
       <p class="copy-14">A copy of your pulls is saved in this browser before anything changes them (an import, a delete, a restore or a Google Drive merge). The last ${MAX_SNAPSHOTS} are kept${driveConfigured() ? html`, and with Google Drive sync on, each copy is saved to your Drive too (the last ${MAX_DRIVE_SNAPSHOTS}), so any of your devices can restore it` : ''}. Restore one if something went wrong; your current pulls are saved here first, so you can undo it.</p>
       ${list.length
         ? html`<div class="versions">${list.map(
@@ -363,12 +364,12 @@ function versionHistory(synced: boolean): Html {
               <button class="btn secondary sm" data-action="${s.local ? 'restore-snapshot' : 'restore-drive-snapshot'}" data-value="${s.id}">Restore</button>
             </div>`,
           )}</div>`
-        : html`<p class="copy-13 secondary versions-empty">No earlier versions yet.</p>`}
+        : emptyState('history', 'No earlier versions yet.')}
     </div>
     ${synced
       ? html`<div class="card-footer"><span>Restoring signs this browser out of Google Drive sync first, so your Drive copy stays as it was.</span></div>`
       : ''}
-  </section>`;
+  </div>`;
 }
 
 /**

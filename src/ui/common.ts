@@ -1,5 +1,26 @@
 import { mirrorUrl } from '../domain/banners';
 
+/**
+ * Marks each loaded picture `.img-ready`, which ends its skeleton (components.css). A redraw's
+ * pictures already in the browser's memory are marked before the page paints, so they don't flash grey.
+ */
+export function installImageReady(): void {
+  const scan = (root: ParentNode) => {
+    for (const img of root.querySelectorAll('img')) if (img.complete && img.naturalWidth) img.classList.add('img-ready');
+  };
+  document.addEventListener(
+    'load',
+    (e) => {
+      if (e.target instanceof HTMLImageElement) e.target.classList.add('img-ready');
+    },
+    true,
+  );
+  new MutationObserver((changes) => {
+    for (const c of changes) for (const n of c.addedNodes) if (n instanceof Element) scan(n);
+  }).observe(document.body, { childList: true, subtree: true });
+  scan(document);
+}
+
 export function installImageFallback(): void {
   document.addEventListener(
     'error',

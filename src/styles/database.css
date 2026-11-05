@@ -102,8 +102,8 @@
 /* The game's rarity emblem (components.ts STAR_SVG), sized and coloured like the text it replaces ★ in. */
 .rarity-star {
   display: inline-block;
-  width: 1em;
-  height: 1em;
+  width: var(--emblem, 1em);
+  height: var(--emblem, 1em);
   vertical-align: -0.12em;
   fill: currentColor;
 }
@@ -112,6 +112,10 @@
 }
 .rarity-star .t2 {
   fill: color-mix(in srgb, currentColor 70%, #000);
+}
+/* Emblems beside small text: one size, whatever the text's. Headings and the header's row keep their own. */
+:is(.glance-stat, .metric-label, .metric-sub, .legend, .rarity-filter, .char-card-names, .rarity) {
+  --emblem: 13px;
 }
 /* A gear slot's mark (Armor, Gloves, Kit), in the text's colour. */
 .slot-icon {
@@ -572,6 +576,15 @@
     background: color-mix(in srgb, var(--background-100) 65%, transparent);
     -webkit-backdrop-filter: blur(16px) saturate(1.3);
     backdrop-filter: blur(16px) saturate(1.3);
+  }
+  /* The picture has fully faded (ui/heroFade.ts): it stops being drawn and the
+     cards, over nothing but the plain page now, stop blurring. */
+  .wiki-hero.has-art.pin-gone .wiki-hero-pin {
+    visibility: hidden;
+  }
+  .wiki-hero.has-art.pin-gone ~ main :is(.card, .metrics:not(.plain)) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 @media (max-width: 640px) {
@@ -1058,7 +1071,18 @@
   overflow: hidden;
   background: var(--gray-100);
 }
+/* 6★ cards: the tiles' rainbow smoke (loadout.css .rarity-art.smoke), up behind the shoulders,
+   where the picture is see-through (lower down the bust covers it). */
+.op-card.r6 .op-card-art::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 72%;
+  mask: linear-gradient(to bottom, #000 70%, transparent);
+  background: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@main/effects/six-star/smoke-loop-3.webp) 0 0 / 100% 100%;
+}
 .op-card-img {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -1128,11 +1152,13 @@
   font: 600 15px/20px var(--font-sans);
 }
 .op-card.unowned .op-card-img,
-.op-card.unowned .op-card-strip {
+.op-card.unowned .op-card-strip,
+.op-card.unowned .op-card-art::before {
   opacity: 0.45;
 }
 .op-card.unowned:hover .op-card-img,
-.op-card.unowned:hover .op-card-strip {
+.op-card.unowned:hover .op-card-strip,
+.op-card.unowned:hover .op-card-art::before {
   opacity: 1;
 }
 @media (max-width: 640px) {

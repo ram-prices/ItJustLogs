@@ -88,7 +88,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `--pin-under` (220px, phones 96px) under the top of the page. No shade
     behind the facts: the text keeps its halo (`.tall .wiki-hero-text`). Browsers without
     scroll-linked animations (Firefox) get the same fade from a scroll handler
-    (`ui/heroFade.ts`, once per frame); the rest is plain CSS both share. With
+    (`ui/heroFade.ts`, once per frame); the rest is plain CSS both share. Once the picture has fully faded (48px past the end) `heroFade.ts` sets `.pin-gone` on the header in every browser: the picture stops being drawn and the cards drop their blur, with only the plain page behind them. Keep that: blurred cards over the running fade cost most of this page's drawing (Firefox software rendering at 3440x1315: 15 fps, p50 70 ms; with `.pin-gone` p50 7 ms past the fade), while scroll handlers, style, layout and paint cost next to nothing. Inside the fade itself the blur has to follow the changing picture every frame and stays slow on weak GPUs; that part is the design. With
     reduced motion the picture isn't held or faded: it scrolls away with the header. The picture is one flat file (Potential posters and the
     player's art have no layers), so on the detail view it shifts as a whole.
     Built pages and Discord embeds keep the base art.
@@ -96,7 +96,8 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `ui/components.ts` (`OROBERYL_ICON`, ef-assets icons/items, `--oroberyl`).
   - Rarity is drawn with the game's emblem, not a ★ glyph: `STAR_SVG`,
     `stars(n)` and `withStars(text)` in `ui/components.ts` (endfield.wiki.gg
-    Star.svg, in the text's colour). Keep "★" only in attributes and
+    Star.svg, in the text's colour). `--emblem` (13px beside small text, database.css) keeps one size on cards, stats and filters;
+    headings and the header's row keep their own. A chart's emblem is a nested SVG, so it's sized by attributes: Chrome ignores CSS sizes there. Keep "★" only in attributes and
     `<option>` text. Potential is written "P3"; the game's Potential star
     (`potentialStar`) only beside that text or as decoration.
     Artifice levels show the game's mark (`artificeIcon`, endfield.wiki.gg
@@ -153,10 +154,11 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     pill, then the name with class and element icons
     (`classIcon`, `elementIcon`) under it, a rarity-coloured line along the card's bottom; no stars. The class/element names sit in `hidden` spans so
     the search still finds them.
-    6★ Arsenal tiles (`tileArt`, `.rarity-art.smoke`) draw the game's rainbow smoke: the item slot's
+    6★ tiles (`tileArt`, `.rarity-art.smoke`, weapons and operators) draw the game's rainbow smoke: the item slot's
     `6StarColorSequence` with `m_fx_sixstar_bg_w`, pre-rendered by ef-assets `scripts/six-star-smoke.py`
     into a 10 s loop (`effects/six-star/smoke-loop-3.webp`; sway and speed matched by eye to a recording),
-    sized from the 120px slot to the 48px tile, in place of the rarity glow (no weapon tile has the glow).
+    sized from the 120px slot to the 48px tile, in place of the rarity glow (no tile has the glow). 6★ operator
+    cards (`.op-card.r6 .op-card-art::before`) use the same loop, over the top 72% of the picture, where the bust leaves it see-through.
     (A live SVG filter was too slow: Chrome redraws it on the CPU per tile, every frame.)
   - `index.html` is a bare shell (`#app`, drop overlay, file input).
     `ui/app.ts` renders header + tabs, routes on clean paths (`/` Home,
@@ -171,7 +173,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     `#/...`) are moved to today's (`currentPath`), and their folders are
     still built, so old links keep working.
     Header tabs: Home, Pulls, Database, Rotations (WIP), Essences, AIC (WIP), Achievements, Archive, Story,
-    Settings. Essences and AIC are hidden until ticked in Settings → Tabs (`showEssences`, `showAic`); their routes still open when typed. Database (`/database/...`) and Pulls (`/banner/...`) are
+    Settings. The current tab has a `--gray-alpha-200` pill and the underline. On phones (`max-width: 640px`) the tabs share the row, icons only (`TAB_ICON`, every tab needs one; the label is `aria-label` and `title`), so all ten fit without scrolling; the WIP badge shrinks to the icon's corner. Essences and AIC are hidden until ticked in Settings → Tabs (`showEssences`, `showAic`); their routes still open when typed. Database (`/database/...`) and Pulls (`/banner/...`) are
     sections picked with side tabs (`databaseTabs` / `pullsTabs` in
     `pages/info.ts`); `/database` and `/banner` open the page last used there.
     Side-tab pages show no title or summary line (the top and side tabs say
@@ -227,5 +229,11 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
   - Signature features of the old site (6★ portrait strip, pity ruler, luck
     curves, profile header) are being re-added one at a time in Geist style.
 
-- Art header (`.wiki-hero.art-hero.has-art`, collections.css), shared by event pages and banner pages (`.banner-hero`): the art is capped (`clamp(260px, 30vw, 340px)`, 220px on phones), full width, `object-fit: cover` anchored at the bottom (banner art at 30% from the top, where the game's layouts put the face), in a grid cell shared with the text container; its own vignette runs into the page, plus a 56px `--background-100` fade (`::after`, 120px in light) and a local dark scrim behind the white text (stronger in light). Art that fails to load drops `has-art` (`installImageFallback`), leaving a plain header.
+- Art header (`.wiki-hero.art-hero.has-art`, collections.css), shared by event pages and banner pages (`.banner-hero`): the art fills the header (at least `clamp(260px, 30vw, 340px)`, 220px on phones; taller when the text needs it), `object-fit: cover` anchored at the bottom (banner art at 30% from the top, where the game's layouts put the face); its own vignette runs into the page, plus a 56px `--background-100` fade (`::after`; in light a long eased one, 56% of the header, since dark art over a short fade reads as a grey band) and a dark scrim behind the white text (stronger in light; `closest-side`, so it reaches nothing before its box ends and leaves no edge). Art that fails to load drops `has-art` (`installImageFallback`), leaving a plain header. Basic Headhunting's flat art has lettering beside the faces, so its header uses `HERO_ART` in kind.ts: ef-assets `banners/game/standard.webp`, the same art with the lettering painted out; its card keeps the flat file.
+- Skeletons: pictures with a fixed box (hero art, portraits, operator cards, tiles, banner art, Home thumbnails, ruler heads; the `:is()` list in components.css) show `--skeleton` with a `--skeleton-shine` band until `installImageReady` (common.ts) marks them `.img-ready`, on load, or before paint for a redraw's pictures already in memory. New picture kinds go in both lists (the shimmer and the reduced-motion one).
+- Empty states: `emptyState(icon, text, { cls, hidden, action })` in components.ts, `.empty-state` in banners.css: one icon and one line inside the panel, wherever a panel has nothing yet and for empty searches (`cls: 'list-search-empty', hidden: true`). `icon` is a Material name or an `Html` mark.
+- Home cards lift 2px with a stronger tint glow (150ms, `@media (hover: hover)`, loadout.css), not while Customize is on. Event rows with art draw it blurred behind the row (`.evt-strip`, home.css); the thumbnail or icon stays.
+- Pity rulers: a 5px track holding two 2px lines; crowded rulers (over `MAX_FULL_PINS`) mark each 6★ with a small emblem in its pity heat. Stats: the weekly chart's 6★ mark is the emblem, and data hints use `data-tip`, not `title`.
+- Reduced motion: the block at the end of components.css stops every animation, keeps transitions to opacity, removes hover lifts and zooms, makes skeletons plain grey and drops the smoke. Parallax CSS sits behind `no-preference` (loadout.css), `parallax.ts` stops listening, the header picture isn't held (database.css, `heroFade.ts`) and the video shows its still. `scrollIntoView` calls pick `auto` there too. To test it, rewrite the stylesheets' `mediaText` from the page: the pane can't emulate it.
+- Settings: four `group(title, parts)` cards in settings.ts (Account and sync, Display, Tabs, Data), each part a `.settings-part` with a line between; Delete locally saved data stays its own danger card.
 - Light theme: dark-first values are tokens with a light counterpart in base.css: `--shadow-pop` (pop-up drop shadow), `--badge-backing` (light only: badges' tint sits on a light backing, so Limited/Unique and the rest read over art too; badges set their tint as `--badge-bg`), `--white-icon-filter` (the game's white class/weapon-type icons, `img.trait-icon`, darkened on white). Timeline bars get fuller fills in light so their white labels read. Hard-coded blacks left in the CSS are art scrims, masks and dialog backdrops, right in both themes.

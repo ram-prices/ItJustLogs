@@ -245,6 +245,9 @@ svg.tab-icon {
 .tab[aria-current='page'] {
   color: var(--gray-1000);
 }
+.tab[aria-current='page']::before {
+  background: var(--gray-alpha-200);
+}
 .tab[aria-current='page']::after {
   content: '';
   position: absolute;
@@ -411,7 +414,7 @@ main {
   color: var(--gray-900);
 }
 .progress {
-  height: 4px;
+  height: 3px;
   margin-top: 12px;
   border-radius: 2px;
   background: var(--gray-alpha-200);
@@ -860,11 +863,6 @@ select.input {
 .table .grow {
   width: 100%;
 }
-.table-empty {
-  padding: 48px 24px;
-  text-align: center;
-  color: var(--gray-900);
-}
 .item {
   display: flex;
   align-items: center;
@@ -979,4 +977,52 @@ select.input {
 .ctx-menu .icon {
   font-size: 16px;
   color: var(--gray-900);
+}
+
+/* ---------- Skeletons --------------------------------------------------- */
+/* Pictures with a fixed box, until they've loaded (common.ts installImageReady marks them).
+   The box stays, so nothing moves when the picture arrives. */
+:is(.wiki-hero-art, .wiki-hero-portrait, .op-card-img, .wiki-tile-portrait, .banner-art > img, .banner-art .op-back, .banner-art .issue-back, .sched-thumb img, .char-card-art img, .six-item img, .ruler-pin-heads img):not(.img-ready, .missing) {
+  background: linear-gradient(100deg, var(--skeleton) 30%, var(--skeleton-shine) 50%, var(--skeleton) 70%) 0 0 / 200% 100%;
+  animation: skeleton 1.4s linear infinite;
+}
+@keyframes skeleton {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* ---------- Reduced motion ---------------------------------------------- */
+/* Nothing moves: no animation, no hover lift or zoom, skeletons plain grey; only fades stay.
+   Parallax and held header pictures are already off here (loadout.css, database.css),
+   the video background shows its still (videoBackground.ts), the smoke is left out. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-property: opacity !important;
+    scroll-behavior: auto !important;
+  }
+  :is(.wiki-hero-art, .wiki-hero-portrait, .op-card-img, .wiki-tile-portrait, .banner-art > img, .banner-art .op-back, .banner-art .issue-back, .sched-thumb img, .char-card-art img, .six-item img, .ruler-pin-heads img):not(.img-ready, .missing) {
+    background: var(--skeleton) !important;
+  }
+  .sched-card:hover,
+  .op-card:hover .op-card-img,
+  .six-item:hover :is(.six-art, .six-heads) {
+    transform: none !important;
+  }
+  .ruler-pin:not(.pin-tick):not(.pin-dot):hover,
+  .ruler-mark:hover {
+    transform: translateX(-50%) !important;
+  }
+  .ruler-pin:hover :is(.ruler-tick, .ruler-dot) {
+    transform: none !important;
+  }
+  .op-card.r6 .op-card-art::before {
+    content: none !important;
+  }
 }

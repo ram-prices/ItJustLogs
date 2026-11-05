@@ -3,7 +3,7 @@ import { fmtPulls, pullsOf, withWikiEnds, type EventRewards, type EventRewardsFi
 import { claimDaysLeft } from '../../domain/income';
 import { hasDailyRewards, SERVER_LABEL, timeOn, type Schedule, type Server, type ScheduleEvent } from '../../domain/schedule';
 import { currentServer, state } from '../../state';
-import { badge, icon, itemName } from '../components';
+import { badge, icon, itemName, emptyState } from '../components';
 import { fmtDate, fmtInt, html, type Html } from '../html';
 import { tip, tipNote } from '../charts';
 import { credit, external, wikiFile } from './info';
@@ -184,9 +184,9 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
         ? r.groups.length
           ? html`${summary(r)}${allItems(r)}${breakdown(r)}
               <p class="copy-13 secondary">Rewards from the wiki's ${external(r.url, 'event page')}. Missing something? The wiki may not have the information yet.</p>`
-          : html`<section class="section"><p class="copy-14 secondary">The wiki's page for this event doesn't list its rewards (yet). ${external(r.url, 'Open it')}.</p></section>`
+          : html`<section class="section">${emptyState('redeem', html`The wiki's page for this event doesn't list its rewards (yet). ${external(r.url, 'Open it')}.`)}</section>`
         : file.data
-          ? html`<section class="section"><p class="copy-14 secondary">This event has no page on the wiki yet, so its rewards aren't listed.</p></section>`
+          ? html`<section class="section">${emptyState('redeem', "This event has no page on the wiki yet, so its rewards aren't listed.")}</section>`
           : file.failed
             ? html`<section class="section"><p class="copy-14 secondary">Couldn't load the rewards. Check your connection and reload.</p></section>`
             : html`<section class="section"><p class="copy-14 secondary">Loading rewards…</p></section>`}
