@@ -32,10 +32,8 @@ Keep these up to date when you change an area; keep this file short.
 
 ## Commands
 
-Node lives at `C:\Program Files\nodejs` and may not be on the Bash PATH:
-`export PATH="/c/Program Files/nodejs:$PATH"` first.
-
-- `npm run dev` (or `preview_start` name `itjustlogs-dev`, port 5173)
+- `preview_start` name `itjustlogs-test`, port 5175. 5173 (`npm run dev`, `itjustlogs-dev`) and
+  5174 hold real data: view only.
 - `npm test` (Vitest), `npm run typecheck`, `npm run build`
 - Keep output short (it stays in the conversation): `npx vitest run --reporter=dot`
   (dots, failures, summary), `npm run typecheck` (silent when clean),
@@ -55,8 +53,7 @@ Only when the owner says "deploy" (that batch only; afterwards changes stay loca
 4. Commit (message ends with the Co-Authored-By line) and `git push origin main` (no PRs; `gh`
    isn't installed). Pages deploys from the push.
 5. Confirm: poll `https://api.github.com/repos/ram-prices/ItJustLogs/actions/runs?head_sha=<sha>`
-   for `"conclusion": "success"` (in the background), then note the live commit in the
-   pending-work memory.
+   for `"conclusion": "success"` (in the background).
 
 ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@pm.me`.
 
@@ -145,6 +142,3 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
   made with ef-assets `scripts/issue-banner.py`). The player's server is a setting (guessed from the
   time zone until chosen).
 - `fixtures/` is gitignored and holds the owner's real export. Never commit it.
-- Never commit: `fixtures/`, `tools/ai-parser/` (owner's personal tool),
-  `src/domain/sim/dbg*.test.ts` and `dbgTeam*.ts` scratch, `.claude/launch.json`,
-  `essence-icon-preview.html`, `essence.svg`.

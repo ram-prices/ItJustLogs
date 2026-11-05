@@ -109,7 +109,7 @@ export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${
  */
 const GAME_ART = new Set([
   'special_1_0_1', 'special_1_0_2', 'special_1_0_3', 'special_1_1_1', 'special_1_1_2', 'special_1_2_1',
-  'special_1_3_1', 'special_1_3_2', 'special_1_4_1', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1',
+  'special_1_3_1', 'special_1_3_2', 'special_1_4_1', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1', 'special_1_6_2',
   'rerun_chr_tangtang', 'rerun_chr_yvonne',
 ]);
 
