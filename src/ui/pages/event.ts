@@ -162,7 +162,7 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
   const start = timeOn(e.start, server);
   const end = timeOn(e.end, server);
   const when = start ? `${fmtDate(start, true)}${end ? ` – ${fmtDate(end, true)}` : ''}` : 'Dates not announced';
-  return html`<section class="wiki-hero art-hero${e.art ? ' has-art' : ''}">
+  return html`<section class="wiki-hero art-hero event-hero${e.art ? ' has-art' : ''}">
       ${e.art ? html`<img class="wiki-hero-art" src="${cdnUrl(e.art)}" alt="" decoding="async" data-fallback />` : ''}
       <div class="container wiki-hero-inner">
         <div class="min0 wiki-hero-text">

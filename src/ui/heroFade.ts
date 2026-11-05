@@ -31,7 +31,8 @@ export function installHeroFade(): void {
   const soon = () => {
     if (!frame) frame = requestAnimationFrame(update);
   };
-  addEventListener('scroll', soon, { passive: true });
+  // Only pages with a pinned picture do anything per frame (event headers have none).
+  addEventListener('scroll', () => document.querySelector('.wiki-hero-pin') && soon(), { passive: true });
   addEventListener('resize', soon);
   still.addEventListener('change', soon);
   // A new page (or a redraw) brings a fresh picture at full opacity.

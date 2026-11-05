@@ -1954,7 +1954,8 @@ a.ladder-row:focus-visible {
 /* Parallax (Settings → Backgrounds; never with reduced motion or without a
    mouse): a picture shifts a little the other way from the mouse over it
    (--px/--py, eased in ui/parallax.ts), slightly enlarged so its edges never
-   show. Banner cards barely move; headers and the Character card more. On an
+   show. Banner cards barely move; headers and the Character card more; event
+   headers stay still. On an
    Issue the backdrop and dotted rule stay put, the ornaments move a little
    and the weapon most, floating gently (on its wrapper, so the float and the
    shift never animate the same element). On a Headhunting banner in layers
@@ -1969,7 +1970,7 @@ a.ladder-row:focus-visible {
   }
 }
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
-  :root[data-motion='on'] :is(.art-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img) {
+  :root[data-motion='on'] :is(.art-hero:not(.event-hero) .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img) {
     --shift: 2%;
     scale: 1.06;
   }
@@ -1996,7 +1997,7 @@ a.ladder-row:focus-visible {
     animation: weapon-float 5s ease-in-out infinite alternate;
     will-change: transform;
   }
-  :root[data-motion='on'] :is(.art-hero .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
+  :root[data-motion='on'] :is(.art-hero:not(.event-hero) .wiki-hero-art, .style-banner .char-card-art img, .style-background .char-card-art img, .banner-art img) {
     translate: calc(var(--px, 0) * -1 * var(--shift)) calc(var(--py, 0) * -1 * var(--shift));
     /* Firefox puts a picture that's only moved (not tilted) on whole pixels,
        so these shifts of a pixel or two would twitch. A 3D tilt too small to

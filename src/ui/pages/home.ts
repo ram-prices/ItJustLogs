@@ -5,6 +5,7 @@ import {
   KIND_LABEL,
   SERVER_LABEL,
   endOrGuess,
+  headhuntingRow,
   isWeaponBanner,
   packLanes,
   scheduleLinks,
@@ -22,7 +23,7 @@ import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
 import { backgroundSource, heat, icon, layeredArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { hourglass, rateUpChip, rateUpIcon, rateUpIdsOf, rateUpOwned, rateUpPotential } from './kind';
+import { hourglass, rateUpChip, rateUpIcon, rateUpIdsOf, rateUpNames, rateUpOwned, rateUpPotential } from './kind';
 import { bannerHref, wikiFile } from './info';
 import { eventTags } from './event';
 
@@ -65,7 +66,8 @@ const pagePath = (b: ScheduleBanner) => bannerHref(isWeaponBanner(b.kind) ? 'wea
 function rateUpLine(b: ScheduleBanner): Html {
   if (!b.rateUps.length) return html``;
   const kind = isWeaponBanner(b.kind) ? 'weap' : 'char';
-  return html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${b.rateUps.join(', ')}</span>${rateUpPotential(kind, rateUpIdsOf(kind, b.poolId, b.rateUps), b.poolId)}</span>`;
+  const ids = rateUpIdsOf(kind, b.poolId, b.rateUps);
+  return html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${rateUpNames(kind, b.rateUps, ids)}</span>${rateUpPotential(kind, ids, b.poolId)}</span>`;
 }
 
 /** An icon per event type ("Sign-In Event", "Challenge Event", ...). */
@@ -519,7 +521,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null,
   if (links?.schedule !== schedule) links = { schedule, map: scheduleLinks(schedule) };
   const startOf = (i: { start: ScheduleBanner['start'] }) => timeOn(i.start, server) ?? Infinity;
   const byStart = (p: ScheduleBanner, q: ScheduleBanner) => startOf(p) - startOf(q) || Number(isWeaponBanner(p.kind)) - Number(isWeaponBanner(q.kind));
-  // Headhunting banners on the first row, Arsenal Issues on the second; each by when it opened.
+  // Headhunting banners on the first row (Chartered first), Arsenal Issues on the second by when they opened.
   const live = schedule.banners.filter((b) => statusOf(b, now, server) === 'live').sort(byStart);
   // Each kind's newest `n` (undefined: all), still in opening order.
   const newest = (list: ScheduleBanner[], n: number | undefined) => (n == null ? list : n > 0 ? list.slice(-n) : []);
@@ -546,7 +548,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null,
           banners: (char, weap, reruns = true) => {
             // Re-runs: RE-Factor Headhunting and Issues.
             const shown = reruns ? live : live.filter((b) => b.kind !== 'refactor' && b.kind !== 'refactorIssue');
-            let rows = [newest(shown.filter((b) => !isWeaponBanner(b.kind)), char), newest(shown.filter((b) => isWeaponBanner(b.kind)), weap)].filter((row) => row.length);
+            let rows = [headhuntingRow(shown.filter((b) => !isWeaponBanner(b.kind)), char), newest(shown.filter((b) => isWeaponBanner(b.kind)), weap)].filter((row) => row.length);
             // Three or fewer (neither kind more than two) share one row; more get a row per kind.
             if (rows.length === 2 && rows[0].length + rows[1].length <= 3) rows = [rows.flat()];
             return rows.length ? html`${rows.map((row) => html`<div class="sched-live">${row.map((b) => liveCard(b, now, server, a))}</div>`)}` : null;

@@ -7,7 +7,7 @@
  * The easing is done here, a step toward the mouse each frame, not with a CSS
  * transition, which would restart on every mouse move.
  */
-const AREAS = '.wiki-hero, .char-card, .banner, .sched-card';
+const AREAS = '.wiki-hero:not(.event-hero), .char-card, .banner, .sched-card';
 /** How much of the way to the mouse each frame covers. */
 const EASE = 0.08;
 

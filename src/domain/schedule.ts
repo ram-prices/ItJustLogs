@@ -89,6 +89,19 @@ export const KIND_LABEL: Record<ScheduleKind, string> = {
 
 export const isWeaponBanner = (k: ScheduleKind): boolean => k === 'issue' || k === 'refactorIssue';
 
+/**
+ * Home's Headhunting row, from banners in opening order: Chartered first, then RE-Factor, then the
+ * rest. A limit keeps the newest `n` (undefined: all), but a Chartered banner always keeps its place.
+ */
+export function headhuntingRow(banners: ScheduleBanner[], n?: number): ScheduleBanner[] {
+  const rank = (b: ScheduleBanner) => (b.kind === 'chartered' ? 0 : b.kind === 'refactor' ? 1 : 2);
+  const chartered = banners.filter((b) => b.kind === 'chartered');
+  const others = banners.filter((b) => b.kind !== 'chartered');
+  const newest = (list: ScheduleBanner[], count: number) => (count > 0 ? list.slice(-count) : []);
+  const room = n ?? banners.length;
+  return [...newest(chartered, room), ...newest(others, room - chartered.length)].sort((p, q) => rank(p) - rank(q));
+}
+
 /** A time on the given server, as epoch ms. */
 export const timeOn = (t: ServerTimes | null, server: Server): number | null => (t ? Date.parse(t[server]) : null);
 

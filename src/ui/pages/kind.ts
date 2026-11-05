@@ -7,10 +7,10 @@ import { SERVER_LABEL, timeOn, type Schedule, type Server } from '../../domain/s
 import type { BannerDb, Kind } from '../../domain/types';
 import { badge, heat, icon, layeredArt, stars, withStars, itemImg, metric, metrics, pageHeader, toggleGroup, emptyState } from '../components';
 import { fmtDate, fmtInt, html, raw, type Html } from '../html';
-import { bannerHref, infoHref, ownedOf, pullsTabs } from './info';
+import { bannerHref, infoHref, ownedOf, pullsTabs, slugsOf } from './info';
 import { state } from '../../state';
 import { MAX_COPIES } from '../../domain/owned';
-import { wikiId } from '../../domain/wiki';
+import { nameSlug, wikiId } from '../../domain/wiki';
 
 /** Operators / Arsenal: list of banners, and a page per banner with its pull history. */
 
@@ -117,9 +117,25 @@ export function rateUpPotential(kind: Kind, rateUpIds: string[], poolId?: string
   return html`<span class="rateup-pot${copy >= MAX_COPIES ? ' max' : ''}" data-tip="${tip('Potential', [tipRow(last ? 'After this banner' : 'Now', level)])}">${level}</span>`;
 }
 
+/**
+ * A banner's rate-up names, each linking to its Database page. Operators always have one (without an
+ * id, by name slug); a weapon links only once weapons.json shows it has one (app.ts loads it).
+ */
+export function rateUpNames(kind: Kind, names: string[], ids: string[]): Html {
+  const slugs = slugsOf(kind);
+  return html`${names.map((name, i) => {
+    const id = ids.length === names.length ? ids[i] : undefined;
+    const slug = nameSlug(name);
+    const page = kind === 'char' || (id && slugs?.byId.has(id)) || slugs?.bySlug.has(slug);
+    const href = id ? infoHref(kind, id) : `${infoHref(kind)}/${encodeURIComponent(slug)}`;
+    return html`${i ? ', ' : ''}${page ? html`<a class="rateup-link" href="${href}">${name}</a>` : name}`;
+  })}`;
+}
+
 export function rateUpChip(b: BannerSummary): Html {
   if (!b.info) return html``;
-  const names = b.category === 'joint' && b.info.rateUpIds.length > 1 ? `${b.info.rateUpIds.length} rate-ups` : b.info.rateUpNames.join(', ');
+  const many = b.category === 'joint' && b.info.rateUpIds.length > 1;
+  const names = many ? `${b.info.rateUpIds.length} rate-ups` : b.info.rateUpNames.join(', ');
   // Copies you own: the ones pulled plus every reward that is a rate-up copy
   // (Chartered Tokens, Joint Selectors, Arsenal rate-up rewards). Arsenal
   // Selectors offer other weapons, so they don't count.
@@ -137,7 +153,7 @@ export function rateUpChip(b: BannerSummary): Html {
   ]);
   const label = `Rate-up: ${names}${got ? ` · obtained ×${total}${breakdown}` : ' · not obtained yet'}`;
   return html`<span class="banner-rateup${got ? ' got' : ''}" data-tip="${tipHtml}" aria-label="${label}">
-    ${rateUpIcon(got)}<span class="ellipsis">${names}</span>${rateUpPotential(b.kind, b.info.rateUpIds, b.poolId)}${total > 1 ? html`<span class="rateup-count">×${total}</span>` : ''}
+    ${rateUpIcon(got)}<span class="ellipsis">${many ? names : rateUpNames(b.kind, b.info.rateUpNames, b.info.rateUpIds)}</span>${rateUpPotential(b.kind, b.info.rateUpIds, b.poolId)}${total > 1 ? html`<span class="rateup-count">×${total}</span>` : ''}
   </span>`;
 }
 
@@ -313,7 +329,7 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
       ${img}
       <div class="banner-art-text">
         <div class="banner-name ellipsis">${c.name}</div>
-        ${c.rateUpNames.length ? html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${c.rateUpNames.join(', ')}</span>${rateUpPotential(c.kind, c.rateUpIds.length ? c.rateUpIds : rateUpIdsOf(c.kind, c.poolId, c.rateUpNames), c.poolId)}</span>` : ''}
+        ${c.rateUpNames.length ? html`<span class="banner-rateup">${rateUpIcon()}<span class="ellipsis">${rateUpNames(c.kind, c.rateUpNames, c.rateUpIds)}</span>${rateUpPotential(c.kind, c.rateUpIds.length ? c.rateUpIds : rateUpIdsOf(c.kind, c.poolId, c.rateUpNames), c.poolId)}</span>` : ''}
       </div>
     </div>
     <div class="unpulled-body">

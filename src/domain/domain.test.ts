@@ -15,7 +15,7 @@ import {
   rateUpPmf,
 } from './pity';
 import scheduleSnapshot from '../data/schedule.snapshot.json';
-import { discordText, guessServer, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
+import { discordText, guessServer, headhuntingRow, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
 import type { BannerDb, PullHistory } from './types';
 import { fmtSkillValue, parseMarkup, skillSets, splitPlaceholders, wikiId } from './wiki';
 import { endministratorOf, extrasOf, ownedItems } from './owned';
@@ -284,6 +284,19 @@ describe('banner schedule', () => {
     expect(guessServer(-240)).toBe('americas'); // UTC-4
     expect(guessServer(60)).toBe('americas'); // UTC+1 (Europe)
     expect(guessServer(480)).toBe('asia'); // UTC+8
+  });
+
+  it('puts the Chartered banner first in the Headhunting row', () => {
+    const b = (name: string, kind: ScheduleBanner['kind']): ScheduleBanner => ({ ...banner(null, null), name, kind });
+    const names = (list: ScheduleBanner[]) => list.map((x) => x.name);
+    // Opening order: the re-run and the special opened before the Chartered banner, or after it.
+    const live = [b('rerun', 'refactor'), b('special', 'special'), b('new', 'chartered'), b('rerun2', 'refactor')];
+    expect(names(headhuntingRow(live))).toEqual(['new', 'rerun', 'rerun2', 'special']);
+    expect(names(headhuntingRow(live, 1))).toEqual(['new']);
+    expect(names(headhuntingRow(live, 2))).toEqual(['new', 'rerun2']);
+    expect(headhuntingRow(live, 0)).toEqual([]);
+    expect(names(headhuntingRow([b('old', 'chartered'), b('rerun', 'refactor')], 1))).toEqual(['old']);
+    expect(names(headhuntingRow([b('a', 'chartered'), b('z', 'chartered'), b('rerun', 'refactor')], 2))).toEqual(['a', 'z']);
   });
 
   it('has the same dated opening 13 hours apart on the two servers', () => {

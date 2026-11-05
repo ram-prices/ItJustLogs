@@ -349,6 +349,8 @@ function page(route: Route): Html {
         : html`Nothing lives at <b>/${route.short}</b>. <a href="/">Go home</a>, or browse <a href="${infoHref('char')}">operators</a> and <a href="${infoHref('weap')}">weapons</a>.`,
     );
   }
+  // Banner cards link rate-up weapons that have a page (rateUpNames).
+  if (route.page === 'home' || (route.page === 'arsenal' && !route.info)) slugsOf('weap', draw);
   if (route.page === 'home') return homePage(withWikiEnds(state.schedule, wikiFile<EventRewardsFile>('events.json', draw).data), currentServer(), a, draw);
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);

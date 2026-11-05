@@ -209,6 +209,15 @@
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
 }
+/* A rate-up's name opens its Database page. */
+.rateup-link {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+.rateup-link:hover {
+  text-decoration: underline;
+}
 .banner-rateup .rateup-icon {
   font-size: 17px;
   color: rgba(255, 255, 255, 0.75);

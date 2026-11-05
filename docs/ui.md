@@ -207,7 +207,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     Every saved picture is kept (last 12, `SavedAvatar` in store.ts, this
     browser only) under Saved pictures, to use again or delete.
     Pages live in `ui/pages/` (`home.ts` = the schedule: banners open now
-    with your pity and rate-up status, events now, coming up, and a
+    with your pity and rate-up status (Headhunting: Chartered first, then RE-Factor, then the rest, `headhuntingRow` in domain/schedule.ts, and a limit never drops a Chartered banner for a re-run), events now, coming up, and a
     version/banner/event timeline; works without an import; anything with
     `data-link` or `data-card-image` gets a right-click / long-press menu
     (`installCopyMenu`: Copy link, Copy banner card, or Share banner card on phones, via `ui/cardImage.ts`); `kind.ts` = operators/arsenal: every banner as a fixed-height card
@@ -230,6 +230,9 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
 
 - Art header (`.wiki-hero.art-hero.has-art`, collections.css), shared by event pages and banner pages (`.banner-hero`): the art fills the header (at least `clamp(260px, 30vw, 340px)`, 220px on phones; taller when the text needs it), `object-fit: cover` anchored at the bottom (banner art at 30% from the top, where the game's layouts put the face); its own vignette runs into the page, plus a 56px `--background-100` fade (`::after`; in light a long eased one, 56% of the header, since dark art over a short fade reads as a grey band) and a dark scrim behind the white text (stronger in light; `closest-side`, so it reaches nothing before its box ends and leaves no edge). Art that fails to load drops `has-art` (`installImageFallback`), leaving a plain header. Basic Headhunting's flat art has lettering beside the faces, so its header uses `HERO_ART` in kind.ts: ef-assets `banners/game/standard.webp`, the same art with the lettering painted out; its card keeps the flat file.
 - Skeletons: pictures with a fixed box (hero art, portraits, operator cards, tiles, banner art, Home thumbnails, ruler heads; the `:is()` list in components.css) show `--skeleton` with a `--skeleton-shine` band until `installImageReady` (common.ts) marks them `.img-ready`, on load, or before paint for a redraw's pictures already in memory. New picture kinds go in both lists (the shimmer and the reduced-motion one).
+- Rate-up names on banner cards (`rateUpNames` in kind.ts) link to the Database page: operators always, weapons once weapons.json shows they have one (app.ts loads it on Home and the Arsenal banner list). Joint banners' "N rate-ups" stays text.
+- Home's list cards (`.sched-next-list`) have no vertical padding, so an event row's art reaches the card's edges; `.evt-strip` overscans the row by 32px so its blur never thins out at an edge.
+- Event headers (`.event-hero`) have no parallax, in CSS and `parallax.ts`; `heroFade.ts` only schedules frames on pages with a pinned picture.
 - Empty states: `emptyState(icon, text, { cls, hidden, action })` in components.ts, `.empty-state` in banners.css: one icon and one line inside the panel, wherever a panel has nothing yet and for empty searches (`cls: 'list-search-empty', hidden: true`). `icon` is a Material name or an `Html` mark.
 - Home cards lift 2px with a stronger tint glow (150ms, `@media (hover: hover)`, loadout.css), not while Customize is on. Event rows with art draw it blurred behind the row (`.evt-strip`, home.css); the thumbnail or icon stays.
 - Pity rulers: a 5px track holding two 2px lines; crowded rulers (over `MAX_FULL_PINS`) mark each 6★ with a small emblem in its pity heat. Stats: the weekly chart's 6★ mark is the emblem, and data hints use `data-tip`, not `title`.
