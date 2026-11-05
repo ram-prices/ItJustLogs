@@ -22,7 +22,7 @@ import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
-import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
+import { finalStrikeSort, operatorInfoPage, operatorInfoTitle, resetOpSettle } from './pages/operator';
 import { installStorage, openArtViewer, resetArtPick, shuffleArt, storageAction } from './pages/art';
 import { openPotentialArtPicker } from './pages/potentialArt';
 import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
@@ -464,6 +464,7 @@ function draw(): void {
   // Banner cards fade in when a page opens, not again on every redraw.
   if (key !== lastKey) {
     resetCardEntrance();
+    resetOpSettle();
     // Operator pages pick a new random picture each time they open.
     resetArtPick();
     openedAt = Date.now();

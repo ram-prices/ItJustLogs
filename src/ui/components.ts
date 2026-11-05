@@ -225,6 +225,23 @@ export function operatorCard(id: string): Html {
   return html`<img class="op-card-img" src="${operatorCardUrl(id)}" alt="" loading="lazy" decoding="async" data-fallback data-alt="${itemIconUrl('char', id)}" data-alt-class="portrait" />`;
 }
 
+/**
+ * The operator cards' results-screen strips (database.css) are CSS backgrounds, so `data-fallback` can't see a
+ * failed load: probe them once, when the grid first draws, and point any that fail at the other mirror.
+ */
+let stripsProbed = false;
+export function probeGachaStrips(): void {
+  if (stripsProbed) return;
+  stripsProbed = true;
+  const pieces = { '6-glow': 'strip-6-glow-sm', '6-foot': 'strip-6-sm', '6-band': 'strip-6-2-sm', '5-glow': 'strip-5-glow-sm', '5-foot': 'strip-5', '5-band': 'strip-5-2-sm', '4-glow': 'strip-4-glow-sm', '4-foot': 'strip-4', rainbow: 'particle-rainbow', band: 'particle-band', sweep: 'particle-sweep' };
+  for (const [key, file] of Object.entries(pieces)) {
+    const url = `${EF_ASSETS_CDN}/ui/gacha/${file}.webp`;
+    const probe = new Image();
+    probe.onerror = () => document.documentElement.style.setProperty(`--gacha-${key}`, `url(${mirrorUrl(url)})`);
+    probe.src = url;
+  }
+}
+
 /** A weapon type's game icon (Sword, Polearm...) in the text's colour; nothing until icons load. */
 export function weaponTypeIcon(type: string): Html {
   const src = iconOf('weapon-types', type);

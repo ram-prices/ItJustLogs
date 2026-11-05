@@ -826,11 +826,13 @@ select.input {
 .fs-sort .icon {
   font-size: 16px;
 }
-.fs-table th.num .fs-sort {
-  margin-left: auto;
-}
-.fs-table th.num {
+/* Numbers right-aligned under their labels: th + button padding equals the td's, and the active
+   column's arrow goes left of its label, so the label's right edge stays on the numbers'. */
+.fs-table :is(th, td).num {
   text-align: right;
+}
+.fs-table th.num .fs-sort {
+  flex-direction: row-reverse;
 }
 .fs-op {
   display: inline-flex;
@@ -855,6 +857,9 @@ select.input {
   }
   .fs-table th {
     padding: 0 4px;
+  }
+  .fs-sort {
+    padding: 6px;
   }
 }
 .table .right {
@@ -1019,10 +1024,12 @@ select.input {
   .ruler-mark:hover {
     transform: translateX(-50%) !important;
   }
+  .op-card-fx,
+  .op-card-sweep,
+  .op-card-rainbow {
+    display: none;
+  }
   .ruler-pin:hover :is(.ruler-tick, .ruler-dot) {
     transform: none !important;
-  }
-  .op-card.r6 .op-card-art::before {
-    content: none !important;
   }
 }
