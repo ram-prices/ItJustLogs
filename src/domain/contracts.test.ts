@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   blockOf,
+  currentSeason,
   decodeShareCode,
   EMPTY_SELECTION,
   encodeShareCode,
@@ -84,6 +85,16 @@ describe('season dates', () => {
     expect(ids('2026-11-06T00:00:00Z')).toEqual(['indigo', 'next', 're-ignition']);
     expect(ids('2026-12-20T00:00:00Z')).toEqual(['next', 'indigo', 're-ignition']);
     expect(ids('2027-06-01T00:00:00Z')).toEqual(['next', 'indigo', 're-ignition']);
+  });
+});
+
+describe('current season', () => {
+  it('is the running one, else the next, else none', () => {
+    const next = season('next', '2027-03-01', '2027-03-08', '2027-03-20', '2027-03-27');
+    const on = (t: string, list = [old, indigo, next]) => currentSeason(list, ms(t), 'asia')?.id;
+    expect(on('2026-11-28T00:00:00Z')).toBe('indigo');
+    expect(on('2026-12-20T00:00:00Z')).toBe('next');
+    expect(on('2026-12-20T00:00:00Z', [old, indigo])).toBeUndefined();
   });
 });
 

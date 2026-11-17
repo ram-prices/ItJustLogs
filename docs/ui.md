@@ -181,7 +181,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     Home is widgets (`ui/pages/homeWidgets.ts`, settings `home`: type, width
     4/6/8/12 of a 12-column grid, own settings; unset = the schedule as
     before): the schedule's four sections, Pity, 6★ history, Latest pulls,
-    Stats, Collection, Note and Character card (an operator, one of their
+    Stats, Collection, Contingency Contract (`contractSection` in home.ts, Current's row look: the running season, else the next, hidden with none or with `showContracts` off; loads only cc/index.json, and the season file when the picker has a saved selection for it), Note and Character card (an operator, one of their
     pictures, title, note, chosen facts) and Empty space (full width, height
     dragged). Customize: drag to move (near a widget's top or bottom stacks
     it in that widget's column; into empty room in a row it lands there at

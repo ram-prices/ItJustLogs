@@ -11,6 +11,7 @@ import {
   seasonsInOrder,
   seasonStatus,
   STATUS_LABEL,
+  STATUS_TONE,
   toggle,
   totalOf,
   type Criterion,
@@ -19,7 +20,6 @@ import {
   type Season,
   type SeasonFile,
   type SeasonIndex,
-  type SeasonStatus,
   type Selection,
 } from '../../domain/contracts';
 import { SERVER_LABEL, timeOn, type Server, type ServerTimes } from '../../domain/schedule';
@@ -41,7 +41,6 @@ import { external, wikiFile } from './info';
 const NOT_KNOWN = 'Not yet known';
 
 const asset = (path: string): string => `${EF_ASSETS_CDN}/${path}`;
-const STATUS_TONE: Record<SeasonStatus, 'green' | 'amber' | 'blue' | 'gray'> = { live: 'green', shop: 'amber', upcoming: 'blue', ended: 'gray' };
 
 const statusBadge = (s: Season, now: number, server: Server): Html => {
   const status = seasonStatus(s, now, server);

@@ -133,6 +133,7 @@ export interface SeasonFile {
 export type SeasonStatus = 'upcoming' | 'live' | 'shop' | 'ended';
 
 export const STATUS_LABEL: Record<SeasonStatus, string> = { upcoming: 'Upcoming', live: 'Live', shop: 'Shop only', ended: 'Ended' };
+export const STATUS_TONE: Record<SeasonStatus, 'green' | 'amber' | 'blue' | 'gray'> = { live: 'green', shop: 'amber', upcoming: 'blue', ended: 'gray' };
 
 export function seasonStatus(s: Season, now: number, server: Server): SeasonStatus {
   if (now < timeOn(s.start, server)!) return 'upcoming';
@@ -168,6 +169,12 @@ export function seasonsInOrder(list: Season[], now: number, server: Server): Sea
   const coming = newest.filter((s) => seasonStatus(s, now, server) === 'upcoming').at(-1);
   const lead = open ?? coming ?? newest[0];
   return lead ? [lead, ...newest.filter((s) => s !== lead)] : [];
+}
+
+/** The running season, else the next: Home's. Null once every season is over. */
+export function currentSeason(list: Season[], now: number, server: Server): Season | null {
+  const lead = seasonsInOrder(list, now, server)[0];
+  return lead && seasonStatus(lead, now, server) !== 'ended' ? lead : null;
 }
 
 // ---------------------------------------------------------------------------

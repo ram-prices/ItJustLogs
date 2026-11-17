@@ -1,5 +1,6 @@
 import type { Analysis, BannerSummary } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId, cdnUrl } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, cdnUrl, EF_ASSETS_CDN } from '../../domain/banners';
+import { currentSeason, encodeShareCode, nextDate, phaseOf, seasonStatus, STATUS_LABEL, STATUS_TONE, totalOf, type SeasonFile, type SeasonIndex } from '../../domain/contracts';
 import type { EventRewards, EventRewardsFile } from '../../domain/eventRewards';
 import {
   KIND_LABEL,
@@ -17,11 +18,13 @@ import {
   type ScheduleItem,
   type Server,
 } from '../../domain/schedule';
+import { state } from '../../state';
+import { loadContractPicks } from '../../store';
 import { tip, tipNote, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
-import { backgroundSource, heat, icon, layeredArt } from '../components';
+import { backgroundSource, badge, heat, icon, layeredArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
 import { hourglass, rateUpChip, rateUpIcon, rateUpIdsOf, rateUpNames, rateUpOwned, rateUpPotential } from './kind';
 import { bannerHref, wikiFile } from './info';
@@ -176,6 +179,50 @@ function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Sched
     </div>
     <div class="sched-next-when">${rowWhen(timeOn(e.start, server), timeOn(e.end, server), now)}</div>
   </a>`;
+}
+
+/**
+ * The running Contingency Contract season, laid out as an event row, and the
+ * player's saved selection under it. Only cc/index.json loads here; the season
+ * file (points, share code) only when there's a selection to show.
+ */
+function contractSection(now: number, server: Server, redraw: () => void): Html | null {
+  if (state.settings.showContracts === false) return null;
+  const index = wikiFile<SeasonIndex>('index.json', redraw, 'cc').data;
+  const s = index && currentSeason(index.seasons, now, server);
+  const next = s && nextDate(s, now, server);
+  if (!s || !next) return null;
+  const status = seasonStatus(s, now, server);
+  const ids = loadContractPicks()[s.id]?.ids ?? [];
+  const file = ids.length ? wikiFile<SeasonFile>(`seasons/${s.id}.json`, redraw, 'cc').data : null;
+  const open = file?.criteria.filter((c) => c.unlockPhase <= phaseOf(s, now, server)).length ?? s.criteria;
+  const link = `/contracts/${s.id}`;
+  const code = file ? encodeShareCode(file.criteria, ids, file.grid.cols) : '';
+  return html`<div class="section">
+    <div class="section-head"><h2 class="heading-20">Contingency Contract</h2></div>
+    <div class="card sched-next-list">
+      <a class="sched-next evt" href="${link}" data-link="${link}" data-tip="${tip(s.name, [tipNote(s.desc)])}">
+        <img class="evt-strip" src="${EF_ASSETS_CDN}/${s.banner}" alt="" loading="lazy" decoding="async" data-fallback />
+        <div class="sched-thumb evt-art">
+          <img src="${EF_ASSETS_CDN}/${s.banner}" alt="" loading="lazy" decoding="async" data-fallback />
+          <span class="evt-art-type"><img class="cc-home-logo" src="${EF_ASSETS_CDN}/cc/art/logo.webp" alt="" loading="lazy" decoding="async" data-fallback /></span>
+        </div>
+        <div class="sched-next-text min0">
+          <div class="sched-next-name ellipsis">${s.name}</div>
+          <div class="sched-next-meta ellipsis"><span>${open < s.criteria ? `${open} of ${s.criteria}` : s.criteria} criteria</span></div>
+          <div class="sched-next-tags">${badge(STATUS_LABEL[status], STATUS_TONE[status])}</div>
+        </div>
+        <div class="sched-next-when"><b>${next.label.toLowerCase()} in ${span(next.at - now)}</b><span class="tertiary">${when(next.at)}</span></div>
+      </a>
+      ${file
+        ? html`<div class="cc-home-pick">
+            <span>Your selection: <b>${totalOf(file.criteria, ids)} points</b></span>
+            <code class="cc-home-code">${code}</code>
+            <button type="button" class="btn secondary sm" data-action="copy-code" data-value="${code}">${icon('content_copy')}Copy</button>
+          </div>`
+        : ''}
+    </div>
+  </div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -559,6 +606,7 @@ export function homePage(schedule: Schedule, server: Server, a: Analysis | null,
                 <div class="card sched-next-list">${liveEvents.map((e) => eventRow(e, now, server, schedule, rewardsOf(e)))}</div>
               </div>`
             : null,
+          contracts: () => contractSection(now, server, redraw),
           upcoming: next.length
             ? html`<div class="section">
                 <div class="section-head"><h2 class="heading-20">Upcoming</h2></div>

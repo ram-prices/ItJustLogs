@@ -226,6 +226,35 @@ a.sched-next:hover {
   color: var(--gray-900);
 }
 /* An event row's third line: its tags (Limited/Permanent, Daily Rewards and how long to start them, Unique). */
+/* The Contingency Contract row: the mode's logo where an event has its type icon, then the saved selection. */
+.cc-home-logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.sched-thumb.evt-art img.cc-home-logo {
+  width: 18px;
+  height: 18px;
+}
+.cc-home-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  box-shadow: 0 -1px 0 var(--gray-alpha-200);
+  font: 400 13px/20px var(--font-sans);
+  color: var(--gray-900);
+}
+.cc-home-pick b {
+  color: var(--gray-1000);
+  font-weight: 600;
+}
+.cc-home-code {
+  margin-left: auto;
+  font: 400 13px/20px var(--font-mono);
+  color: var(--gray-1000);
+}
 .sched-next-tags {
   display: flex;
   flex-wrap: wrap;
@@ -431,6 +460,9 @@ a.sched-next:hover {
     flex-direction: row;
     gap: 6px;
     align-items: baseline;
+  }
+  .cc-home-code {
+    margin-left: 0;
   }
 }
 

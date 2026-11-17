@@ -28,6 +28,8 @@ export interface ScheduleParts {
   /** The banners open now: Headhunting's and Arsenal's newest `char` and `weap` (undefined: all), re-runs or not. */
   banners: (char?: number, weap?: number, reruns?: boolean) => Html | null;
   events: Html | null;
+  /** The running Contingency Contract season; null with no season, or the tab switched off. A function: it loads data, so only a placed widget should. */
+  contracts: () => Html | null;
   upcoming: Html | null;
   timeline: Html | null;
 }
@@ -110,6 +112,7 @@ const WIDGETS: Record<string, WidgetDef> = {
     render: (w, c) => c.parts.banners(w.char, w.weap, w.reruns !== false),
   },
   events: { label: 'Current events', about: 'Events running now.', size: 12, render: (_, c) => c.parts.events },
+  contracts: { label: 'Contingency Contract', about: 'The running season, its next date and your saved selection.', size: 12, render: (_, c) => c.parts.contracts() },
   upcoming: { label: 'Upcoming', about: 'Banners and events coming next.', size: 12, render: (_, c) => c.parts.upcoming },
   timeline: { label: 'Timeline', about: 'Versions, banners and events on a timeline.', size: 12, render: (_, c) => c.parts.timeline },
   pity: { label: 'Pity', about: 'Your 6★ pity and rate-up guarantees right now.', size: 6, pulls: true, render: (_, c) => pityWidget(c.a!) },
@@ -134,6 +137,7 @@ const SPACER_MIN = 16;
 const DEFAULT_HOME: HomeWidget[] = [
   { id: 'banners', type: 'banners', size: 12 },
   { id: 'events', type: 'events', size: 12 },
+  { id: 'contracts', type: 'contracts', size: 12 },
   { id: 'upcoming', type: 'upcoming', size: 12 },
   { id: 'timeline', type: 'timeline', size: 12 },
 ];

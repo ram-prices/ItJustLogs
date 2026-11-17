@@ -959,6 +959,10 @@ async function onClick(e: MouseEvent): Promise<void> {
       return syncNow();
     case 'sync-signout':
       return signOut();
+    case 'copy-code': {
+      const ok = await copyText(el.dataset.value!);
+      return toast(ok ? 'Share code copied.' : "Couldn't copy the code.", ok ? 'info' : 'error');
+    }
     case 'copy-link':
       toast((await copyText(el.dataset.value!)) ? 'Link copied.' : "Couldn't copy the link.", 'info');
       break;
