@@ -108,7 +108,10 @@ const files = new Map<string, Loaded<unknown> & { loading: boolean; waiting: Set
 
 /**
  * The wiki file if it's loaded; starts loading it if not, and redraws (with
- * every `redraw` asked for while it loaded) when it's in.
+ * every `redraw` asked for while it loaded) when it's in. A failure redraws
+ * once (loading → failed); while the file is still failing (loadWikiFile
+ * negative-caches the rejection for a minute) redraws don't, so a bad file
+ * can't redraw the page on every redraw.
  */
 export function wikiFile<T>(file: string, redraw: () => void, dir = 'wiki'): Loaded<T> {
   const key = dir === 'wiki' ? file : `${dir}/${file}`;
@@ -118,21 +121,24 @@ export function wikiFile<T>(file: string, redraw: () => void, dir = 'wiki'): Loa
   if (!f.data && !f.loading) {
     const entry = f;
     entry.loading = true;
-    entry.failed = false;
-    const done = () => {
+    const wasFailed = entry.failed;
+    const settle = (redrawNow: boolean) => {
       entry.loading = false;
+      // Always clear (a repeated failure can't grow it); a later success is
+      // always preceded by a call that re-adds the current redraws.
       const fns = [...entry.waiting];
       entry.waiting.clear();
-      fns.forEach((fn) => fn());
+      if (redrawNow) fns.forEach((fn) => fn());
     };
     loadWikiFile<T>(file, dir).then(
       (d) => {
         entry.data = d;
-        done();
+        entry.failed = false;
+        settle(true);
       },
       () => {
         entry.failed = true;
-        done();
+        settle(!wasFailed);
       },
     );
   }

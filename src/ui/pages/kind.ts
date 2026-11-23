@@ -28,15 +28,6 @@ const LUCK_COLOR: Record<LuckTier, string> = {
 };
 const luckWord = (t: LuckTier): Html => html`<span class="luck-word" style="color:${LUCK_COLOR[t]}">${LUCK_LABEL[t]}</span>`;
 
-/**
- * A 6★ that dropped early is a win worth marking: operators under pity 20 (of
- * 80), Arsenal on its first set of ten (of 4). Free pulls have no pity, so they
- * never count.
- */
-const LUCKY_PITY = 20;
-const isLucky = (p: AnalyzedPull): boolean =>
-  p.rarity === 6 && p.pity !== null && !p.isFree && (p.kind === 'weap' ? p.pity === 1 : p.pity < LUCKY_PITY);
-
 /** Corner marks on a 6★ tile: a "new" sparkle (top left) and a rate-up chevron (top right, the banner's colour). */
 const sixFlags = (isNew: boolean, isRateUp: boolean): Html =>
   html`${isNew ? html`<span class="six-flag new" role="img" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isRateUp ? html`<span class="six-flag rateup" role="img" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}`;
@@ -251,22 +242,20 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
   }
   const max = kind === 'char' ? 80 : WEAPON_PITY_SETS;
   const open = sixOpen.has(kind);
-  // The one-time light-up (banners.css): a winning tile — a rate-up, a "new"
-  // copy or a lucky drop — blooms in its accent colour, staggered among the
-  // winners (--win-i, capped so the strip settles within a second), while each
-  // winner's own portrait gets the same diagonal shimmer band, all at once
-  // (no stagger: every tile's band sweeps together). It plays once per page
-  // open (lit, reset with the card entrances) and keeps its class through the
-  // startup's redraws; under reduced motion the CSS skips it.
-  const winOf = (g: AnalyzedPull[]): boolean =>
-    (g.some((x) => x.isNew) || g.some((x) => x.isRateUp) || g.some(isLucky)) && litNow(g.map((x) => x.itemId).join('|'));
+  // The one-time shimmer (banners.css six-shimmer): only a rate-up tile gets
+  // the diagonal light band across its portrait; new-only and lucky-only tiles
+  // keep their corner marks but don't shimmer. The band ripples down the strip
+  // (--win-delay, measured by sixShimmerCascade after render: top-left tiles
+  // first, bottom-right last). It plays once per page open (lit, reset with
+  // the card entrances) and keeps its class through the startup's redraws;
+  // under reduced motion the CSS skips it.
+  const winOf = (g: AnalyzedPull[]): boolean => g.some((x) => x.isRateUp) && litNow(g.map((x) => x.itemId).join('|'));
   const items = [
     ...groups.map((g) => ({ ts: g[0].ts, seq: g[0].seq, g, t: null as TokenEntry | null })),
     ...tokens.map((t) => ({ ts: t.ts, seq: t.seq, g: null, t })),
   ]
     .sort((x, y) => y.ts - x.ts || y.seq - x.seq)
     .map((it) => ({ ...it, win: it.g ? winOf(it.g) : false }));
-  let winI = 0; // Each winner's place among the winners, for the bloom's stagger.
   return html`<div class="section six-section${open ? ' open' : ''}" data-kind="${kind}">
     <div class="section-head">
       <h2 class="heading-20">${withStars('6★ history')}</h2>
@@ -297,12 +286,10 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         const title = (x: AnalyzedPull) => tip(x.name, [tipRow('Banner', x.bannerName), tipRow('Date', fmtDate(x.ts, true))]);
         // The win marks: a "new" sparkle and a rate-up chevron in the portrait's
         // corners (on a shared set, each weapon's own — the chevron on its rate-up,
-        // a star on each new copy); a 6★ that dropped early (lucky) is a winning
-        // kind too, so it blooms in green.
+        // a star on each new copy).
         const isNew = g.some((x) => x.isNew);
         const flags = sixFlags(isNew, !!up);
-        const winStyle = win ? `--win-i:${Math.min(winI++, 5)};--win-glow:${up ? 'var(--six-tint, var(--r6))' : isNew ? 'var(--amber)' : 'var(--green)'};` : '';
-        const style = [known ? `--six-tint:${known}` : '', winStyle].filter(Boolean).join(';');
+        const style = known ? `--six-tint:${known}` : '';
         const tintAttrs = raw(
           [
             tintUrl ? `data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : '',
@@ -333,7 +320,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
 
 /**
  * The per-tile shimmer's diagonal cascade (banners.css six-shimmer): each
- * winning tile's band is delayed by its diagonal position (top + left), so the
+ * rate-up tile's band is delayed by its diagonal position (top + left), so the
  * sweep ripples from the top-left tile to the bottom-right one; tiles on the
  * same diagonal share a delay. Measured after the strip is in the DOM (call
  * from draw, like tintSixStrip); the band still rests off the edge, so a
@@ -422,7 +409,7 @@ export function installCardGlow(): void {
 /**
  * Cards that have played their fade-in since the page opened: a redraw
  * (data loading, sync, a setting) draws them without it. The 6★ strip's
- * winning tiles and the banner page's highlight (hl:) light up once on the
+ * rate-up tiles and the banner page's highlight (hl:) light up once on the
  * same opening; the startup's redraws (image and snapshot loads, the
  * ef-assets refreshes) land within the light-up, so a lit key keeps its
  * class for LIT_MS — longer than the whole effect — and goes static after.
@@ -967,7 +954,7 @@ function pullRow(b: BannerSummary, p: AnalyzedPull): Html {
     ${hasLuck ? raw(`data-action="luck" data-key="${p.key.replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="${String(open)}"`) : ''}>
     <span class="pull-no num">${p.bannerPull ?? '–'}</span>
     <div class="item">${itemImg(p.kind, p.itemId)}<div class="item-name">
-      <span class="ellipsis">${p.name}</span>${p.isRateUp && p.rarity === 6 ? html`<span class="pull-tag rateup${p.kind === 'weap' ? ' weap' : ''}" role="img" title="Rate-up" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}${p.isNew ? html`<span class="pull-tag new" role="img" title="New" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isLucky(p) ? html`<span class="pull-lucky" title="Dropped early">lucky · ${p.pity!}</span>` : ''}${p.pity === null ? badge('Free', 'outline') : ''}
+      <span class="ellipsis">${p.name}</span>${p.isRateUp && p.rarity === 6 ? html`<span class="pull-tag rateup${p.kind === 'weap' ? ' weap' : ''}" role="img" title="Rate-up" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}${p.isNew ? html`<span class="pull-tag new" role="img" title="New" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${p.pity === null ? badge('Free', 'outline') : ''}
     </div></div>
     <span class="pull-pity num" style="${p.rarity === 6 && p.pity !== null ? `color:${heat(p.pity, b.pity.max)}` : 'color:var(--gray-700)'}">${p.pity ?? '–'}</span>
     ${SHOW_LUCK ? html`<span class="pull-luck num">${luck !== undefined && p.outcome !== 'guaranteed' ? html`<span style="color:${luck < 0.25 ? 'var(--green)' : luck > 0.75 ? 'var(--red)' : 'inherit'}">${(luck * 100).toFixed(1)}%</span>` : html`<span class="tertiary">–</span>`}</span>` : ''}

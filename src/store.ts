@@ -496,24 +496,41 @@ async function refreshFile<T>(file: string, key: string): Promise<T | null> {
 /**
  * Wiki data (ef-assets wiki/*.json, from endfield.wiki.gg). Too big for
  * localStorage, so it's fetched when a wiki page opens and left to the
- * browser's HTTP cache; a failed fetch is retried on the next visit.
+ * browser's HTTP cache; a resolved load stays cached, never refetched. A
+ * failed load is remembered for a minute (WIKI_FAIL_TTL): calls in the
+ * minute get the same rejection without a new request, and once the minute
+ * is up the file is tried again, so a flaky network recovers.
  */
 const wikiFiles = new Map<string, Promise<unknown>>();
+const wikiFailures = new Map<string, number>();
+const WIKI_FAIL_TTL = 60_000;
 
 export function loadWikiFile<T>(file: string, dir = 'wiki'): Promise<T> {
   const key = `${dir}/${file}`;
   let p = wikiFiles.get(key) as Promise<T> | undefined;
+  if (p) {
+    const failedAt = wikiFailures.get(key);
+    if (failedAt !== undefined && Date.now() - failedAt >= WIKI_FAIL_TTL) {
+      // The failure is old enough to retry: drop the cached rejection and fetch again.
+      wikiFiles.delete(key);
+      wikiFailures.delete(key);
+      p = undefined;
+    }
+  }
   if (!p) {
     p = (async () => {
       for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
         try {
           const res = await fetch(`${base}/${key}`, { signal: AbortSignal.timeout(10000) });
-          if (res.ok) return (await res.json()) as T;
+          if (res.ok) {
+            wikiFailures.delete(key);
+            return (await res.json()) as T;
+          }
         } catch {
           /* try the next mirror */
         }
       }
-      wikiFiles.delete(key);
+      wikiFailures.set(key, Date.now());
       throw new Error(`Couldn't load ${key}`);
     })();
     wikiFiles.set(key, p);

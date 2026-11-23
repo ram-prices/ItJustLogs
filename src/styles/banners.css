@@ -1196,8 +1196,6 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .banner-list > .banner,
   .banner-list > .banner .banner-summary::before,
-  .six-item.win > .six-art::before,
-  .six-item.win .six-heads::before,
   .six-item.win > .six-art::after,
   .six-item.win .six-heads::after {
     animation: none;
@@ -1360,20 +1358,6 @@ code {
 }
 .pull-tag.new .icon {
   color: var(--amber);
-}
-/* The "lucky · N" pill on a 6★ that dropped early (kind.ts pullRow). */
-.pull-lucky {
-  display: inline-flex;
-  align-items: center;
-  height: 16px;
-  padding: 0 7px;
-  border-radius: 9999px;
-  margin-left: 4px;
-  font: 600 10px/1 var(--font-sans);
-  color: var(--green);
-  background: var(--green-bg);
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 /* Arsenal: pulls grouped into sets of 10. */
 .pull-set {
@@ -1608,36 +1592,7 @@ code {
   height: 6px;
   border-radius: 50%;
 }
-/* The one-time light-up of a winning 6★ tile (kind.ts sixStrip): a soft bloom in
-   the tile's accent colour (--win-glow: the banner tint for a rate-up, amber for a
-   "new" copy, green for a lucky drop), staggered among the winners (--win-i,
-   capped so the strip settles within a second). It plays once per page open;
-   kind.ts keeps the class through the startup's redraws so the effect finishes,
-   and it is static after. */
-.six-item.win > .six-art::before,
-.six-item.win .six-heads::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 12px;
-  box-shadow: 0 0 18px 4px color-mix(in srgb, var(--win-glow, var(--r6)) 55%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  animation: win-bloom 0.7s ease-out both;
-  animation-delay: calc(min(var(--win-i, 0), 5) * 50ms);
-}
-@keyframes win-bloom {
-  0% {
-    opacity: 0;
-  }
-  40% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-/* The per-tile one-time sweep (kind.ts sixStrip: .win on a winning tile): the
+/* The per-tile one-time sweep (kind.ts sixStrip: .win on a rate-up tile): the
    same diagonal light band as the strip's old sweep, across each tile's own
    portrait (single tiles) or heads oval (shared sets). Diagonal cascade: each
    tile's band is delayed by its diagonal position (--win-delay, set by
