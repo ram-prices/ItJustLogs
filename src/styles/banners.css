@@ -326,7 +326,7 @@
   /* Acrylic panel, after the original's ruler box: a faint frosted plate
      that lets the card's ambient glow through. The sides leave room for half
      a pin or teardrop past the track's ends (the end teardrop needs more). */
-  padding: 8px 26px 2px 16px;
+  padding: 8px 26px 8px 16px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.035);
   backdrop-filter: blur(12px) saturate(1.2);
@@ -686,7 +686,7 @@
 }
 .banner-body > .card-head {
   min-height: 40px;
-  padding-block: 4px;
+  padding-block: 8px;
 }
 .banner-body .table td.grow {
   max-width: 0; /* let the name column shrink and ellipsize */
@@ -1302,7 +1302,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 12px 12px 16px;
+  padding: 8px 12px 12px 16px;
 }
 .pull {
   display: grid;
@@ -1516,32 +1516,39 @@ code {
   pointer-events: none;
 }
 /* Corner marks on a 6★ tile (kind.ts sixFlags): a "new" sparkle top left, a
-   rate-up chevron top right in the banner's colour. They sit on the portrait
-   (single) or the heads oval (shared) and lift with it. */
+   rate-up chevron top right. Each sits on a small dark badge (80% opaque) so
+   it reads over busy operator art; they sit on the portrait (single) or the
+   heads oval (shared) and lift with it. */
 .six-flag {
   position: absolute;
   top: 3px;
   z-index: 1;
   display: inline-grid;
   place-items: center;
-  min-width: 16px;
-  height: 16px;
+  min-width: 18px;
+  height: 18px;
   padding: 0 3px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.7);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.8);
   pointer-events: none;
 }
 .six-flag .icon {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
 }
 .six-flag.new {
   left: 3px;
   color: var(--amber);
 }
+/* The chevron is solid white in a heavier weight (like the other rate-up
+   marks), so it pops over any background; the banner's colour stays on the
+   tile's ring. */
 .six-flag.rateup {
   right: 3px;
-  color: var(--six-tint, var(--r6));
+  color: #fff;
+}
+.six-flag.rateup .icon {
+  font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
 }
 .six-item:hover .six-art {
   transform: translateY(-2px);

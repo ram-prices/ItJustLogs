@@ -28,7 +28,7 @@ const LUCK_COLOR: Record<LuckTier, string> = {
 };
 const luckWord = (t: LuckTier): Html => html`<span class="luck-word" style="color:${LUCK_COLOR[t]}">${LUCK_LABEL[t]}</span>`;
 
-/** Corner marks on a 6★ tile: a "new" sparkle (top left) and a rate-up chevron (top right, the banner's colour). */
+/** Corner marks on a 6★ tile: a "new" sparkle (top left) and a rate-up chevron (top right). Both sit on a dark badge so they read over the art. */
 const sixFlags = (isNew: boolean, isRateUp: boolean): Html =>
   html`${isNew ? html`<span class="six-flag new" role="img" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isRateUp ? html`<span class="six-flag rateup" role="img" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}`;
 

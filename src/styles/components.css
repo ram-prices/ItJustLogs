@@ -368,6 +368,7 @@ main {
   border-radius: 0;
   overflow: visible;
   gap: 32px;
+  padding-top: 12px;
   padding-bottom: 8px;
 }
 .metrics.plain .metric {

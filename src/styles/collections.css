@@ -469,12 +469,12 @@
 /* The page's header in the side column, above the tabs (sideTabs' head): the view
    beside it starts at the top instead of under a header band. */
 main:has(> .collection-layout > .page-header) {
-  padding-top: 40px;
+  padding-top: 48px;
 }
 .collection-layout:has(> .page-header) {
   grid-template-columns: 220px minmax(0, 1fr);
   grid-template-rows: auto 1fr;
-  row-gap: 0;
+  row-gap: 8px;
 }
 .collection-layout > .page-header {
   grid-column: 1;
