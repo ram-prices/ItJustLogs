@@ -14,7 +14,7 @@ import { badge, classIcon, elementIcon, heroGlow, icon, itemImg, operatorCard, p
 import { html, type Html } from '../html';
 import { tip, tipRow } from '../charts';
 import finalStrikes from '../../data/final-strikes.json';
-import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile, type LadderInfo } from './info';
+import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, gameCredit, infoHref, previewPage, previewsOf, loadingOrFailed, ownedOf, ownedSection, ownedTag, rankSlider, rateUpCard, rich, sliderRank, statusPage, wikiFile, type LadderInfo } from './info';
 
 /**
  * Operator info pages (/database/operators and /database/operators/<name>): class,
@@ -545,7 +545,7 @@ function breakpointsTable(o: WikiOperator, u: UltimateEnergy, uge: number): Html
  * Attributes and Loadout as three columns, skills and talents, the player's
  * Storage (when they own the operator) and the profile.
  */
-function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a: Analysis | null, redraw: () => void): Html {
+function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a: Analysis | null, redraw: () => void, gameOps: Record<string, WikiOperator> | null): Html {
   const owned = ownedOf(a, 'char')?.get(id);
   const bonuses = bonusesFor(id, o, a, redraw);
   const stats = statsSection(id, o, bonuses, owned?.copies ? owned.potential : null);
@@ -572,7 +572,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
             </div>`}
       ${owned?.copies ? html`<section class="section wiki-storage">${storageBox(id, o.name, redraw)}</section>` : ''}
       ${profileSection(o)}
-      ${credit(attribution, o.page)}
+      ${gameOps?.[id] ? gameCredit() : credit(attribution, o.page)}
     </main>`;
 }
 
@@ -603,7 +603,10 @@ export function operatorInfoPage(id: string | undefined, a: Analysis | null, red
   const p = !o ? previews?.operators[id] : undefined;
   if (p && previews) return operatorPreview(id, p, previews.attribution);
   if (!o) return statusPage('char', 'Operators', html`There's no wiki data for this operator yet. <a href="${operatorInfoHref()}">See all operators</a>. ${external('https://endfield.wiki.gg/', 'endfield.wiki.gg')} may have it.`);
-  return detailPage(wikiId(id), o, file.attribution, a, redraw);
+  // The game-tables override (operators the wiki has no numbers for yet): its
+  // operators' footer credits the game's tables, not the wiki snapshot.
+  const game = wikiFile<Record<string, WikiOperator>>('operators-game.json', redraw);
+  return detailPage(wikiId(id), o, file.attribution, a, redraw, game.data);
 }
 
 /** Tab title for the operator info pages. */

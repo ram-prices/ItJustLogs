@@ -1195,7 +1195,11 @@ code {
 }
 @media (prefers-reduced-motion: reduce) {
   .banner-list > .banner,
-  .banner-list > .banner .banner-summary::before {
+  .banner-list > .banner .banner-summary::before,
+  .six-item.win > .six-art::before,
+  .six-item.win .six-heads::before,
+  .six-item.win > .six-art::after,
+  .six-item.win .six-heads::after {
     animation: none;
   }
 }
@@ -1357,6 +1361,20 @@ code {
 .pull-tag.new .icon {
   color: var(--amber);
 }
+/* The "lucky · N" pill on a 6★ that dropped early (kind.ts pullRow). */
+.pull-lucky {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 7px;
+  border-radius: 9999px;
+  margin-left: 4px;
+  font: 600 10px/1 var(--font-sans);
+  color: var(--green);
+  background: var(--green-bg);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 /* Arsenal: pulls grouped into sets of 10. */
 .pull-set {
   display: flex;
@@ -1513,6 +1531,34 @@ code {
   font: 600 10px/1 var(--font-sans);
   pointer-events: none;
 }
+/* Corner marks on a 6★ tile (kind.ts sixFlags): a "new" sparkle top left, a
+   rate-up chevron top right in the banner's colour. They sit on the portrait
+   (single) or the heads oval (shared) and lift with it. */
+.six-flag {
+  position: absolute;
+  top: 3px;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+.six-flag .icon {
+  font-size: 12px;
+  line-height: 1;
+}
+.six-flag.new {
+  left: 3px;
+  color: var(--amber);
+}
+.six-flag.rateup {
+  right: 3px;
+  color: var(--six-tint, var(--r6));
+}
 .six-item:hover .six-art {
   transform: translateY(-2px);
 }
@@ -1523,6 +1569,7 @@ code {
   width: auto;
 }
 .six-heads {
+  position: relative;
   display: flex;
   padding: 2px;
   margin: -2px;
@@ -1560,6 +1607,70 @@ code {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+}
+/* The one-time light-up of a winning 6★ tile (kind.ts sixStrip): a soft bloom in
+   the tile's accent colour (--win-glow: the banner tint for a rate-up, amber for a
+   "new" copy, green for a lucky drop), staggered among the winners (--win-i,
+   capped so the strip settles within a second). It plays once per page open;
+   kind.ts keeps the class through the startup's redraws so the effect finishes,
+   and it is static after. */
+.six-item.win > .six-art::before,
+.six-item.win .six-heads::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  box-shadow: 0 0 18px 4px color-mix(in srgb, var(--win-glow, var(--r6)) 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: win-bloom 0.7s ease-out both;
+  animation-delay: calc(min(var(--win-i, 0), 5) * 50ms);
+}
+@keyframes win-bloom {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* The per-tile one-time sweep (kind.ts sixStrip: .win on a winning tile): the
+   same diagonal light band as the strip's old sweep, across each tile's own
+   portrait (single tiles) or heads oval (shared sets). Diagonal cascade: each
+   tile's band is delayed by its diagonal position (--win-delay, set by
+   sixShimmerCascade after render: top-left tiles first, bottom-right last), so
+   the sweep ripples down the strip rather than all at once. The resting
+   position is fully off the right edge, so a tile that never animates
+   (reduced motion, a redraw) shows no trace of it. */
+.six-item.win > .six-art::after,
+.six-item.win .six-heads::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.35) 50%, transparent 68%) no-repeat;
+  background-size: 220% 100%;
+  background-position: -24.67% 0;
+  animation: six-shimmer 0.9s ease-out both;
+  animation-delay: var(--win-delay, 0s);
+}
+.six-item.win .six-heads::after {
+  border-radius: 12px;
+}
+/* The band enters fully off the left (124.67%) and exits fully off the right. */
+@keyframes six-shimmer {
+  from {
+    background-position: 124.67% 0;
+  }
+  to {
+    background-position: -24.67% 0;
+  }
 }
 @media (max-width: 640px) {
   .six-strip {

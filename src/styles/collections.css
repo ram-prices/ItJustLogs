@@ -311,6 +311,61 @@
   margin-top: 16px;
   grid-template-columns: minmax(0, 720px);
 }
+/* The banner page's one-line highlight of its most notable 6★ (kind.ts bannerHighlight). */
+.banner-highlight {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--gray-alpha-100);
+  box-shadow: var(--shadow-border);
+  font: 400 13px/18px var(--font-sans);
+  color: var(--gray-900);
+}
+/* The one-time glow-in of the highlight (kind.ts bannerPage): the same family as
+   the 6★ strip's light-up — the line rises in while a soft gold bloom fades up
+   and settles. It plays once per page open; under reduced motion it just appears. */
+.banner-highlight.enter {
+  animation: highlight-rise 0.8s ease-out both;
+}
+.banner-highlight.enter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 22px 3px color-mix(in srgb, var(--r6) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: highlight-bloom 0.8s ease-out both;
+}
+@keyframes highlight-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes highlight-bloom {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.banner-highlight .icon {
+  font-size: 18px;
+  color: var(--r6);
+  flex-shrink: 0;
+}
+.banner-highlight b {
+  font-weight: 600;
+  color: var(--gray-1000);
+}
 /* The game's banner layouts put the operator's face high. */
 .banner-hero.has-art .wiki-hero-art {
   object-position: center 30%;
@@ -1184,6 +1239,10 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
 @media (prefers-reduced-motion: reduce) {
   .wiki-acc::details-content {
     transition: none;
+  }
+  .banner-highlight.enter,
+  .banner-highlight.enter::before {
+    animation: none;
   }
 }
 .wiki-variant {

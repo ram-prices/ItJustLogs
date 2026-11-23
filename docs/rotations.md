@@ -227,7 +227,7 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   timeline has an Enemy lane with its Staggered stretches (`World.staggers`); a parsed run always has it, its boss's face
   as its name, in both views, even with nothing on it (a recording with no Stagger or mechanic). Cooldowns run through ultimate cut-ins
   (`clockNow`: the game timer does; a video shows a combo back on cooldown across two). Rotations has side tabs:
-  Parser (`/rotations`, also `/rotations/parser`; opens on the newest parsed run) and Simulator (`/rotations/sim`); the old `/rotations/transcript` redirects): a read video's team, enemy
+  Parser (`/rotations`, also `/rotations/parser`; opens on the newest parsed run) and Simulator (`/rotations/sim`); the whole tab is hidden until ticked in Settings → Tabs (`showSim`), the routes still open when typed; the old `/rotations/transcript` redirects): a read video's team, enemy
   (`enemySeen`) and presses, food (setting `videoFood`); its history (Parsed runs) lists recordings only and comes
   first, with Parse gameplay and Import run at its bottom; an opened run shows below it on the page, not in
   a card (its name as a header, date and length under it, its buttons at the right; then Damage per second, Total

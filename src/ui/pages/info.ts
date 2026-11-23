@@ -301,6 +301,18 @@ export function credit(a: WikiAttribution, page?: string): Html {
   </p>`;
 }
 
+/**
+ * The footer for an operator whose numbers the wiki has no set for yet: read
+ * from the game's own tables (the EndfieldData dump) by ef-assets'
+ * scripts/operator-from-game.py, in wiki/operators-game.json.
+ */
+export function gameCredit(): Html {
+  return html`<p class="wiki-credit copy-13">
+    ${icon('menu_book')}
+    <span>Data from the game's tables (${external('https://git.escartem.moe/Endfield/EndfieldData', 'EndfieldData')}).</span>
+  </p>`;
+}
+
 /** Operators › Headhunting, Arsenal › Issues: the banners pages' breadcrumbs. */
 /** Database › Operators › Si (an item's page), or Database › Operators (the list). */
 export function crumbs(kind: Kind, name?: string): Html {

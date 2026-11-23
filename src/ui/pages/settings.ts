@@ -285,7 +285,8 @@ export function settingsPage(redraw: () => void): Html {
       ${group('Tabs', html`<div class="card-body settings-checks">
         <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showEssences" ${raw(s.showEssences ? 'checked' : '')} />Show the Essences tab</label>
         <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showAic" ${raw(s.showAic ? 'checked' : '')} />Show the AIC tab</label>
-        <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showContracts" ${raw(s.showContracts !== false ? 'checked' : '')} />Show the Contracts tab</label>
+        <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showContracts" ${raw(s.showContracts ? 'checked' : '')} />Show the Contracts tab</label>
+        <label class="char-fact-pick"><input type="checkbox" class="check" data-setting="showSim" ${raw(s.showSim ? 'checked' : '')} />Show the Rotations tab</label>
         </div>`)}
 
       ${group('Data', html`<div class="settings-part">

@@ -408,7 +408,7 @@ const foeOf = (key: string) => {
   return enemy ? knownEnemy(enemy) : ENEMIES[0];
 };
 
-/** Rotations: the Simulator (/rotations) and the Parser (/rotations/parser: a gameplay recording's rotation), as side tabs. */
+/** Rotations: the Parser (/rotations: a gameplay recording's rotation) and the Simulator (/rotations/sim), as side tabs. The whole tab is hidden unless ticked in Settings → Tabs (`showSim`); its routes still open when typed. */
 export function rotationsPage(redraw: () => void, view?: string): Html {
   const header = pageHeader('Rotations', 'The whole sim is still very much a work in progress: expect bugs and results that don’t make sense.');
   const index = wikiFile<CombatIndex>('index.json', redraw, 'combat');

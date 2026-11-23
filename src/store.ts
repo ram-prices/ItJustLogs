@@ -159,8 +159,10 @@ export interface Settings {
   /** Header tabs hidden unless ticked in Settings. */
   showEssences?: boolean;
   showAic?: boolean;
-  /** Contracts shows unless switched off. */
+  /** Contracts, hidden unless ticked in Settings. */
   showContracts?: boolean;
+  /** The Rotations tab (Parser and Simulator side tabs), hidden unless ticked in Settings. */
+  showSim?: boolean;
   /** How far that picture reaches beside its circle on each side, in circle widths (cropper.ts). */
   avatarBox?: AvatarBox;
   /** Home's widgets in order; unset = the schedule (homeWidgets.ts DEFAULT_HOME). */

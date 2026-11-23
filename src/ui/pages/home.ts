@@ -187,7 +187,7 @@ function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Sched
  * file (points, share code) only when there's a selection to show.
  */
 function contractSection(now: number, server: Server, redraw: () => void): Html | null {
-  if (state.settings.showContracts === false) return null;
+  if (!state.settings.showContracts) return null;
   const index = wikiFile<SeasonIndex>('index.json', redraw, 'cc').data;
   const s = index && currentSeason(index.seasons, now, server);
   const next = s && nextDate(s, now, server);

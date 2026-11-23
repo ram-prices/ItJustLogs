@@ -18,7 +18,7 @@ import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
 import { installParallax } from './parallax';
 import { installHeroFade } from './heroFade';
 import { syncVideoBackground } from './videoBackground';
-import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
+import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, sixShimmerCascade, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
 import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
@@ -299,7 +299,7 @@ function header(route: Route): Html {
       ${has ? syncButton() : html`<button class="btn secondary sm" data-action="import">${icon('upload_file')}<span class="hide-sm">Import</span></button>`}
     </div>
     <nav class="tabs" aria-label="Sections">
-      ${TABS.filter(([tab]) => (tab !== 'essences' || state.settings.showEssences) && (tab !== 'aic' || state.settings.showAic) && (tab !== 'contracts' || state.settings.showContracts !== false)).map(([tab, label]) => {
+      ${TABS.filter(([tab]) => (tab !== 'essences' || state.settings.showEssences) && (tab !== 'aic' || state.settings.showAic) && (tab !== 'contracts' || state.settings.showContracts) && (tab !== 'rotations' || state.settings.showSim)).map(([tab, label]) => {
         // Database and Pulls open the page the player was last on there. Pulls needs an import.
         const href = tab === 'home' ? '/' : tab === 'database' || tab === 'pulls' ? currentPath(tabViews[tab] ?? SECTION_HOME[tab]) : `/${tab}`;
         const disabled = !has && tab === 'pulls';
@@ -512,6 +512,8 @@ function draw(): void {
   markOverflow();
   tintWeaponCards();
   tintSixStrip();
+  // The 6★ strip's shimmer ripples diagonally: set each winner's delay from its position.
+  sixShimmerCascade();
   tintHeroes();
   syncVideoBackground();
   fitBannerCards();
@@ -800,7 +802,7 @@ function installProfile(): void {
     // Rotations: the team and fight options.
     if (rotations.mod?.simChange(el)) return;
     if (el.dataset?.setting === 'displayName') updateSettings({ displayName: el.value.trim() });
-    if (el.dataset?.setting === 'showEssences' || el.dataset?.setting === 'showAic' || el.dataset?.setting === 'showContracts') updateSettings({ [el.dataset.setting]: el.checked });
+    if (el.dataset?.setting === 'showEssences' || el.dataset?.setting === 'showAic' || el.dataset?.setting === 'showContracts' || el.dataset?.setting === 'showSim') updateSettings({ [el.dataset.setting]: el.checked });
     // Contingency Contract: a share code typed or pasted.
     if (contracts.mod?.contractsChange(el)) return draw();
     // Extra copies (Settings): edit one entry's copies or note.

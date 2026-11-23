@@ -28,6 +28,19 @@ const LUCK_COLOR: Record<LuckTier, string> = {
 };
 const luckWord = (t: LuckTier): Html => html`<span class="luck-word" style="color:${LUCK_COLOR[t]}">${LUCK_LABEL[t]}</span>`;
 
+/**
+ * A 6★ that dropped early is a win worth marking: operators under pity 20 (of
+ * 80), Arsenal on its first set of ten (of 4). Free pulls have no pity, so they
+ * never count.
+ */
+const LUCKY_PITY = 20;
+const isLucky = (p: AnalyzedPull): boolean =>
+  p.rarity === 6 && p.pity !== null && !p.isFree && (p.kind === 'weap' ? p.pity === 1 : p.pity < LUCKY_PITY);
+
+/** Corner marks on a 6★ tile: a "new" sparkle (top left) and a rate-up chevron (top right, the banner's colour). */
+const sixFlags = (isNew: boolean, isRateUp: boolean): Html =>
+  html`${isNew ? html`<span class="six-flag new" role="img" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isRateUp ? html`<span class="six-flag rateup" role="img" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}`;
+
 
 /** Basic Headhunting always leads; everything else is most recent first. */
 const bannersOf = (kind: Kind, a: Analysis) =>
@@ -238,6 +251,22 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
   }
   const max = kind === 'char' ? 80 : WEAPON_PITY_SETS;
   const open = sixOpen.has(kind);
+  // The one-time light-up (banners.css): a winning tile — a rate-up, a "new"
+  // copy or a lucky drop — blooms in its accent colour, staggered among the
+  // winners (--win-i, capped so the strip settles within a second), while each
+  // winner's own portrait gets the same diagonal shimmer band, all at once
+  // (no stagger: every tile's band sweeps together). It plays once per page
+  // open (lit, reset with the card entrances) and keeps its class through the
+  // startup's redraws; under reduced motion the CSS skips it.
+  const winOf = (g: AnalyzedPull[]): boolean =>
+    (g.some((x) => x.isNew) || g.some((x) => x.isRateUp) || g.some(isLucky)) && litNow(g.map((x) => x.itemId).join('|'));
+  const items = [
+    ...groups.map((g) => ({ ts: g[0].ts, seq: g[0].seq, g, t: null as TokenEntry | null })),
+    ...tokens.map((t) => ({ ts: t.ts, seq: t.seq, g: null, t })),
+  ]
+    .sort((x, y) => y.ts - x.ts || y.seq - x.seq)
+    .map((it) => ({ ...it, win: it.g ? winOf(it.g) : false }));
+  let winI = 0; // Each winner's place among the winners, for the bloom's stagger.
   return html`<div class="section six-section${open ? ' open' : ''}" data-kind="${kind}">
     <div class="section-head">
       <h2 class="heading-20">${withStars('6★ history')}</h2>
@@ -247,9 +276,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
       </div>
     </div>
     <div class="six-strip">
-      ${[...groups.map((g) => ({ ts: g[0].ts, seq: g[0].seq, g, t: null as TokenEntry | null })), ...tokens.map((t) => ({ ts: t.ts, seq: t.seq, g: null, t }))]
-        .sort((x, y) => y.ts - x.ts || y.seq - x.seq)
-        .map(({ g, t }) => {
+      ${items.map(({ g, t, win }) => {
         if (t) {
           // Arsenal counts in sets of ten.
           const n = t.at == null ? null : kind === 'weap' ? setOf(t.at) : t.at;
@@ -259,7 +286,6 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         }
         g = g!;
         const p = g[0];
-        const pity = html`<span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
         // Rate-ups are outlined in their banner card's colour: the art's for
         // Headhunting, the weapon's own for Arsenal (as the cards glow).
         // Chartered banners (one rate-up) glow in the operator's colour; Joint ones in their art's.
@@ -268,13 +294,25 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         const byOperator = p.kind === 'char' && p.poolId.startsWith('special_');
         const tintUrl = up ? (up.kind === 'weap' ? itemIconUrl('weap', up.itemId) : byOperator ? itemIconUrl('char', up.itemId) : bannerArtUrl(up.poolId)) : null;
         const known = tintUrl ? sixTintFor(tintUrl) : null;
-        const tintAttrs = tintUrl
-          ? raw(`data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"${known ? ` style="--six-tint:${known}"` : ''}`)
-          : '';
-        const cls = `six-item${up ? ' rateup' : ''}`;
         const title = (x: AnalyzedPull) => tip(x.name, [tipRow('Banner', x.bannerName), tipRow('Date', fmtDate(x.ts, true))]);
+        // The win marks: a "new" sparkle and a rate-up chevron in the portrait's
+        // corners (on a shared set, each weapon's own — the chevron on its rate-up,
+        // a star on each new copy); a 6★ that dropped early (lucky) is a winning
+        // kind too, so it blooms in green.
+        const isNew = g.some((x) => x.isNew);
+        const flags = sixFlags(isNew, !!up);
+        const winStyle = win ? `--win-i:${Math.min(winI++, 5)};--win-glow:${up ? 'var(--six-tint, var(--r6))' : isNew ? 'var(--amber)' : 'var(--green)'};` : '';
+        const style = [known ? `--six-tint:${known}` : '', winStyle].filter(Boolean).join(';');
+        const tintAttrs = raw(
+          [
+            tintUrl ? `data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : '',
+            style ? `style="${style}"` : '',
+          ].filter(Boolean).join(' '),
+        );
+        const cls = `six-item${up ? ' rateup' : ''}${win ? ' win' : ''}`;
+        const pity = html`<span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
         // Portraits open that operator's or weapon's info page.
-        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}</span>${pity}</a>`;
+        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}${flags}</span>${pity}</a>`;
         // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
         const step = 100 / g.length;
         const blend = Math.min(10, step / 3);
@@ -285,12 +323,40 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
           })
           .join(', ');
         return html`<div class="${cls} shared" data-tip="${g.map(title).join('')}" ${tintAttrs}>
-          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}</a>`)}</span></span>
+          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}${sixFlags(x.isNew, x.isRateUp)}</a>`)}</span></span>
           ${pity}
         </div>`;
       })}
     </div>
   </div>`;
+}
+
+/**
+ * The per-tile shimmer's diagonal cascade (banners.css six-shimmer): each
+ * winning tile's band is delayed by its diagonal position (top + left), so the
+ * sweep ripples from the top-left tile to the bottom-right one; tiles on the
+ * same diagonal share a delay. Measured after the strip is in the DOM (call
+ * from draw, like tintSixStrip); the band still rests off the edge, so a
+ * non-animating tile (reduced motion, a redraw) shows no trace.
+ */
+export function sixShimmerCascade(): void {
+  const tiles: { el: HTMLElement; d: number }[] = [];
+  for (const el of document.querySelectorAll<HTMLElement>('.six-item.win')) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0) tiles.push({ el, d: r.top + r.left });
+  }
+  if (tiles.length < 2) return;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const t of tiles) {
+    if (t.d < min) min = t.d;
+    if (t.d > max) max = t.d;
+  }
+  const span = max - min;
+  for (const t of tiles) {
+    const norm = span > 0 ? (t.d - min) / span : 0;
+    t.el.style.setProperty('--win-delay', `${(norm * 0.8).toFixed(3)}s`);
+  }
 }
 
 /** What the list page needs beyond the analysis: the banner catalog, for "All banners". */
@@ -355,11 +421,25 @@ export function installCardGlow(): void {
 
 /**
  * Cards that have played their fade-in since the page opened: a redraw
- * (data loading, sync, a setting) draws them without it.
+ * (data loading, sync, a setting) draws them without it. The 6★ strip's
+ * winning tiles and the banner page's highlight (hl:) light up once on the
+ * same opening; the startup's redraws (image and snapshot loads, the
+ * ef-assets refreshes) land within the light-up, so a lit key keeps its
+ * class for LIT_MS — longer than the whole effect — and goes static after.
  */
 const entered = new Set<string>();
-export const resetCardEntrance = (): void => entered.clear();
+const lit = new Map<string, number>();
+const LIT_MS = 3000;
+export const resetCardEntrance = (): void => {
+  entered.clear();
+  lit.clear();
+};
 const enter = (key: string): string => (entered.has(key) ? '' : (entered.add(key), ' enter'));
+/** A key lights up on its first draw and keeps doing so while the page is fresh. */
+const litNow = (key: string): boolean => {
+  const at = lit.get(key);
+  return at === undefined ? (lit.set(key, Date.now()), true) : Date.now() - at < LIT_MS;
+};
 
 /** The banner cards: pulled ones, plus (with `showAll`) every other banner that has opened, by opening date. */
 function bannerCards(kind: Kind, banners: BannerSummary[], opts: ListOptions): { cards: Html[]; total: number } {
@@ -421,7 +501,29 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
 // ---------------------------------------------------------------------------
 
 /** Banners whose flat art has lettering beside the faces: a text-free crop for the page's header (ef-assets banners/game/). */
-const HERO_ART: Record<string, string> = { standard: `${EF_ASSETS_CDN}/banners/game/standard.webp` };
+const HERO_ART: Record<string, string> = {
+  standard: `${EF_ASSETS_CDN}/banners/game/standard.webp`,
+  beginner: `${EF_ASSETS_CDN}/banners/game/beginner.webp`,
+};
+
+/**
+ * The banner's most notable 6★ in one line: its rate-up (the first one, if any),
+ * else its luckiest 6★ (the lowest pity). Shown at the top of the banner page.
+ */
+function bannerHighlight(b: BannerSummary): Html {
+  const sixes = b.pulls.filter((p) => p.rarity === 6 && p.bannerPull !== null && p.pity !== null);
+  if (!sixes.length) return html``;
+  const firstRateUp = sixes.filter((p) => p.isRateUp).sort((x, y) => (x.bannerPull ?? 0) - (y.bannerPull ?? 0))[0];
+  const luckiest = sixes.reduce((m, p) => ((p.pity ?? 0) < (m.pity ?? 0) ? p : m), sixes[0]);
+  const notable = firstRateUp ?? luckiest;
+  const isLuckiest = (notable.pity ?? 0) === (luckiest.pity ?? 0);
+  const pull = notable.bannerPull ?? 0;
+  const text = notable.isRateUp
+    ? html`Rate-up <b>${notable.name}</b> · pull ${pull}${isLuckiest ? ' · luckiest 6★ this banner' : ''}`
+    : html`Luckiest 6★: <b>${notable.name}</b> · pull ${pull}`;
+  // It glows in once on the page's opening (collections.css), like the strip's light-up.
+  return html`<div class="banner-highlight${litNow(`hl:${b.poolId}`) ? ' enter' : ''}" role="note">${icon(notable.isRateUp ? 'stat_2' : 'auto_awesome', true)}<span class="banner-highlight-text">${text}</span></div>`;
+}
 
 /**
  * /banner/headhunting/<banner>, /banner/arsenal/<banner>: one banner, its art
@@ -444,6 +546,9 @@ export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOption
   const version = s?.version ?? (patchOf(pool).major >= 0 ? patchOf(pool).key : null);
   const rateUps = b?.info?.rateUpNames ?? c?.rateUpNames ?? [];
   const rateUpIds = b?.info?.rateUpIds ?? c?.rateUpIds ?? [];
+  // A Joint banner's several rate-ups read as a count, like the card's chip; one rate-up links to its page.
+  const many = rateUps.length > 1 && (b ? b.category === 'joint' : true);
+  const rateUpValue = many ? `${rateUps.length} rate-ups` : rateUpNames(kind, rateUps, rateUpIds);
   const schedArt = s?.art ? cdnUrl(s.art) : '';
   // Headhunting: the game's banner layout; Issues: the text-free Issue art. Each falls back to the other.
   const faces = HERO_ART[pool];
@@ -459,12 +564,13 @@ export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOption
           <div class="wiki-facts">
             <span class="wiki-fact"><span class="wiki-fact-label">When (${SERVER_LABEL[opts.server]})</span>${when ?? 'Permanent'}</span>
             ${version ? html`<span class="wiki-fact"><span class="wiki-fact-label">Version</span>${version}</span>` : ''}
-            ${rateUps.length ? html`<span class="wiki-fact"><span class="wiki-fact-label">Rate-up</span><span class="banner-hero-rateup">${rateUps.join(', ')}${rateUpPotential(kind, rateUpIds, pool)}</span></span>` : ''}
+            ${rateUps.length ? html`<span class="wiki-fact"><span class="wiki-fact-label">Rate-up</span><span class="banner-hero-rateup">${rateUpValue}${rateUpPotential(kind, rateUpIds, pool)}</span></span>` : ''}
           </div>
         </div>
       </div>
     </section>
     <main class="container fade-in banner-page">
+      ${b ? bannerHighlight(b) : ''}
       <div class="banner-list">${b ? bannerSection(b, bannerEnded(opts.schedule, opts.server)(b)) : unpulledCard(c!)}</div>
     </main>`;
 }
@@ -586,7 +692,7 @@ function bannerSection(b: BannerSummary, ended = false, i = 0): Html {
         <div class="glance-row">
           ${pityStat(b, ended)}
           ${b.rewards
-            ? html`<span class="glance-stat glance-reward" data-tip="${tip(`Next ${b.rewards.nextReward.toLowerCase()}`, [tipRow('Progress', rewardProgress(b)), tipRow('Goal', String(b.rewards.goal))])}" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${b.rewards.nextReward === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b></span>`
+            ? html`<span class="glance-stat glance-reward" data-tip="${tip(`Next ${b.rewards.nextReward.toLowerCase()}`, [tipRow('Progress', rewardProgress(b)), tipRow('Goal', String(b.rewards.goal))])}" aria-label="${rewardProgress(b)} toward the next ${b.rewards.nextReward.toLowerCase()}">${b.rewards.nextReward === 'Token' ? TOKEN_GLYPH : icon(rewardIcon(b.rewards.nextReward), true)}<b>${fmtInt(b.rewards.progress)}</b><i>/${b.rewards.goal}</i></span>`
             : ''}
         </div>
         ${pityRuler(b, ended)}
@@ -861,7 +967,7 @@ function pullRow(b: BannerSummary, p: AnalyzedPull): Html {
     ${hasLuck ? raw(`data-action="luck" data-key="${p.key.replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="${String(open)}"`) : ''}>
     <span class="pull-no num">${p.bannerPull ?? '–'}</span>
     <div class="item">${itemImg(p.kind, p.itemId)}<div class="item-name">
-      <span class="ellipsis">${p.name}</span>${p.isRateUp && p.rarity === 6 ? html`<span class="pull-tag rateup${p.kind === 'weap' ? ' weap' : ''}" role="img" title="Rate-up" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}${p.isNew ? html`<span class="pull-tag new" role="img" title="New" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${p.pity === null ? badge('Free', 'outline') : ''}
+      <span class="ellipsis">${p.name}</span>${p.isRateUp && p.rarity === 6 ? html`<span class="pull-tag rateup${p.kind === 'weap' ? ' weap' : ''}" role="img" title="Rate-up" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}${p.isNew ? html`<span class="pull-tag new" role="img" title="New" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isLucky(p) ? html`<span class="pull-lucky" title="Dropped early">lucky · ${p.pity!}</span>` : ''}${p.pity === null ? badge('Free', 'outline') : ''}
     </div></div>
     <span class="pull-pity num" style="${p.rarity === 6 && p.pity !== null ? `color:${heat(p.pity, b.pity.max)}` : 'color:var(--gray-700)'}">${p.pity ?? '–'}</span>
     ${SHOW_LUCK ? html`<span class="pull-luck num">${luck !== undefined && p.outcome !== 'guaranteed' ? html`<span style="color:${luck < 0.25 ? 'var(--green)' : luck > 0.75 ? 'var(--red)' : 'inherit'}">${(luck * 100).toFixed(1)}%</span>` : html`<span class="tertiary">–</span>`}</span>` : ''}
