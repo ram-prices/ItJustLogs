@@ -548,6 +548,55 @@ function announce(text: string): void {
   requestAnimationFrame(() => (region.textContent = text));
 }
 
+/**
+ * Entrance animations survive redraws. A redraw (data arriving just after a page opens) rebuilds
+ * the page with innerHTML, so a card or the page's fade-in that was halfway in would start over or,
+ * without its class, jump to the end ("popcorn"). Before the rebuild, how far each one has played is
+ * read from the browser itself (Web Animations: currentTime, which also counts the stagger delay); a
+ * guess from the clock doesn't work, since on a busy load the browser starts them later than the
+ * code ran. After the rebuild the same element gets the same time, or is finished if it was done.
+ * Elements are matched by id, data-pool, data-card-image, or main for the page.
+ */
+const ENTRANCE = '.banner-list > .banner, .banner-list > .banner .banner-summary, main.fade-in';
+const entranceKey = (el: Element): string | null => {
+  const host = el.closest('.banner-list > .banner, main') ?? el;
+  const k = host.id || (host as HTMLElement).dataset?.pool || (host as HTMLElement).dataset?.cardImage || (host.tagName === 'MAIN' ? 'main' : null);
+  return k && (host === el ? k : `${k} summary`);
+};
+type Played = { seen: Set<string>; times: Map<string, number> };
+function entrancesPlayed(scope: Element): Played {
+  const seen = new Set<string>();
+  for (const el of scope.querySelectorAll(ENTRANCE)) {
+    const k = entranceKey(el);
+    if (k) seen.add(k);
+  }
+  const times = new Map<string, number>();
+  for (const a of document.getAnimations()) {
+    if (!(a instanceof CSSAnimation) || !(a.effect instanceof KeyframeEffect)) continue;
+    const el = a.effect.target;
+    if (!el || !scope.contains(el) || !el.matches(ENTRANCE)) continue;
+    const k = entranceKey(el);
+    if (k && typeof a.currentTime === 'number') times.set(`${k}${a.effect.pseudoElement ?? ''}|${a.animationName}`, a.currentTime);
+  }
+  return { seen, times };
+}
+function carryEntrances(scope: Element, played: Played): void {
+  for (const a of document.getAnimations()) {
+    if (!(a instanceof CSSAnimation) || !(a.effect instanceof KeyframeEffect)) continue;
+    const el = a.effect.target;
+    if (!el || !scope.contains(el) || !el.matches(ENTRANCE)) continue;
+    const k = entranceKey(el);
+    if (!k || !played.seen.has(k)) continue; // new on this redraw: it plays from the start
+    const t = played.times.get(`${k}${a.effect.pseudoElement ?? ''}|${a.animationName}`);
+    try {
+      if (t === undefined) a.finish(); // it had already played to the end
+      else a.currentTime = t;
+    } catch {
+      // An endless animation can't be finished: leave it.
+    }
+  }
+}
+
 let redrawnTimer: ReturnType<typeof setTimeout> | undefined;
 function draw(): void {
   applyTheme();
@@ -571,8 +620,9 @@ function draw(): void {
   // later redraws (a setting changed, Drive sync starting and finishing)
   // swap the page in place instead of flashing it.
   root().classList.toggle('settled', key === lastKey && Date.now() - openedAt > SETTLE_MS);
-  // A redraw while the page is still fading in carries the fade on from where it was (banners.css .fade-in).
-  root().style.setProperty('--opened-ago', `${Date.now() - openedAt}ms`);
+  // A redraw of the same page while it's still coming in (cards, the page fade): the rebuilt elements
+  // carry their entrance on from exactly where it was, instead of jumping or starting over.
+  const played = key === lastKey ? entrancesPlayed(root()) : null;
   const navigated = routeChanged;
   routeChanged = false;
   const tabRows = tabRowScroll();
@@ -582,6 +632,7 @@ function draw(): void {
   clearTimeout(redrawnTimer);
   redrawnTimer = setTimeout(() => root().classList.remove('redrawn'), 200);
   render(root(), html`${header(route)}${page(route)}${footer()}`);
+  if (played) carryEntrances(root(), played);
   watchHeader();
   watchHero();
   restoreTabRows(tabRows);

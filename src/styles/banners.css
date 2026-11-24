@@ -1112,8 +1112,6 @@ code {
 }
 .fade-in {
   animation: rise 0.3s var(--ease) both;
-  /* How long ago the page opened (app.ts draw): a redraw doesn't start the fade over. */
-  animation-delay: calc(-1 * var(--opened-ago, 0ms));
 }
 /* A redraw of the page already open (#app.settled, app.ts draw) doesn't fade it in again. */
 .settled .fade-in {
@@ -1127,15 +1125,15 @@ code {
   inherits: true;
   initial-value: transparent;
 }
-/* --enter-ago: how much of the entrance already played before a redraw rebuilt the card (kind.ts
-   enterAgo); the delay goes back by it, so the animation carries on instead of jumping. */
+/* A redraw mid-entrance rebuilds the card; app.ts carryEntrances sets the new one to where the old
+   one was, so it carries on instead of jumping. */
 .banner-list > .banner.enter {
   animation: card-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: calc(min(var(--i, 0), 12) * 50ms - var(--enter-ago, 0ms));
+  animation-delay: calc(min(var(--i, 0), 12) * 50ms);
 }
 .banner-list > .banner.enter .banner-summary::before {
   animation: tint-in 1.6s ease backwards;
-  animation-delay: calc(min(var(--i, 0), 12) * 50ms + 250ms - var(--enter-ago, 0ms));
+  animation-delay: calc(min(var(--i, 0), 12) * 50ms + 250ms);
 }
 /* The header's sync button turns while it syncs. */
 .header-sync.busy .icon {

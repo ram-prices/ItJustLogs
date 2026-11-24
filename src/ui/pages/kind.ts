@@ -372,8 +372,7 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
       ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`
       : '';
   const when = c.start ? `${fmtDate(c.start)} – ${c.end ? fmtDate(c.end) : 'open'}` : 'Permanent';
-  const enterKey = `unpulled:${c.poolId ?? c.name}`;
-  return html`<article class="card banner unpulled${enter(enterKey)}" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}" ${tintAttr} style="--banner-tint:${tintFor(item || url)};--i:${i};--enter-ago:${enterAgo(enterKey)}ms">
+  return html`<article class="card banner unpulled${enter(`unpulled:${c.poolId ?? c.name}`)}" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}" ${tintAttr} style="--banner-tint:${tintFor(item || url)};--i:${i}">
     <div class="banner-art">
       ${img}
       <div class="banner-art-text">
@@ -413,16 +412,17 @@ export function installCardGlow(): void {
 const entered = new Map<string, number>();
 const lit = new Map<string, number>();
 const LIT_MS = 3000;
-/** The longest card entrance: the last staggered card (12 × 50 ms) plus its 600 ms slide, and the tint after it. */
-const ENTER_MS = 12 * 50 + 250 + 1600;
+/** How long a card keeps its entrance class: its longest entrance (12 × 50 ms stagger, 250 ms, the 1.6 s tint) with room for a late start. */
+const ENTER_MS = 5000;
 export const resetCardEntrance = (): void => {
   entered.clear();
   lit.clear();
 };
 /**
- * A card's entrance class. A redraw rebuilds the card (innerHTML), so while its entrance is still
- * playing it keeps the class and `enterAgo` shifts the animation back by the time already played:
- * it carries on where it was instead of snapping to the end (a visible jump) or starting over.
+ * A card's entrance class. A redraw rebuilds the card (innerHTML), so while its entrance may still be
+ * playing it keeps the class, and app.ts carryEntrances sets the rebuilt card's animation to where the
+ * old one was (or finished): it carries on instead of jumping to the end or starting over. The window
+ * is generous because on a busy load the browser starts the animation well after this code runs.
  */
 const enter = (key: string): string => {
   const at = entered.get(key);
@@ -431,11 +431,6 @@ const enter = (key: string): string => {
     return ' enter';
   }
   return performance.now() - at < ENTER_MS ? ' enter' : '';
-};
-/** How long ago a card's entrance started (ms), for its style's --enter-ago; call after `enter`. */
-const enterAgo = (key: string): number => {
-  const at = entered.get(key);
-  return at === undefined ? 0 : Math.round(performance.now() - at);
 };
 /** A key lights up on its first draw and keeps doing so while the page is fresh. */
 const litNow = (key: string): boolean => {
@@ -681,7 +676,7 @@ function bannerSection(b: BannerSummary, ended = false, i = 0): Html {
   // operator's with skin left out), not the banner art's.
   const tintAttr = item ? html`data-tint-item="${item}"${b.kind === 'char' ? ' data-tint-skin' : ''}` : '';
   const open = expanded.has(key);
-  return html`<article class="card banner${open ? ' expanded' : ''}${ended ? ' ended' : ''}${enter(key)}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)};--i:${i};--enter-ago:${enterAgo(key)}ms">
+  return html`<article class="card banner${open ? ' expanded' : ''}${ended ? ' ended' : ''}${enter(key)}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)};--i:${i}">
     <div class="banner-summary">
       <div class="banner-art">
         ${art(b)}
