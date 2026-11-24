@@ -686,6 +686,33 @@ function watchUserTurns(): void {
       true,
     );
 }
+/**
+ * Keeps Firefox drawing the cards' entrance from the right moment. Firefox runs the slide off the
+ * main thread and stops updating its own copy of it; when something else on the page then repaints
+ * (a picture arriving, a colour found), the cards are drawn from that stale copy: they step back,
+ * sit short of their place, and jump when the copy is next updated ("popcorn", seen only in real
+ * Firefox, never in headless tests). Reading a card's computed transform every frame keeps the copy
+ * current. Found because the ?debug readout, which read it each frame, made the jump disappear.
+ * Runs only while a card is sliding in, at most 2 s per page opening.
+ */
+let samplingEntrances = false;
+function keepEntrancesSampled(): void {
+  if (samplingEntrances) return;
+  samplingEntrances = true;
+  const until = performance.now() + 2000;
+  const tick = (): void => {
+    const cards = document.querySelectorAll('.banner-list > .banner.enter');
+    let running = false;
+    for (let i = 0; i < cards.length && i < 24; i++) {
+      const style = getComputedStyle(cards[i]);
+      if (style.transform !== 'none' || style.opacity !== '1') running = true;
+    }
+    if (running && performance.now() < until) requestAnimationFrame(tick);
+    else samplingEntrances = false;
+  };
+  requestAnimationFrame(tick);
+}
+
 let heldRedraw = false;
 function holdForEntrance(): boolean {
   if (typeof document.getAnimations !== 'function') return false;
@@ -757,6 +784,7 @@ function draw(): void {
   redrawnTimer = setTimeout(() => root().classList.remove('redrawn'), 200);
   render(root(), html`${header(route)}${page(route)}${footer()}`);
   if (played) carryEntrances(root(), played);
+  keepEntrancesSampled();
   watchHeader();
   watchHero();
   restoreTabRows(tabRows);
