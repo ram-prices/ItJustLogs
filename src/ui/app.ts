@@ -571,6 +571,8 @@ function draw(): void {
   // later redraws (a setting changed, Drive sync starting and finishing)
   // swap the page in place instead of flashing it.
   root().classList.toggle('settled', key === lastKey && Date.now() - openedAt > SETTLE_MS);
+  // A redraw while the page is still fading in carries the fade on from where it was (banners.css .fade-in).
+  root().style.setProperty('--opened-ago', `${Date.now() - openedAt}ms`);
   const navigated = routeChanged;
   routeChanged = false;
   const tabRows = tabRowScroll();

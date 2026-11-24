@@ -372,7 +372,8 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
       ? html`<img class="weapon" src="${weapon}" alt="" loading="lazy" decoding="async" crossorigin="anonymous" ${tint} data-fallback />`
       : '';
   const when = c.start ? `${fmtDate(c.start)} – ${c.end ? fmtDate(c.end) : 'open'}` : 'Permanent';
-  return html`<article class="card banner unpulled${enter(`unpulled:${c.poolId ?? c.name}`)}" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}" ${tintAttr} style="--banner-tint:${tintFor(item || url)};--i:${i}">
+  const enterKey = `unpulled:${c.poolId ?? c.name}`;
+  return html`<article class="card banner unpulled${enter(enterKey)}" ${c.poolId ? html`id="banner-${c.poolId}"` : ''} data-card-image="${c.name}" ${tintAttr} style="--banner-tint:${tintFor(item || url)};--i:${i};--enter-ago:${enterAgo(enterKey)}ms">
     <div class="banner-art">
       ${img}
       <div class="banner-art-text">
@@ -409,14 +410,33 @@ export function installCardGlow(): void {
  * ef-assets refreshes) land within the light-up, so a lit key keeps its
  * class for LIT_MS — longer than the whole effect — and goes static after.
  */
-const entered = new Set<string>();
+const entered = new Map<string, number>();
 const lit = new Map<string, number>();
 const LIT_MS = 3000;
+/** The longest card entrance: the last staggered card (12 × 50 ms) plus its 600 ms slide, and the tint after it. */
+const ENTER_MS = 12 * 50 + 250 + 1600;
 export const resetCardEntrance = (): void => {
   entered.clear();
   lit.clear();
 };
-const enter = (key: string): string => (entered.has(key) ? '' : (entered.add(key), ' enter'));
+/**
+ * A card's entrance class. A redraw rebuilds the card (innerHTML), so while its entrance is still
+ * playing it keeps the class and `enterAgo` shifts the animation back by the time already played:
+ * it carries on where it was instead of snapping to the end (a visible jump) or starting over.
+ */
+const enter = (key: string): string => {
+  const at = entered.get(key);
+  if (at === undefined) {
+    entered.set(key, performance.now());
+    return ' enter';
+  }
+  return performance.now() - at < ENTER_MS ? ' enter' : '';
+};
+/** How long ago a card's entrance started (ms), for its style's --enter-ago; call after `enter`. */
+const enterAgo = (key: string): number => {
+  const at = entered.get(key);
+  return at === undefined ? 0 : Math.round(performance.now() - at);
+};
 /** A key lights up on its first draw and keeps doing so while the page is fresh. */
 const litNow = (key: string): boolean => {
   const at = lit.get(key);
@@ -661,7 +681,7 @@ function bannerSection(b: BannerSummary, ended = false, i = 0): Html {
   // operator's with skin left out), not the banner art's.
   const tintAttr = item ? html`data-tint-item="${item}"${b.kind === 'char' ? ' data-tint-skin' : ''}` : '';
   const open = expanded.has(key);
-  return html`<article class="card banner${open ? ' expanded' : ''}${ended ? ' ended' : ''}${enter(key)}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)};--i:${i}">
+  return html`<article class="card banner${open ? ' expanded' : ''}${ended ? ' ended' : ''}${enter(key)}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)};--i:${i};--enter-ago:${enterAgo(key)}ms">
     <div class="banner-summary">
       <div class="banner-art">
         ${art(b)}
