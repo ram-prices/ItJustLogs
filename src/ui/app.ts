@@ -341,6 +341,7 @@ const footer = (): Html => html`<footer class="container site-footer copy-13 ter
   <span>Fan-made with Claude AI, not affiliated with Gryphline or Hypergryph.</span>
   <a href="/privacy/" data-native>Privacy policy</a>
   <a href="https://github.com/ram-prices/ItJustLogs" target="_blank" rel="noopener">Source on GitHub</a>
+  <span class="site-build">Version ${__BUILD__}</span>
 </footer>`;
 
 function welcome(): Html {
@@ -597,14 +598,65 @@ function carryEntrances(scope: Element, played: Played): void {
   }
 }
 
+/**
+ * Background redraws wait for the banner cards' entrance. Just after a page opens, data keeps
+ * arriving (saved versions, icons, pictures, wiki files) and each arrival redraws; a rebuild
+ * replaces every card mid-slide, and in a real browser the new cards stall until they're painted
+ * and then jump into place ("popcorn"; carrying the animation over isn't enough, the stall is in
+ * the painting). So while a card on screen is still sliding in, a redraw nobody asked for is held
+ * and done once, when the cards have landed. What the player does (a click, a key, typing, Back)
+ * still redraws at once, and so does opening another page.
+ */
+let userTurn = false;
+function watchUserTurns(): void {
+  for (const type of ['click', 'input', 'change', 'keydown', 'drop', 'submit', 'popstate'])
+    addEventListener(
+      type,
+      () => {
+        userTurn = true;
+        // After every handler of this event (and what they awaited at once) has run.
+        setTimeout(() => (userTurn = false), 0);
+      },
+      true,
+    );
+}
+let heldRedraw = false;
+function holdForEntrance(): boolean {
+  if (typeof document.getAnimations !== 'function') return false;
+  const sliding = document.getAnimations().filter((a) => {
+    if (!(a instanceof CSSAnimation) || a.animationName !== 'card-in' || a.playState === 'finished' || a.playState === 'idle') return false;
+    const el = a.effect instanceof KeyframeEffect ? a.effect.target : null;
+    if (!el || !root().contains(el)) return false;
+    const box = el.getBoundingClientRect();
+    return box.bottom > 0 && box.top < innerHeight;
+  });
+  if (!sliding.length) return false;
+  if (!heldRedraw) {
+    heldRedraw = true;
+    let cap: ReturnType<typeof setTimeout> | undefined;
+    const release = (): void => {
+      if (!heldRedraw) return;
+      heldRedraw = false;
+      clearTimeout(cap);
+      draw();
+    };
+    // The cap is for an animation that never reports its end (a hidden tab, a browser quirk).
+    cap = setTimeout(release, 1500);
+    void Promise.allSettled(sliding.map((a) => a.finished)).then(release);
+  }
+  return true;
+}
+
 let redrawnTimer: ReturnType<typeof setTimeout> | undefined;
 function draw(): void {
   applyTheme();
   const route = parseRoute();
+  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}${route.shortState ? `?${route.short}` : ''}`;
+  // The same page, nobody asked, and its cards are still sliding in: later (holdForEntrance).
+  if (key === lastKey && !userTurn && holdForEntrance()) return;
   // Redraws (data refreshes, settings) rebuild the page; keep its inner scrollers and focus where they were.
   const scrolls = innerScrolls();
   const focused = focusMark(root());
-  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}${route.shortState ? `?${route.short}` : ''}`;
   // Remember which page of Database / Pulls the player is on, for their tab next time.
   const section = tabOf(route);
   if (section === 'database' && !route.id) saveTabView('database', infoHref(route.page === 'arsenal' ? 'weap' : 'char'));
@@ -1368,6 +1420,7 @@ export function mount(): void {
     history.replaceState(history.state, '', location.pathname.replace(/\/+$/, '') + location.search);
   addEventListener('popstate', onPopState);
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
+  watchUserTurns();
   subscribe(draw);
   onSyncStatus(draw);
   draw();

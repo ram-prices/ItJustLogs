@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -386,7 +387,21 @@ function contentSecurityPolicy(): Plugin {
   };
 }
 
+/** Which build this is, shown in the footer: the commit (CI's, else the local one) and the UTC minute it was built. */
+function buildId(): string {
+  let sha = process.env.GITHUB_SHA ?? '';
+  if (!sha) {
+    try {
+      sha = execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch {
+      sha = 'local';
+    }
+  }
+  return `${sha.slice(0, 7)} ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
+
 export default defineConfig({
+  define: { __BUILD__: JSON.stringify(buildId()) },
   // Absolute asset paths: pages live at /operators/ etc., and the site is
   // served from the root of its own domain (itjustlogs.dev).
   base: '/',
