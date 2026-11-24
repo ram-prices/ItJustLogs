@@ -13,6 +13,7 @@ import {
   type PaidIncome,
   type PatchIncome,
 } from '../../domain/income';
+import { extraKind, extrasOf } from '../../domain/owned';
 import { patchStats, weeklyTimeline, type PatchStats } from '../../domain/patches';
 import { currentServer, state } from '../../state';
 import { tip, tipNote, tipRow, weeklyChart } from '../charts';
@@ -351,7 +352,9 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
     return ((t.patch + t.other) / TICKETS_PER_ISSUE) * 10;
   };
   // Bond Quota: what each duplicate 5★ / 6★ operator gave, then by patch, as whole Chartered HH Permits.
-  const bondByPull = income?.shops ? bondQuota(a.banners.flatMap((b) => b.pulls), income.shops.bond.duplicate) : new Map<object, number>();
+  // Story operators (the player's extras) are owned from the start, so their first pulled copy is a duplicate.
+  const storyOwned = extrasOf(state.settings).filter((x) => extraKind(x.id) === 'char' && x.copies > 0).map((x) => x.id);
+  const bondByPull = income?.shops ? bondQuota(a.banners.flatMap((b) => b.pulls), income.shops.bond.duplicate, storyOwned) : new Map<object, number>();
   const bondOf = (p: PatchStats) =>
     [...p.banners.flatMap((b) => b.summary?.pulls ?? []), ...otherIn(p)].reduce((n, x) => n + (bondByPull.get(x) ?? 0), 0);
   // Headhunting Dossiers: the export's records where it lists a banner's rewards, else one per Chartered banner at
@@ -479,8 +482,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
         <div class="card-head">
           <h2 class="heading-16">Pulls per week</h2>
           <div class="legend">
-            <span><i style="background:var(--op)"></i>Operators</span>
-            <span><i style="background:var(--ars)"></i>Arsenal</span>
+            <span><i class="op"></i>Operators</span>
+            <span><i class="ars"></i>Arsenal</span>
             <span><span class="legend-star">${stars(1)}</span>${withStars('Week with a 6★')}</span>
           </div>
         </div>
@@ -492,8 +495,8 @@ export function statsPage(a: Analysis, redraw: () => void): Html {
           <h2 class="heading-16">By patch</h2>
           ${anyFree
             ? html`<div class="legend">
-                <span><i style="background:var(--gray-1000)"></i>Pulls spent</span>
-                <span><i class="faded" style="background:var(--gray-1000)"></i>${paid.length ? 'Pulls earned' : 'Free pulls earned'}</span>
+                <span><i class="ink"></i>Pulls spent</span>
+                <span><i class="ink faded"></i>${paid.length ? 'Pulls earned' : 'Free pulls earned'}</span>
               </div>`
             : ''}
         </div>

@@ -571,7 +571,7 @@ select option {
   gap: 2px;
 }
 .wiki-tile-name {
-  font: 700 15px/20px var(--font-sans);
+  font: 600 15px/20px var(--font-sans);
 }
 
 /* Operator portraits on the Operators page link to their info page. */
@@ -621,9 +621,6 @@ a.six-item {
   .wiki-hero-link {
     margin-left: auto;
   }
-  .wiki-skills {
-    grid-template-columns: 1fr;
-  }
   .wiki-skill,
   .wiki-list li {
     padding: 16px;
@@ -648,11 +645,6 @@ a.six-item {
 }
 .wiki-pips i.on {
   background: var(--r5);
-}
-.wiki-fact-pot {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 /* The operator's art box (art.ts artBox): a tile per kept item, which opens it. */
 .wiki-art-box {
@@ -687,8 +679,7 @@ a.six-item {
   display: block;
 }
 .wiki-art-item img,
-.wiki-art-item video,
-.wiki-art-link {
+.wiki-art-item video {
   display: block;
   width: 100%;
   aspect-ratio: 1;
@@ -697,14 +688,8 @@ a.six-item {
   box-shadow: var(--shadow-border);
   background: var(--gray-alpha-200);
 }
-.wiki-art-link {
-  display: grid;
-  place-items: center;
-  color: var(--gray-900);
-}
 .wiki-art-item:hover img,
-.wiki-art-item:hover video,
-.wiki-art-item:hover .wiki-art-link {
+.wiki-art-item:hover video {
   box-shadow: var(--shadow-border), 0 0 0 2px var(--gray-alpha-400);
 }
 a.wiki-art-item {
@@ -1052,10 +1037,6 @@ a.ladder-row:focus-visible {
 }
 .wiki-type:first-child {
   margin-top: 0;
-}
-/* The full list's heading, under a Coming soon row. */
-.wiki-all-head {
-  margin-top: 56px;
 }
 
 /* Potentials the player has unlocked */
@@ -1738,10 +1719,6 @@ a.ladder-row:focus-visible {
   color: var(--gray-1000);
   font-weight: 600;
 }
-.char-fact-icon {
-  width: 22px;
-  height: 22px;
-}
 .char-pic-img.wide {
   width: 114px;
 }
@@ -1882,10 +1859,11 @@ a.ladder-row:focus-visible {
 .char-pic input:checked + .char-pic-img {
   box-shadow: 0 0 0 2px var(--focus);
 }
-.char-fact-picks {
-  flex-direction: row !important;
+.char-fact-picks,
+.home-dialog .char-fact-picks {
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 8px 16px !important;
+  gap: 8px 16px;
 }
 .char-fact-picks > .label-13 {
   width: 100%;
@@ -1909,9 +1887,9 @@ a.ladder-row:focus-visible {
   }
 }
 @media (max-width: 640px) {
-  .widget,
-  .widget-col {
-    grid-column: span 12 !important;
+  .home-grid > .widget,
+  .home-grid > .widget-col {
+    grid-column: span 12;
   }
   /* One column on phones: an empty space would only push things down. */
   .home-grid:not(.editing) .widget[data-type='spacer'] {

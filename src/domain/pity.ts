@@ -114,7 +114,7 @@ const memo = new Map<string, Float64Array>();
  * from banked pity and carry the banner guarantee; later copies are fresh waits.
  */
 export function kthCopyPmf(p: PityProfile, k: number, first: PmfOptions): Float64Array {
-  const key = `${JSON.stringify(p)}|${k}|${first.startPity ?? 0}|${first.guaranteeAt ?? ''}`;
+  const key = `${JSON.stringify(p)}|${k}|${first.startPity ?? 0}|${first.guaranteeAt ?? ''}|${first.maxPulls ?? ''}`;
   const hit = memo.get(key);
   if (hit) return hit;
   const result = k <= 1 ? rateUpPmf(p, first) : convolve(kthCopyPmf(p, k - 1, first), rateUpPmf(p));

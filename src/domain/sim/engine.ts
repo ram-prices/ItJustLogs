@@ -760,7 +760,7 @@ export class World {
       if (cap && this.frame <= cap.until && !(a.selectorData?.validatorData ?? []).some((v: Data) => /SkillCastIdValidator/.test(v.$type ?? ''))) list = cap.n ? list.slice(-cap.n) : [];
     }
     else if (/CharacterTeamFinder|SquadFinder/.test(t)) list = this.team;
-    else if (/OwnerSpawnedEntityFinder/.test(t)) list = this.entities.filter((e) => e.owner === ctx.owner && e.slot < 0 && !e.marker);
+    else if (/OwnerSpawnedEntityFinder/.test(t)) list = this.entities.filter((e) => e.alive && e.owner === ctx.owner && e.slot < 0 && !e.marker);
     else if (/SourceFinder/.test(t)) list = [ctx.source];
     // Random spots (pointNum of them): with no positions, each is at the enemy (Zhuang Fangyi's Sunderblades land on
     // sword_gene_num spots, one projectile each).
@@ -2630,6 +2630,9 @@ export class World {
     for (const r of this.runs) if (r.owner === e) this.endRun(r);
     this.abilityEvent(e, 'OnAbilityEntitySelfFinished', e);
     if (e.owner) this.abilityEvent(e.owner, 'OnAbilityEntityFinished', e);
+    // Its buffs go with it, silently: nothing in the data says a summon's buffs fire OnBuffFinish when it goes, and
+    // left on they'd keep ticking (periodic OnBuffTrigger) on a summon that's gone.
+    e.buffs.length = 0;
   }
 
   /** OnOutputBuff for an infliction an operator stacked (as the game's infliction buff). */
@@ -2689,7 +2692,6 @@ export class World {
   /** Frames passed with time stopped (they don't count as fight time). */
   frozenFrames = 0;
 
-  /** Advances one frame: runs continue, buffs tick and expire, SP regenerates (8 a second). */
   /** The Ultimate Energy an operator's ultimate (as the button has it now) costs. */
   ultCost(op: Entity): number {
     const ult = this.skillIdOf(op, 'ultimate');
@@ -2706,47 +2708,78 @@ export class World {
     return r.buff ? r.buff.owner.buffs.includes(r.buff) : r.run ? !r.run.ended : true;
   }
 
+  /** Advances one frame: runs continue, buffs tick and expire, SP regenerates (8 a second). Each phase in order. */
   tick(): void {
-    // Arts Inflictions run out.
+    this.expireInflictions();
+    this.dropRefrains();
+    // A cut-in stops the fight's clock: no SP regenerates, no buff, cooldown or Stagger time passes (the game's SP bar
+    // stands still through one: 58 → 61 over 3.4 s, 57 → 60 over 5.0 s; the stage timer runs on, the clock doesn't).
+    if (this.freeze && this.freeze.left > 0) return this.frozenTick(this.freeze);
+    this.frame++;
+    this.recoverCooldowns();
+    this.trackForms();
+    this.sealTime();
+    this.guards();
+    this.watchJumps();
+    this.regenSp();
+    this.finishSummons();
+    this.endAuras();
+    this.stepChannels();
+    this.stepRuns();
+    this.stepBuffs();
+  }
+
+  /** Arts Inflictions run out. */
+  private expireInflictions(): void {
     for (const x of ELEMENTS) {
       const until = this.enemy.bb.get(`inflict_until_${x}`);
       if (until !== undefined && this.frame >= until && (this.enemy.bb.get(`inflict_${x}`) ?? 0) > 0) this.enemy.bb.set(`inflict_${x}`, 0);
     }
-    if (this.refrains.length) {
-      // clearUspOnEnd empties the bar once no block is left on that operator (Arcane's ultimate hands one listener on
-      // to the next with the bar full: that keeps it).
-      const ended = this.refrains.filter((r) => !this.refrainOn(r));
-      this.refrains = this.refrains.filter((r) => this.refrainOn(r));
-      for (const r of ended) if (r.clear && !this.refrains.some((x) => x.op === r.op)) r.op.energy = 0;
-    }
-    // A cut-in stops the fight's clock: no SP regenerates, no buff, cooldown or Stagger time passes (the game's SP bar
-    // stands still through one: 58 → 61 over 3.4 s, 57 → 60 over 5.0 s; the stage timer runs on, the clock doesn't).
-    if (this.freeze && this.freeze.left > 0) {
-      const { owner, from } = this.freeze;
-      this.freeze.left--;
-      this.frozenFrames++;
-      // The caster's own casts go on, and so do other operators' summons (the owner's Last Rite recording: Si's Ink
-      // Lung, frozen through her own cut-in, counts on through Arcane's, and its combo-cooldown cut lands inside it).
-      for (const r of [...this.runs])
-        if (!r.ended && ((r.owner === owner && this.startedSince(r, from)) || this.summonOfOther(r.owner, owner))) {
-          r.start--;
-          this.stepRun(r);
-        }
-      this.runs = this.runs.filter((r) => !r.ended);
-      if (this.freeze.left <= 0) this.freeze = this.freezeQueue.shift() ?? null;
-      return;
-    }
-    this.frame++;
-    // A combo's cooldown recovers × the operator's ComboSkillCooldownRecoveryScalar (Zhuang Fangyi's ult_base:
-    // combo_cd_rate 4, a quarter of it in her ultimate).
-    if (recoversCooldowns(this.bundles))
-      for (const op of this.team) {
-        const id = this.skillIdOf(op, 'combo');
-        const at = this.readyAt.get(id) ?? 0;
-        if (at <= this.clockNow) continue;
-        const rate = this.factor(op, 'ComboSkillCooldownRecoveryScalar');
-        if (rate !== 1) this.readyAt.set(id, Math.max(this.clockNow, at - (rate - 1)));
+  }
+
+  /** Ended Ultimate Energy blocks (RefrainObtainUsp) go. */
+  private dropRefrains(): void {
+    if (!this.refrains.length) return;
+    // clearUspOnEnd empties the bar once no block is left on that operator (Arcane's ultimate hands one listener on
+    // to the next with the bar full: that keeps it).
+    const ended = this.refrains.filter((r) => !this.refrainOn(r));
+    this.refrains = this.refrains.filter((r) => this.refrainOn(r));
+    for (const r of ended) if (r.clear && !this.refrains.some((x) => x.op === r.op)) r.op.energy = 0;
+  }
+
+  /** A frame of a cut-in: only the caster's runs since it began (and other operators' summons) go on. */
+  private frozenTick(freeze: NonNullable<typeof this.freeze>): void {
+    const { owner, from } = freeze;
+    freeze.left--;
+    this.frozenFrames++;
+    // The caster's own casts go on, and so do other operators' summons (the owner's Last Rite recording: Si's Ink
+    // Lung, frozen through her own cut-in, counts on through Arcane's, and its combo-cooldown cut lands inside it).
+    for (const r of [...this.runs])
+      if (!r.ended && ((r.owner === owner && this.startedSince(r, from)) || this.summonOfOther(r.owner, owner))) {
+        r.start--;
+        this.stepRun(r);
       }
+    this.runs = this.runs.filter((r) => !r.ended);
+    if (this.freeze!.left <= 0) this.freeze = this.freezeQueue.shift() ?? null;
+  }
+
+  /**
+   * A combo's cooldown recovers × the operator's ComboSkillCooldownRecoveryScalar (Zhuang Fangyi's ult_base:
+   * combo_cd_rate 4, a quarter of it in her ultimate).
+   */
+  private recoverCooldowns(): void {
+    if (!recoversCooldowns(this.bundles)) return;
+    for (const op of this.team) {
+      const id = this.skillIdOf(op, 'combo');
+      const at = this.readyAt.get(id) ?? 0;
+      if (at <= this.clockNow) continue;
+      const rate = this.factor(op, 'ComboSkillCooldownRecoveryScalar');
+      if (rate !== 1) this.readyAt.set(id, Math.max(this.clockNow, at - (rate - 1)));
+    }
+  }
+
+  /** The spans each operator's attacks the video can't show (attacksUnseen) last. */
+  private trackForms(): void {
     for (const op of this.team) {
       const open = this.formOpen[op.slot];
       if (open === undefined && !this.modes.get(op)?.length) continue;
@@ -2755,50 +2788,71 @@ export class World {
       else if (on) this.forms[open!].end = this.frame;
       else this.formOpen[op.slot] = undefined;
     }
-    // An Imprisoned enemy's own clock runs slow: each whole frame it loses, its timers wait a frame.
-    if (this.seals.length) {
-      this.sealDebt += 1 - this.foeScale();
-      while (this.sealDebt >= 1) {
-        this.sealDebt -= 1;
-        this.foeLoseFrame();
+  }
+
+  /** An Imprisoned enemy's own clock runs slow: each whole frame it loses, its timers wait a frame. */
+  private sealTime(): void {
+    if (!this.seals.length) return;
+    this.sealDebt += 1 - this.foeScale();
+    while (this.sealDebt >= 1) {
+      this.sealDebt -= 1;
+      this.foeLoseFrame();
+    }
+  }
+
+  /** Jumps whose condition is watched (JumpToAction over a span). */
+  private watchJumps(): void {
+    if (!this.jumpWatch.length) return;
+    this.jumpWatch = this.jumpWatch.filter((j) => !j.run.ended && this.frame <= j.until);
+    for (const j of [...this.jumpWatch])
+      if (this.check(j.a.conditionAction?.actionData, j.ctx)) {
+        this.jumpWatch = this.jumpWatch.filter((x) => x !== j);
+        this.jumpTo(j.run, Number(j.a.destFrame));
       }
-    }
-    this.guards();
-    // Jumps whose condition is watched (JumpToAction over a span).
-    if (this.jumpWatch.length) {
-      this.jumpWatch = this.jumpWatch.filter((j) => !j.run.ended && this.frame <= j.until);
-      for (const j of [...this.jumpWatch])
-        if (this.check(j.a.conditionAction?.actionData, j.ctx)) {
-          this.jumpWatch = this.jumpWatch.filter((x) => x !== j);
-          this.jumpTo(j.run, Number(j.a.destFrame));
-        }
-    }
+  }
+
+  /** SP regenerates, except in a combo's slow motion (which holds the Stagger too) or a held replay frame. */
+  private regenSp(): void {
     const slowed = this.slowLeft > 0;
     if (slowed) {
       this.slowLeft--;
       this.holdStagger(1);
     }
     if (!this.holdSp && !slowed) this.sp = Math.min(this.spMax, this.sp + (this.foe.sp?.regen ?? 8) / FPS);
-    // Summons whose time is up.
+  }
+
+  /** Summons whose time is up. */
+  private finishSummons(): void {
     for (const e of this.entities) if (e.alive && e.until !== undefined && e.until <= this.frame) this.finishEntity(e);
-    // An aura's buffs end with the aura.
-    if (this.auraBuffs.length) {
-      const over = (x: (typeof this.auraBuffs)[number]) => (x.run ? x.run.ended || this.frame >= x.until : !x.self || !x.self.owner.buffs.includes(x.self));
-      for (const x of this.auraBuffs) if (over(x) && x.buff.owner.buffs.includes(x.buff)) this.endBuff(x.buff, x.buff.stacks, true);
-      this.auraBuffs = this.auraBuffs.filter((x) => !over(x) && x.buff.owner.buffs.includes(x.buff));
-    }
-    // Channels: their next hits, while their skill runs.
-    if (this.channels.length) {
-      // Its skill still runs, or its buff is still on.
-      const on = (ch: (typeof this.channels)[number]) => (ch.run ? !ch.run.ended : !!ch.buff && ch.buff.owner.buffs.includes(ch.buff));
-      for (const ch of this.channels)
-        while (on(ch) && ch.left > 0 && ch.at <= this.frame + TICK_EPS && ch.at < ch.until - TICK_EPS) {
-          for (const e of ch.spec ? this.targets(ch.spec, ch.ctx) : [ch.ctx.target ?? this.enemy]) this.exec(ch.list, { ...ch.ctx, target: e });
-          ch.at += ch.every;
-          ch.left--;
-        }
-      this.channels = this.channels.filter((ch) => on(ch) && ch.left > 0 && ch.at < ch.until - TICK_EPS);
-    }
+    // Gone summons with nothing left on them leave the list (the frame walks and clone() would carry them on; a
+    // reference elsewhere, a context group or a buff's source, keeps the object itself).
+    if (this.entities.some((e) => !e.alive && !e.buffs.length)) this.entities = this.entities.filter((e) => e.alive || e.buffs.length);
+  }
+
+  /** An aura's buffs end with the aura. */
+  private endAuras(): void {
+    if (!this.auraBuffs.length) return;
+    const over = (x: (typeof this.auraBuffs)[number]) => (x.run ? x.run.ended || this.frame >= x.until : !x.self || !x.self.owner.buffs.includes(x.self));
+    for (const x of this.auraBuffs) if (over(x) && x.buff.owner.buffs.includes(x.buff)) this.endBuff(x.buff, x.buff.stacks, true);
+    this.auraBuffs = this.auraBuffs.filter((x) => !over(x) && x.buff.owner.buffs.includes(x.buff));
+  }
+
+  /** Channels: their next hits, while their skill runs. */
+  private stepChannels(): void {
+    if (!this.channels.length) return;
+    // Its skill still runs, or its buff is still on.
+    const on = (ch: (typeof this.channels)[number]) => (ch.run ? !ch.run.ended : !!ch.buff && ch.buff.owner.buffs.includes(ch.buff));
+    for (const ch of this.channels)
+      while (on(ch) && ch.left > 0 && ch.at <= this.frame + TICK_EPS && ch.at < ch.until - TICK_EPS) {
+        for (const e of ch.spec ? this.targets(ch.spec, ch.ctx) : [ch.ctx.target ?? this.enemy]) this.exec(ch.list, { ...ch.ctx, target: e });
+        ch.at += ch.every;
+        ch.left--;
+      }
+    this.channels = this.channels.filter((ch) => on(ch) && ch.left > 0 && ch.at < ch.until - TICK_EPS);
+  }
+
+  /** Skill and attack timelines go on. */
+  private stepRuns(): void {
     for (const r of [...this.runs])
       if (!r.ended) {
         // Haste: an operator's own skills and attacks play (1 + Haste) frames a frame.
@@ -2806,14 +2860,15 @@ export class World {
         this.stepRun(r);
       }
     this.runs = this.runs.filter((r) => !r.ended);
+  }
+
+  /** Buffs tick (OnBuffTrigger), run their timelines, lose run-out stacks and expire. */
+  private stepBuffs(): void {
     for (const e of [...this.team, this.enemy, ...this.entities])
       for (const b of [...e.buffs]) {
         // A paused buff's clock (its end, timeline and ticks) stands still.
         if (b.paused) {
-          b.start++;
-          if (b.end !== Infinity) b.end++;
-          if (b.stackEnds) b.stackEnds = b.stackEnds.map((x) => x + 1);
-          if (b.nextTrigger !== Infinity) b.nextTrigger++;
+          waitFrame(b);
           continue;
         }
         if (b.byRun?.ended) {
@@ -3653,10 +3708,7 @@ export class World {
     for (const b of e.buffs) {
       // The Imprisonment's own buffs run on their caster's time.
       if (b.paused || /combo_skill_seal/.test(b.id)) continue;
-      b.start++;
-      if (b.end !== Infinity) b.end++;
-      if (b.stackEnds) b.stackEnds = b.stackEnds.map((x) => x + 1);
-      if (b.nextTrigger !== Infinity) b.nextTrigger++;
+      waitFrame(b);
     }
     for (const k of [...e.bb.keys()]) if (/^inflict_until_|^breachUntil$/.test(k)) e.bb.set(k, e.bb.get(k)! + 1);
     if (this.staggered(e)) {
@@ -3804,11 +3856,29 @@ export const COMBO_TRIGGERS: Record<string, (ev: ComboEvent, w: World, op: Entit
 /** A custom event's name: written in, or a value (Liino's liino_comboskill_end). */
 const eventName = (x: Data): string => (typeof x === 'string' ? x : x?.useBlackboardKey ? '' : String(x?.value ?? ''));
 
+/** A buff's clock waits a frame: its start, end, stacks' ends and next trigger all move one later (paused, or an Imprisoned enemy's). */
+function waitFrame(b: Buff): void {
+  b.start++;
+  if (b.end !== Infinity) b.end++;
+  if (b.stackEnds) b.stackEnds = b.stackEnds.map((x) => x + 1);
+  if (b.nextTrigger !== Infinity) b.nextTrigger++;
+}
+
 /** Whether any buff in the bundles changes a cooldown's recovery (ComboSkillCooldownRecoveryScalar): ticks skip it otherwise. */
+// Cached per bundle (each team's search builds a new bundles array of the same bundle objects), then per array.
 const recoveryCache = new WeakMap<Bundle[], boolean>();
+const bundleRecovers = new WeakMap<Bundle, boolean>();
 function recoversCooldowns(bundles: Bundle[]): boolean {
   let yes = recoveryCache.get(bundles);
-  if (yes === undefined) recoveryCache.set(bundles, (yes = bundles.some((b) => JSON.stringify(b.buffs).includes('CooldownRecoveryScalar'))));
+  if (yes === undefined)
+    recoveryCache.set(
+      bundles,
+      (yes = bundles.some((b) => {
+        let r = bundleRecovers.get(b);
+        if (r === undefined) bundleRecovers.set(b, (r = JSON.stringify(b.buffs).includes('CooldownRecoveryScalar')));
+        return r;
+      })),
+    );
   return yes;
 }
 
@@ -3822,24 +3892,34 @@ const sharedCache = new WeakMap<object, WeakSet<object>>();
  * starts afresh (Tangtang's Final Strike gives SP on its first hit only, EntityBB_atk05_cnt; Perlica's combo bounce).
  */
 const projectileKeyCache = new WeakMap<Bundle[], Set<string>>();
+/**
+ * One bundle's part: each EntityBB_ key its skills and buffs mention, whether only projectile hits (projhit) do, and
+ * the keys they write. Cached per bundle, so a new bundles array of the same bundles (a team in a gear search) only
+ * merges them.
+ */
+const bundleKeyCache = new WeakMap<Bundle, { onlyProj: Map<string, boolean>; written: Set<string> }>();
+function bundleKeys(b: Bundle): { onlyProj: Map<string, boolean>; written: Set<string> } {
+  let out = bundleKeyCache.get(b);
+  if (out) return out;
+  out = { onlyProj: new Map(), written: new Set() };
+  for (const [id, d] of [...Object.entries(b.skills), ...Object.entries(b.buffs)]) {
+    const text = JSON.stringify(d);
+    const proj = /projhit/.test(id);
+    for (const m of text.matchAll(/"(?:EntityBB_)?(\w+)"/g)) {
+      const k = `EntityBB_${m[1]}`;
+      out.onlyProj.set(k, (out.onlyProj.get(k) ?? true) && proj);
+    }
+    for (const m of text.matchAll(/"key":\s*"(EntityBB_\w+)"/g)) out.written.add(m[1]);
+  }
+  bundleKeyCache.set(b, out);
+  return out;
+}
 function projectileKeys(bundles: Bundle[]): Set<string> {
   let keys = projectileKeyCache.get(bundles);
   if (keys) return keys;
-  const users = new Map<string, Set<string>>();
-  for (const b of bundles)
-    for (const [id, d] of [...Object.entries(b.skills), ...Object.entries(b.buffs)])
-      for (const m of JSON.stringify(d).matchAll(/"(?:EntityBB_)?(\w+)"/g)) {
-        const k = `EntityBB_${m[1]}`;
-        if (!users.has(k)) users.set(k, new Set());
-        users.get(k)!.add(id);
-      }
+  const parts = bundles.map(bundleKeys);
   keys = new Set();
-  for (const b of bundles)
-    for (const d of [...Object.values(b.skills), ...Object.values(b.buffs)])
-      for (const m of JSON.stringify(d).matchAll(/"key":\s*"(EntityBB_\w+)"/g)) {
-        const ids = users.get(m[1]) ?? new Set();
-        if ([...ids].every((id) => /projhit/.test(id))) keys.add(m[1]);
-      }
+  for (const p of parts) for (const k of p.written) if (parts.every((q) => q.onlyProj.get(k) ?? true)) keys.add(k);
   projectileKeyCache.set(bundles, keys);
   return keys;
 }

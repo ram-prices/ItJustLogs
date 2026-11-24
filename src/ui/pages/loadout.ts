@@ -111,9 +111,6 @@ export function weaponBuildOf(wpnId: string, w: WikiWeapon, potential: number | 
   return { stage, tuning, maxed, essence, max, bounds, levels: weaponSkillLevels(bounds, essence), level: tuningMaxLevel(tuning, stage) };
 }
 
-/** The levels a weapon's skills count at (weaponBuildOf). */
-export const weaponRanksFor = (wpnId: string, w: WikiWeapon, potential: number | null): number[] => weaponBuildOf(wpnId, w, potential).levels;
-
 /** A weapon's wiki entry (once loaded) and the player's Potential on it (null: no copy). */
 function weaponOf(wpnId: string): { w?: WikiWeapon; potential: number | null } {
   const mine = ownedOf(state.analysis, 'weap')?.get(wpnId);

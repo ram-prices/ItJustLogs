@@ -30,7 +30,7 @@
 import type { AnalyzedPull } from './analyze';
 import { pullsOf, type EventRewardsFile } from './eventRewards';
 import { timeOn, type Schedule, type Server } from './schedule';
-import type { WikiAttribution } from './wiki';
+import { wikiId, type WikiAttribution } from './wiki';
 
 export interface IncomeFile {
   attribution: WikiAttribution;
@@ -210,7 +210,9 @@ export interface PatchWindow {
 export function patchWindows(schedule: Schedule, server: Server, now: number): PatchWindow[] {
   const dated = schedule.versions
     .map((v) => ({ name: v.name, start: timeOn(v.release, server) }))
-    .filter((v): v is { name: string; start: number } => v.start != null);
+    .filter((v): v is { name: string; start: number } => v.start != null)
+    // In time order, whatever order the schedule lists them in: each window ends at the next release.
+    .sort((a, b) => a.start - b.start);
   const released = dated.filter((v) => v.start <= now);
   return released.map((v, i) => {
     const next = dated[i + 1]?.start;
@@ -322,14 +324,21 @@ export function pullsFrom(totals: Record<string, number>): { headhunting: number
 /**
  * The Bond Quota each operator pull gave: a 5★ or 6★ the player already had
  * gives `duplicate[rarity]` (the first copy gives none). Pulls in time order.
+ * `ownedIds`: operators the player had before any pull (story operators from
+ * their extras), so even the first pulled copy of one is a duplicate.
  */
-export function bondQuota(pulls: Pick<AnalyzedPull, 'kind' | 'rarity' | 'itemId' | 'ts'>[], duplicate: Record<string, number>): Map<object, number> {
-  const owned = new Set<string>();
+export function bondQuota(
+  pulls: Pick<AnalyzedPull, 'kind' | 'rarity' | 'itemId' | 'ts'>[],
+  duplicate: Record<string, number>,
+  ownedIds: Iterable<string> = [],
+): Map<object, number> {
+  const owned = new Set<string>([...ownedIds].map(wikiId));
   const out = new Map<object, number>();
   for (const p of [...pulls].filter((x) => x.kind === 'char').sort((a, b) => a.ts - b.ts)) {
     if (p.rarity < 5) continue;
-    if (owned.has(p.itemId)) out.set(p, duplicate[p.rarity] ?? 0);
-    else owned.add(p.itemId);
+    const id = wikiId(p.itemId);
+    if (owned.has(id)) out.set(p, duplicate[p.rarity] ?? 0);
+    else owned.add(id);
   }
   return out;
 }

@@ -119,7 +119,7 @@ export function installListSearch(): void {
       return;
     }
     if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target as Element)) return;
-    if (document.querySelector('dialog[open], .sort-pop, .ctx-menu')) return;
+    if (document.querySelector('dialog[open], .dialog-backdrop, .sort-pop, .ctx-menu')) return;
     // A letter or digit typed anywhere (or Backspace while a search is on) goes into the search; the key lands there.
     const key = e.key.length === 1 && e.key !== ' ';
     if (key || (e.key === 'Backspace' && input.value)) focusSearch(input);

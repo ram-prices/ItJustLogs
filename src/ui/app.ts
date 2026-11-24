@@ -10,8 +10,8 @@ import { installTooltips } from './charts';
 import { installImageFallback, installImageReady, toast } from './common';
 import { LOGO, TAB_ICON, avatar, icon, loadIcons, pageHeader } from './components';
 import { EXPORTER_SOURCE } from './guide';
-import { fmtInt, html, raw, render, type Html } from './html';
-import { askSamePlayer } from './dialog';
+import { fmtInt, focusMark, html, raw, render, restoreFocus, type Html } from './html';
+import { askReload, askSamePlayer } from './dialog';
 import { ImportMismatch, exportBackup, exportHistory, importText, type ImportMode } from './io';
 import { copyText, focusScheduleItem, homePage, installCopyMenu, installTimelineLabels, scrollTimelineToNow } from './pages/home';
 import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
@@ -25,7 +25,7 @@ import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installStorage, openArtViewer, resetArtPick, shuffleArt, storageAction } from './pages/art';
 import { openPotentialArtPicker } from './pages/potentialArt';
-import { applyListSearch, installListSearch, refocusListSearch } from './pages/search';
+import { applyListSearch, installListSearch } from './pages/search';
 import { openSortPopup } from './pages/sorting';
 import { achievementsPage, archivesPage, collectionAction, collectionChange, readFindingsFrom, readMedalsFrom } from './pages/collections';
 import { eventOf, eventPage } from './pages/event';
@@ -40,7 +40,8 @@ import { installTint, tintAmbients, tintHeroes, tintSixStrip, tintWeaponCards } 
 /**
  * App shell and router. Layout follows the Vercel dashboard: a header with
  * the product mark and a row of underlined tabs, then a page header band and
- * the page body. Routes are hash-based so every banner page has its own URL.
+ * the page body. Routes are clean paths (history.pushState), so every page
+ * has its own URL; old #/ links are moved to them in mount().
  */
 
 type Page = 'home' | 'operators' | 'arsenal' | 'essences' | 'aic' | 'rotations' | 'contracts' | 'stats' | 'achievements' | 'archives' | 'story' | 'settings' | 'event';
@@ -66,6 +67,8 @@ const TABS: [Tab, string][] = [
 ];
 /** Paths that are pages of their own. */
 const PAGES = new Set<string>(['home', 'operators', 'arsenal', 'essences', 'aic', 'rotations', 'contracts', 'stats', 'achievements', 'archives', 'story', 'settings']);
+/** Paths that open Home as they always have: the folders of /banners/<name> and /event/<id> on their own, the shell's file. */
+const HOME_ALIASES = new Set<string>(['banners', 'event', 'events', 'index.html']);
 /** Where Database and Pulls open first: the operator list, the Headhunting banners. */
 const SECTION_HOME = { database: '/database/operators', pulls: '/banner/headhunting' } as const;
 /** The path each section answers to (/database, /banner). */
@@ -143,11 +146,11 @@ function bannerRoute(kind: Kind, segment: string | undefined): Route {
 /** Pages are clean paths: / (home), /database/operators[/<name>], /database/arsenals[/<name>], /banner/headhunting[/<banner>], /banner/arsenal[/<banner>], /banner/stats, /banners/<name> (Home at that banner), /event/<id> (that event and its rewards), /settings. */
 function parseRoute(): Route {
   const old = currentPath(location.pathname);
-  if (old !== location.pathname) history.replaceState(null, '', old + location.search + location.hash);
+  if (old !== location.pathname) history.replaceState(history.state, '', old + location.search + location.hash);
   // /database and /banner: the page of that section the player was last on.
   const path = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
   for (const section of ['database', 'pulls'] as const)
-    if (path === SECTION_PATH[section]) history.replaceState(null, '', currentPath(loadTabViews()[section] ?? SECTION_HOME[section]));
+    if (path === SECTION_PATH[section]) history.replaceState(history.state, '', currentPath(loadTabViews()[section] ?? SECTION_HOME[section]));
   const [page, id, sub] = location.pathname.replace(/^\/+/, '').split('/');
   const top = page.toLowerCase();
   if (top === 'database' || top === 'banner') {
@@ -159,32 +162,34 @@ function parseRoute(): Route {
           ? top === 'database'
             ? itemRoute(kind, sub)
             : bannerRoute(kind, sub)
-          : ({ page: 'home' } as Route);
+          : ({ page: 'home', short: location.pathname.replace(/^\/+|\/+$/g, ''), shortState: 'missing' } as Route);
     // Old ids and odd spellings: show the page's own address (its name).
     if (kind && route.id && !route.pending) {
       const own = top === 'database' ? infoHref(kind, route.id) : bannerHref(kind, route.id);
-      if (own !== location.pathname) history.replaceState(null, '', own + location.search + location.hash);
+      if (own !== location.pathname) history.replaceState(history.state, '', own + location.search + location.hash);
     }
     return route;
   }
-  if (page === 'banners' && id) return { page: 'home', focus: `/banners/${id.toLowerCase()}` };
-  if (page === 'event' && id) return { page: 'event', id };
+  if (top === 'banners' && id) return { page: 'home', focus: `/banners/${id.toLowerCase()}` };
+  if (top === 'event' && id) return { page: 'event', id };
   // LEGACY, to be removed with legacyEventLinks: old /events/<name> links go to their /event/<id>.
-  if (page === 'events' && id) {
+  if (top === 'events' && id) {
     const old = `/events/${id.toLowerCase()}`;
     const e = [...legacyEventLinks(state.schedule)].find(([, path]) => path === old)?.[0];
     if (e?.id == null) return { page: 'home', focus: old };
-    history.replaceState(null, '', `/event/${e.id}`);
+    history.replaceState(history.state, '', `/event/${e.id}`);
     return { page: 'event', id: String(e.id) };
   }
-  if (page && !id && !PAGES.has(page) && isShortLink(page)) {
-    const short = page.toLowerCase();
+  if (page && !id && !PAGES.has(top) && isShortLink(page)) {
+    const short = top;
     const { map, failed } = shortLinkMap(draw);
     const t = map?.get(short);
     if (t) return { page: t.kind === 'weap' ? 'arsenal' : 'operators', info: true, id: t.id, short };
     return { page: 'home', short, shortState: map ? 'missing' : failed ? 'failed' : 'loading' };
   }
-  const p = (PAGES.has(page) ? page : 'home') as Page;
+  // Any other path that isn't a page (/foo/bar): Page not found, not Home.
+  if (top && !PAGES.has(top) && !HOME_ALIASES.has(top)) return { page: 'home', short: location.pathname.replace(/^\/+|\/+$/g, ''), shortState: 'missing' };
+  const p = (PAGES.has(top) ? top : 'home') as Page;
   if ((p === 'operators' || p === 'arsenal') && id === 'info') return { page: p, info: true, id: sub ? decodeURIComponent(sub) : undefined };
   return { page: p, id: id ? decodeURIComponent(id) : undefined };
 }
@@ -196,19 +201,30 @@ const root = () => document.getElementById('app')!;
  * loading it (redrawing when it's in) and gives it once loaded; `mod` only
  * looks. Keeps the Essences page and the readers out of what every visit loads.
  */
-function lazy<T>(load: () => Promise<T>): { mod: T | null; get(): T | null } {
+function lazy<T>(load: () => Promise<T>): { mod: T | null; failed: boolean; get(): T | null } {
   let loading = false;
   const l = {
     mod: null as T | null,
+    /**
+     * Its chunk didn't load: after a deploy a tab opened before it asks for
+     * an old file that's gone. Not retried (it would fail on every redraw);
+     * the page offers a reload instead.
+     */
+    failed: false,
     get(): T | null {
-      if (!l.mod && !loading) {
+      if (!l.mod && !loading && !l.failed) {
         loading = true;
         load().then(
           (m) => {
             l.mod = m;
             draw();
           },
-          () => (loading = false),
+          (e) => {
+            console.warn('Page code failed to load', e);
+            loading = false;
+            l.failed = true;
+            draw();
+          },
         );
       }
       return l.mod;
@@ -216,6 +232,17 @@ function lazy<T>(load: () => Promise<T>): { mod: T | null; get(): T | null } {
   };
   return l;
 }
+
+/** A lazy page's place while its code loads, or a reload offer when it couldn't. */
+const lazyPage = (l: { failed: boolean }, title: string): Html => (l.failed ? failedPage(title) : loadingPage(title));
+
+/** The page's code couldn't be loaded (usually a newer version of the site is out): reload to get it. */
+const failedPage = (title: string): Html =>
+  html`${pageHeader(title)}<main class="container">${chunkFailed()}</main>`;
+
+/** "Couldn't load this page." with a Reload button: lazy pages and the picture cropper. */
+const chunkFailed = (): Html =>
+  html`<div class="card"><div class="empty"><p class="copy-14">Couldn't load this page.</p><button class="btn primary sm empty-action" data-action="reload">${icon('refresh')}Reload</button></div></div>`;
 const essences = lazy(() => import('./pages/essences'));
 const story = lazy(() => import('./pages/story'));
 const aic = lazy(() => import('./pages/aic'));
@@ -285,7 +312,7 @@ function header(route: Route): Html {
   const tabViews = loadTabViews();
   const current = tabOf(route);
   const name = state.settings.displayName || 'Endministrator';
-  return html`<header class="header"><div class="container">
+  return html`<a class="skip-link" href="#content" data-action="skip-to-content">Skip to content</a><header class="header"><div class="container">
     <div class="header-top">
       <a class="logo" href="/">${LOGO}<span>ItJustLogs</span></a>
       ${has
@@ -325,13 +352,13 @@ function welcome(): Html {
           <div class="empty-icon">${icon('inbox')}</div>
           <h2 class="heading-20">Import your pull history</h2>
           <p class="copy-14">Choose an exported file, drop it anywhere on this page, or press <kbd>Ctrl</kbd> <kbd>V</kbd> after running the exporter below.</p>
-          <button class="btn primary" data-action="import" style="margin-top:8px">${icon('upload_file')}Import file</button>
+          <button class="btn primary empty-action" data-action="import">${icon('upload_file')}Import file</button>
         </div>
       </div>
       <div class="section card">
         <div class="card-body">
-          <h2 class="heading-20" style="margin-bottom:8px">Get your pull history</h2>
-          <p class="copy-14 secondary" style="margin-bottom:20px">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. Read it before you run it.</p>
+          <h2 class="heading-20 welcome-title">Get your pull history</h2>
+          <p class="copy-14 secondary welcome-intro">Windows PC version of the game. The script only reads the game's web cache and talks to Gryphline's own history server. Read it before you run it.</p>
           ${getDataSteps()}
         </div>
       </div>
@@ -357,15 +384,15 @@ function page(route: Route): Html {
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);
-  if (route.page === 'essences') return essences.get()?.essencesPage(draw) ?? loadingPage('Essences');
+  if (route.page === 'essences') return essences.get()?.essencesPage(draw) ?? lazyPage(essences, 'Essences');
   // The AIC planner: no import needed.
-  if (route.page === 'aic') return aic.get()?.aicPage(draw) ?? loadingPage('AIC planner');
+  if (route.page === 'aic') return aic.get()?.aicPage(draw) ?? lazyPage(aic, 'AIC planner');
   // Rotations: game data and the player's loadouts; no import needed.
-  if (route.page === 'rotations') return rotations.get()?.rotationsPage(draw, route.id) ?? loadingPage('Rotations');
+  if (route.page === 'rotations') return rotations.get()?.rotationsPage(draw, route.id) ?? lazyPage(rotations, 'Rotations');
   // Contingency Contract: game data, no import needed.
-  if (route.page === 'contracts') return contracts.get()?.contractsPage(route.id, draw) ?? loadingPage('Contingency Contract');
+  if (route.page === 'contracts') return contracts.get()?.contractsPage(route.id, draw) ?? lazyPage(contracts, 'Contingency Contract');
   // The game's story text: no import needed.
-  if (route.page === 'story') return story.get()?.storyPage(route.id, draw) ?? loadingPage('Story');
+  if (route.page === 'story') return story.get()?.storyPage(route.id, draw) ?? lazyPage(story, 'Story');
   if (route.page === 'event') return eventPage(route.id, draw);
   // Info pages are game data: they work without an import, and show the player's copies with one.
   if (route.pending) return route.page === 'arsenal' ? loadingOrFailed('weap', 'Arsenals', false) : loadingOrFailed('char', 'Operators', false);
@@ -456,13 +483,79 @@ function restoreTabRows(before: (number | null)[]): void {
   });
 }
 
+/**
+ * Boxes inside pages that scroll on their own (CSS overflow: auto): Home's
+ * timeline and lists, banner cards' pull lists, tables, the operator page's
+ * pull and art lists, Rotations' timelines and lists, the contract board.
+ */
+const INNER_SCROLLERS = ['.tl-scroll', '.banner-scroll', '.versions', '.extras', '.table-wrap', '.wiki-pulls', '.wiki-art-list', '.reader-list', '.picker-list', '.sim-tl-scroll', '.sim-history', '.sim-steps', '.sim-moves', '.cc-board-card'];
+
+/** Each inner scroller's place, keyed by its kind and its banner card (data-pool) or its place among its kind. */
+function innerScrolls(): Map<string, [left: number, top: number]> {
+  const out = new Map<string, [number, number]>();
+  for (const sel of INNER_SCROLLERS)
+    document.querySelectorAll<HTMLElement>(`#app ${sel}`).forEach((el, i) => {
+      if (!el.scrollLeft && !el.scrollTop) return;
+      out.set(`${sel}|${el.closest<HTMLElement>('[data-pool]')?.dataset.pool ?? i}`, [el.scrollLeft, el.scrollTop]);
+    });
+  return out;
+}
+
+function restoreInnerScrolls(before: Map<string, [number, number]>): void {
+  if (!before.size) return;
+  for (const sel of INNER_SCROLLERS)
+    document.querySelectorAll<HTMLElement>(`#app ${sel}`).forEach((el, i) => {
+      const at = before.get(`${sel}|${el.closest<HTMLElement>('[data-pool]')?.dataset.pool ?? i}`);
+      if (!at) return;
+      el.scrollLeft = at[0];
+      el.scrollTop = at[1];
+    });
+}
+
+/**
+ * Back and Forward: each history entry keeps the page's scroll in its state
+ * (saved as the player scrolls and just before leaving), and popstate puts it
+ * back once the page is drawn. New pages still open at the top.
+ */
+let restoringScroll: number | null = null;
+let scrollSaveTimer: ReturnType<typeof setTimeout> | undefined;
+const saveScroll = (): void => {
+  clearTimeout(scrollSaveTimer);
+  const y = Math.round(scrollY);
+  if (history.state?.scrollY !== y) history.replaceState({ ...(history.state ?? {}), scrollY: y }, '');
+};
+
+/** Set by a link click or Back/Forward: the next draw moves focus to the new page and announces it. */
+let routeChanged = false;
+
+/** After a route change: focus on the page's title (else its main), for keyboards and screen readers, without scrolling. */
+function focusPage(): void {
+  const target =
+    document.querySelector<HTMLElement>('#app main h1, #app .page-header h1, #app h1') ??
+    document.querySelector<HTMLElement>('#app main');
+  if (!target) return;
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+  target.dataset.routeFocus = '';
+  target.focus({ preventScroll: true });
+}
+
+/** Says the new page's title to screen readers (the live region in index.html). */
+function announce(text: string): void {
+  const region = document.getElementById('routeAnnouncer');
+  if (!region) return;
+  // Cleared first, so the same title twice is still read.
+  region.textContent = '';
+  requestAnimationFrame(() => (region.textContent = text));
+}
+
 let redrawnTimer: ReturnType<typeof setTimeout> | undefined;
 function draw(): void {
   applyTheme();
   const route = parseRoute();
-  // Redraws (data refreshes, settings) rebuild the page; keep the timeline where it was.
-  const timelineScroll = document.querySelector('.tl-scroll')?.scrollLeft;
-  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}`;
+  // Redraws (data refreshes, settings) rebuild the page; keep its inner scrollers and focus where they were.
+  const scrolls = innerScrolls();
+  const focused = focusMark(root());
+  const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}${route.shortState ? `?${route.short}` : ''}`;
   // Remember which page of Database / Pulls the player is on, for their tab next time.
   const section = tabOf(route);
   if (section === 'database' && !route.id) saveTabView('database', infoHref(route.page === 'arsenal' ? 'weap' : 'char'));
@@ -478,8 +571,8 @@ function draw(): void {
   // later redraws (a setting changed, Drive sync starting and finishing)
   // swap the page in place instead of flashing it.
   root().classList.toggle('settled', key === lastKey && Date.now() - openedAt > SETTLE_MS);
-  // A redraw while the player types a search keeps the box focused.
-  const searching = document.activeElement?.matches('[data-list-search]');
+  const navigated = routeChanged;
+  routeChanged = false;
   const tabRows = tabRowScroll();
   // A redraw puts new buttons under the pointer, whose hover outline would fade in again (a flash): for a moment
   // styles change at once.
@@ -490,19 +583,24 @@ function draw(): void {
   watchHeader();
   watchHero();
   restoreTabRows(tabRows);
-  if (searching) refocusListSearch();
   if (key !== lastKey) {
     scrollTo({ top: 0 });
     if (route.page === 'home') scrollTimelineToNow();
     // /banners/<name>, /event/<id>: that item's card, row or timeline bar.
     if (route.focus) focusScheduleItem(route.focus);
   } else {
-    if (timelineScroll != null) {
-      const tl = document.querySelector('.tl-scroll');
-      if (tl) tl.scrollLeft = timelineScroll;
-    }
+    restoreInnerScrolls(scrolls);
     if (route.focus) focusScheduleItem(route.focus, false);
   }
+  // Back / Forward: where the page was. Its data may still be loading (a short page), so the next
+  // redraws in the moment after try again until it's reached.
+  if (restoringScroll != null) {
+    scrollTo({ top: restoringScroll });
+    if (Math.abs(scrollY - restoringScroll) < 2 || Date.now() - openedAt > SETTLE_MS) restoringScroll = null;
+  }
+  // A new page: focus on its title. A redraw: focus (and a field's caret) back where it was.
+  if (navigated) focusPage();
+  else restoreFocus(root(), focused);
   lastKey = key;
   applyListSearch();
   if (route.page === 'story') {
@@ -528,8 +626,11 @@ function draw(): void {
         ? (story.mod?.storyTitle(route.id) ?? 'Story')
         : route.page === 'contracts'
           ? (contracts.mod?.contractsTitle(route.id) ?? 'Contingency Contract')
-        : (PULLS_TITLE[route.page] ?? TABS.find(([t]) => t === route.page)?.[1]);
+        : route.shortState === 'missing' || route.shortState === 'failed'
+          ? 'Page not found'
+          : (PULLS_TITLE[route.page] ?? TABS.find(([t]) => t === route.page)?.[1]);
   document.title = `${title ? `${title} · ` : ''}ItJustLogs`;
+  if (navigated) announce(title ?? 'ItJustLogs');
 }
 
 // ---------------------------------------------------------------------------
@@ -755,11 +856,31 @@ async function useSavedAvatar(id: string): Promise<void> {
   await setImage('avatar', saved.blob);
 }
 
+/** Remove picture: no picture, its edit dropped, and none of the saved ones current. */
+async function removeAvatar(): Promise<void> {
+  const done = await Promise.allSettled([deleteAvatarEdit(), loadAvatarHistory().then((h) => saveAvatarHistory({ list: h.list, current: undefined }))]);
+  forgetSavedAvatars();
+  await setImage('avatar', null);
+  const failed = done.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) throw failed.reason;
+}
+
 async function forgetSavedAvatar(id: string): Promise<void> {
   const history = await loadAvatarHistory();
   await saveAvatarHistory({ list: history.list.filter((x) => x.id !== id), current: history.current === id ? undefined : history.current });
   forgetSavedAvatars();
   draw();
+}
+
+/** The cropper's code, or null after offering a reload when it couldn't load (a stale tab after a deploy). */
+async function loadCropper(): Promise<typeof import('./cropper') | null> {
+  try {
+    return await import('./cropper');
+  } catch (e) {
+    console.warn('Cropper failed to load', e);
+    askReload();
+    return null;
+  }
 }
 
 /** Edit picture: the cropper again, from the upload and its framing (else the picture as it is, on a device that didn't upload it). */
@@ -768,7 +889,9 @@ async function editAvatar(): Promise<void> {
     const edit = await loadAvatarEdit();
     const source = edit?.source ?? (await loadImage('avatar'));
     if (!source) return;
-    const { cropAvatar } = await import('./cropper');
+    const cropper = await loadCropper();
+    if (!cropper) return;
+    const { cropAvatar } = cropper;
     const done = await cropAvatar(source, !!state.settings.avatarPop, edit, state.settings.displayName);
     if (done) await saveAvatar(done);
   } catch {
@@ -785,7 +908,9 @@ function installProfile(): void {
     if (!file) return;
     try {
       // The player frames it first (cropper.ts); Cancel keeps the old picture.
-      const { cropAvatar } = await import('./cropper');
+      const cropper = await loadCropper();
+      if (!cropper) return;
+      const { cropAvatar } = cropper;
       const done = await cropAvatar(file, !!state.settings.avatarPop, undefined, state.settings.displayName);
       if (done) await saveAvatar(done);
     } catch {
@@ -840,9 +965,25 @@ function navigate(e: MouseEvent): boolean {
   e.preventDefault();
   if (a.getAttribute('aria-disabled') === 'true') return true;
   const to = a.getAttribute('href')!;
-  if (to !== location.pathname) history.pushState(null, '', to);
+  if (to !== location.pathname) {
+    // This entry keeps where the page was scrolled, for Back.
+    saveScroll();
+    history.pushState(null, '', to);
+  }
+  restoringScroll = null;
+  routeChanged = true;
   draw();
   return true;
+}
+
+/** Back / Forward: the page drawn again, scrolled where it was left. */
+function onPopState(): void {
+  // A save still waiting belongs to the entry just left; it would land on this one.
+  clearTimeout(scrollSaveTimer);
+  const y = history.state?.scrollY;
+  restoringScroll = typeof y === 'number' ? y : null;
+  routeChanged = true;
+  draw();
 }
 
 /**
@@ -869,8 +1010,10 @@ async function onClick(e: MouseEvent): Promise<void> {
   if (navigate(e)) return;
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!el) return;
-  // Achievements and Archive handle their own buttons.
-  if (collectionAction(el.dataset.action ?? '', el) || essences.mod?.essenceAction(el.dataset.action ?? '', el) || aic.mod?.aicAction(el.dataset.action ?? '', el) || rotations.mod?.simAction(el.dataset.action ?? '', el) || contracts.mod?.contractsAction(el.dataset.action ?? '', el)) return draw();
+  // Achievements and Archive handle their own buttons ('drawn': a setting changed, which redrew already).
+  const collection = collectionAction(el.dataset.action ?? '', el);
+  if (collection === 'drawn') return;
+  if (collection || essences.mod?.essenceAction(el.dataset.action ?? '', el) || aic.mod?.aicAction(el.dataset.action ?? '', el) || rotations.mod?.simAction(el.dataset.action ?? '', el) || contracts.mod?.contractsAction(el.dataset.action ?? '', el)) return draw();
   if (el.dataset.action === 'essence-read') return void import('./essenceReader').then((m) => m.readEssences());
   if (el.dataset.action?.startsWith('store-')) return storageAction(el, draw);
   switch (el.dataset.action) {
@@ -879,15 +1022,24 @@ async function onClick(e: MouseEvent): Promise<void> {
     case 'avatar-upload':
       return document.getElementById('avatarInput')!.click();
     case 'avatar-remove':
-      void deleteAvatarEdit();
-      void loadAvatarHistory().then((h) => saveAvatarHistory({ list: h.list, current: undefined }).then(forgetSavedAvatars));
-      return setImage('avatar', null);
+      return removeAvatar();
     case 'avatar-edit':
-      return void editAvatar();
+      return editAvatar();
     case 'avatar-use':
-      return void useSavedAvatar(el.dataset.value!);
+      return useSavedAvatar(el.dataset.value!);
     case 'avatar-forget':
-      return void forgetSavedAvatar(el.dataset.value!);
+      return forgetSavedAvatar(el.dataset.value!);
+    case 'reload':
+      return location.reload();
+    case 'skip-to-content': {
+      e.preventDefault();
+      const main = document.querySelector<HTMLElement>('#app main');
+      if (!main) return;
+      if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1');
+      main.dataset.routeFocus = '';
+      main.focus({ preventScroll: true });
+      return main.scrollIntoView({ block: 'start' });
+    }
     case 'avatar-shape':
       return updateSettings({ avatarPop: el.dataset.value === 'pop' });
     case 'filter': {
@@ -1120,7 +1272,14 @@ export function mount(): void {
   installListSearch();
   installProfile();
   installSync();
-  document.addEventListener('click', (e) => void onClick(e));
+  document.addEventListener('click', (e) =>
+    onClick(e).catch((err: unknown) => {
+      console.warn('Click failed', err);
+      toast(`Something went wrong: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    }),
+  );
+  // Anything else that fails without a handler: logged, not silent.
+  addEventListener('unhandledrejection', (e) => console.warn('Unhandled rejection', e.reason));
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
     if ((e.key === 'Enter' || e.key === ' ') && el.dataset?.action === 'luck') {
@@ -1128,14 +1287,33 @@ export function mount(): void {
       el.click();
     }
   });
-  addEventListener('resize', markOverflow);
+  // Once per frame however fast the window is resized.
+  let resizeFrame = 0;
+  addEventListener('resize', () => {
+    if (resizeFrame) return;
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      markOverflow();
+    });
+  });
+  // Back / Forward put the scroll back themselves (onPopState); the player scrolling first wins.
+  history.scrollRestoration = 'manual';
+  addEventListener(
+    'scroll',
+    () => {
+      clearTimeout(scrollSaveTimer);
+      scrollSaveTimer = setTimeout(saveScroll, 250);
+    },
+    { passive: true },
+  );
+  for (const type of ['wheel', 'touchstart', 'keydown'] as const) addEventListener(type, () => (restoringScroll = null), { passive: true });
   // Old links and bookmarks used #/page; move them to the clean path. GitHub
   // Pages also redirects /operators to /operators/ (it's a folder there):
   // drop the trailing slash so the address stays clean.
-  if (location.hash.startsWith('#/')) history.replaceState(null, '', `/${location.hash.slice(2)}`);
+  if (location.hash.startsWith('#/')) history.replaceState(history.state, '', `/${location.hash.slice(2)}`);
   else if (location.pathname.length > 1 && location.pathname.endsWith('/'))
-    history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search);
-  addEventListener('popstate', draw);
+    history.replaceState(history.state, '', location.pathname.replace(/\/+$/, '') + location.search);
+  addEventListener('popstate', onPopState);
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
   subscribe(draw);
   onSyncStatus(draw);

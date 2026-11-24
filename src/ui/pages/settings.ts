@@ -21,7 +21,7 @@ export function getDataSteps(): Html {
       <li><span>Open <b>Windows PowerShell</b> (no administrator needed), paste the script below with a right-click, and press <kbd>Enter</kbd> if it shows <code>&gt;&gt;</code>.</span></li>
       <li><span>When it says <b>Done</b>, come back here and press <kbd>Ctrl</kbd> <kbd>V</kbd>. The file is also saved to your Desktop.</span></li>
     </ol>
-    <div class="code" style="margin-top:20px">
+    <div class="code steps-code">
       <button class="btn secondary sm" data-action="copy-script">${icon('content_copy')}Copy</button>
       <pre><code>${EXPORTER_SOURCE}</code></pre>
     </div>`;

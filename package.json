@@ -10,9 +10,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "//": "highs is pinned: its version must match HIGHS in src/ui/aicWorker.ts (loaded from jsDelivr at runtime).",
   "devDependencies": {
-    "@types/node": "^26.6.5",
-    "highs": "^1.15.3",
+    "@types/node": "^24",
+    "highs": "1.15.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.5"

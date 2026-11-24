@@ -18,7 +18,9 @@ import { buildBackup, type Backup } from './io';
  *   them last (`changed` times; a tie goes to Drive, so a fresh device picks
  *   up the saved name and picture);
  * - Drive's file version is checked again right before uploading, so a
- *   newer copy from another device is merged in rather than overwritten;
+ *   newer copy from another device is merged in rather than overwritten, and
+ *   if the version after uploading shows another write slipped in between,
+ *   one more pass merges it (syncWith's `recheck`);
  * - operator art isn't in that file: each picture is a file of its own,
  *   named by its key (syncArt), so the backup stays small and a picture is
  *   uploaded once, then downloaded only by devices without it;
@@ -83,7 +85,15 @@ async function applyRemote(remote: Backup): Promise<boolean> {
         if (choice === 'cancel') return false;
         replace = choice === 'replace';
       }
-      if (replace) await clearHistory("Before using Drive's pulls");
+      if (replace) {
+        try {
+          await clearHistory("Before using Drive's pulls");
+        } catch (e) {
+          // No version history copy of this browser's pulls could be saved: keep them and pause, like a Cancel.
+          toast((e as Error).message, 'error');
+          return false;
+        }
+      }
       const { added } = mergeHistories(state.history ?? { characters: [], weapons: [] }, h);
       if (replace || added.char || added.weap) await importHistory(h, 'Before syncing from Google Drive');
     }
@@ -127,7 +137,13 @@ async function hashOf(b: Backup): Promise<string> {
   return [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
-async function syncWith(token: string): Promise<void> {
+/**
+ * One sync pass. `recheck`: when Drive's version after our upload isn't the
+ * one we read plus one, another device may have uploaded in between (the
+ * check before uploading can't close that gap), so run one more pass to
+ * merge whatever it wrote. Only once: the second pass doesn't recheck.
+ */
+async function syncWith(token: string, recheck = true): Promise<void> {
   if (!meta.email) {
     meta.email = await drive.whoAmI(token);
     save();
@@ -171,12 +187,18 @@ async function syncWith(token: string): Promise<void> {
         continue;
       }
     }
+    let raced = false;
     if (!file || hash !== remoteHash) {
       const body = JSON.stringify(local);
-      file = file ? await drive.updateFile(token, file.id, body) : await drive.createFile(token, body);
+      if (file) {
+        const read = Number(file.version);
+        file = await drive.updateFile(token, file.id, body);
+        raced = Number(file.version) !== read + 1;
+      } else file = await drive.createFile(token, body);
     }
     meta = { ...meta, fileId: file.id, version: file.version, hash, lastSynced: Date.now(), paused: false };
     save();
+    if (raced && recheck) return syncWith(token, false);
     await syncArt(token);
     await syncRuns(token);
     await syncAvatarEdit(token);

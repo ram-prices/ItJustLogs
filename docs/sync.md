@@ -9,7 +9,19 @@ Read when touching `src/drive.ts`, `ui/sync.ts`, snapshots, operator art or the 
   plus `changed` times. Pulls merge like an import, with the same same-player
   check and dialog (`ui/dialog.ts`); settings and each picture are taken whole
   from whichever side changed them last (ties go to Drive); Drive's file
-  `version` is re-checked right before each upload.
+  `version` is re-checked right before each upload, and if the version the
+  upload returns isn't the one read plus one (another device wrote in
+  between, or Drive counted some other change), one more sync pass runs to
+  merge it (`syncWith(token, recheck)`, once only).
+  - Importing a downloaded backup (`importText` in ui/io.ts) never takes its
+    deletion lists (`deletedArt`, `deletedRuns`; `importableSettings`): sync
+    would delete whatever they name in Drive and on every device. This
+    browser's lists stay. Its settings, name and pictures replace this
+    browser's without asking only when its pulls are this player's (or
+    the player chose "Replace saved pulls"); a backup with no pulls, or one
+    the player added with "Add anyway", asks first (Keep mine / Use the
+    backup's, `askUseBackupSettings`). Its parsed runs and operator art are
+    only ever added.
   - Guardrail: the Drive copy's pulls only ever grow. Every sync downloads it
     and merges its pulls in before uploading (which also restores pulls this
     browser lost), and `missingPulls` (parse.ts) refuses any upload that would
@@ -17,6 +29,10 @@ Read when touching `src/drive.ts`, `ui/sync.ts`, snapshots, operator art or the 
     saved pulls" on import, restoring a version) signs this browser out of
     sync first, so it never reaches Drive. Only the player deleting the app
     data in Google Drive removes the Drive copy.
+  - `clearHistory` (state.ts) refuses, deleting nothing, when there are pulls
+    and no version history copy of them could be saved; Replace on import
+    and "Use Drive's pulls" show its message as a toast (sync then pauses,
+    like Cancel), and Delete pull history in Settings shows it too.
 - Version history (`store.ts` snapshots, `state.snapshot`): before any
   import, delete, replace, restore or Drive merge that changes the pulls, the
   previous pulls are saved in IndexedDB (`data` store, `snapshot:<id>` plus a

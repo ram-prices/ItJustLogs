@@ -1,4 +1,5 @@
 import { ARCHIVE_CATEGORIES, FINDING_CATEGORIES, MEDAL_CATEGORIES, medalImage, type Finding, type FindingFile, type Medal, type MedalFile, type MedalProgress } from '../../domain/collections';
+import COLLECTION_IDS from '../../data/collectionIds.json';
 import { state, updateSettings } from '../../state';
 import { icon, pageHeader, toggleGroup, emptyState } from '../components';
 import { html, raw, render, type Html } from '../html';
@@ -28,11 +29,18 @@ function medalData(redraw: () => void): MedalFile | null {
   waiting.medals.add(redraw);
   if (!loading.medals) {
     loading = { ...loading, medals: true };
-    void import('../../data/medals.snapshot.json').then((m) => {
-      medalFile = m.default as unknown as MedalFile;
-      waiting.medals.forEach((fn) => fn());
-      waiting.medals.clear();
-    });
+    import('../../data/medals.snapshot.json').then(
+      (m) => {
+        medalFile = m.default as unknown as MedalFile;
+        waiting.medals.forEach((fn) => fn());
+        waiting.medals.clear();
+      },
+      (e) => {
+        // Tried again on the next redraw.
+        console.warn('Medal list failed to load', e);
+        loading = { ...loading, medals: false };
+      },
+    );
   }
   return null;
 }
@@ -42,11 +50,17 @@ function findingData(redraw: () => void): FindingFile | null {
   waiting.findings.add(redraw);
   if (!loading.findings) {
     loading = { ...loading, findings: true };
-    void import('../../data/findings.snapshot.json').then((m) => {
-      findingFile = m.default as unknown as FindingFile;
-      waiting.findings.forEach((fn) => fn());
-      waiting.findings.clear();
-    });
+    import('../../data/findings.snapshot.json').then(
+      (m) => {
+        findingFile = m.default as unknown as FindingFile;
+        waiting.findings.forEach((fn) => fn());
+        waiting.findings.clear();
+      },
+      (e) => {
+        console.warn('Archive list failed to load', e);
+        loading = { ...loading, findings: false };
+      },
+    );
   }
   return null;
 }
@@ -58,15 +72,17 @@ export async function readMedalsFrom(files: File[]): Promise<void> {
   await readMedalFiles(files, data.medals);
 }
 
-/** Medals and Archive entries the player has, of how many (Home's Collection widget); null while loading. */
-export function archiveProgress(redraw: () => void): { medals: [number, number] | null; archive: [number, number] | null } {
-  const m = medalData(redraw);
-  const f = findingData(redraw);
+/**
+ * Medals and Archive entries the player has, of how many (Home's Collection
+ * widget). From the snapshots' ids alone (data/collectionIds.json, kept equal
+ * to them by collectionIds.test.ts), so Home doesn't load the 600 kB lists.
+ */
+export function archiveProgress(): { medals: [number, number]; archive: [number, number] } {
   const medals = state.settings.medals ?? {};
   const have = new Set(state.settings.findings ?? []);
   return {
-    medals: m ? [m.medals.filter((x) => medals[x.id]).length, m.medals.length] : null,
-    archive: f ? [f.findings.filter((x) => have.has(x.id)).length, f.findings.length] : null,
+    medals: [COLLECTION_IDS.medals.filter((id) => medals[id]).length, COLLECTION_IDS.medals.length],
+    archive: [COLLECTION_IDS.findings.filter((id) => have.has(id)).length, COLLECTION_IDS.findings.length],
   };
 }
 
@@ -96,8 +112,11 @@ function setMedal(id: string, p: MedalProgress | null): void {
   updateSettings({ medals: Object.keys(all).length ? all : undefined });
 }
 
-/** The pages' clicks (app.ts passes them on, then redraws). True if it was one of theirs. */
-export function collectionAction(action: string, el: HTMLElement): boolean {
+/**
+ * The pages' clicks (app.ts passes them on, then redraws). True if it was one
+ * of theirs; 'drawn' if it changed a setting, which redrew the page already.
+ */
+export function collectionAction(action: string, el: HTMLElement): boolean | 'drawn' {
   const id = el.dataset.value ?? '';
   switch (action) {
     case 'medal-show':
@@ -122,7 +141,7 @@ export function collectionAction(action: string, el: HTMLElement): boolean {
     }
     case 'medal-toggle':
       setMedal(id, medalsOwned()[id] ? null : {});
-      return true;
+      return 'drawn';
     case 'finding-toggle': {
       const have = findingsOwned();
       if (!have.delete(id)) have.add(id);
@@ -130,7 +149,7 @@ export function collectionAction(action: string, el: HTMLElement): boolean {
       // The open document's own toggle follows.
       const dlg = document.querySelector<HTMLElement>('.finding-dialog [data-action="finding-toggle"]');
       if (dlg) paintToggle(dlg, have.has(id), 'Collected', 'Mark collected');
-      return true;
+      return 'drawn';
     }
     case 'finding-open':
       openFinding(id);

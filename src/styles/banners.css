@@ -194,7 +194,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 9999px;
-  background: #0072f5;
+  background: var(--link);
   color: #fff;
   font: 500 12px/1 var(--font-sans);
 }
@@ -703,26 +703,6 @@
 .item-name .badge {
   flex-shrink: 0;
 }
-.item-text {
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.item-sub {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 6px;
-  color: var(--gray-700);
-  font: 400 12px/16px var(--font-sans);
-}
-@container (max-width: 340px) {
-  .banner-body .hide-xnarrow {
-    display: none;
-  }
-}
 .banner-dates {
   font-size: 16px;
   line-height: 32px;
@@ -742,15 +722,6 @@
   gap: 8px;
   font: 400 14px/20px var(--font-sans);
   min-width: 0;
-}
-.mini-stat .label-12 {
-  color: var(--gray-700);
-}
-.mini-stat .v {
-  margin-top: 2px;
-  font: 600 18px/24px var(--font-sans);
-  letter-spacing: -0.18px;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Empty state -------------------------------------------------- */
@@ -975,11 +946,11 @@ code {
   font: 400 14px/20px var(--font-sans);
 }
 .danger {
-  box-shadow: 0 0 0 1px color-mix(in srgb, #e5484d 40%, transparent), 0 2px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--red-solid) 40%, transparent), 0 2px 2px rgba(0, 0, 0, 0.04);
 }
 .danger .card-footer {
-  background: color-mix(in srgb, #e5484d 6%, var(--background-200));
-  border-top-color: color-mix(in srgb, #e5484d 40%, transparent);
+  background: color-mix(in srgb, var(--red-solid) 6%, var(--background-200));
+  border-top-color: color-mix(in srgb, var(--red-solid) 40%, transparent);
 }
 
 /* ---------- Charts ------------------------------------------------------ */
@@ -1022,6 +993,15 @@ code {
   height: 8px;
   border-radius: 2px;
   margin-right: 6px;
+}
+.legend i.op {
+  background: var(--op);
+}
+.legend i.ars {
+  background: var(--ars);
+}
+.legend i.ink {
+  background: var(--gray-1000);
 }
 .bar-cell {
   display: flex;
@@ -1089,7 +1069,7 @@ code {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 120;
+  z-index: var(--z-toast);
   display: grid;
   gap: 8px;
   width: min(380px, calc(100% - 32px));
@@ -1114,7 +1094,7 @@ code {
 .drop-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-overlay);
   display: none;
   place-items: center;
   background: rgba(0, 0, 0, 0.5);
@@ -1334,9 +1314,9 @@ code {
 .pull-luck {
   text-align: right;
 }
-/* Names as in the original tracker's list: bold, 13px, white. */
+/* Names as in the original tracker's list: semibold, 13px, white. */
 .pull .item-name > .ellipsis {
-  font: 700 13px/18px var(--font-sans);
+  font: 600 13px/18px var(--font-sans);
   color: var(--gray-1000);
 }
 /* Row markers after the name: rate-up chevrons and "new" sparkles. */
@@ -1593,6 +1573,9 @@ code {
   font: 500 12px/16px var(--font-sans);
   text-transform: uppercase;
   color: var(--gray-1000);
+}
+.six-pity i.free {
+  background: var(--green);
 }
 .six-pity i {
   width: 6px;

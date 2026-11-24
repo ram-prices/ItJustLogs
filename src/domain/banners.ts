@@ -28,7 +28,10 @@ export function lookupBanner(db: BannerDb, poolId: string): BannerInfo | null {
   let entry: BannerDbEntry | undefined = db[id] ?? db[id.replace(/^weponbox_/, 'weaponbox_')];
   // Joint operations reuse one rate-up roster that ef-assets lists once; fall back to the latest joint entry.
   if (!entry && id.startsWith('joint_')) {
-    const jointKeys = Object.keys(db).filter((k) => k.startsWith('joint_')).sort();
+    // Numerically: joint_1_10_1 is newer than joint_1_9_1.
+    const jointKeys = Object.keys(db)
+      .filter((k) => k.startsWith('joint_'))
+      .sort((a, b) => comparePatches(patchOf(a), patchOf(b)) || poolNumber(a) - poolNumber(b));
     entry = db[jointKeys[jointKeys.length - 1]];
   }
   if (!entry) return null;
@@ -36,13 +39,25 @@ export function lookupBanner(db: BannerDb, poolId: string): BannerInfo | null {
   return { rateUpIds: entry.rateUpIds ?? [], rateUpNames: Array.isArray(names) ? names : [names] };
 }
 
+/** A pool's number within its patch: special_1_4_2 → 2; 0 without one. */
+const poolNumber = (poolId: string): number => Number(canonicalPoolId(poolId).match(/_\d+_\d+_(\d+)$/)?.[1] ?? 0);
+
+/** Chartered Headhunting pools: special_<major>_<minor>_<n> (banners.json). Only these share Chartered pity. */
+const CHARTERED_POOL = /^special_\d+_\d+(?:_\d+)?$/;
+
+/**
+ * A character pool that is none of the known kinds (an exporter that left the
+ * pool out, 'unknown', or a pool type the game added later) is 'other': its own
+ * pity per pool (analyze.ts pityScope), never Chartered's, and no rewards.
+ */
 export function categoryOf(kind: Kind, poolId: string): Category {
   const id = canonicalPoolId(poolId);
   if (kind === 'weap') return id.includes('constant') ? 'constant' : 'limited';
   if (id === 'beginner') return 'newHorizons';
   if (id === 'standard') return 'basic';
   if (id.startsWith('joint_')) return 'joint';
-  return 'chartered';
+  if (CHARTERED_POOL.test(id)) return 'chartered';
+  return 'other';
 }
 
 export const CATEGORY_LABEL: Record<Category, string> = {
@@ -50,6 +65,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   joint: 'Joint Headhunting',
   basic: 'Basic Headhunting',
   newHorizons: 'New Horizons',
+  other: 'Other headhunting',
   limited: 'Arsenal Issue',
   constant: 'Constant Issue',
 };

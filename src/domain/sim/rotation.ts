@@ -73,7 +73,7 @@ export interface Press {
 }
 
 /** Frames since the start, stopped time too. */
-const clock = (w: World) => w.frame + w.frozenFrames;
+export const clock = (w: World): number => w.frame + w.frozenFrames;
 
 /** An input, or holding back (only basic attacks) until a frame. */
 export type Step = Press | { frame: number; wait: number };

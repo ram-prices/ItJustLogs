@@ -24,20 +24,40 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      # Actions are pinned to commit SHAs (tag in the trailing comment). To bump one:
+      #   git ls-remote https://github.com/actions/<name> refs/tags/<tag>
+      # (for an annotated tag, use the peeled `<tag>^{}` SHA).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      # The sim's rule tests read ef-assets combat/ and wiki/. They read them from this
+      # pinned commit, not live main, so a data-only change in ef-assets can't block a
+      # deploy (the daily cron would otherwise test against whatever main holds that day).
+      # To bump after checking the tests pass against new data
+      # (EF_ASSETS_REF=<sha> npx vitest run src/domain/sim):
+      #   git ls-remote https://github.com/ram-prices/ef-assets refs/heads/main
+      # The build step below still fetches live ef-assets data on its own.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          repository: ram-prices/ef-assets
+          ref: 750c42381b488e5b0427301935281d3ba9339472 # ef-assets main, 2026-11-23
+          path: ef-assets
+          sparse-checkout: |
+            combat
+            wiki
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test
+        env:
+          EF_ASSETS_DIR: ${{ github.workspace }}/ef-assets
       - run: npm run build
         env:
           # OAuth client ID for Google Drive sync (a public value; repo variable, not a secret).
           # Unset: the build has no sync and never loads Google's sign-in script.
           VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: dist
 
@@ -49,4 +69,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

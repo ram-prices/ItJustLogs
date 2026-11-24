@@ -35,6 +35,9 @@ addEventListener('ijl:runs', () => {
   });
 });
 
+/** A sim worker that errors before answering: most often its script is gone after a deploy. */
+const WORKER_FAILED = 'The simulator didn’t load (the site may have been updated). Reload the page and try again.';
+
 /**
  * Plays a video's presses in the sim (the worker's replay), the team as the page has it. A new parsed run, or with
  * `into` that saved run again (its transcript edited), keeping its star, name and note.
@@ -67,6 +70,15 @@ export function runReplay(v: VideoRotation, at: number[], req: SimRequest, names
       page.replayWorker = null;
       redraw();
     }
+  };
+  // The worker's script failed to load (a tab left open across a deploy asks for a chunk that's gone) or threw.
+  w.onerror = (e) => {
+    e.preventDefault();
+    if (page.replayWorker !== w) return;
+    w.terminate();
+    page.replayWorker = null;
+    page.replay = { names, ids, at: into?.at, ...(shown ? { result: shown } : {}), error: WORKER_FAILED };
+    redraw();
   };
   // Readings saved before the stopwatch was read have no end: the fight's length stands in.
   w.postMessage({ id, req, replay: steps, stopwatch: { end: v.end ?? v.seconds, pauses: v.pauses ?? [], away: v.away ?? [], guard: v.guard ?? [], ...(v.boss ? { phases: phaseChanges(v.boss, v.pauses ?? []) } : {}) } });
@@ -156,6 +168,14 @@ export function run(req: SimRequest, key: string, names: string[], cores: number
       page.failed = e.data.error;
       stop();
     }
+    redraw();
+  };
+  const w = page.worker;
+  w.onerror = (e) => {
+    e.preventDefault();
+    if (page.worker !== w) return;
+    page.failed = WORKER_FAILED;
+    stop();
     redraw();
   };
   page.worker.postMessage({ id, req, cores });

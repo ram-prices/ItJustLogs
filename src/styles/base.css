@@ -10,6 +10,14 @@
 /* ---------- Tokens ------------------------------------------------------- */
 :root {
   color-scheme: dark;
+  /* Stacking scale (small local z-indexes inside a component stay numbers). */
+  --z-header: 30;
+  --z-overlay: 100;
+  --z-dialog: 900;
+  --z-pop: 950;
+  --z-menu: 1000;
+  --z-tooltip: 1100;
+  --z-toast: 1200;
   --background-100: #0a0a0a;
   --background-200: #000000;
   --gray-100: #1a1a1a;
@@ -59,6 +67,7 @@
   --amber-bg: rgba(255, 178, 36, 0.14);
   --orange: #f76808;
   --red: #ff6369;
+  --red-solid: #e5484d;
   --oroberyl: #ff7350; /* the Oroberyl crystal's red */
   --chartered: #e2d957; /* the Chartered HH Permit's yellow */
   --basic-permit: #4a9be0; /* the Basic HH Permit's blue */
@@ -123,6 +132,7 @@
   --amber-bg: rgba(255, 178, 36, 0.18);
   --orange: #bd4b00;
   --red: #cd2b31;
+  --red-solid: #cd2b31;
   --oroberyl: #d2381f;
   --chartered: #9a8a07;
   --basic-permit: #2a72b8;
@@ -204,10 +214,6 @@ p a {
 }
 
 /* ---------- Geist type scale -------------------------------------------- */
-.heading-48 {
-  font: 600 48px/56px var(--font-sans);
-  letter-spacing: -1.2px;
-}
 .heading-32 {
   font: 600 32px/40px var(--font-sans);
   letter-spacing: -0.64px;
@@ -255,20 +261,13 @@ p a {
   font-variant-numeric: tabular-nums;
 }
 /* Uppercase labels: Jost Medium with a touch of tracking. */
-.label-mono,
 .metric-label,
-.table th,
-.mini-stat .label-12 {
+.table th {
   font: 500 12px/16px var(--font-sans);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 @media (max-width: 640px) {
-  .heading-48 {
-    font-size: 36px;
-    line-height: 40px;
-    letter-spacing: -0.9px;
-  }
   .heading-32 {
     font-size: 28px;
     line-height: 34px;

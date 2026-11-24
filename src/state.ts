@@ -5,6 +5,7 @@ import { mergeHistories, parseTimestamp } from './domain/parse';
 import { guessServer, type Schedule, type Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
 import * as store from './store';
+import { sanitizeSettings } from './settingsSanitize';
 
 interface State {
   history: PullHistory | null;
@@ -100,6 +101,7 @@ export async function restoreSnapshot(id: string): Promise<{ chars: number; weap
 
 /** Replaces the pulls with `copy` (from version history here or in Google Drive), saving the current pulls first. */
 export async function restoreCopy(copy: PullHistory): Promise<{ chars: number; weaps: number; savedCurrent: boolean }> {
+  await ensureHistoryRead();
   const savedCurrent = await snapshot('Before restoring an older copy');
   await store.saveHistory(copy);
   state.history = copy;
@@ -118,21 +120,59 @@ function recompute(): void {
 export async function loadSavedHistory(): Promise<void> {
   try {
     state.history = await store.loadHistory();
+    historyUnread = false;
   } catch (e) {
+    historyUnread = true;
     console.warn('Could not read saved history', e);
+  }
+  // Imports before the seqId fix could add a seqId-less copy of pulls already saved: drop them once.
+  if (state.history) {
+    const fixed = mergeHistories(state.history, { characters: [], weapons: [] }).history;
+    if (shapeOf(fixed) !== shapeOf(state.history)) {
+      await snapshot('Before removing duplicate pulls');
+      await store.saveHistory(fixed);
+      state.history = fixed;
+      changed('history');
+    }
   }
   recompute();
 }
 
+/** Record counts and how many carry a seqId: tells whether a merge repaired or filled anything. */
+const shapeOf = (h: PullHistory): string =>
+  [h.characters, h.weapons].map((list) => `${list.length}/${list.filter((r) => r.seqId != null && r.seqId !== '').length}`).join(',');
+
+/** True while the saved pulls couldn't be read (store.ts openDb gave up): what's shown isn't what's saved. */
+let historyUnread = false;
+
+/**
+ * Before anything writes the pulls: if they couldn't be read at start, read them now, so a write
+ * never replaces saved pulls the page never saw. Throws when they still can't be read.
+ */
+async function ensureHistoryRead(): Promise<void> {
+  if (!historyUnread) return;
+  try {
+    state.history = await store.loadHistory();
+  } catch (e) {
+    throw new Error("Your saved pulls couldn't be opened, so nothing was changed. Reload the page and try again.", { cause: e });
+  }
+  historyUnread = false;
+  recompute();
+  emit();
+}
+
 /** Merges an imported file onto saved history. Returns how many new pulls it added. */
 export async function importHistory(incoming: PullHistory, reason = 'Before import'): Promise<{ char: number; weap: number }> {
+  await ensureHistoryRead();
   const base = state.history ?? { characters: [], weapons: [] };
   const { history, added } = mergeHistories(base, incoming);
-  if (added.char || added.weap) await snapshot(reason);
+  // A merge that adds nothing can still drop old duplicates or fill in seqIds: sync that too.
+  const altered = added.char || added.weap || shapeOf(history) !== shapeOf(base);
+  if (altered) await snapshot(reason);
   await store.saveHistory(history);
   state.history = history;
   recompute();
-  if (added.char || added.weap) changed('history');
+  if (altered) changed('history');
   emit();
   return added;
 }
@@ -152,7 +192,8 @@ export function setSchedule(schedule: Schedule): void {
 export const currentServer = (): Server => state.settings.server ?? guessServer();
 
 export function updateSettings(patch: Partial<store.Settings>): void {
-  state.settings = withStorageItems(withoutRetiredPlaces({ ...state.settings, ...patch }));
+  // Patches can come from a backup or Drive: sanitized like everything loaded (settingsSanitize.ts).
+  state.settings = withStorageItems(withoutRetiredPlaces(sanitizeSettings({ ...state.settings, ...patch })));
   store.saveSettings(state.settings);
   changed('settings');
   emit();
@@ -179,9 +220,16 @@ export async function loadImages(): Promise<void> {
   emit();
 }
 
-/** Deletes the imported pull history only; name, picture and settings are kept. */
+/**
+ * Deletes the imported pull history only; name, picture and settings are kept.
+ * Throws, deleting nothing, when there are pulls and no version history copy
+ * of them could be saved: deleting them then couldn't be undone.
+ */
 export async function clearHistory(reason = 'Before deleting pull history'): Promise<void> {
-  await snapshot(reason);
+  await ensureHistoryRead();
+  const h = state.history;
+  if (!(await snapshot(reason)) && h && (h.characters.length || h.weapons.length))
+    throw new Error("Your pulls weren't deleted: a version history copy of them couldn't be saved first, so it couldn't be undone. Try again, or download a backup first.");
   await store.clearHistory();
   state.history = null;
   recompute();

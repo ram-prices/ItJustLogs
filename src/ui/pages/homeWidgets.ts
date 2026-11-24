@@ -4,9 +4,11 @@ import type { Kind } from '../../domain/types';
 import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import type { HomeWidget } from '../../store';
+import type { HomeWidgetType } from '../../settingsSanitize';
 import { bannerArtUrl, operatorFullUrl } from '../../domain/banners';
 import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars, emptyState } from '../components';
-import { fmtDate, fmtInt, html, raw, render, type Html } from '../html';
+import { holdFocus } from '../dialog';
+import { fmtDate, fmtInt, focusMark, html, raw, render, restoreFocus, type Html } from '../html';
 import { artOf, saveFiles } from './art';
 import { archiveProgress } from './collections';
 import { infoHref, potentialStar, wikiFile } from './info';
@@ -47,6 +49,11 @@ const PLACES: ['left' | 'center' | 'right', string, string][] = [
   ['center', 'align_horizontal_center', 'Centre'],
   ['right', 'align_horizontal_right', 'Right'],
 ];
+
+/** A widget width as markup may use it: one of the four sizes, else full width. */
+const sizeOf = (n: unknown): WidgetSize => ([4, 6, 8, 12] as unknown[]).includes(n) ? (n as WidgetSize) : 12;
+/** A grid row or column as markup may use it: an integer, else 1. */
+const intOf = (n: unknown): number => (Number.isInteger(n) ? (n as number) : 1);
 
 const SIZES: [WidgetSize, string][] = [
   [4, '⅓'],
@@ -103,6 +110,7 @@ interface WidgetDef {
   render: (w: HomeWidget, c: Ctx) => Html | null;
 }
 
+// Keyed by settingsSanitize's list, so a widget type the sanitizer doesn't know can't be added here.
 const WIDGETS: Record<string, WidgetDef> = {
   banners: {
     label: 'Current Banners',
@@ -126,9 +134,9 @@ const WIDGETS: Record<string, WidgetDef> = {
     label: 'Empty space',
     about: 'Blank room across the page between widgets. Drag its bottom edge to make it taller or shorter.',
     size: 12,
-    render: (w) => html`<div class="widget-spacer" style="height:${w.height ?? SPACER_HEIGHT}px"></div>`,
+    render: (w) => html`<div class="widget-spacer" style="height:${Number.isFinite(w.height) ? w.height : SPACER_HEIGHT}px"></div>`,
   },
-};
+} satisfies Record<HomeWidgetType, WidgetDef>;
 
 /** An empty space's height until it's dragged; the least it can be. */
 const SPACER_HEIGHT = 120;
@@ -383,10 +391,11 @@ export function widgetGrid(parts: ScheduleParts, a: Analysis | null, redraw: () 
     WIDGETS[w.type].pulls && !a ? emptyState('inbox', 'Import your pulls to see this.') : WIDGETS[w.type].render(w, c);
   // A column's widgets take its top widget's width and place; a lone one is itself the grid's item,
   // at the row and column `gridPlaces` gives it.
+  // Escaped and coerced: the layout comes from settings (backups, Drive), so never trust its values here.
   const place = (head: HomeWidget, at: { row: number; start: number }) =>
-    raw(`data-size="${head.size}" style="--span:${head.size};--row:${at.row};--start:${at.start}"`);
+    html`data-size="${sizeOf(head.size)}" style="--span:${sizeOf(head.size)};--row:${intOf(at.row)};--start:${intOf(at.start)}"`;
   const cell = (w: HomeWidget, body: Html | null, head: HomeWidget, at: { row: number; start: number } | null): Html =>
-    html`<section class="widget${w.hideTitle ? ' no-title' : ''}" data-widget="${w.id}" data-type="${w.type}" ${at ? place(head, at) : raw(`data-size="${head.size}"`)}>
+    html`<section class="widget${w.hideTitle ? ' no-title' : ''}" data-widget="${w.id}" data-type="${w.type}" ${at ? place(head, at) : html`data-size="${sizeOf(head.size)}"`}>
       ${editing ? toolbar({ ...w, size: head.size, align: head.align }, WIDGETS[w.type]) : ''}
       <div class="widget-body">${body ?? emptyState('inbox', 'Nothing to show right now.')}</div>
       ${editing && w.type === 'spacer' ? html`<span class="spacer-edge" title="Drag to make it taller or shorter"></span>` : ''}
@@ -529,7 +538,7 @@ function progressWidget(c: Ctx): Html {
     const mine = ownedItems(c.a, kind, extras);
     return [ids.filter((id) => mine.get(id)?.copies).length, ids.length] as const;
   };
-  const p = archiveProgress(c.redraw);
+  const p = archiveProgress();
   const essences = Object.values(state.settings.essences ?? {}).reduce((n, x) => n + x, 0);
   const row = (label: string, href: string, v: readonly [number, number] | null) =>
     metric({ label, value: v ? html`${fmtInt(v[0])}<span class="metric-of">/${fmtInt(v[1])}</span>` : '…', progress: v && v[1] ? v[0] / v[1] : undefined, aside: html`<a class="label-12" href="${href}">Open</a>` });
@@ -575,7 +584,7 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
   const style = w.artStyle ?? (full || art ? 'banner' : 'avatar');
   const src = full ?? art?.src;
   const banner = full ? bannerArtOf(w.op) : null;
-  const picture = html`<span class="char-card-art">${src ? html`<img class="${full ? 'full-art' : ''}" src="${src}" alt="" decoding="async" ${full ? raw(`style="${faceStyle(w.op)}" data-fallback${banner ? ` data-alt="${banner}" data-alt-class="stitched"` : ''}`) : ''} />` : itemImg('char', w.op, 'char-card-portrait')}</span>`;
+  const picture = html`<span class="char-card-art">${src ? html`<img class="${full ? 'full-art' : ''}" src="${src}" alt="" decoding="async" ${full ? html`style="${faceStyle(w.op)}" data-fallback${banner ? html` data-alt="${banner}" data-alt-class="stitched"` : ''}` : ''} />` : itemImg('char', w.op, 'char-card-portrait')}</span>`;
   // Ambient: with a picture, glows of the colours along its edges, each from its side (as
   // YouTube's ambient mode does, tint.ts tintAmbients); else a glow of the portrait's colour. Inside the card
   // while it has its outline, past it without.
@@ -639,8 +648,15 @@ function dialog(title: string, body: (refresh: () => void, close: () => void) =>
   document.querySelector('.home-dialog')?.closest('.dialog-backdrop')?.remove();
   const backdrop = document.createElement('div');
   backdrop.className = 'dialog-backdrop';
-  const close = () => backdrop.remove();
-  const draw = () =>
+  let release = () => {};
+  const close = () => {
+    if (!backdrop.isConnected) return;
+    backdrop.remove();
+    release();
+  };
+  const draw = () => {
+    // A refresh re-renders the form: keep focus (and a field's caret) where it was.
+    const mark = focusMark(backdrop);
     render(
       backdrop,
       html`<form class="card dialog home-dialog" role="dialog" aria-modal="true" aria-label="${title}">
@@ -648,6 +664,8 @@ function dialog(title: string, body: (refresh: () => void, close: () => void) =>
         ${body(draw, close)}
       </form>`,
     );
+    restoreFocus(backdrop, mark);
+  };
   draw();
   backdrop.addEventListener('click', (e) => {
     if (e.target === backdrop || (e.target as HTMLElement).closest('[data-close]')) close();
@@ -658,6 +676,8 @@ function dialog(title: string, body: (refresh: () => void, close: () => void) =>
     close();
   });
   document.body.append(backdrop);
+  // Focus starts on the form's first field or choice, not the Close button.
+  release = holdFocus(backdrop, close, backdrop.querySelector<HTMLElement>(':is(.home-dialog-head ~ *, .home-dialog-head ~ * *):is(input:not([type="hidden"]), select, textarea, button)'));
 }
 
 function addDialog(): void {
@@ -756,7 +776,7 @@ function configDialog(id: string): void {
           ? html`<div class="field"><span class="label-13">Picture</span>
               <div class="char-pics">
                 <label class="char-pic" title="Portrait"><input type="radio" name="pic" value="" ${raw(!draft.pic ? 'checked' : '')} />${itemImg('char', draft.op, 'char-pic-img')}</label>
-                <label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" data-fallback ${bannerArtOf(draft.op) ? raw(`data-alt="${bannerArtOf(draft.op)}" data-alt-class="stitched"`) : ''} /></label>
+                <label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" data-fallback ${bannerArtOf(draft.op) ? html`data-alt="${bannerArtOf(draft.op)}" data-alt-class="stitched"` : ''} /></label>
                 ${art.map((x) => html`<label class="char-pic"><input type="radio" name="pic" value="${x.id}" ${raw(draft.pic === x.id ? 'checked' : '')} /><img class="char-pic-img" src="${x.src}" alt="" /></label>`)}
                 <label class="btn secondary sm">${icon('add')}Add pictures<input type="file" accept="image/*" multiple hidden data-art /></label>
               </div>

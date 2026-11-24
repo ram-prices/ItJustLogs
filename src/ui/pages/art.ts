@@ -2,6 +2,7 @@ import { removedArt, sourceSite } from '../../domain/artMeta';
 import { itemKey, itemsOf, newestFirst, removedItem, savedItem, type StoredItem } from '../../domain/storage';
 import { artChanged, state, updateSettings } from '../../state';
 import { deleteArt, loadArt, saveArt } from '../../store';
+import { webUrl } from '../../settingsSanitize';
 import { icon, emptyState } from '../components';
 import { html, render, type Html } from '../html';
 
@@ -75,7 +76,7 @@ const media = (a: Art): Html =>
 
 /** A small link back to where an item came from. */
 const sourceLink = (url: string | undefined): Html =>
-  url ? html`<a class="art-source label-12" href="${url}" target="_blank" rel="noopener noreferrer" title="${url}">${icon('open_in_new')}${sourceSite(url) || 'Source'}</a>` : html``;
+  url && webUrl(url) ? html`<a class="art-source label-12" href="${url}" target="_blank" rel="noopener noreferrer" title="${url}">${icon('open_in_new')}${sourceSite(url) || 'Source'}</a>` : html``;
 
 /** Each operator's files as object URLs, loaded once (and again after a change). */
 const loaded = new Map<string, Art[]>();
@@ -196,7 +197,7 @@ function entryTile(opId: string, e: Entry): Html {
     </div>`;
   if (e.kind === 'link')
     return html`<div class="store-row store-link">
-      <a class="store-link-main" href="${e.url}" target="_blank" rel="noopener noreferrer" title="${e.url}">
+      <a class="store-link-main" ${webUrl(e.url) ? html`href="${e.url}"` : ''} target="_blank" rel="noopener noreferrer" title="${e.url}">
         ${icon('link')}<span class="min0"><span class="copy-14 ellipsis store-link-title">${e.title || sourceSite(e.url) || e.url}</span><span class="label-12 tertiary ellipsis">${e.url}</span></span>
       </a>
       ${itemActions(e.key)}
@@ -276,16 +277,6 @@ export function storageBox(opId: string, name: string, redraw: () => void): Html
 }
 
 const focusEditor = () => setTimeout(() => document.querySelector<HTMLElement>('.store-edit [data-store-field]')?.focus());
-
-/** A web address, or null if it isn't one. */
-function webUrl(text: string): string | null {
-  try {
-    const u = new URL(text.trim());
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
-  } catch {
-    return null;
-  }
-}
 
 function saveEditing(redraw: () => void): void {
   const ed = editing;

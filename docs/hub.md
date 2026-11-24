@@ -103,8 +103,8 @@ Only two linked sessions remain; the owner archived the rest.
   via ef-assets `schedule-overrides.json`); built-site fix for the operator banner fade (`border-image-source: none`);
   operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on
   the operator page; banner art Custom/Auto and tall header for every banner art; art only as the
-  banner (box lists everything, plays videos); X post links download media (`domain/xpost.ts`,
-  sources in `settings.artSources`, link-only `artLinks`; Drive resumable upload over 5 MB untested);
+  banner (box lists everything, plays videos); art source links (e.g. X posts) kept in
+  `settings.artSources`, link-only `artLinks` (no media download: there is no xpost module; Drive resumable upload over 5 MB untested);
   "SP/s per chain" rows on operator Attributes; Pull history on operator and weapon pages as three equal boxes (Copies,
   Potential, saved art); full backups with saved runs (`Backup.sims`, `restoreSims`); Arcane back in
   `GAME_ART`; operator banner parallax (ef-assets `banners/game/layers/`) and the pinned operator

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EventRewardsFile } from './eventRewards';
-import { dailyResets, patchIncome, patchWindows, ticketsFromPulls, weeklyResets, type IncomeFile } from './income';
+import { bondQuota, dailyResets, patchIncome, patchWindows, ticketsFromPulls, weeklyResets, type IncomeFile } from './income';
+import { extrasOf } from './owned';
 import { hasDailyRewards, type Schedule, type ScheduleEvent } from './schedule';
 
 const at = (americas: string, asia: string) => ({ americas, asia });
@@ -131,6 +132,34 @@ describe('free income per patch', () => {
     // Monday 2026-02-02 04:00 Americas; Sunday night doesn't count.
     expect(weeklyResets(Date.parse('2026-01-28T12:00:00Z'), Date.parse('2026-02-02T08:59:00Z'), 'americas')).toBe(0);
     expect(weeklyResets(Date.parse('2026-01-28T12:00:00Z'), Date.parse('2026-02-02T09:00:00Z'), 'americas')).toBe(1);
+  });
+
+  it('counts resets right around 04:00 on both servers', () => {
+    // 04:00 Americas (UTC-5) = 09:00 UTC; 04:00 Asia (UTC+8) = 20:00 UTC the day before.
+    const resetUtc = { americas: '2026-02-02T09:00:00Z', asia: '2026-02-01T20:00:00Z' } as const;
+    for (const server of ['americas', 'asia'] as const) {
+      const reset = Date.parse(resetUtc[server]);
+      expect(dailyResets(reset - 60_000, reset - 1, server)).toBe(0);
+      expect(dailyResets(reset - 1, reset, server)).toBe(1);
+      expect(dailyResets(reset, reset + 60_000, server)).toBe(0);
+      expect(dailyResets(reset - 1, reset + 86_400_000, server)).toBe(2);
+      // 2026-02-02 is a Monday: these 04:00 resets are also the weekly one (Asia's falls on Sunday in UTC).
+      expect(weeklyResets(reset - 1, reset, server)).toBe(1);
+      expect(weeklyResets(reset - 86_400_000, reset - 1, server)).toBe(0);
+      expect(weeklyResets(reset, reset + 6 * 86_400_000, server)).toBe(0);
+      expect(weeklyResets(reset, reset + 7 * 86_400_000, server)).toBe(1);
+    }
+  });
+
+  it('puts versions in time order even when the schedule lists them out of order', () => {
+    const third = { name: 'Third', release: at('2026-03-01T23:00:00-05:00', '2026-03-02T12:00:00+08:00'), maintenance: null, posts: [] };
+    const shuffled = { ...schedule, versions: [third, schedule.versions[1], schedule.versions[0]] };
+    const w = patchWindows(shuffled, 'americas', Date.parse('2026-03-10T00:00:00Z'));
+    expect(w.map((x) => [x.key, x.version, x.end])).toEqual([
+      ['1.0', 'Launch', Date.parse('2026-02-12T04:00:00Z')],
+      ['1.1', 'Second', Date.parse('2026-03-02T04:00:00Z')],
+      ['1.2', 'Third', Date.parse('2026-03-10T00:00:00Z')],
+    ]);
   });
 
   it('spans each released version until the next one, projecting the current one', () => {
@@ -317,6 +346,20 @@ describe('free income per patch', () => {
 
   it('gives Arsenal Tickets back for Headhunting results only', () => {
     expect(ticketsFromPulls([{ kind: 'char', rarity: 6 }, { kind: 'char', rarity: 5 }, { kind: 'char', rarity: 4 }, { kind: 'weap', rarity: 6 }])).toBe(2220);
+  });
+
+  it('Bond Quota: story operators count as owned, so their first pulled copy is a duplicate', () => {
+    const dup = { 5: 10, 6: 50 };
+    const pulls = [
+      { kind: 'char' as const, rarity: 5, itemId: 'chr_0004_pelica', ts: 1 },
+      { kind: 'char' as const, rarity: 5, itemId: 'chr_0005_chen', ts: 2 },
+      { kind: 'char' as const, rarity: 6, itemId: 'chr_new', ts: 3 },
+      { kind: 'char' as const, rarity: 6, itemId: 'chr_new', ts: 4 },
+    ];
+    const story = extrasOf({}).map((x) => x.id);
+    expect(pulls.map((p) => bondQuota(pulls, dup, story).get(p) ?? 0)).toEqual([10, 10, 0, 50]);
+    // Without the story extras, the first copy of each gives none.
+    expect(pulls.map((p) => bondQuota(pulls, dup).get(p) ?? 0)).toEqual([0, 0, 0, 50]);
   });
 });
 

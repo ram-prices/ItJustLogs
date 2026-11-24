@@ -43,12 +43,15 @@ export class Pool implements Runner {
   /** A pool of `n` workers with the request's combat data loaded; null when workers can't start here. */
   static async open(n: number, req: SimRequest): Promise<Pool | null> {
     if (n < 2 || typeof Worker === 'undefined') return null;
+    const judges: Worker[] = [];
     try {
-      const judges = Array.from({ length: n }, () => new Worker(new URL('./simJudge.ts', import.meta.url), { type: 'module' }));
+      for (let i = 0; i < n; i++) judges.push(new Worker(new URL('./simJudge.ts', import.meta.url), { type: 'module' }));
       const pool = new Pool(judges);
       await Promise.all(judges.map((_, i) => pool.send(i, { id: 0, init: req })));
       return pool;
     } catch {
+      // One failed: stop every one already started, so none is left running.
+      for (const w of judges) w.terminate();
       return null;
     }
   }

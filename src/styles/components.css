@@ -31,7 +31,7 @@
   box-shadow: 0 1px 0 var(--ring);
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--z-header);
 }
 .header-top {
   display: flex;
@@ -569,11 +569,11 @@ main {
   background: var(--gray-alpha-100);
 }
 .btn.error {
-  background: #e5484d;
+  background: var(--red-solid);
   color: #fff;
 }
 .btn.error:hover {
-  background: #d93d42;
+  background: color-mix(in srgb, var(--red-solid) 92%, #000);
 }
 .btn.icon-only {
   width: 32px;
@@ -793,9 +793,6 @@ select.input {
 .table tbody tr:hover {
   background: var(--gray-alpha-100);
 }
-.table tr.clickable {
-  cursor: pointer;
-}
 .fs-section {
   margin-top: 32px;
 }
@@ -908,7 +905,7 @@ select.input {
   box-shadow: var(--shadow-menu);
 }
 .tooltip {
-  z-index: 60;
+  z-index: var(--z-tooltip);
   pointer-events: none;
   min-width: 160px;
   max-width: min(280px, calc(100vw - 16px));
@@ -949,7 +946,7 @@ select.input {
   margin-right: 6px;
 }
 .ctx-menu {
-  z-index: 1000;
+  z-index: var(--z-menu);
   min-width: 180px;
   padding: 4px;
 }
@@ -1028,4 +1025,48 @@ select.input {
   .ruler-pin:hover :is(.ruler-tick, .ruler-dot) {
     transform: none !important;
   }
+}
+
+/* App shell: skip link, focus, route announcer */
+/* Read by screen readers only (the route announcer). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The first stop for Tab: off screen until focused, then over the header's top left. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: var(--z-menu);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--background-100);
+  box-shadow: var(--shadow-menu);
+  color: var(--gray-1000);
+  transform: translateY(calc(-100% - 16px));
+}
+.skip-link:focus {
+  transform: none;
+}
+/* A page's title or main, focused after a route change (app.ts focusPage): not a control, so no ring. */
+[data-route-focus]:focus {
+  outline: none;
+}
+/* Constant spacing that used to be inline: the welcome page, Settings' exporter script, "Couldn't load this page". */
+.empty .empty-action {
+  margin-top: 8px;
+}
+.card-body .welcome-title {
+  margin-bottom: 8px;
+}
+.card-body .welcome-intro {
+  margin-bottom: 20px;
+}
+.code.steps-code {
+  margin-top: 20px;
 }

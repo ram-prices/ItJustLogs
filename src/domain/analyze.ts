@@ -31,7 +31,9 @@ export interface AnalyzedPull extends Pull {
   outcome?: Outcome;
   /** Which rate-up copy on this banner this pull was. */
   copy?: number;
-  /** P(at least `copy` rate-up copies within `bannerPull` pulls) — how lucky this was. Lower = luckier. */
+  /** Paid pulls only: which rate-up copy the paid pulls had bought (free rate-ups left out). */
+  paidCopy?: number;
+  /** P(at least `paidCopy` rate-up copies within `bannerPull` pulls) — how lucky this was. Lower = luckier. */
   luck?: number;
   bannerName: string;
 }
@@ -139,9 +141,12 @@ function profileFor(category: Category): PityProfile | null {
   return null;
 }
 
-/** 6★ pity is shared by every Chartered banner; other character pools keep their own. Weapons are per banner. */
+/**
+ * 6★ pity is shared by every Chartered banner; other character pools keep their own (each Joint and
+ * each unrecognised 'other' pool separately). Weapons are per banner.
+ */
 function pityScope(kind: Kind, category: Category, poolId: string): string {
-  if (kind === 'weap' || category === 'joint') return `${kind}:${poolId}`;
+  if (kind === 'weap' || category === 'joint' || category === 'other') return `${kind}:${poolId}`;
   return `${kind}:${category}`;
 }
 
@@ -200,6 +205,7 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
   ] as const) {
     const pity = new Map<string, number>();
     const wonOnBanner = new Map<string, boolean>();
+    const paidCopies = new Map<string, number>();
     // Arsenal: the set that held the latest 6★, and the one before it (for a second 6★ in the same set).
     const lastSixSet = new Map<string, number>();
     const prevSixSet = new Map<string, number>();
@@ -238,6 +244,9 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
 
       if (p.isFree) {
         b.freePulls++;
+        // A free rate-up 6★ on a Chartered banner is a rate-up copy, but never
+        // touches pity or the 120-pull guarantee (the banner isn't won by it).
+        if (p.rarity === 6 && isRateUp && category === 'chartered' && b.info) ap.copy = ++b.rateUpCopies;
       } else {
         b.paidPulls++;
         ap.bannerPull = b.paidPulls;
@@ -274,8 +283,11 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
                   (kind === 'weap' && b.paidPulls > WEAPON_GUARANTEE - 10));
               ap.outcome = guaranteed ? 'guaranteed' : 'won';
               ap.copy = ++b.rateUpCopies;
+              // Luck counts only what the paid pulls bought: a free rate-up wasn't theirs.
+              ap.paidCopy = (paidCopies.get(b.poolId) ?? 0) + 1;
+              paidCopies.set(b.poolId, ap.paidCopy);
               wonOnBanner.set(b.poolId, true);
-              const pmf = copyPmf(b, ap.copy)!;
+              const pmf = copyPmf(b, ap.paidCopy)!;
               // Arsenal pulls come in tens, so judge luck at the end of the ten-pull.
               const at = kind === 'weap' ? Math.ceil(b.paidPulls / 10) * 10 : b.paidPulls;
               ap.luck = cdfAt(pmf, at);

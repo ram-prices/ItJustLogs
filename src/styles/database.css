@@ -486,133 +486,129 @@
     }
   }
 }
-@media all {
-  .wiki-hero.has-art {
-    padding-bottom: var(--pin-under);
-    margin-bottom: calc(-1 * var(--pin-under));
-  }
-  .wiki-hero.tall.has-art {
-    min-height: calc(var(--band) + var(--pin-under));
-  }
-  .wiki-hero.has-art .wiki-hero-pin {
-    position: fixed;
-    top: var(--header-h, 0px);
+.wiki-hero.has-art {
+  padding-bottom: var(--pin-under);
+  margin-bottom: calc(-1 * var(--pin-under));
+}
+.wiki-hero.tall.has-art {
+  min-height: calc(var(--band) + var(--pin-under));
+}
+.wiki-hero.has-art .wiki-hero-pin {
+  position: fixed;
+  top: var(--header-h, 0px);
+  bottom: auto;
+  height: var(--hero-h, 360px);
+  overflow: hidden;
+}
+/* The picture's shades sit on it, so they stay and fade with it: a strong
+   vignette in the page's colour, and its foot fading gradually (eased) into
+   the page, from mid-band to the end of the strip under the page. */
+.wiki-hero.has-art::before,
+.wiki-hero.has-art::after {
+  display: none;
+}
+.wiki-hero.has-art .wiki-hero-pin {
+  --fade-from: 45%;
+}
+.wiki-hero.tall.has-art .wiki-hero-pin {
+  --fade-from: calc(var(--band) * 0.4);
+}
+.wiki-hero.has-art .wiki-hero-pin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent var(--fade-from),
+    color-mix(in srgb, var(--background-100) 8%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.15),
+    color-mix(in srgb, var(--background-100) 25%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.3),
+    color-mix(in srgb, var(--background-100) 50%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.48),
+    color-mix(in srgb, var(--background-100) 73%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.65),
+    color-mix(in srgb, var(--background-100) 90%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.82),
+    var(--background-100)
+  );
+}
+.wiki-hero.has-art .wiki-hero-pin::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 68% 80% at 52% 34%,
+    transparent 22%,
+    color-mix(in srgb, var(--background-100) 40%, transparent) 50%,
+    color-mix(in srgb, var(--background-100) 75%, transparent) 75%,
+    color-mix(in srgb, var(--background-100) 95%, transparent)
+  );
+}
+/* Desktop: a face low in its picture can't reach the band while the
+   picture covers the whole header, so the picture's own box ends sooner,
+   just enough (never above half the strip under the page), fading out. */
+@media (min-width: 641px) {
+  .wiki-hero.tall.has-art:not(.own-art) .wiki-hero-art {
     bottom: auto;
-    height: var(--hero-h, 360px);
-    overflow: hidden;
-  }
-  /* The picture's shades sit on it, so they stay and fade with it: a strong
-     vignette in the page's colour, and its foot fading gradually (eased) into
-     the page, from mid-band to the end of the strip under the page. */
-  .wiki-hero.has-art::before,
-  .wiki-hero.has-art::after {
-    display: none;
-  }
-  .wiki-hero.has-art .wiki-hero-pin {
-    --fade-from: 45%;
-  }
-  .wiki-hero.tall.has-art .wiki-hero-pin {
-    --fade-from: calc(var(--band) * 0.4);
-  }
-  .wiki-hero.has-art .wiki-hero-pin::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background: linear-gradient(
-      to bottom,
-      transparent var(--fade-from),
-      color-mix(in srgb, var(--background-100) 8%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.15),
-      color-mix(in srgb, var(--background-100) 25%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.3),
-      color-mix(in srgb, var(--background-100) 50%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.48),
-      color-mix(in srgb, var(--background-100) 73%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.65),
-      color-mix(in srgb, var(--background-100) 90%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.82),
-      var(--background-100)
+    height: clamp(
+      calc(var(--band) + var(--pin-under) / 2),
+      calc((100 - var(--fy, 50)) * 0.5cqw + var(--band) * 0.4),
+      100%
     );
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
   }
-  .wiki-hero.has-art .wiki-hero-pin::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background: radial-gradient(
-      ellipse 68% 80% at 52% 34%,
-      transparent 22%,
-      color-mix(in srgb, var(--background-100) 40%, transparent) 50%,
-      color-mix(in srgb, var(--background-100) 75%, transparent) 75%,
-      color-mix(in srgb, var(--background-100) 95%, transparent)
-    );
-  }
-  /* Desktop: a face low in its picture can't reach the band while the
-     picture covers the whole header, so the picture's own box ends sooner,
-     just enough (never above half the strip under the page), fading out. */
-  @media (min-width: 641px) {
-    .wiki-hero.tall.has-art:not(.own-art) .wiki-hero-art {
-      bottom: auto;
-      height: clamp(
-        calc(var(--band) + var(--pin-under) / 2),
-        calc((100 - var(--fy, 50)) * 0.5cqw + var(--band) * 0.4),
-        100%
-      );
-      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
-      mask-image: linear-gradient(to bottom, #000 calc(100% - 140px), rgba(0, 0, 0, 0.5) calc(100% - 60px), transparent);
-    }
-  }
-  /* border-image-source, not the border-image shorthand: the CSS minifier
-     turns `border-image: none` into an empty value, which browsers drop. */
-  .wiki-hero.has-art ~ main.wiki-page {
-    background: none;
-    border-image-source: none;
-  }
-  .wiki-hero.has-art ~ main > .section:first-child {
-    margin-top: 24px;
-  }
-  .wiki-hero.has-art ~ main .section-head {
-    text-shadow: 0 1px 8px var(--background-100);
-  }
-  .wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
-    background: color-mix(in srgb, var(--background-100) 65%, transparent);
-    -webkit-backdrop-filter: blur(16px) saturate(1.3);
-    backdrop-filter: blur(16px) saturate(1.3);
-  }
-  /* The picture has fully faded (ui/heroFade.ts): it stops being drawn and the
-     cards, over nothing but the plain page now, stop blurring. */
-  .wiki-hero.has-art.pin-gone .wiki-hero-pin {
-    visibility: hidden;
-  }
-  .wiki-hero.has-art.pin-gone ~ main :is(.card, .metrics:not(.plain)) {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
+}
+/* border-image-source, not the border-image shorthand: the CSS minifier
+   turns `border-image: none` into an empty value, which browsers drop. */
+.wiki-hero.has-art ~ main.wiki-page {
+  background: none;
+  border-image-source: none;
+}
+.wiki-hero.has-art ~ main > .section:first-child {
+  margin-top: 24px;
+}
+.wiki-hero.has-art ~ main .section-head {
+  text-shadow: 0 1px 8px var(--background-100);
+}
+.wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
+  background: color-mix(in srgb, var(--background-100) 65%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+/* The picture has fully faded (ui/heroFade.ts): it stops being drawn and the
+   cards, over nothing but the plain page now, stop blurring. */
+.wiki-hero.has-art.pin-gone .wiki-hero-pin {
+  visibility: hidden;
+}
+.wiki-hero.has-art.pin-gone ~ main :is(.card, .metrics:not(.plain)) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 @media (max-width: 640px) {
   :root {
     --pin-under: 96px;
   }
   /* Phones: the whole picture across the top as before; no blur on the cards. */
-  @media all {
-    .wiki-hero.tall.has-art {
-      min-height: 0;
-    }
-    /* The picture spans the top only (50vw): it fades out by its own foot. */
-    .wiki-hero.tall.has-art .wiki-hero-pin::after {
-      display: none;
-    }
-    .wiki-hero.tall.has-art .wiki-hero-pin::before {
-      bottom: auto;
-      height: 50vw;
-    }
-    .wiki-hero.tall.has-art .wiki-hero-art {
-      -webkit-mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
-      mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
-    }
-    .wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
-      background: color-mix(in srgb, var(--background-100) 85%, transparent);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
+  .wiki-hero.tall.has-art {
+    min-height: 0;
+  }
+  /* The picture spans the top only (50vw): it fades out by its own foot. */
+  .wiki-hero.tall.has-art .wiki-hero-pin::after {
+    display: none;
+  }
+  .wiki-hero.tall.has-art .wiki-hero-pin::before {
+    bottom: auto;
+    height: 50vw;
+  }
+  .wiki-hero.tall.has-art .wiki-hero-art {
+    -webkit-mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
+    mask-image: linear-gradient(to bottom, #000 35%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.4) 72%, rgba(0, 0, 0, 0.12) 88%, transparent);
+  }
+  .wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
+    background: color-mix(in srgb, var(--background-100) 85%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -700,7 +696,7 @@
    Potential's picture, locked ones dimmed. */
 .pot-art-pop {
   position: fixed;
-  z-index: 950;
+  z-index: var(--z-pop);
   width: min(520px, calc(100vw - 16px));
   padding: 16px;
   box-shadow: var(--shadow-menu);
@@ -869,11 +865,6 @@
 .wiki-inactive {
   opacity: 0.55;
 }
-.wiki-skills {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
 .wiki-skill {
   display: flex;
   flex-direction: column;
@@ -987,8 +978,7 @@
 .attr-toggle {
   height: 24px;
   padding: 0 10px;
-  /* A real border, not an inset shadow: shadows look jagged around a pill's tight curves. */
-  border: 1px solid var(--gray-alpha-400);
+  box-shadow: var(--shadow-border);
   border-radius: 9999px;
   background: none;
   color: var(--gray-900);
@@ -1002,7 +992,7 @@
 }
 .attr-toggle[aria-pressed='true'] {
   color: var(--green);
-  border-color: currentColor;
+  box-shadow: 0 0 0 1px currentColor;
 }
 /* A change that makes a skill worse (rare): shown, but not as a gain. */
 .attr-loss {

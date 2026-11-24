@@ -1,7 +1,81 @@
 import type { HistoryMatch } from '../domain/parse';
-import { html, render } from './html';
+import { focusMark, html, render, restoreFocus } from './html';
 
 export type SamePlayerChoice = 'cancel' | 'replace' | 'merge';
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Makes an in-page dialog (`backdrop`, already in the document) modal for the
+ * keyboard: focus moves into it (`first`, else its first control), Tab and
+ * Shift+Tab stay inside it, Escape calls `close`. The returned function puts
+ * focus back where it was before; call it from `close`. Keeps working when
+ * the dialog re-renders its own content.
+ */
+export function holdFocus(backdrop: HTMLElement, close: () => void, first?: HTMLElement | null): () => void {
+  const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+  const mark = focusMark(document.body);
+  const controls = () => [...backdrop.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0);
+  backdrop.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const list = controls();
+    if (!list.length) return e.preventDefault();
+    const at = list.indexOf(document.activeElement as HTMLElement);
+    if (e.shiftKey && at <= 0) {
+      e.preventDefault();
+      list[list.length - 1].focus();
+    } else if (!e.shiftKey && (at === -1 || at === list.length - 1)) {
+      e.preventDefault();
+      list[0].focus();
+    }
+  });
+  const target = first ?? controls()[0] ?? backdrop.querySelector<HTMLElement>('[role="dialog"], [role="alertdialog"]');
+  if (target && !target.matches(FOCUSABLE)) target.tabIndex = -1;
+  target?.focus({ preventScroll: true });
+  return () => {
+    // A redraw while it was open replaced the opener: its stand-in in the new page.
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+    else restoreFocus(document.body, mark);
+  };
+}
+
+/**
+ * Code loaded on use (the picture cropper) that didn't load: usually a newer
+ * version of the site is out and this tab asks for an old file. Offers a reload.
+ */
+export function askReload(): void {
+  document.querySelector('.reload-dialog')?.closest('.dialog-backdrop')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.className = 'dialog-backdrop';
+  render(
+    backdrop,
+    html`<div class="card dialog reload-dialog" role="alertdialog" aria-modal="true" aria-labelledby="reload-title">
+      <h2 class="heading-20" id="reload-title">Couldn't load this page.</h2>
+      <div class="dialog-actions">
+        <button class="btn secondary sm" data-choice="cancel">Cancel</button>
+        <button class="btn primary sm" data-choice="reload">Reload</button>
+      </div>
+    </div>`,
+  );
+  let release = () => {};
+  const close = () => {
+    backdrop.remove();
+    release();
+  };
+  backdrop.addEventListener('click', (ev) => {
+    const choice = (ev.target as HTMLElement).closest<HTMLElement>('[data-choice]')?.dataset.choice;
+    if (choice === 'reload') location.reload();
+    else if (ev.target === backdrop || choice === 'cancel') close();
+  });
+  document.body.append(backdrop);
+  release = holdFocus(backdrop, close, backdrop.querySelector<HTMLElement>('[data-choice="reload"]'));
+}
 
 /** Opening a second dialog cancels the first, so its caller isn't left waiting. */
 let closeOpen: ((c: SamePlayerChoice) => void) | null = null;
@@ -35,9 +109,11 @@ export function askSamePlayer(match: HistoryMatch, source: string, replaceLabel 
     </div>`,
   );
   return new Promise((resolve) => {
+    let release = () => {};
     const close = (choice: SamePlayerChoice) => {
       backdrop.remove();
       closeOpen = null;
+      release();
       resolve(choice);
     };
     closeOpen = close;
@@ -46,8 +122,7 @@ export function askSamePlayer(match: HistoryMatch, source: string, replaceLabel 
       if (ev.target === backdrop || choice === 'cancel') return close('cancel');
       if (choice === 'replace' || choice === 'merge') close(choice);
     });
-    backdrop.addEventListener('keydown', (ev) => ev.key === 'Escape' && close('cancel'));
     document.body.append(backdrop);
-    backdrop.querySelector<HTMLElement>('[data-choice="cancel"]')!.focus();
+    release = holdFocus(backdrop, () => close('cancel'), backdrop.querySelector<HTMLElement>('[data-choice="cancel"]'));
   });
 }

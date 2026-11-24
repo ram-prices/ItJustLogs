@@ -57,6 +57,7 @@ export function weeklyChart(buckets: TimelineBucket[]): Html {
   const labelEvery = Math.max(1, Math.ceil(buckets.length / 8));
 
   const marks: string[] = [];
+  const hits: string[] = [];
   buckets.forEach((b, i) => {
     const x0 = m.l + i * slot + (slot - bw) / 2;
     const charTop = y(b.char);
@@ -82,16 +83,21 @@ export function weeklyChart(buckets: TimelineBucket[]): Html {
       tipRow('Arsenal', fmtInt(b.weap), 'var(--ars)'),
       ...(sixNames.length ? [tipRow('6★', sixNames.join(', '), 'var(--r6)')] : []),
     ]);
-    marks.push(
-      `<rect class="hit" x="${m.l + i * slot}" y="${m.t}" width="${slot}" height="${ih}" data-tip="${escape(tipHtml)}"/>`,
+    // The tip's numbers for screen readers too: each week is an image of its own.
+    const label = `Week of ${fmtWeek(b.start)}: ${fmtInt(b.char)} operator ${b.char === 1 ? 'pull' : 'pulls'}, ${fmtInt(b.weap)} arsenal ${b.weap === 1 ? 'pull' : 'pulls'}${sixNames.length ? `, 6 stars: ${sixNames.join(', ')}` : ''}`;
+    hits.push(
+      `<rect class="hit" x="${m.l + i * slot}" y="${m.t}" width="${slot}" height="${ih}" role="img" aria-label="${escape(label)}" data-tip="${escape(tipHtml)}"/>`,
     );
   });
 
   return html`<div class="chart">
-    ${raw(`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pulls per week">
+    ${raw(`<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="Pulls per week">
+      <g aria-hidden="true">
       <g class="grid">${ticks.map((t) => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/>`).join('')}</g>
       ${ticks.map((t) => `<text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${fmtInt(t)}</text>`).join('')}
       ${marks.join('')}
+      </g>
+      ${hits.join('')}
     </svg>`)}
   </div>`;
 }

@@ -2,7 +2,7 @@ import { CONTROLLER, MOBILE, READ_HEIGHT, READ_NAME, areas, clockAnchors, clockI
 import { FOODS, enemySeen, spGained } from '../domain/sim/team';
 import { toast } from './common';
 import { icon } from './components';
-import { html, raw, render } from './html';
+import { html, render, type Html } from './html';
 import { recognize } from './screenReader';
 import { clearReaderDraft, loadReaderDraft, saveReaderDraft } from '../store';
 
@@ -380,7 +380,8 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
       let missedAt = -Infinity;
       const onFrame = (_: number, meta: VideoFrameCallbackMetadata) => {
         if (cancelled()) return resolve();
-        if (video.paused) return;
+        // Paused from outside (a media key): wait for the frames again (onpause resumes it).
+        if (video.paused) return void video.requestVideoFrameCallback(onFrame);
         // Already at the slowest: what it shows is what this device can measure, so go on.
         if (last >= 0 && meta.mediaTime - last > MISSED && speed > SLOWEST) {
           // Frames went by unseen (a busy device): back up, a little slower.
@@ -401,12 +402,22 @@ async function sampleVideo(video: HTMLVideoElement, layout: Layout, cancelled: (
         if (!video.ended) video.requestVideoFrameCallback(onFrame);
       };
       const stop = () => {
+        video.ontimeupdate = video.onended = video.onpause = null;
         video.pause();
-        video.ontimeupdate = video.onended = null;
         resolve();
       };
       video.requestVideoFrameCallback(onFrame);
       video.onended = stop;
+      // Cancel pauses it (finish), so that ends here. Any other pause (a media key, the system) would
+      // leave it waiting for frames forever: play on, or if it won't, step through the rest instead.
+      video.onpause = () => {
+        if (cancelled()) {
+          video.ontimeupdate = video.onended = video.onpause = null;
+          return resolve();
+        }
+        if (video.ended) return;
+        video.play().catch(stop);
+      };
       // No frames shown while it plays (a tab in the background draws none): step through it instead.
       video.ontimeupdate = () => {
         if (cancelled() || video.currentTime - Math.max(0, last) > 1) stop();
@@ -474,8 +485,8 @@ function review(dlg: HTMLElement, reading: Reading, portraits: string[], operato
     return slot === null ? '?' : slotName[slot];
   };
   const presses = () => steps.filter((s) => s.input !== 'strike' && s.input !== 'finisher').length;
-  const slotSelect = (value: Slot | null | undefined, attrs: string) =>
-    html`<select class="input gameplay-select" ${raw(attrs)}>
+  const slotSelect = (value: Slot | null | undefined, attrs: Html) =>
+    html`<select class="input gameplay-select" ${attrs}>
       <option value="" ${value === null || value === undefined ? 'selected' : ''}>?</option>
       ${SLOTS.map((_, i) => html`<option value="${i}" ${value === i ? 'selected' : ''}>${slotName[i]}</option>`)}
     </select>`;
@@ -502,7 +513,7 @@ function review(dlg: HTMLElement, reading: Reading, portraits: string[], operato
                     </select>
                   </label>`,
                 )}
-                <label class="gameplay-slot"><span class="label-12 secondary">Controlled</span>${slotSelect(controlled, 'data-gameplay-controlled')}</label>
+                <label class="gameplay-slot"><span class="label-12 secondary">Controlled</span>${slotSelect(controlled, html`data-gameplay-controlled`)}</label>
               </div>
               <p class="label-12 secondary">Before the fight</p>
               <p class="copy-13 gameplay-stage">${stage ? stage.name : enemy ? `${enemy}: not in the sim yet, fought as the training dummy` : 'No boss read: fought as the training dummy'}${stage
@@ -527,7 +538,7 @@ function review(dlg: HTMLElement, reading: Reading, portraits: string[], operato
                       ${groups.map(
                         (g) => html`<label class="gameplay-slot">
                           <img class="gameplay-art" src="${groupArt.get(g) ?? ''}" alt="" width="96" height="36" />
-                          ${slotSelect(groupSlot.get(g), `data-gameplay-group="${g}"`)}
+                          ${slotSelect(groupSlot.get(g), html`data-gameplay-group="${g}"`)}
                         </label>`,
                       )}
                     </div>`
@@ -538,7 +549,7 @@ function review(dlg: HTMLElement, reading: Reading, portraits: string[], operato
                   const pick = guessed.has(k);
                   return html`<li class="${strike ? 'secondary' : ''}">
                     <span class="num secondary">${secs(s.t - start)}</span>
-                    ${strike ? '' : pick ? slotSelect(slotOf(s), `data-gameplay-step="${k}"`) : nameOf(s)}${strike ? '' : ' · '}${READ_NAME[s.input]}${s.interrupt ? ' · Interrupt' : ''}${s.back ? ` · ${spGained(s.back)} SP gained` : ''}
+                    ${strike ? '' : pick ? slotSelect(slotOf(s), html`data-gameplay-step="${k}"`) : nameOf(s)}${strike ? '' : ' · '}${READ_NAME[s.input]}${s.interrupt ? ' · Interrupt' : ''}${s.back ? ` · ${spGained(s.back)} SP gained` : ''}
                   </li>`;
                 })}
               </ol>

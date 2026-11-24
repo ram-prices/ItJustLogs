@@ -24,7 +24,8 @@ export interface Pull {
   isNew: boolean;
 }
 
-export type CharCategory = 'chartered' | 'joint' | 'basic' | 'newHorizons';
+/** 'other': a pool that is none of the known kinds (no pool id in the export, or a kind the game added later). */
+export type CharCategory = 'chartered' | 'joint' | 'basic' | 'newHorizons' | 'other';
 export type WeapCategory = 'limited' | 'constant';
 export type Category = CharCategory | WeapCategory;
 

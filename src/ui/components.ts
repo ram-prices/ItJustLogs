@@ -1,6 +1,6 @@
 import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, operatorLayerUrls, mirrorUrl, operatorCardUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
-import { html, raw, type Html } from './html';
+import { escape, html, raw, type Html } from './html';
 import { tintFor } from './tint';
 
 /**
@@ -99,7 +99,7 @@ export const essenceNotches = (wpnId: string, skill: number, name: string, level
     Array.from(
       { length: max },
       (_, i) =>
-        `<button type="button" class="notch ${i >= room ? 'shut' : i < level ? 'gem' : 'open'}" data-action="essence-notch" data-wpn="${wpnId}" data-skill="${skill}" data-value="${i + 1}" aria-label="Essence +${i + 1}" title="Essence +${i + 1}"></button>`,
+        `<button type="button" class="notch ${i >= room ? 'shut' : i < level ? 'gem' : 'open'}" data-action="essence-notch" data-wpn="${escape(wpnId)}" data-skill="${skill}" data-value="${i + 1}" aria-label="Essence +${i + 1}" title="Essence +${i + 1}"></button>`,
     ).join(''),
   )}</span>`;
 /**
@@ -134,7 +134,7 @@ export const withStars = (text: string): Html => html`${text.split('★').map((p
 export function metric(o: MetricOpts): Html {
   return html`<div class="metric">
     <div class="metric-label"><span>${withStars(o.label)}</span>${o.aside ?? ''}</div>
-    <div class="metric-value" ${o.valueColor ? raw(`style="color:${o.valueColor}"`) : ''}>${o.value}</div>
+    <div class="metric-value" ${o.valueColor ? html`style="color:${o.valueColor}"` : ''}>${o.value}</div>
     ${o.sub ? html`<div class="metric-sub">${typeof o.sub === 'string' ? withStars(o.sub) : o.sub}</div>` : ''}
     ${o.progress !== undefined
       ? html`<div class="progress"><i style="width:${Math.max(0, Math.min(1, o.progress)) * 100}%;${o.progressColor ? `background:${o.progressColor}` : ''}"></i></div>`
@@ -153,31 +153,43 @@ export type IconKind = 'items' | 'elements' | 'classes' | 'weapon-types' | 'pote
 let icons: Partial<Record<IconKind | 'colors', Record<string, string>>> | null = null;
 export function loadIcons(redraw: () => void): void {
   const url = `${EF_ASSETS}/icons/index.json`;
-  fetch(url)
-    .then((r) => (r.ok ? r : fetch(mirrorUrl(url)!)))
-    .then((r) => (r.ok ? r.json() : null))
-    .then((data) => {
-      if (!data) return;
-      icons = data;
-      redraw();
-      probeMaskIcons(redraw);
-    })
-    .catch(() => {});
+  void (async () => {
+    // Each mirror in turn, on an HTTP error or a network one (as loadWikiFile does).
+    for (const from of [url, mirrorUrl(url)]) {
+      if (!from) continue;
+      try {
+        const res = await fetch(from, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) continue;
+        icons = await res.json();
+        redraw();
+        probeMaskIcons(redraw);
+        return;
+      } catch {
+        /* try the next mirror */
+      }
+    }
+  })();
 }
-/** Mask icons (element, class, weapon type) are CSS backgrounds, so `data-fallback` can't see a failed load: probe them and use the other mirror for any that fail. */
+/**
+ * Mask icons (element, class, weapon type) are CSS backgrounds, so `data-fallback` can't see a failed load:
+ * probe one per kind, and if it fails use the other mirror for that whole kind (one redraw once all are in).
+ */
 const mirrored = new Set<string>();
 function probeMaskIcons(redraw: () => void): void {
-  for (const kind of ['elements', 'classes', 'weapon-types'] as const) {
-    for (const file of Object.values(icons?.[kind] ?? {})) {
-      const url = `${EF_ASSETS_CDN}/icons/${file}`;
+  const probes = (['elements', 'classes', 'weapon-types'] as const).map((kind) => {
+    const files = Object.values(icons?.[kind] ?? {});
+    if (!files.length) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
       const probe = new Image();
+      probe.onload = () => resolve(false);
       probe.onerror = () => {
-        mirrored.add(url);
-        redraw();
+        for (const file of files) mirrored.add(`${EF_ASSETS_CDN}/icons/${file}`);
+        resolve(true);
       };
-      probe.src = url;
-    }
-  }
+      probe.src = `${EF_ASSETS_CDN}/icons/${files[0]}`;
+    });
+  });
+  void Promise.all(probes).then((failed) => failed.some(Boolean) && redraw());
 }
 /** A name's icon URL, if ef-assets has one (a plural "...Permits" finds "...Permit"). */
 export function iconOf(kind: IconKind, name: string): string | null {

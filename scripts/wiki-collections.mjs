@@ -46,4 +46,6 @@ for (const f of findings.findings) {
 }
 writeFileSync('src/data/medals.snapshot.json', JSON.stringify(medals, null, 1) + '\n');
 writeFileSync('src/data/findings.snapshot.json', JSON.stringify(findings, null, 1) + '\n');
+// Home's Collection widget counts from these ids alone, without loading the snapshots (collectionIds.test.ts).
+writeFileSync('src/data/collectionIds.json', JSON.stringify({ medals: medals.medals.map((x) => x.id), findings: findings.findings.map((x) => x.id) }) + '\n');
 console.log(`medals: ${medals.medals.length}, archive: ${findings.findings.length}${left ? `; ${left} pictures without an ef-assets copy yet, left out` : ''}`);

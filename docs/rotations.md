@@ -385,7 +385,9 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   sim track with the video, which is how transcript mistakes are found; the Simulator tab stays expected-value.
   Under the Sim view the summary's Duration is the sim's clear time (`ReplayResult.clear`, `clearOn` in team.ts): the
   hit that empties the last phase's HP, or, short of that by the recording's end, a copy of the fight going on the
-  Basic way (combos and ultimates as they come, battle skills in team order) until it does; no time limit. That fight is kept
+  Basic way (combos and ultimates as they come, battle skills in team order) until it does, for at most 600 s of fight
+  clock past the recording's end (frames plus stopped time; a cap so a team that can't clear doesn't run forever:
+  then the clear time is where it stopped). That fight is kept
   (`ReplayResult.runOn`: presses, Final Strikes, Staggers, track, SP), and the Sim view's timeline plays on through it to
   the sim's clear (`simLong`, `withRunOn`; the player keeps its place switching views, `baseOf`, and the run's
   phases and nodes, `preparePlay` taking the base result; the engine marks each Stagger node it reaches), with the sim's own
@@ -684,6 +686,29 @@ Two more (2026-10-31), the owner's call, no replay moved (Skydrummer 3,588,467, 
   ultimate's 600% Additional ATK lands. Without the buff in the data, the same numbers as before (`linked`).
 Findings left (15 rows): group E (Arclight's third slash, Perlica's Cycle Protocol, Rossi's combo SEQ 1, Purrchena's
 hold), Endministrator P1 (game code), Avywenna's lances (6), Camille's Vesperwings, Liino's Starry Boost.
+
+### Tracked sim-vs-data gaps (the 15 expected-fail rows)
+
+The `finding(...)` rows in rules2.test.ts, run with `it.fails`: each is a known gap between the sim and the data. The
+suite must keep exactly 15 expected failures; one turning red means the engine now matches the data (drop its
+`finding` and say so). By operator (rank in brackets where a row runs at both):
+- Endministrator m and f (2): Ultimate SP at P1. Data 50 SP when the crystals are consumed, sim 0: the P1 buff's
+  atb_return is read by no skill or buff in the data (the game's code gives it).
+- Perlica (1): Cycle Protocol, her combo on a Vulnerable enemy chains once more. Data 2 hits, sim 1: talent2 is set on
+  combo_skill but checked in combo_skill_projhit (or the bounce needs a second enemy).
+- Arclight (1): Battle Skill on Electrification. Data 6.07, sim 7.08: the electrified branch deals both atk_scale and
+  atk_scale2 (maybe a real third slash the wiki doesn't list; needs a recording).
+- Avywenna (6): Thunderlance EX back [1, 12] and its Stagger: each lance flies back twice
+  (OwnerSpawnedEntityFinder ignores the TagValidator; no data gives lances the tag). The combo's 3 Thunderlances back
+  [1, 12] and the battle skill's Ultimate Energy with them: one lance on the field (FixedPointFinder groups have no
+  positions).
+- Rossi (2): Combo Skill SEQ 1 [1, 12]. Data 1.5, sim 2.1: two channel hits plus buff_combo_2_damage ticking 7 times.
+- Camille (1): her combo on hovering Vesperwings sets off no explosion: the entity's passive skill isn't given it by
+  any data.
+- Purrchena (1): Battle Skill hold. Data 5 s (shield 3 s + block_end 2 s), sim 7.4 s: an event-driven loop played as a
+  timeline; check against footage.
+- Liino (1): Starry Boost, battle skill after her combo returns 10 SP. Sim 0: global_buff_liino_combo_atb_return
+  (CreateGlobalBuffAction) isn't in ef-assets.
 
 ## State at the 2026-10-25 handoff
 

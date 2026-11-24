@@ -433,13 +433,6 @@ input.sim-run-value-edit {
 .sim-member.controlled-some {
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--link) calc(25% + 45% * var(--held, 0)), transparent);
 }
-/* "Controlled" at the end of the most controlled operator's name row, in the outline's colour. */
-.sim-member-controlled {
-  margin-left: auto;
-  padding-left: 6px;
-  flex: none;
-  color: var(--link);
-}
 /* A parsed run's portrait and name: one link to the operator's Database page. */
 .sim-op-name {
   display: inline-flex;
@@ -664,15 +657,6 @@ input.sim-run-value-edit {
 .sim-play-seek:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-/* The Timeline header's right side: playback speed, then Recording | Sim. */
-.sim-head-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sim-head-tools .sim-play-speed {
-  width: auto;
 }
 .sim-boss {
   display: flex;
@@ -1169,13 +1153,6 @@ input.sim-run-value-edit {
   font: 600 10px/1 var(--font-sans);
   color: var(--gray-1000);
   text-shadow: 0 0 2px var(--background-100), 0 0 2px var(--background-100);
-}
-/* The enemy's under the boss's bars, in the bars' column. */
-.sim-boss-buffs {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 8px;
-  margin-top: 6px;
 }
 .sim-buff {
   position: absolute;

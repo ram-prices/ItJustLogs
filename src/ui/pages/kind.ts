@@ -290,14 +290,9 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         const isNew = g.some((x) => x.isNew);
         const flags = sixFlags(isNew, !!up);
         const style = known ? `--six-tint:${known}` : '';
-        const tintAttrs = raw(
-          [
-            tintUrl ? `data-six-tint="${tintUrl.replace(/"/g, '&quot;')}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : '',
-            style ? `style="${style}"` : '',
-          ].filter(Boolean).join(' '),
-        );
+        const tintAttrs = html`${tintUrl ? html`data-six-tint="${tintUrl}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : ''}${tintUrl && style ? ' ' : ''}${style ? html`style="${style}"` : ''}`;
         const cls = `six-item${up ? ' rateup' : ''}${win ? ' win' : ''}`;
-        const pity = html`<span class="six-pity">${p.pity === null ? html`<i style="background:var(--green)"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
+        const pity = html`<span class="six-pity">${p.pity === null ? html`<i class="free"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
         // Portraits open that operator's or weapon's info page.
         if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}${flags}</span>${pity}</a>`;
         // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
@@ -368,7 +363,7 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
   // tintWeaponCards), else from the art.
   const operators = c.rateUpIds.filter((id) => id.startsWith('chr_'));
   const item = (c.kind === 'weap' ? weapon : operators.length === 1 ? itemIconUrl('char', operators[0]) : '') ?? '';
-  const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${c.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
+  const tintAttr = item ? html`data-tint-item="${item}"${c.kind === 'char' ? ' data-tint-skin' : ''}` : '';
   const tint = item ? '' : raw('data-tint');
   const img = url
     ? (c.poolId && url === bannerArtUrl(c.poolId) ? layeredArt(c.poolId, url) : null) ??
@@ -540,7 +535,7 @@ export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOption
   // Headhunting: the game's banner layout; Issues: the text-free Issue art. Each falls back to the other.
   const faces = HERO_ART[pool];
   const [art, alt] = faces ? [faces, bannerArtUrl(pool) ?? ''] : kind === 'weap' && schedArt ? [schedArt, bannerArtUrl(pool) ?? ''] : [bannerArtUrl(pool) ?? schedArt, schedArt];
-  const fallback = alt && alt !== art ? raw(`data-alt="${alt.replace(/"/g, '&quot;')}" data-alt-class="alt"`) : '';
+  const fallback = alt && alt !== art ? html`data-alt="${alt}" data-alt-class="alt"` : '';
   const category = b ? CATEGORY_LABEL[b.category] : k.title;
   return html`<section class="wiki-hero art-hero banner-hero${art ? ' has-art' : ''}">
       ${art ? html`<img class="wiki-hero-art${faces ? ' faces' : ''}" src="${art}" alt="" decoding="async" data-fallback ${fallback} />` : ''}
@@ -564,7 +559,7 @@ export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOption
 
 const expanded = new Set<string>();
 
-export const bannerKey = (b: BannerSummary) => `${b.kind}:${b.poolId}`;
+const bannerKey = (b: BannerSummary) => `${b.kind}:${b.poolId}`;
 
 /**
  * List filters per banner; any combination, never empty. '4' means 4★ and
@@ -664,7 +659,7 @@ function bannerSection(b: BannerSummary, ended = false, i = 0): Html {
   const src = artSrc || weapon;
   // Cards with one rate-up glow in its own colour (the weapon's, or the
   // operator's with skin left out), not the banner art's.
-  const tintAttr = item ? raw(`data-tint-item="${item.replace(/"/g, '&quot;')}"${b.kind === 'char' ? ' data-tint-skin' : ''}`) : '';
+  const tintAttr = item ? html`data-tint-item="${item}"${b.kind === 'char' ? ' data-tint-skin' : ''}` : '';
   const open = expanded.has(key);
   return html`<article class="card banner${open ? ' expanded' : ''}${ended ? ' ended' : ''}${enter(key)}" id="banner-${b.poolId}" data-pool="${key}" data-art="${src}" data-card-image="${b.name}" ${tintAttr} style="--banner-tint:${tintFor(item || src)};--i:${i}">
     <div class="banner-summary">
@@ -792,7 +787,8 @@ function pityRuler(b: BannerSummary, ended = false): Html {
   // Milestones as teardrop markers: the rate-up guarantee (when it lands
   // before the axis end) and every reward point on the axis.
   // The guarantee only matters while the rate-up is still outstanding.
-  if (b.guarantee && b.guarantee.max < axis && b.rateUpCopies === 0) {
+  // (A free rate-up copy doesn't close it, so ask the meter, not the copy count.)
+  if (b.guarantee && b.guarantee.max < axis && !b.guarantee.done) {
     const g = b.guarantee.max;
     items.above.push({
       at: pct(g),
@@ -932,10 +928,12 @@ export function toggleLuck(key: string): boolean {
 
 /** The drawer under a rate-up pull: how likely that result was, and the curve. */
 function luckDrawer(b: BannerSummary, p: AnalyzedPull): Html {
-  const pmf = copyPmf(b, p.copy!);
+  // Luck is judged on the copies the paid pulls bought (free rate-ups left out).
+  const n = p.paidCopy ?? p.copy!;
+  const pmf = copyPmf(b, n);
   if (!pmf || p.luck === undefined) return html``;
   const at = p.kind === 'weap' ? Math.ceil(p.bannerPull! / 10) * 10 : p.bannerPull!;
-  const copies = p.copy === 1 ? '1 copy' : `${p.copy} copies`;
+  const copies = n === 1 ? '1 copy' : `${n} copies`;
   const tone = p.luck < 0.25 ? 'var(--green)' : p.luck > 0.75 ? 'var(--red)' : 'var(--gray-1000)';
   const carried = b.startPity > 0 && b.category === 'chartered' ? html` <span class="tertiary">Started with ${b.startPity} pity carried over.</span>` : '';
   const guaranteed = p.outcome === 'guaranteed' ? html` <span class="tertiary">This one was the guarantee.</span>` : '';
@@ -951,7 +949,7 @@ function pullRow(b: BannerSummary, p: AnalyzedPull): Html {
   const hasLuck = p.isRateUp && p.rarity === 6 && p.copy !== undefined && luck !== undefined;
   const open = hasLuck && openLuck.has(p.key);
   return html`<div class="pull${p.rarity === 6 ? ' six' : p.rarity === 5 ? ' five' : ''}${hasLuck ? ' has-luck' : ''}${open ? ' open' : ''}" data-tip="${tip(fmtDate(p.ts, true), [])}"
-    ${hasLuck ? raw(`data-action="luck" data-key="${p.key.replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="${String(open)}"`) : ''}>
+    ${hasLuck ? html`data-action="luck" data-key="${p.key}" role="button" tabindex="0" aria-expanded="${String(open)}"` : ''}>
     <span class="pull-no num">${p.bannerPull ?? '–'}</span>
     <div class="item">${itemImg(p.kind, p.itemId)}<div class="item-name">
       <span class="ellipsis">${p.name}</span>${p.isRateUp && p.rarity === 6 ? html`<span class="pull-tag rateup${p.kind === 'weap' ? ' weap' : ''}" role="img" title="Rate-up" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}${p.isNew ? html`<span class="pull-tag new" role="img" title="New" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${p.pity === null ? badge('Free', 'outline') : ''}

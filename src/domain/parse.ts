@@ -24,24 +24,57 @@ export function parseTimestamp(v: unknown): number {
   return Number.isNaN(d) ? 0 : d;
 }
 
+const recordTs = (r: RawRecord): number => parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp);
+const hasSeq = (r: RawRecord): boolean => str(r.seqId).trim() !== '';
+
 /**
- * Identity of a record for de-duplicating merged imports. seqId is the API's own
- * per-kind sequence number; timestamp + item guard against legacy files without it.
+ * Time + item of a record. Not unique: every pull of a ten-pull shares one
+ * time, so two identical 4★ in one ten-pull have the same group key. seqId is
+ * left out on purpose, since some exporters omit it.
  */
-export function recordKey(r: RawRecord, kind: Kind): string {
+function groupKey(r: RawRecord, kind: Kind): string {
   const item = str(kind === 'char' ? r.charId : r.weaponId) || str(r.itemId) || str(r.kind);
-  return `${str(r.seqId)}|${parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp)}|${item}`;
+  return `${recordTs(r)}|${item}`;
 }
 
-export function normalize(r: RawRecord, kind: Kind): Pull {
+/**
+ * Identity of each record in a list: time + item + occurrence. The n-th record
+ * (0-based, in list order) with a given time + item gets `ts|item|n`.
+ */
+export function recordKeys(list: RawRecord[], kind: Kind): string[] {
+  const seen = new Map<string, number>();
+  return list.map((r) => {
+    const g = groupKey(r, kind);
+    const n = seen.get(g) ?? 0;
+    seen.set(g, n + 1);
+    return `${g}|${n}`;
+  });
+}
+
+/**
+ * Repairs histories that hold the same pulls twice, once with seqIds and once
+ * without (an old merge of a seqId-less export onto a seqId'd history). In a
+ * time + item group that has records with a seqId, the ones without are dropped:
+ * the seqId'd export is authoritative for that group.
+ */
+export function dropShadowedDuplicates(list: RawRecord[], kind: Kind): RawRecord[] {
+  const withSeq = new Set<string>();
+  for (const r of list) if (hasSeq(r)) withSeq.add(groupKey(r, kind));
+  if (!withSeq.size) return list;
+  const out = list.filter((r) => hasSeq(r) || !withSeq.has(groupKey(r, kind)));
+  return out.length === list.length ? list : out;
+}
+
+/** `key` is unique per pull: seqId when the record has one, else its occurrence key. */
+export function normalize(r: RawRecord, kind: Kind, occurrence?: string): Pull {
   const itemId = str(kind === 'char' ? r.charId : r.weaponId) || str(r.itemId);
   const name =
     str(kind === 'char' ? r.charName : r.weaponName) || str(r.nameText) || str(r.name) || itemId || 'Unknown';
   return {
-    key: recordKey(r, kind),
+    key: hasSeq(r) ? `${str(r.seqId)}|${groupKey(r, kind)}` : `|${occurrence ?? groupKey(r, kind)}`,
     kind,
     seq: Number(r.seqId) || 0,
-    ts: parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp),
+    ts: recordTs(r),
     poolId: str(r.poolId).trim() || 'unknown',
     poolName: str(r.poolName).trim(),
     itemId,
@@ -52,9 +85,24 @@ export function normalize(r: RawRecord, kind: Kind): Pull {
   };
 }
 
-/** Oldest first. The API returns newest first, but don't rely on input order. */
+/**
+ * Oldest-first comparison of two records tagged with their list position. Ties
+ * on time go by seq; when either lacks one (a ten-pull from an exporter without
+ * seqIds), by position reversed, since stored and exported lists are newest first.
+ */
+const oldestFirst = <T extends { ts: number; seq: number }>(a: { v: T; i: number }, b: { v: T; i: number }): number =>
+  a.v.ts - b.v.ts || (a.v.seq && b.v.seq ? a.v.seq - b.v.seq : b.i - a.i);
+
+function sortOldestFirst<T extends { ts: number; seq: number }>(list: T[]): T[] {
+  return list
+    .map((v, i) => ({ v, i }))
+    .sort(oldestFirst)
+    .map((x) => x.v);
+}
+
+/** Oldest first. The API returns newest first, but don't rely on input order beyond ties. */
 export function chronological(pulls: Pull[]): Pull[] {
-  return [...pulls].sort((a, b) => a.ts - b.ts || a.seq - b.seq);
+  return sortOldestFirst(pulls);
 }
 
 /** A banner reward the export lists (Token, Arsenal rate-up copy, Dossier, Selector). */
@@ -73,19 +121,24 @@ export interface Gift {
 export function giftsOf(history: PullHistory): Gift[] {
   const out: Gift[] = [];
   for (const [kind, records] of [['char', history.characters], ['weap', history.weapons]] as const) {
+    const gifts: Gift[] = [];
     for (const r of records) {
       if (!isGift(r)) continue;
-      out.push({ kind, gift: str(r.kind), poolId: str(r.poolId).trim(), ts: parseTimestamp(r.gachaTs ?? r.ts ?? r.timestamp), seq: Number(r.seqId) || 0, name: str(r.nameText) || str(r.name) });
+      gifts.push({ kind, gift: str(r.kind), poolId: str(r.poolId).trim(), ts: recordTs(r), seq: Number(r.seqId) || 0, name: str(r.nameText) || str(r.name) });
     }
+    out.push(...sortOldestFirst(gifts));
   }
-  return out.sort((a, b) => a.ts - b.ts || a.seq - b.seq);
+  // Each kind is already in order; this only interleaves the two (stable).
+  return out.sort((a, b) => a.ts - b.ts);
 }
 
 export function toPulls(history: PullHistory): { char: Pull[]; weap: Pull[] } {
-  return {
-    char: chronological(history.characters.filter((r) => !isGift(r)).map((r) => normalize(r, 'char'))),
-    weap: chronological(history.weapons.filter((r) => !isGift(r)).map((r) => normalize(r, 'weap'))),
+  const list = (records: RawRecord[], kind: Kind) => {
+    const pulls = records.filter((r) => !isGift(r));
+    const keys = recordKeys(pulls, kind);
+    return chronological(pulls.map((r, i) => normalize(r, kind, keys[i])));
   };
+  return { char: list(history.characters, 'char'), weap: list(history.weapons, 'weap') };
 }
 
 /**
@@ -121,13 +174,11 @@ export interface MergeResult {
 }
 
 /**
- * Union of two histories. The game only serves a limited window of history, so
- * merging each new export onto what's saved keeps older pulls forever.
- */
-/**
- * How many pulls in `from` are missing from `to` (banner rewards ignored).
- * Drive sync refuses to upload when this is above 0: the Drive copy's pulls
- * may only ever grow.
+ * How many pulls in `from` are missing from `to` (banner rewards ignored), per
+ * time + item: max(0, count in `from` − count in `to`). Both sides are repaired
+ * with dropShadowedDuplicates first, so a copy holding old duplicates doesn't
+ * block an upload forever. Drive sync refuses to upload when this is above 0:
+ * the Drive copy's pulls may only ever grow.
  */
 export function missingPulls(from: PullHistory | null | undefined, to: PullHistory | null | undefined): number {
   if (!from) return 0;
@@ -136,27 +187,56 @@ export function missingPulls(from: PullHistory | null | undefined, to: PullHisto
     ['char', from.characters, to?.characters ?? []],
     ['weap', from.weapons, to?.weapons ?? []],
   ] as [Kind, RawRecord[], RawRecord[]][]) {
-    const have = new Set(b.map((r) => recordKey(r, kind)));
-    for (const r of a) if (!isGift(r) && !have.has(recordKey(r, kind))) missing++;
+    const count = (list: RawRecord[]) => {
+      const m = new Map<string, number>();
+      for (const r of dropShadowedDuplicates(list, kind)) {
+        if (isGift(r)) continue;
+        const g = groupKey(r, kind);
+        m.set(g, (m.get(g) ?? 0) + 1);
+      }
+      return m;
+    };
+    const have = count(b);
+    for (const [g, n] of count(a)) missing += Math.max(0, n - (have.get(g) ?? 0));
   }
   return missing;
 }
 
+/**
+ * Union of two histories. The game only serves a limited window of history, so
+ * merging each new export onto what's saved keeps older pulls forever.
+ *
+ * Records are matched on time + item + occurrence (see recordKeys), never on
+ * seqId: per time + item group the result holds max(base, incoming) records,
+ * all of the base's plus the incoming extras. An incoming record with a seqId
+ * replaces its seqId-less match, so seqIds fill in. Duplicates left by older
+ * merges are dropped (dropShadowedDuplicates). `added` counts incoming records
+ * kept; repairs don't count.
+ */
 export function mergeHistories(base: PullHistory, incoming: PullHistory): MergeResult {
   const mergeList = (a: RawRecord[], b: RawRecord[], kind: Kind) => {
-    const seen = new Set(a.map((r) => recordKey(r, kind)));
-    const fresh = b.filter((r) => {
-      const k = recordKey(r, kind);
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
+    const merged = [...dropShadowedDuplicates(a, kind)];
+    const fromIncoming = new Set<RawRecord>();
+    const at = new Map<string, number>();
+    recordKeys(merged, kind).forEach((k, i) => at.set(k, i));
+    const inc = dropShadowedDuplicates(b, kind);
+    recordKeys(inc, kind).forEach((k, i) => {
+      const r = inc[i];
+      const j = at.get(k);
+      if (j === undefined) {
+        merged.push(r);
+        fromIncoming.add(r);
+      } else if (!hasSeq(merged[j]) && hasSeq(r)) {
+        merged[j] = r;
+      }
     });
-    const merged = [...a, ...fresh].sort(
-      (x, y) =>
-        parseTimestamp(y.gachaTs ?? y.ts) - parseTimestamp(x.gachaTs ?? x.ts) ||
-        (Number(y.seqId) || 0) - (Number(x.seqId) || 0),
-    );
-    return { merged, added: fresh.length };
+    const kept = dropShadowedDuplicates(merged, kind);
+    // Newest first, stable: same-time records without seqIds keep their order.
+    const sorted = kept
+      .map((r, i) => ({ r, i, ts: recordTs(r), seq: Number(r.seqId) || 0 }))
+      .sort((x, y) => y.ts - x.ts || (x.seq && y.seq ? y.seq - x.seq : x.i - y.i))
+      .map((x) => x.r);
+    return { merged: sorted, added: kept.filter((r) => fromIncoming.has(r)).length };
   };
   const c = mergeList(base.characters, incoming.characters, 'char');
   const w = mergeList(base.weapons, incoming.weapons, 'weap');

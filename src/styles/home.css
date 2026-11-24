@@ -494,7 +494,7 @@ a.sched-next:hover {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 900;
+  z-index: var(--z-dialog);
   display: grid;
   place-items: center;
   padding: 16px;

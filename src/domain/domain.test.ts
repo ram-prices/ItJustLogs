@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import db from '../data/banners.snapshot.json';
 import { analyze } from './analyze';
 import { canonicalPoolId, categoryOf, patchOf } from './banners';
-import { compareHistories, mergeHistories, missingPulls, parseHistoryJson } from './parse';
+import { compareHistories, dropShadowedDuplicates, mergeHistories, missingPulls, parseHistoryJson } from './parse';
 import { weeklyTimeline, patchStats } from './patches';
 import {
   CHARTERED,
@@ -15,7 +15,7 @@ import {
   rateUpPmf,
 } from './pity';
 import scheduleSnapshot from '../data/schedule.snapshot.json';
-import { discordText, guessServer, headhuntingRow, packLanes, statusOf, timeOn, type Schedule, type ScheduleBanner } from './schedule';
+import { discordText, endOrGuess, guessServer, headhuntingRow, packLanes, statusOf, timeOn, UNKNOWN_END_DAYS, type Schedule, type ScheduleBanner } from './schedule';
 import type { BannerDb, PullHistory } from './types';
 import { fmtSkillValue, parseMarkup, skillSets, splitPlaceholders, wikiId } from './wiki';
 import { endministratorOf, extrasOf, ownedItems } from './owned';
@@ -356,6 +356,14 @@ describe('same-player check on import', () => {
     expect(compareHistories(mine, noSeq).verdict).toBe('same');
   });
 
+  it('merging a seqId-less copy of a seqId history adds nothing', () => {
+    const noSeq = { characters: mine.characters.map((r) => ({ ...r, seqId: undefined })), weapons: [] } as unknown as PullHistory;
+    const { history, added } = mergeHistories(mine, noSeq);
+    expect(added.char).toBe(0);
+    expect(history.characters).toHaveLength(30);
+    expect(history.characters.every((r) => r.seqId)).toBe(true);
+  });
+
   it("flags someone else's pulls from the same period", () => {
     const friend = { characters: Array.from({ length: 30 }, (_, i) => pull(i + 1, `chr_${(i + 3) % 5}x`)), weapons: [] } as unknown as PullHistory;
     expect(compareHistories(mine, friend).verdict).toBe('different');
@@ -365,6 +373,64 @@ describe('same-player check on import', () => {
     const later = { characters: [pull(100, 'chr_1', 60)], weapons: [] } as unknown as PullHistory;
     expect(compareHistories(mine, later).verdict).toBe('noOverlap');
     expect(compareHistories(null, later).verdict).toBe('empty');
+  });
+});
+
+describe('exports without seqIds', () => {
+  const T = String(Date.UTC(2026, 1, 1));
+  // One ten-pull, oldest first: pull 3 is a 6★, pulls 5 and 8 are the same 4★.
+  const tenPull = (withSeq: boolean) =>
+    Array.from({ length: 10 }, (_, i) => ({
+      seqId: withSeq ? String(i + 1) : undefined,
+      gachaTs: T,
+      charId: i === 2 ? 'chr_six' : i === 4 || i === 7 ? 'chr_twin' : `chr_${i}`,
+      rarity: i === 2 ? 6 : 4,
+      poolId: 'standard',
+    })).reverse(); // stored and exported newest first
+  const hist = (characters: object[]) => ({ characters, weapons: [] }) as unknown as PullHistory;
+  const empty = hist([]);
+
+  it('keeps repeated pulls inside one ten-pull', () => {
+    const first = mergeHistories(empty, hist(tenPull(false)));
+    expect(first.added.char).toBe(10);
+    expect(first.history.characters.filter((r) => r.charId === 'chr_twin')).toHaveLength(2);
+    const again = mergeHistories(first.history, hist(tenPull(false)));
+    expect(again.added.char).toBe(0);
+    expect(again.history.characters.filter((r) => r.charId === 'chr_twin')).toHaveLength(2);
+  });
+
+  it('fills in seqIds from an export that has them', () => {
+    const { history, added } = mergeHistories(hist(tenPull(false)), hist(tenPull(true)));
+    expect(added.char).toBe(0);
+    expect(history.characters).toHaveLength(10);
+    expect(history.characters.every((r) => r.seqId)).toBe(true);
+  });
+
+  it('repairs a history holding the same pulls with and without seqIds', () => {
+    const broken = [...tenPull(true), ...tenPull(false)];
+    expect(dropShadowedDuplicates(broken, 'char')).toHaveLength(10);
+    const { history, added } = mergeHistories(hist(broken), empty);
+    expect(added.char).toBe(0);
+    expect(history.characters).toHaveLength(10);
+    expect(history.characters.every((r) => r.seqId)).toBe(true);
+  });
+
+  it('missingPulls matches on time + item + occurrence', () => {
+    expect(missingPulls(hist(tenPull(false)), hist(tenPull(true)))).toBe(0);
+    expect(missingPulls(hist(tenPull(true)), hist(tenPull(false)))).toBe(0);
+    expect(missingPulls(hist(tenPull(true)), hist(tenPull(false).slice(1)))).toBe(1);
+    // A twin lost: one of the two identical records is missing.
+    expect(missingPulls(hist(tenPull(true)), hist(tenPull(false).filter((r, i) => !(r.charId === 'chr_twin' && i < 5))))).toBe(1);
+    // A Drive copy holding old duplicates doesn't block uploads.
+    expect(missingPulls(hist([...tenPull(true), ...tenPull(false)]), hist(tenPull(true)))).toBe(0);
+  });
+
+  it('processes a seqId-less ten-pull oldest first', () => {
+    const b = analyze(hist(tenPull(false)), bannerDb).banners.find((x) => x.poolId === 'standard')!;
+    expect(b.pulls.map((p) => p.itemId)).toEqual(['chr_0', 'chr_1', 'chr_six', 'chr_3', 'chr_twin', 'chr_5', 'chr_6', 'chr_twin', 'chr_8', 'chr_9']);
+    expect(b.pulls[2].pity).toBe(3);
+    expect(b.pulls.map((p) => p.pity)).toEqual([1, 2, 3, 1, 2, 3, 4, 5, 6, 7]);
+    expect(new Set(b.pulls.map((p) => p.key)).size).toBe(10);
   });
 });
 
@@ -551,5 +617,205 @@ describe('luck tiers', () => {
     expect(luckTier(12 / 20, 0.5, 20)).toBe('lucky');
     expect(luckTier(14 / 20, 0.5, 20)).toBe('very-lucky');
     expect(luckTier(0.53, 0.5, 1000)).toBe('average'); // many tries, but only 6% better
+  });
+});
+
+describe('character pity scopes and the Chartered guarantee', () => {
+  // Pulls in the order given, one second apart.
+  type Spec = [poolId: string, charId?: string, rarity?: number, extra?: object];
+  const history = (specs: Spec[]) =>
+    ({
+      characters: specs.map(([poolId, charId = 'chr_filler', rarity = 4, extra = {}], i) => ({
+        seqId: String(i + 1),
+        gachaTs: String(1_700_000_000_000 + i * 1000),
+        charId,
+        charName: charId,
+        rarity,
+        poolId,
+        ...extra,
+      })),
+      weapons: [],
+    }) as unknown as PullHistory;
+  const fill = (poolId: string, n: number): Spec[] => Array.from({ length: n }, () => [poolId] as Spec);
+  const bannerOf = (a: Analysis, poolId: string) => a.banners.find((b) => b.poolId === poolId)!;
+
+  it('shares 6★ pity across Chartered banners, while Joint and Basic count on their own', () => {
+    const a = analyze(
+      history([
+        ...fill('special_1_0_1', 50),
+        ...fill('joint_1_2_2', 10),
+        ...fill('standard', 10),
+        ...fill('special_1_0_2', 29),
+        ['special_1_0_2', 'chr_off', 6],
+      ]),
+      bannerDb,
+    );
+    const next = bannerOf(a, 'special_1_0_2');
+    expect(next.startPity).toBe(50);
+    expect(next.pulls.find((p) => p.rarity === 6)!.pity).toBe(80);
+    expect(next.pity.value).toBe(0);
+    expect(bannerOf(a, 'special_1_0_1').pity.value).toBe(50);
+    expect(bannerOf(a, 'joint_1_2_2')).toMatchObject({ startPity: 0, pity: { value: 10 } });
+    expect(bannerOf(a, 'standard')).toMatchObject({ startPity: 0, pity: { value: 10 } });
+  });
+
+  it("gives a pool that isn't a known Chartered one its own pity", () => {
+    const a = analyze(
+      history([
+        ...fill('special_1_0_1', 40),
+        ...fill('unknown', 5),
+        ['mystery_9_9_1', 'chr_x', 4, { poolName: 'Mystery Pool' }],
+        ...fill('mystery_9_9_1', 3),
+        ...fill('special_1_0_2', 1),
+      ]),
+      bannerDb,
+    );
+    const unknown = bannerOf(a, 'unknown');
+    expect(unknown).toMatchObject({ category: 'other', name: 'Other headhunting', startPity: 0, pity: { value: 5 }, rewards: null, guarantee: null });
+    // Each 'other' pool counts on its own, and keeps its own name when it has one.
+    expect(bannerOf(a, 'mystery_9_9_1')).toMatchObject({ category: 'other', name: 'Mystery Pool', startPity: 0, pity: { value: 4 }, rewards: null });
+    // The Chartered count went on from 40, untouched by the unknown pool.
+    expect(bannerOf(a, 'special_1_0_2')).toMatchObject({ startPity: 40, pity: { value: 41 } });
+  });
+
+  it('a rate-up on pull 120 after a lost 6★ is guaranteed; a second one on the banner is won', () => {
+    const a = analyze(
+      history([
+        ...fill('special_1_0_1', 69),
+        ['special_1_0_1', 'chr_off', 6],
+        ...fill('special_1_0_1', 49),
+        ['special_1_0_1', 'chr_0016_laevat', 6],
+        ...fill('special_1_0_1', 29),
+        ['special_1_0_1', 'chr_0016_laevat', 6],
+      ]),
+      bannerDb,
+    );
+    const b = bannerOf(a, 'special_1_0_1');
+    expect(b.pulls.filter((p) => p.rarity === 6).map((p) => [p.bannerPull, p.outcome])).toEqual([
+      [70, 'lost'],
+      [120, 'guaranteed'],
+      [150, 'won'],
+    ]);
+    expect(b.guarantee).toMatchObject({ value: 120, done: true });
+  });
+
+  it('a free 6★ between paid pulls leaves pity running', () => {
+    const a = analyze(history([...fill('special_1_0_1', 20), ['special_1_0_1', 'chr_free', 6, { isFree: true }], ...fill('special_1_0_1', 10)]), bannerDb);
+    const b = bannerOf(a, 'special_1_0_1');
+    expect(b.pulls.filter((p) => !p.isFree).map((p) => p.pity).slice(18)).toEqual([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
+    expect(b.pity.value).toBe(30);
+    expect(b).toMatchObject({ paidPulls: 30, freePulls: 1 });
+  });
+
+  it('a free rate-up 6★ is a copy, but leaves pity and the 120 guarantee alone', () => {
+    const a = analyze(
+      history([
+        ...fill('special_1_0_1', 20),
+        ['special_1_0_1', 'chr_0016_laevat', 6, { isFree: true }],
+        ...fill('special_1_0_1', 99),
+        ['special_1_0_1', 'chr_0016_laevat', 6],
+      ]),
+      bannerDb,
+    );
+    const b = bannerOf(a, 'special_1_0_1');
+    const sixes = b.pulls.filter((p) => p.rarity === 6);
+    expect(sixes.map((p) => [p.bannerPull, p.pity, p.outcome, p.copy])).toEqual([
+      [null, null, undefined, 1],
+      [120, 120, 'guaranteed', 2],
+    ]);
+    // Pity ran straight through the free one: 20 before it, 21 right after.
+    expect(b.pulls.filter((p) => !p.isFree).map((p) => p.pity).slice(19, 21)).toEqual([20, 21]);
+    expect(b.rateUpCopies).toBe(2);
+    expect(b.guarantee).toMatchObject({ value: 120, done: true });
+    expect(a.char).toMatchObject({ sixStars: 1, won: 0, guaranteed: 1 });
+  });
+
+  it("a free rate-up copy doesn't change the next paid rate-up's luck", () => {
+    const paid = ['special_1_0_1', 'chr_0016_laevat', 6] as const;
+    const withFree = bannerOf(analyze(history([...fill('special_1_0_1', 20), ['special_1_0_1', 'chr_0016_laevat', 6, { isFree: true }], ...fill('special_1_0_1', 29), [...paid]]), bannerDb), 'special_1_0_1');
+    const without = bannerOf(analyze(history([...fill('special_1_0_1', 49), [...paid]]), bannerDb), 'special_1_0_1');
+    const a = withFree.pulls.find((p) => p.rarity === 6 && !p.isFree)!;
+    const b = without.pulls.find((p) => p.rarity === 6)!;
+    expect(a).toMatchObject({ bannerPull: 50, copy: 2, paidCopy: 1 });
+    expect(b).toMatchObject({ bannerPull: 50, copy: 1, paidCopy: 1 });
+    expect(a.luck).toBeGreaterThan(0);
+    expect(a.luck).toBe(b.luck);
+  });
+
+  it('a free rate-up 6★ leaves the guarantee meter open', () => {
+    const a = analyze(history([...fill('special_1_0_1', 30), ['special_1_0_1', 'chr_0016_laevat', 6, { isFree: true }]]), bannerDb);
+    const b = bannerOf(a, 'special_1_0_1');
+    expect(b.guarantee).toMatchObject({ value: 30, max: 120, done: false });
+    expect(b.pity.value).toBe(30);
+    expect(b.rateUpCopies).toBe(1);
+  });
+});
+
+describe('same-player check at the 90% line', () => {
+  const pull = (day: number, charId: string) => ({ seqId: String(day), gachaTs: String(Date.UTC(2026, 0, day)), charId, rarity: 4, poolId: 'standard' });
+  const saved = { characters: Array.from({ length: 10 }, (_, i) => pull(i + 1, `chr_${i}`)), weapons: [] } as unknown as PullHistory;
+  const changed = (n: number) => ({ characters: saved.characters.map((r, i) => (i < n ? { ...r, charId: 'chr_other' } : r)), weapons: [] }) as unknown as PullHistory;
+
+  it('9 of 10 matching is the same player; 8 of 10 is not', () => {
+    expect(compareHistories(saved, changed(1))).toMatchObject({ verdict: 'same', shared: 9, foreign: 1 });
+    expect(compareHistories(saved, changed(2))).toMatchObject({ verdict: 'different', shared: 8, foreign: 2 });
+  });
+});
+
+describe('banners with an unannounced end, on both servers', () => {
+  const DAY = 86_400_000;
+  const open: ScheduleBanner = {
+    name: 'Open',
+    kind: 'chartered',
+    rateUps: [],
+    poolId: null,
+    version: null,
+    // The same local opening, 13 hours apart.
+    start: { americas: '2026-10-14T12:00:00-05:00', asia: '2026-10-14T12:00:00+08:00' },
+    end: null,
+    availability: null,
+    art: null,
+    posts: [],
+  };
+
+  it('guesses the end a few weeks after each server opens, and keeps it live for a while', () => {
+    for (const server of ['americas', 'asia'] as const) {
+      const start = timeOn(open.start, server)!;
+      expect(endOrGuess(open, server)).toBe(start + UNKNOWN_END_DAYS * DAY);
+      expect(statusOf(open, start - 1, server)).toBe('upcoming');
+      expect(statusOf(open, start, server)).toBe('live');
+      expect(statusOf(open, start + 119 * DAY, server)).toBe('live');
+      expect(statusOf(open, start + 120 * DAY, server)).toBe('ended');
+    }
+    // Between the two openings it's live in Asia and not yet in the Americas.
+    const between = timeOn(open.start, 'asia')! + DAY / 4;
+    expect(statusOf(open, between, 'asia')).toBe('live');
+    expect(statusOf(open, between, 'americas')).toBe('upcoming');
+    expect(endOrGuess({ ...open, start: null }, 'asia')).toBeNull();
+  });
+});
+
+describe('owned copies: listed rewards against the estimate', () => {
+  const pull = (itemId: string, ts: number) => ({ itemId, name: itemId, seq: ts, ts, bannerPull: ts, kind: 'char' }) as never;
+  const token = (at: number[]) => ({ label: 'Token', earned: at.length, copies: at.length, milestones: (upTo: number) => at.filter((x) => x <= upTo).map((x) => ({ at: x, name: 'Token', copy: true })) });
+  const banner = (poolId: string, rateUp: string) => ({
+    kind: 'char',
+    poolId,
+    name: poolId,
+    paidPulls: 240,
+    lastTs: 240,
+    pulls: [pull('chr_filler', 240)],
+    info: { rateUpIds: [rateUp], rateUpNames: [] },
+    rewards: token([240]),
+  });
+
+  it("a 1.4+ banner's listed Token isn't counted again as an estimate; an older banner's is estimated", () => {
+    const a = {
+      banners: [banner('special_1_4_1', 'chr_new'), banner('special_1_1_1', 'chr_old')],
+      gifts: [{ kind: 'char', gift: 'gift_operator_token', poolId: 'special_1_4_1', ts: 240, seq: 240.5, name: "chr_new's Token" }],
+    } as unknown as Analysis;
+    const owned = ownedItems(a, 'char');
+    expect(owned.get('chr_new')!.acquisitions.map((x) => [x.ts, x.reward, !!x.estimated])).toEqual([[240, 'Token', false]]);
+    expect(owned.get('chr_old')!.acquisitions.map((x) => [x.ts, x.reward, !!x.estimated])).toEqual([[240, 'Token', true]]);
   });
 });

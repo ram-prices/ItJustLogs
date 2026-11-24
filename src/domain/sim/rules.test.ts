@@ -1,16 +1,17 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
-  asset,
-  Probe,
+  allButLast,
+  first,
+  inflictOn as inflict,
+  last,
+  nthHit as nth,
+  potentials,
   rules as r,
+  runTables,
   SCRIPT,
-  simData,
-  Sources,
+  TEAM_USP,
+  TEAM_USP_SOURCE,
   type OperatorRules,
-  type Rule,
-  type Setup,
-  type TraceHit,
-  type WikiOp,
 } from './testkit';
 
 /**
@@ -21,28 +22,6 @@ import {
  *
  * To add an operator: a table below (its id, name, setups and rules) and its entry in OPERATORS.
  */
-
-const first = (h: TraceHit[]) => h.slice(0, 1);
-const last = (h: TraceHit[]) => h.slice(-1);
-const allButLast = (h: TraceHit[]) => h.slice(0, -1);
-const nth = (i: number) => (h: TraceHit[]) => h.slice(i, i + 1);
-/**
- * What buff_common_obtain_ultimate_sp gives each operator (every battle skill and Si's combo create it): its blackboard's
- * usp_everyone, whatever SP the skill cost (× a ratio its creator may assign: 1 in this batch).
- */
-const TEAM_USP = (d: Sources) =>
-  Number(
-    d.bundle.buffs.buff_common_obtain_ultimate_sp.blackboard.find((x: { key: string }) => x.key === 'usp_everyone')
-      .valueDouble,
-  );
-const TEAM_USP_SOURCE = 'combat/ops buffs.buff_common_obtain_ultimate_sp blackboard usp_everyone';
-/** An Arts Infliction on the enemy just before a press (the data's elements: Cryst, Pulse, Natural, Fire). */
-const inflict = (element: string, stacks: number) => (p: Probe) => {
-  p.w.enemy.bb.set(`inflict_${element}`, stacks);
-  p.w.enemy.bb.set(`inflict_until_${element}`, p.w.frame + 600);
-};
-const potentials = (...ps: number[]): Record<string, Setup> =>
-  Object.fromEntries(ps.map((n) => [`P${n}`, { potential: n }]));
 
 const TANGTANG: OperatorRules = {
   id: 'chr_0027_tangtang',
@@ -719,40 +698,4 @@ const ARCANE: OperatorRules = {
 
 const OPERATORS = [ARCANE, TANGTANG, SI, TYPHOEUS, LAST_RITE, YVONNE, LIINO, ZHUANG_FANGYI];
 
-for (const op of OPERATORS)
-  describe(op.name, () => {
-    let src: Sources;
-    const probes = new Map<string, Probe>();
-    beforeAll(async () => {
-      const mates = [...new Set(Object.values(op.setups ?? {}).flatMap((s) => s.team ?? []))];
-      const [data, wiki, bundle] = await Promise.all([
-        simData([op.id, ...mates]),
-        asset('wiki/operators.json').then((w) => w.operators[op.id] as WikiOp),
-        asset(`combat/ops/${op.id}.json`),
-      ]);
-      src = new Sources(wiki, bundle, op.id);
-      const want = new Set(
-        op.rules.flatMap((x) => (x.ranks ?? [12]).flatMap((rank) => [`${x.setup ?? 'base'}|${rank}`, `base|${rank}`])),
-      );
-      for (const key of want) {
-        const [name, rank] = key.split('|');
-        const setup = { ...(op.setups?.[name] ?? {}), rank: Number(rank) };
-        probes.set(key, new Probe(data, op.id, setup).play(setup.script ?? SCRIPT));
-      }
-    }, 120_000);
-    const run = (rule: Rule, rank: number) => () => {
-      const p = probes.get(`${rule.setup ?? 'base'}|${rank}`)!;
-      const sim = rule.sim(p, probes.get(`base|${rank}`)!);
-      const data = rule.data(src, rank, p);
-      const tol = typeof rule.tol === 'function' ? rule.tol(p) : (rule.tol ?? 1e-6);
-      if (typeof data === 'number' && typeof sim === 'number')
-        expect(Math.abs(sim - data), `sim ${sim}, data ${data}`).toBeLessThanOrEqual(tol);
-      else expect(sim).toEqual(data);
-    };
-    for (const rule of op.rules)
-      for (const rank of rule.ranks ?? [12])
-        (rule.finding ? it.fails : it)(
-          `${rule.what}${rule.ranks ? ` [rank ${rank}]` : ''}${rule.footage ? ' [footage]' : ''}${rule.finding ? ' [finding]' : ''}: ${rule.source}`,
-          run(rule, rank),
-        );
-  });
+runTables(OPERATORS, { describe, beforeAll, it, expect });

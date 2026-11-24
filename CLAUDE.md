@@ -37,7 +37,7 @@ Keep these up to date when you change an area; keep this file short.
 - `npm test` (Vitest), `npm run typecheck`, `npm run build`
 - Keep output short (it stays in the conversation): `npx vitest run --reporter=dot`
   (dots, failures, summary), `npm run typecheck` (silent when clean),
-  `npm run build 2>&1 | tail -4`. Scratch sim tests (`src/domain/sim/dbg*`,
+  `npm run build 2>&1 | tail -4` (PowerShell: `| Select-Object -Last 4`). Scratch sim tests (`src/domain/sim/dbg*`,
   gitignored, excluded from both) run only on purpose:
   `DBG=1 npx vitest run src/domain/sim/dbg81.test.ts`.
 
@@ -49,7 +49,7 @@ Only when the owner says "deploy" (that batch only; afterwards changes stay loca
    editing site files must be idle and done; otherwise commit only the finished files by name.
 2. Never commit: `fixtures/`, `tools/ai-parser/`, `.claude/launch.json`, `src/domain/sim/dbg*`,
    `essence-icon-preview.html`, `essence.svg`. Stage files by name, never `git add -A`.
-3. `npm run typecheck`, `npx vitest run --reporter=dot`, `npm run build 2>&1 | tail -4`: all clean.
+3. `npm run typecheck`, `npx vitest run --reporter=dot`, `npm run build 2>&1 | tail -4` (PowerShell: `| Select-Object -Last 4`): all clean.
 4. Commit (message ends with the Co-Authored-By line) and `git push origin main` (no PRs; `gh`
    isn't installed). Pages deploys from the push.
 5. Confirm: poll `https://api.github.com/repos/ram-prices/ItJustLogs/actions/runs?head_sha=<sha>`
@@ -69,7 +69,7 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
 - UI essentials (more in `docs/ui.md`): Geist tokens and type classes as a
   baseline, drifting toward the old eftracker "acrylic" feel. Styles live in
   `src/styles/*.css` by area (base, components, banners, home, database,
-  collections, loadout, story, aic, rotations), imported in cascade order by
+  collections, loadout, story, aic, contracts, rotations), imported in cascade order by
   `src/styles.css`; light theme is `:root[data-theme='light']`; phone
   tweaks in `max-width: 640px` blocks; pages up to 1600px (`.container`).
   Borders are shadows (`--shadow-border`); weights 400/500/600; Jost
@@ -80,6 +80,9 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
   Escape every user/game string with the `html` template (`ui/html.ts`).
 - Readers (medals, findings, essences, gameplay recordings) are Tesseract.js +
   rules, no AI, pinned by tests with real samples.
+- Production CSP: a `<meta>` built by `contentSecurityPolicy()` in `vite.config.ts` (builds only);
+  any new external origin (CDN, API, image host) must be added there. Settings from outside
+  (localStorage, backup, Drive) pass `sanitizeSettings` (`src/settingsSanitize.ts`).
 - `scripts/export-pulls.ps1`: the PowerShell exporter, shown in Settings → Get
   your data via `?raw`. Keep it readable and dependency-free. Its only network
   target must stay `ef-webview.gryphline.com`. Character pool types are a fixed
@@ -89,7 +92,11 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
 
 - Chartered Headhunting 6★ pity is shared across all Chartered banners; the
   120-pull rate-up guarantee is per banner. Basic, New Horizons and each Joint
-  pool keep their own pity. Weapon pity and the 80-pull guarantee are per banner.
+  pool keep their own pity. Any other character pool (unknown or missing id) is
+  `'other'`: its own pity, no guarantee, no rewards. Weapon pity and the 80-pull guarantee are per banner.
+  A free rate-up 6★ on a Chartered banner counts as a copy but never touches pity or the 120 guarantee
+  (a later paid rate-up at 120 is still `guaranteed`; luck counts paid copies only, `paidCopy`). Some
+  banners gave a Token at 120 without consuming pity; not modelled (1.4+ exports list those Tokens as gift records).
 - Arsenal Issues are pulled in sets of 10 and the game treats each set as one
   pull: weapon pity is out of 4 sets, the rate-up guarantee is the 8th set.
   Rewards: a Selector on set 10 (non-rate-up weapons, not a copy), then every 8

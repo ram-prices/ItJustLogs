@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 /// <reference types="vitest/config" />
@@ -117,6 +118,17 @@ async function imageExists(url: string): Promise<boolean> {
   }
 }
 
+/**
+ * When ef-assets can't be reached: a scheduled deploy (which exists only to
+ * refresh these pages) fails, so the last good deploy stays live instead of
+ * one built from stale snapshots, without newer pages or any contract pages.
+ * Local and push builds fall back, loudly.
+ */
+function unavailable(what: string, e: unknown, fallback: string): void {
+  if (process.env.GITHUB_EVENT_NAME === 'schedule') throw new Error(`[item-pages] ef-assets ${what} unavailable (${e}); failing the scheduled build so the last deploy stays live`);
+  console.warn(`\n[item-pages] WARNING: ef-assets ${what} unavailable (${e}); ${fallback}. Pages newer than that will be missing.\n`);
+}
+
 /** The wiki data from ef-assets, or the snapshot if it can't be fetched. */
 async function loadWiki(): Promise<WikiShare> {
   try {
@@ -129,7 +141,7 @@ async function loadWiki(): Promise<WikiShare> {
     if (!process.env.CI) writeFileSync(WIKI_SNAPSHOT, `${JSON.stringify(data, null, 1)}\n`);
     return data;
   } catch (e) {
-    console.warn(`[item-pages] ef-assets wiki data unavailable (${e}); using ${WIKI_SNAPSHOT}`);
+    unavailable('wiki data', e, `using ${WIKI_SNAPSHOT}`);
     return JSON.parse(readFileSync(WIKI_SNAPSHOT, 'utf8')) as WikiShare;
   }
 }
@@ -139,7 +151,7 @@ async function loadSchedule(): Promise<Schedule> {
   try {
     return await fetchAsset<Schedule>('schedule.json');
   } catch (e) {
-    console.warn(`[item-pages] ef-assets schedule unavailable (${e}); using ${SCHEDULE_SNAPSHOT}`);
+    unavailable('schedule', e, `using ${SCHEDULE_SNAPSHOT}`);
     return JSON.parse(readFileSync(SCHEDULE_SNAPSHOT, 'utf8')) as Schedule;
   }
 }
@@ -149,7 +161,7 @@ async function loadSeasons(): Promise<SeasonIndex['seasons']> {
   try {
     return (await fetchAsset<SeasonIndex>('cc/index.json')).seasons;
   } catch (e) {
-    console.warn(`[item-pages] ef-assets contract seasons unavailable (${e})`);
+    unavailable('contract seasons', e, 'building no /contracts/<season> pages');
     return [];
   }
 }
@@ -163,10 +175,27 @@ const PREVIEW_TAG = /\s*<meta\s+(?:property|name)="(?:og:[^"]+|twitter:[^"]+|des
 function withPreview(index: string, p: Preview, embed: ComponentEmbed, title: string, wiki = true): string {
   // Wiki data gets the wiki's credit; schedule art is shown large, portraits as thumbnails.
   const tags = [previewTags({ ...p, siteName: wiki ? 'ItJustLogs · endfield.wiki.gg' : 'ItJustLogs', large: !wiki }), embedTag(embed)].filter(Boolean).join('\n    ');
+  // Function replacers: wiki text may hold `$&`, `` $` `` or `$'`, which a replacement string would expand.
+  const titleTag = `<title>${title.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`)} · ItJustLogs</title>`;
   return index
     .replace(PREVIEW_TAG, '')
-    .replace(/<title>[^<]*<\/title>/, `<title>${title.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`)} · ItJustLogs</title>`)
-    .replace('</head>', `  ${tags}\n  </head>`);
+    .replace(/<title>[^<]*<\/title>/, () => titleTag)
+    .replace('</head>', () => `  ${tags}\n  </head>`);
+}
+
+/** Page ids and keys that are safe as a file name (no `..`, slashes or odd characters). */
+const SAFE_ID = /^[\w-]+$/;
+
+/** Old paths kept only so old links open; the app moves them on, so the sitemap leaves them out. */
+const LEGACY_PAGES = new Set(['pulls', 'operators', 'arsenal', 'stats']);
+/** Page folders that are old addresses of another page (same preview), left out of the sitemap. */
+const LEGACY_DIRS = new Set(['operators/info', 'arsenal/info', 'events']);
+
+/** sitemap.xml for the built pages (absolute URLs on SITE_URL). */
+function sitemap(paths: string[]): string {
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const urls = [...new Set(paths)].map((p) => `  <url><loc>${esc(`${SITE_URL}${p}`)}</loc></url>`);
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
 }
 
 /**
@@ -256,8 +285,11 @@ function pageCopies(): Plugin {
       if (lead) seasonPage('contracts', 'index', lead, '/contracts', 'Contingency Contract');
       const missing: string[] = [];
       let largest = 0;
+      const unsafe = pages.filter((x) => !SAFE_ID.test(x.id));
+      if (unsafe.length) console.warn(`[item-pages] WARNING: skipped pages with unsafe ids: ${unsafe.map((x) => JSON.stringify(`${x.dir}/${x.id}`)).join(', ')}`);
+      const safe = pages.filter((x) => SAFE_ID.test(x.id));
       await Promise.all(
-        pages.map(async ({ dir, id, name, p, embed, fromWiki = true }) => {
+        safe.map(async ({ dir, id, name, p, embed, fromWiki = true }) => {
           if (p.image && !(await imageExists(p.image))) {
             missing.push(id);
             p = { ...p, image: '' };
@@ -270,7 +302,23 @@ function pageCopies(): Plugin {
       );
       // Short links (/si, /lunar-calling): the same page at the root, which Pages serves from si.html.
       const shortLinks = itemShortLinks(wiki.operators, wiki.weapons);
-      for (const [slug, t] of shortLinks) copyFileSync(join(outDir, t.kind === 'weap' ? 'arsenal/info' : 'operators/info', `${t.id}.html`), join(outDir, `${slug}.html`));
+      for (const [slug, t] of shortLinks) {
+        if (!SAFE_ID.test(slug) || !SAFE_ID.test(t.id)) {
+          console.warn(`[item-pages] WARNING: skipped short link with unsafe key: ${JSON.stringify(slug)} → ${JSON.stringify(t.id)}`);
+          shortLinks.delete(slug);
+          continue;
+        }
+        copyFileSync(join(outDir, t.kind === 'weap' ? 'arsenal/info' : 'operators/info', `${t.id}.html`), join(outDir, `${slug}.html`));
+      }
+      // sitemap.xml (public/robots.txt points to it): the clean paths and every built page, without the
+      // legacy addresses and the short links (copies of a page listed under its own path).
+      const paths = [
+        '/',
+        ...PAGES.filter((page) => !LEGACY_PAGES.has(page)).map((page) => `/${page}`),
+        ...safe.filter((x) => !LEGACY_DIRS.has(x.dir)).map((x) => (x.id === 'index' ? `/${x.dir}` : `/${x.dir}/${x.id}`)),
+      ];
+      writeFileSync(join(outDir, 'sitemap.xml'), sitemap(paths));
+      console.log(`[item-pages] sitemap.xml: ${new Set(paths).size} URLs`);
       const n = [...shortLinks.values()].filter((t) => t.kind === 'weap').length;
       console.log(`[item-pages] short links: ${shortLinks.size - n} operator, ${n} weapon (/${[...shortLinks.keys()].slice(0, 3).join(', /')}...)`);
       console.log(`[item-pages] largest component embed: ${largest} bytes`);
@@ -281,11 +329,68 @@ function pageCopies(): Plugin {
   };
 }
 
+/**
+ * The production Content-Security-Policy, as a <meta> in index.html (GitHub
+ * Pages can't send headers). Builds only: the dev server needs inline
+ * scripts for HMR. Every page copy (pageCopies) is made from the built
+ * index.html, so it carries the same policy. A new external origin (a CDN,
+ * an API) must be added here, or the browser blocks it.
+ *
+ * Where each origin is used:
+ * - cdn.jsdelivr.net: ef-assets pictures, videos and data mirror (domain/banners.ts),
+ *   CSS masks, Tesseract.js with its worker, core (WebAssembly) and language data
+ *   (ui/screenReader.ts), HiGHS (ui/aicWorker.ts).
+ * - raw.githubusercontent.com: ef-assets data files, and the pictures' fallback mirror.
+ * - web-static.hg-cdn.com: event art the official schedule links to (schedule.json `art`).
+ * - accounts.google.com/gsi/, www.googleapis.com, oauth2.googleapis.com: Google
+ *   sign-in and Drive sync (drive.ts); Google's documented GIS policy plus token revoke.
+ * - fonts.googleapis.com, fonts.gstatic.com: Jost, Geist Mono and Material Symbols.
+ * - blob: and data: are the player's own files (pictures, videos, backups), and
+ *   Tesseract's worker is a blob: script.
+ */
+function contentSecurityPolicy(): Plugin {
+  return {
+    name: 'content-security-policy',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        // Every inline script must be covered by its hash (a src or JSON script needs none).
+        const hashes = [...html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+          .filter(([, attrs = '', body]) => !/\ssrc=/.test(attrs) && !/type="application\/(ld\+)?json"/.test(attrs) && body.trim())
+          .map(([, , body]) => `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`);
+        const jsdelivr = 'https://cdn.jsdelivr.net';
+        const raw = 'https://raw.githubusercontent.com';
+        const policy = [
+          "default-src 'self'",
+          `script-src 'self' ${hashes.join(' ')} ${jsdelivr} https://accounts.google.com/gsi/client 'wasm-unsafe-eval'`,
+          "worker-src 'self' blob:",
+          `connect-src 'self' ${raw} ${jsdelivr} https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com blob: data:`,
+          `img-src 'self' data: blob: ${jsdelivr} ${raw} https://web-static.hg-cdn.com`,
+          `media-src 'self' blob: ${jsdelivr} ${raw}`,
+          "font-src 'self' https://fonts.gstatic.com",
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
+          'frame-src https://accounts.google.com/gsi/',
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+        ]
+          .map((d) => d.replace(/\s+/g, ' '))
+          .join('; ');
+        // Right after the charset, before anything it governs.
+        const tag = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
+        if (!/<meta charset="UTF-8" \/>/.test(html)) throw new Error('[csp] index.html has no <meta charset="UTF-8" /> to put the policy after');
+        return html.replace(/<meta charset="UTF-8" \/>/, (m) => `${m}\n    ${tag}`);
+      },
+    },
+  };
+}
+
 export default defineConfig({
   // Absolute asset paths: pages live at /operators/ etc., and the site is
   // served from the root of its own domain (itjustlogs.dev).
   base: '/',
-  plugins: [pageCopies()],
+  plugins: [contentSecurityPolicy(), pageCopies()],
   server: {
     port: 5173,
     strictPort: true,

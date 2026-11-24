@@ -8,7 +8,7 @@
 import { equip, type Base, type Build, type GearData, type WeaponData } from './build';
 import { optimizeBuilds, type Optimize } from './gearSearch';
 import { ELEMENTS, FPS, INFLICTION_NAME, World, buffShown, effectsShown, kindOf, type Bundle, type Enemy, type Form, type Input, type Mod, type Stagger, type Strike } from './engine';
-import { beam, fightOf, localRunner, scoreOf, search, searchCycle, type Fight, type Press, type Rules, type Runner, type Team } from './rotation';
+import { beam, clock, fightOf, localRunner, scoreOf, search, searchCycle, type Fight, type Press, type Rules, type Runner, type Team } from './rotation';
 
 /** One team position: the operator and, when set, Potentials other than the player's own. */
 export interface SimMember {
@@ -777,6 +777,18 @@ export function chainFrames(w: World, slot: number, haste = 0): number {
  * Frames an operator's Finisher takes to land from the press that makes it, on `w`'s Staggered enemy (a copy plays
  * it: presses until one is taken, then counts).
  */
+/** How many of a sorted list's first items `ok` holds for, `ok` being true up to some point and false after (a binary search). */
+function countWhile(sorted: number[], ok: (x: number) => boolean): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ok(sorted[mid])) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 function finisherFrames(w: World, slot: number): number {
   const c = w.clone();
   c.controlled = slot;
@@ -839,7 +851,6 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   const order = steps.slice().sort((a, b) => a.t - b.t);
   const firstHit = order.find((x) => x.input === 'strike' || x.input === 'finisher');
   w.controlled = firstHit?.slot ?? 0;
-  const clock = () => w.frame + w.frozenFrames;
   // How long each operator's basic attacks take to reach their Final Strike, at a Haste (SpeedupAction: Tangtang's
   // combo buff takes Yvonne's from 95 frames to 80), measured from the fight's start once per rate.
   const fresh = w.clone();
@@ -942,16 +953,23 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   const staggerLeft: [number, number][] = [];
   // The buffs shown on each operator and the enemy, sampled with the bars.
   const { buffs, note: noteBuffs } = buffRecorder();
-  while (clock() < end) {
-    if (clock() % 8 === 0 && !paused(clock())) {
-      track.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
-      spTrack.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(w.sp)]);
+  // Counted per frame without walking every strike: the video's strikes sorted (by landing, and by chain start per
+  // operator), and the sim's Finishers counted as its strikes come in (w.strikes only grows).
+  const shownAtSorted = shownAt.slice().sort((a, b) => a - b);
+  const shownFrom = w.team.map((_, slot) => shown.filter((_, i) => shownBy[i] === slot).sort((a, b) => a - b));
+  const finishersSorted = finishers.slice().sort((a, b) => a - b);
+  let finishersLanded = 0;
+  let strikesCounted = 0;
+  while (clock(w) < end) {
+    if (clock(w) % 8 === 0 && !paused(clock(w))) {
+      track.push([Math.round((game(clock(w)) / FPS) * 100) / 100, Math.round(w.dealt), Math.round(w.meterNow() * 1000) / 1000]);
+      spTrack.push([Math.round((game(clock(w)) / FPS) * 100) / 100, Math.round(w.sp)]);
       const left = w.staggerLeft();
-      if (left !== undefined) staggerLeft.push([Math.round((game(clock()) / FPS) * 100) / 100, Math.round(left * 1000) / 1000]);
-      noteBuffs(w, Math.round((game(clock()) / FPS) * 100) / 100);
+      if (left !== undefined) staggerLeft.push([Math.round((game(clock(w)) / FPS) * 100) / 100, Math.round(left * 1000) / 1000]);
+      noteBuffs(w, Math.round((game(clock(w)) / FPS) * 100) / 100);
     }
-    clockAt[w.frame] ??= clock();
-    while (resumed < pauses.length && clock() >= pauses[resumed][1]) {
+    clockAt[w.frame] ??= clock(w);
+    while (resumed < pauses.length && clock(w) >= pauses[resumed][1]) {
       const [from, to] = pauses[resumed];
       const phase = stopwatch?.phases ? stopwatch.phases.some((p) => Math.abs(Math.round(p * FPS) - from) <= 1) : to - from >= PHASE_CHANGE * FPS;
       if (phase) {
@@ -963,7 +981,7 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
     let pressed = false;
     // Each due press, in order per operator: one that can't be made yet (a combo still on cooldown) holds up only its
     // own operator's later presses, not a teammate's (Arcane's second combo waiting must not hold Last Rite's).
-    while (k < todo.length && todo[k].at <= clock()) waiting.push(k++);
+    while (k < todo.length && todo[k].at <= clock(w)) waiting.push(k++);
     const held = new Set<number>();
     for (const i of [...waiting]) {
       const p = todo[i];
@@ -973,14 +991,14 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
       if (w.press(p.slot, p.input)) {
         if (p.interrupt) w.interrupt(p.slot);
         // A press before the stopwatch's 0 (cast as the stage starts) is made at 0:00 but shown at its own time.
-        const when = p.at < 0 ? p.at : game(clock());
+        const when = p.at < 0 ? p.at : game(clock(w));
         presses.push({ frame: when, slot: p.slot, input: p.input, at: when });
         pressSp.push(w.sp - spBefore);
         pressAfter.push(w.sp);
         pendingSp = { i: pressSp.length - 1, before: spBefore };
         pressed = true;
         waiting.splice(waiting.indexOf(i), 1);
-      } else if (clock() - p.at > REPLAY_SLACK * FPS) {
+      } else if (clock(w) - p.at > REPLAY_SLACK * FPS) {
         missed.push({ t: game(p.at) / FPS, slot: p.slot, input: p.input });
         waiting.splice(waiting.indexOf(i), 1);
       } else held.add(p.slot);
@@ -993,22 +1011,27 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
       const haste = w.hasteOf(e);
       return haste ? Math.min(chain[slot] - chainAt(slot, haste), Math.round(haste * w.hasteLeft(e))) : 0;
     });
-    const due = shown.filter((from, k) => (quick ? shownAt[k] - QUICK_STRIKE * FPS : from + sooner[shownBy[k]]) <= clock()).length;
+    // (A strike by a slot outside the team never counts outside `quick`: its chain start is NaN.)
+    const c = clock(w);
+    const due = quick
+      ? countWhile(shownAtSorted, (at) => at - QUICK_STRIKE * FPS <= c)
+      : shownFrom.reduce((n, list, slot) => n + countWhile(list, (from) => from + sooner[slot] <= c), 0);
     const unseen = w.attacksUnseen(w.controlled);
     // A Finisher only when the video shows one by then (its SP refill: the parser reads them), pressed as long before
     // it as it takes to land; no other press makes one (an attack due on a Staggered enemy the video leaves alone).
     if (w.finisherWaiting() && !landing.has(w.controlled)) landing.set(w.controlled, finisherFrames(w, w.controlled));
-    const finisher = w.finisherWaiting() && w.strikes.filter((x) => x.finisher).length < finishers.filter((at) => at <= clock() + (landing.get(w.controlled) ?? FPS)).length;
+    for (; strikesCounted < w.strikes.length; strikesCounted++) if (w.strikes[strikesCounted].finisher) finishersLanded++;
+    const finisher = w.finisherWaiting() && finishersLanded < countWhile(finishersSorted, (at) => at <= clock(w) + (landing.get(w.controlled) ?? FPS));
     w.finishers = finisher;
-    if (!pressed && !paused(clock()) && (unseen || finisher || w.strikes.length - free < due)) w.press(w.controlled, 'attack');
+    if (!pressed && !paused(clock(w)) && (unseen || finisher || w.strikes.length - free < due)) w.press(w.controlled, 'attack');
     const before = w.strikes.length;
-    const stood = paused(clock());
+    const stood = paused(clock(w));
     // While the recording's stopwatch stands still the game's timer does, and no SP regenerates.
     w.holdSp = stood;
     const f0 = w.frame;
     const spTick = w.sp;
     const z0 = w.frozenFrames;
-    const c0 = clock();
+    const c0 = clock(w);
     w.tick();
     if (w.frozenFrames > z0 && !stood) addFreeze(freezes, game(c0) / FPS);
     // A press's cost can land in the frame after it.
@@ -1032,9 +1055,17 @@ export function replaySim(req: SimRequest, data: SimData, steps: ReplayStep[], s
   for (; k < todo.length; k++) missed.push({ t: game(todo[k].at) / FPS, slot: todo[k].slot, input: todo[k].input });
   // A video Final Strike with none of the sim's near it, in fight frames: a cut-in between the two (the video's
   // strike landing as an ultimate stops time) doesn't count.
+  // The first frame whose clock reached c: a binary search over the clocks' running maximum (the first frame it
+  // reaches c is the first whose own clock does).
+  const clockMax: number[] = [];
+  for (let f = 0, max = -Infinity; f < clockAt.length; f++) {
+    if (clockAt[f] !== undefined && clockAt[f] > max) max = clockAt[f];
+    clockMax.push(max);
+  }
   const frameAt = (c: number) => {
-    const f = clockAt.findIndex((x) => x !== undefined && x >= c);
-    return f < 0 ? w.frame : f;
+    if (Number.isNaN(c)) return w.frame;
+    const f = countWhile(clockMax, (x) => x < c);
+    return f >= clockMax.length ? w.frame : f;
   };
   const landed = w.strikes.map((x) => x.frame);
   for (const x of order.filter((y) => y.input === 'strike' || y.input === 'finisher')) {

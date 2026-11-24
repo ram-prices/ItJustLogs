@@ -3,6 +3,7 @@ import type { PullHistory } from '../domain/types';
 import { artChanged, clearHistory, importHistory, setImage, state, updateSettings } from '../state';
 import { allArtKeys, artBlob, avatarEditFromJson, avatarEditToJson, blobToDataUrl, dataUrlToBlob, listSims, loadAvatarEdit, putArt, restoreSims, saveAvatarEdit, type AvatarEditJson, type ChangeTimes, type SavedSim, type Settings } from '../store';
 import { toast } from './common';
+import { html, render } from './html';
 import { forgetLoadedArt } from './pages/art';
 
 /** Import (any supported file) and backup export. */
@@ -116,14 +117,76 @@ export class ImportMismatch extends Error {
 /** check: refuse a different player's file; merge: add it anyway; replace: delete saved pulls first. */
 export type ImportMode = 'check' | 'merge' | 'replace';
 
-async function guard(incoming: PullHistory, mode: ImportMode, text: string, source: string): Promise<void> {
+/**
+ * Checks (or, on Replace, clears) the saved pulls before an import. Returns
+ * the same-player verdict in check mode, null otherwise, or false when the
+ * import must stop (the saved pulls couldn't be cleared; a toast said why).
+ */
+async function guard(incoming: PullHistory, mode: ImportMode, text: string, source: string): Promise<HistoryMatch['verdict'] | null | false> {
   if (mode === 'replace') {
-    await clearHistory();
-    return;
+    try {
+      await clearHistory();
+    } catch (e) {
+      // No version history copy could be saved: nothing was deleted or imported.
+      toast((e as Error).message, 'error');
+      return false;
+    }
+    return null;
   }
-  if (mode === 'merge') return;
+  if (mode === 'merge') return null;
   const match = compareHistories(state.history, incoming);
   if (match.verdict === 'different' || match.verdict === 'noOverlap') throw new ImportMismatch(match, text, source);
+  return match.verdict;
+}
+
+const hasPulls = (h: PullHistory | null | undefined): h is PullHistory => !!h && (h.characters?.length > 0 || h.weapons?.length > 0);
+
+/**
+ * A backup's settings without the deletion lists (`deletedArt`, `deletedRuns`):
+ * sync deletes whatever those name, in Drive and on every device, so an old or
+ * someone else's backup must never bring its own. This browser's stay.
+ */
+export function importableSettings(s: unknown): Partial<Settings> | null {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+  const out = { ...(s as Partial<Settings>) };
+  delete out.deletedArt;
+  delete out.deletedRuns;
+  return out;
+}
+
+/**
+ * A backup with no pulls, or from what may be another player: ask before its
+ * settings, name and pictures replace this browser's. In-page, like
+ * dialog.ts, since some browsers block confirm().
+ */
+function askUseBackupSettings(source: string, why: string): Promise<boolean> {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'dialog-backdrop';
+  render(
+    backdrop,
+    html`<div class="card dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title">
+      <h2 class="heading-20" id="dialog-title">Use this backup's settings?</h2>
+      <p class="copy-14">${source}: ${why} Using its settings replaces your name, profile and header pictures and every setting saved here.</p>
+      <div class="dialog-actions">
+        <button class="btn secondary sm" data-choice="keep">Keep mine</button>
+        <button class="btn primary sm" data-choice="use">Use the backup's</button>
+      </div>
+    </div>`,
+  );
+  return new Promise((resolve) => {
+    const close = (use: boolean) => {
+      backdrop.remove();
+      resolve(use);
+    };
+    backdrop.addEventListener('click', (ev) => {
+      const choice = (ev.target as HTMLElement).closest<HTMLElement>('[data-choice]')?.dataset.choice;
+      if (ev.target === backdrop || choice === 'keep') close(false);
+      else if (choice === 'use') close(true);
+    });
+    backdrop.addEventListener('keydown', (ev) => ev.key === 'Escape' && close(false));
+    document.body.append(backdrop);
+    backdrop.querySelector<HTMLElement>('[data-choice="keep"]')!.focus();
+  });
 }
 
 /** Imports an ItJustLogs backup or any pull-history export (exporter, eftracker, track.py). */
@@ -136,27 +199,38 @@ export async function importText(text: string, source: string, mode: ImportMode 
   }
   if (data && typeof data === 'object' && (data as Backup).app === 'itjustlogs') {
     const b = data as Backup;
-    if (b.history) {
-      await guard(b.history, mode, text, source);
+    // Its settings, name and pictures replace this browser's only when its pulls are this player's
+    // (or the player chose to replace theirs with them); otherwise the player is asked first.
+    let why: string | null = null;
+    if (hasPulls(b.history)) {
+      const verdict = await guard(b.history, mode, text, source);
+      if (verdict === false) return;
       await importHistory(b.history);
+      if (mode === 'merge') why = "Its pulls didn't look like the ones saved here, so it may be another player's backup.";
+    } else {
+      why = "It has no pulls, so there's no way to tell whether it's from this player.";
     }
-    if (b.settings) updateSettings(b.settings);
-    for (const slot of ['avatar', 'header'] as const) {
-      const img = b.images?.[slot];
-      if (img?.startsWith('data:image/')) await setImage(slot, await dataUrlToBlob(img));
+    const settings = importableSettings(b.settings);
+    const images = (['avatar', 'header'] as const).filter((slot) => b.images?.[slot]?.startsWith('data:image/'));
+    const changes = images.length > 0 || (!!settings && JSON.stringify({ ...state.settings, ...settings }) !== JSON.stringify(state.settings));
+    const useProfile = changes && (why === null || (await askUseBackupSettings(source, why)));
+    if (useProfile) {
+      if (settings) updateSettings(settings);
+      for (const slot of images) await setImage(slot, await dataUrlToBlob(b.images![slot]!));
+      if (b.avatarEdit?.source?.startsWith('data:image/') && images.includes('avatar')) await saveAvatarEdit(await avatarEditFromJson(b.avatarEdit));
     }
-    if (b.avatarEdit?.source?.startsWith('data:image/') && b.images?.avatar) await saveAvatarEdit(await avatarEditFromJson(b.avatarEdit));
     const sims = Array.isArray(b.sims) ? await restoreSims(b.sims) : 0;
     const art = await restoreArt(b.art);
     const extra = [
       sims ? `${sims} saved ${sims === 1 ? 'run' : 'runs'}` : '',
       art ? `${art} operator ${art === 1 ? 'picture' : 'pictures'}` : '',
     ].filter(Boolean);
-    toast(extra.length ? `Export imported, with ${extra.join(' and ')}.` : 'Export imported.');
+    const kept = changes && !useProfile ? ' Your settings, name and pictures were kept.' : '';
+    toast((extra.length ? `Export imported, with ${extra.join(' and ')}.` : 'Export imported.') + kept);
     return;
   }
   const incoming = parseHistoryJson(text);
-  await guard(incoming, mode, text, source);
+  if ((await guard(incoming, mode, text, source)) === false) return;
   const added = await importHistory(incoming);
   const total = added.char + added.weap;
   toast(total ? `Imported ${added.char} operator and ${added.weap} arsenal pulls.` : 'Nothing new — everything in that file was already saved.');

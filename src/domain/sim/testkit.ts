@@ -7,10 +7,13 @@ import { teamOf, type SimBuild, type SimData, type SimRequest } from './team';
  * The per-operator rule tests' harness (rules.test.ts): game data in, one operator alone on a dummy, everything the
  * engine did after each press out, and the rules each operator's table is made of. Tests only.
  *
- * Data: ef-assets `combat/` and `wiki/`, from a local clone at EF_ASSETS_DIR (its root) or else fetched from GitHub.
+ * Data: ef-assets `combat/` and `wiki/`, from a local clone at EF_ASSETS_DIR (its root) or else fetched from GitHub
+ * at EF_ASSETS_REF (a branch or commit, default main). CI pins a commit (.github/workflows/deploy.yml).
  */
 
 const DIR = process.env.EF_ASSETS_DIR?.replace(/[\\/]?$/, '/');
+const REF = process.env.EF_ASSETS_REF;
+const REMOTE = REF ? EF_ASSETS.replace(/\/main$/, `/${REF}`) : EF_ASSETS;
 const cache = new Map<string, Promise<any>>();
 export const asset = (path: string): Promise<any> => {
   if (!cache.has(path))
@@ -18,7 +21,7 @@ export const asset = (path: string): Promise<any> => {
       path,
       DIR
         ? Promise.resolve(JSON.parse(readFileSync(DIR + path, 'utf8')))
-        : fetch(`${EF_ASSETS}/${path}`).then((r) => r.json()),
+        : fetch(`${REMOTE}/${path}`).then((r) => r.json()),
     );
   return cache.get(path)!;
 };
@@ -618,7 +621,7 @@ export const finding = (rule: Rule, note: string, ranks = rule.ranks ?? [12]): R
 ];
 
 // ---------------------------------------------------------------------------
-// Table helpers and the runner (rules2.test.ts; rules.test.ts keeps its own copies)
+// Table helpers and the runner (rules.test.ts and rules2.test.ts)
 // ---------------------------------------------------------------------------
 
 export const first = (h: TraceHit[]) => h.slice(0, 1);

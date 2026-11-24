@@ -63,7 +63,7 @@
 }
 .sort-pop {
   position: fixed;
-  z-index: 950;
+  z-index: var(--z-pop);
   width: min(380px, calc(100vw - 16px));
   padding: 16px;
   box-shadow: var(--shadow-border), var(--shadow-pop);
@@ -182,7 +182,7 @@
   position: fixed;
   left: 50%;
   top: 50%;
-  z-index: 900;
+  z-index: var(--z-dialog);
   max-width: calc(100vw - 32px);
   color: var(--gray-1000);
   /* No box: a soft shadow keeps the letters readable over the tiles. */
@@ -799,17 +799,11 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   flex-direction: column;
   gap: 16px;
 }
-.sim-video-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
 .gameplay-progress {
   position: fixed;
   left: 24px;
   bottom: 24px;
-  z-index: 110;
+  z-index: calc(var(--z-overlay) + 10);
   display: grid;
   gap: 8px;
   width: min(300px, calc(100% - 32px));
@@ -994,8 +988,7 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   gap: 6px;
   height: 32px;
   padding: 0 12px;
-  /* A real border, not an inset shadow: shadows look jagged around a pill's tight curves. */
-  border: 1px solid var(--gray-alpha-400);
+  box-shadow: var(--shadow-border);
   border-radius: 9999px;
   background: none;
   color: var(--gray-900);
@@ -1012,7 +1005,7 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
 }
 .have-toggle[aria-pressed='true'] {
   color: var(--green);
-  border-color: currentColor;
+  box-shadow: 0 0 0 1px currentColor;
 }
 .finding-grid {
   display: grid;

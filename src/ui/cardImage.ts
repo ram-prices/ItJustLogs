@@ -1,3 +1,5 @@
+import { holdFocus } from './dialog';
+
 /**
  * Banner cards as pictures: right-click or long-press a card → "Copy banner card" ("Share banner card" on phones).
  * The card is drawn as it looks on screen (html-to-image, loaded only when
@@ -131,9 +133,11 @@ function showImage(url: string, save: () => void) {
     </div>
   </div>`;
   backdrop.querySelector('img')!.src = url;
+  let release = () => {};
   const close = () => {
     backdrop.remove();
     URL.revokeObjectURL(url);
+    release();
   };
   backdrop.addEventListener('click', (e) => {
     const choice = (e.target as HTMLElement).closest<HTMLElement>('[data-choice]')?.dataset.choice;
@@ -141,4 +145,5 @@ function showImage(url: string, save: () => void) {
     if (choice === 'close' || e.target === backdrop) close();
   });
   document.body.append(backdrop);
+  release = holdFocus(backdrop, close, backdrop.querySelector<HTMLElement>('[data-choice="close"]'));
 }

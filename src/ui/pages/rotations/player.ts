@@ -178,6 +178,8 @@ export function preparePlay(r: SimResult): { video?: Bars } {
     }
   controlled.push({ slot: cur, from: since, to: Infinity });
   page.playBars = { sim, video, seconds: r.seconds, nodes: enemy?.nodes ?? [], phases: phaseStarts.map(clock), sp: { sim: simSp, video: videoSp }, spMax: enemy?.sp?.max ?? 300, spRegen: enemy?.sp?.regen, buffs: (r as ReplayResult).buffs, controlled };
+  // A redraw: paintPlay looks its elements up again.
+  painted = null;
   queueMicrotask(paintPlay);
   return { video };
 }
@@ -306,8 +308,17 @@ function spSeries(series: [number, number][]): [number, number][] {
 /** The SP bar's value at the playhead from a series ([seconds, SP]). */
 function spNow(raw: [number, number][]): number {
   const series = spSeries(raw);
+  // The last reading at or before the playhead (the first when none is), by binary search: the series is in time order.
   let i = 0;
-  while (i + 1 < series.length && series[i + 1][0] <= page.play.t) i++;
+  let lo = 1;
+  let hi = series.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (series[mid][0] <= page.play.t) {
+      i = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
   const [t0, v0] = series[i];
   const next = series[i + 1];
   const dt = page.play.t - t0;
@@ -385,6 +396,36 @@ if (typeof document !== 'undefined')
     true,
   );
 
+/** paintPlay's elements and the transcript rows' times, looked up once per redraw rather than every frame. */
+interface Painted {
+  heads: HTMLElement[];
+  times: HTMLElement[];
+  seeks: HTMLInputElement[];
+  rows: { li: HTMLElement; t: number }[];
+  sp: { kind: string; series: [number, number][] | undefined; value: HTMLElement | null; segs: HTMLElement[] }[];
+  phases: HTMLElement[];
+  bosses: { kind: string | undefined; hp: HTMLElement | null; meter: HTMLElement | null }[];
+  /** Any one of them, to tell the markup was replaced (a redraw that didn't go through playBars). */
+  probe: HTMLElement | null;
+}
+let painted: Painted | null = null;
+
+function lookUp(d: NonNullable<typeof page.playBars>): Painted {
+  const all = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
+  const p: Painted = {
+    heads: all('.sim-playhead'),
+    times: all('.sim-play-time, .sim-buffs-time'),
+    seeks: all<HTMLInputElement>('.sim-play-seek'),
+    rows: all('.sim-moves li[data-t]').map((li) => ({ li, t: Number(li.dataset.t) })),
+    sp: all('.sim-sp-row').map((el) => ({ kind: el.dataset.sp ?? '', series: d.sp[el.dataset.sp as 'sim' | 'video'], value: el.querySelector<HTMLElement>('.sim-sp-value'), segs: all('.sim-sp-seg i', el) })),
+    phases: all('.sim-boss-phase'),
+    bosses: all('.sim-boss-row').map((el) => ({ kind: el.dataset.bars, hp: el.querySelector<HTMLElement>('.sim-boss-hp i'), meter: el.querySelector<HTMLElement>('.sim-boss-meter i') })),
+    probe: null,
+  };
+  p.probe = p.heads[0] ?? p.seeks[0] ?? p.rows[0]?.li ?? p.times[0] ?? null;
+  return p;
+}
+
 /** Puts the playhead, the time and the bars where page.play.t is. */
 export function paintPlay(): void {
   const d = page.playBars;
@@ -392,32 +433,36 @@ export function paintPlay(): void {
   for (const list of document.querySelectorAll<HTMLElement>('.sim-moves:not([data-kept])')) {
     list.dataset.kept = '1';
     list.scrollTop = page.movesTop;
+    painted = null;
   }
+  // Paused (a seek, a step) it looks again each time; playing, once per redraw.
+  if (!painted || !page.play.running || (painted.probe && !painted.probe.isConnected)) painted = lookUp(d);
+  const { heads, times, seeks, rows, sp, phases, bosses } = painted;
   // On the timeline's clock, from its start (a press before the stopwatch's 0) to its end.
   const frac = Math.max(0, Math.min(1, (page.play.t - page.tlStart) / (d.seconds - page.tlStart)));
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-playhead')) el.style.setProperty('--p', String(frac));
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-play-time, .sim-buffs-time')) el.textContent = clockTime(page.play.t);
+  for (const el of heads) el.style.setProperty('--p', String(frac));
+  for (const el of times) el.textContent = clockTime(page.play.t);
   if (page.play.running) showPlayhead();
-  for (const el of document.querySelectorAll<HTMLInputElement>('.sim-play-seek')) {
+  for (const el of seeks) {
     // Not while it's being dragged; a click leaves it focused, so focus alone isn't that.
     if (!el.matches(':active')) el.value = String(page.play.t);
     el.style.setProperty('--p', String(frac));
     el.parentElement?.style.setProperty('--p', String(frac));
   }
   // The transcript's move at the playhead (the last one at or before it), and any at the same moment with it.
-  let at: HTMLElement | null = null;
-  const rows = [...document.querySelectorAll<HTMLElement>('.sim-moves li[data-t]')];
-  for (const li of rows) {
-    li.classList.remove('now');
-    if (Number(li.dataset.t) <= page.play.t + 1e-6) at = li;
+  let atRow: (typeof rows)[number] | null = null;
+  for (const r of rows) {
+    r.li.classList.remove('now');
+    if (r.t <= page.play.t + 1e-6) atRow = r;
   }
-  if (page.play.t > 0 && at) {
-    const t = Number(at.dataset.t);
-    for (const li of rows) if (Math.abs(Number(li.dataset.t) - t) < 0.05) li.classList.add('now');
+  const at = atRow?.li ?? null;
+  if (page.play.t > 0 && atRow) {
+    const t = atRow.t;
+    for (const r of rows) if (Math.abs(r.t - t) < 0.05) r.li.classList.add('now');
   }
   // Folded, the transcript shows only the moment at the playhead (before it starts, the first).
-  const curT = Number((page.play.t > 0 && at ? at : rows[0])?.dataset.t ?? NaN);
-  for (const li of rows) li.classList.toggle('cur', Math.abs(Number(li.dataset.t) - curT) < 0.05);
+  const curT = (page.play.t > 0 && atRow ? atRow : rows[0])?.t ?? NaN;
+  for (const r of rows) r.li.classList.toggle('cur', Math.abs(r.t - curT) < 0.05);
   // While playing, the transcript keeps the current move in view (its own list scrolls, not the page).
   if (page.play.running && at && !at.classList.contains('seen')) {
     for (const li of document.querySelectorAll<HTMLElement>('.sim-moves li.seen')) li.classList.remove('seen');
@@ -428,26 +473,22 @@ export function paintPlay(): void {
       if (top < list.scrollTop || top + at.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = page.movesTop = Math.max(0, top - list.clientHeight / 3);
     }
   }
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-sp-row')) {
-    const series = d.sp[el.dataset.sp as 'sim' | 'video'];
+  for (const { kind, series, value, segs } of sp) {
     if (!series?.length) continue;
     const v = spNow(series);
-    const value = el.querySelector<HTMLElement>('.sim-sp-value');
     if (value) value.textContent = String(Math.round(v));
     // The number is the value; the bar slides to it on a jump.
-    const drawn = spShown(el.dataset.sp ?? '', v);
-    el.querySelectorAll<HTMLElement>('.sim-sp-seg i').forEach((seg, k) => (seg.style.width = `${Math.max(0, Math.min(1, (drawn - k * 100) / 100)) * 100}%`));
+    const drawn = spShown(kind, v);
+    segs.forEach((seg, k) => (seg.style.width = `${Math.max(0, Math.min(1, (drawn - k * 100) / 100)) * 100}%`));
   }
   paintLive();
   paintBuffs();
   const phase = 1 + d.phases.filter((p) => page.play.t >= p).length;
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-boss-phase')) el.textContent = `Phase ${phase}`;
-  for (const el of document.querySelectorAll<HTMLElement>('.sim-boss-row')) {
-    const b = el.dataset.bars === 'video' ? d.video : d.sim;
+  for (const el of phases) el.textContent = `Phase ${phase}`;
+  for (const { kind, hp: hpBar, meter: meterBar } of bosses) {
+    const b = kind === 'video' ? d.video : d.sim;
     if (!b) continue;
-    const now = barsNow(b, el.dataset.bars);
-    const hpBar = el.querySelector<HTMLElement>('.sim-boss-hp i');
-    const meterBar = el.querySelector<HTMLElement>('.sim-boss-meter i');
+    const now = barsNow(b, kind);
     if (hpBar) hpBar.style.width = now.hp;
     if (meterBar) {
       meterBar.style.width = now.meter;
@@ -497,8 +538,15 @@ function paintLive(): void {
 
 /** Plays the timeline from where it is (in real time × its speed) until its end or a pause. */
 export function runPlay(): void {
+  // Leaving the page (another route, or the player's markup gone) stops it, without redrawing a page no longer shown.
+  const path = location.pathname;
   const step = (now: number) => {
     if (!page.play.running || !page.playBars) return;
+    if (location.pathname !== path || !document.querySelector('.sim-play')) {
+      page.play.running = false;
+      page.play.raf = 0;
+      return;
+    }
     page.play.t = Math.min(page.playBars.seconds, page.play.t + ((now - page.play.last) / 1000) * page.play.speed);
     page.play.last = now;
     paintPlay();

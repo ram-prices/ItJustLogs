@@ -6,6 +6,7 @@
 import { plan, type AicData, type PlanInput } from '../domain/aic';
 import type { Solver } from '../domain/lp';
 
+// Must match the exact `highs` version in package.json (its types and tests use the installed copy).
 const HIGHS = 'https://cdn.jsdelivr.net/npm/highs@1.15.3/build/';
 
 let solver: Promise<Solver> | null = null;

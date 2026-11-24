@@ -26,6 +26,8 @@ dist-ssr
 # Local pull-history samples (personal data)
 fixtures/
 .claude/settings.local.json
+.claude/launch.json
+.openchamber/
 
 # Local-only work: scratch sim tests (they read a local ef-assets clone), the owner's AI parser, stray previews
 src/domain/sim/dbg*

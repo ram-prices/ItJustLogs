@@ -9,6 +9,7 @@ import type { Loadout } from './domain/loadout';
 import type { ExtraCopy } from './domain/owned';
 import type { Schedule, Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
+import { sanitizeSettings } from './settingsSanitize';
 
 /**
  * Everything lives in this browser. Pull history and images go in IndexedDB,
@@ -36,6 +37,7 @@ export interface AvatarBox {
 }
 
 /** One of Home's widgets (ui/pages/homeWidgets.ts): what it is, its width out of 12, and its own settings. */
+/** A new field must also be added to `widget()` in settingsSanitize.ts, or loading drops it. */
 export interface HomeWidget {
   id: string;
   type: string;
@@ -239,7 +241,8 @@ export async function saveHistory(h: PullHistory): Promise<void> {
   }
 }
 
-export const loadSettings = (): Settings => withStorageItems(withoutRetiredPlaces({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) }));
+export const loadSettings = (): Settings =>
+  withStorageItems(withoutRetiredPlaces(sanitizeSettings({ ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(KEYS.settings) })));
 export const saveSettings = (s: Settings): void => writeJson(KEYS.settings, s);
 
 /** What changed when (ms), so Google Drive sync can tell which copy is newer. 0 = never changed here. */
@@ -550,9 +553,25 @@ export type ImageSlot = 'avatar' | 'header';
 type StoreName = 'data' | 'images';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+/** Why saved data couldn't be opened (another tab holds an older version of it, or it never answered); null once it opens. */
+let dbTrouble: string | null = null;
+export const savedDataTrouble = (): string | null => dbTrouble;
+/** How long to wait for the database before going on without it. */
+const DB_OPEN_TIMEOUT = 8000;
 
 function openDb(): Promise<IDBDatabase> {
   dbPromise ??= new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (why: string, error: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      dbTrouble = why;
+      // The next use asks again (the other tab may be closed by then).
+      dbPromise = null;
+      reject(error);
+    };
+    const timer = setTimeout(() => fail('timeout', new Error('Saved data took too long to open')), DB_OPEN_TIMEOUT);
     const req = indexedDB.open('itjustlogs', 2);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -560,11 +579,24 @@ function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => {
-      dbPromise = null;
-      reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Answered after we gave up: let it go, so it doesn't block a later upgrade.
+      if (settled) return db.close();
+      settled = true;
+      clearTimeout(timer);
+      dbTrouble = null;
+      // A newer version of the site opened in another tab wants to upgrade: step aside (reopened on next use).
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
     };
+    req.onerror = () => fail('error', req.error);
+    // Another tab has it open at an older version: it's asked to let go (onversionchange there); if it
+    // hasn't within a few seconds, go on without it rather than wait.
+    req.onblocked = () => setTimeout(() => fail('blocked', new Error('Saved data is open in another tab')), 3000);
   });
   return dbPromise;
 }
