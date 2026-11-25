@@ -11,7 +11,7 @@ import type { HomeWidget, Settings } from './store';
  */
 
 /** Home's widget types (ui/pages/homeWidgets.ts WIDGETS is typed by this list, so they stay the same). */
-export const HOME_WIDGET_TYPES = ['banners', 'events', 'contracts', 'upcoming', 'timeline', 'pity', 'sixes', 'latest', 'stats', 'progress', 'character', 'note', 'spacer'] as const;
+const HOME_WIDGET_TYPES = ['banners', 'events', 'contracts', 'upcoming', 'timeline', 'pity', 'sixes', 'latest', 'stats', 'progress', 'character', 'note', 'spacer'] as const;
 export type HomeWidgetType = (typeof HOME_WIDGET_TYPES)[number];
 
 const SIZES = [4, 6, 8, 12] as const;

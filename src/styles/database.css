@@ -114,7 +114,7 @@
   fill: color-mix(in srgb, currentColor 70%, #000);
 }
 /* Emblems beside small text: one size, whatever the text's. Headings and the header's row keep their own. */
-:is(.glance-stat, .metric-label, .metric-sub, .legend, .rarity-filter, .char-card-names, .rarity) {
+:is(.glance-stat, .metric-label, .metric-sub, .legend, .rarity-filter, .char-card-names) {
   --emblem: 13px;
 }
 /* A gear slot's mark (Armor, Gloves, Kit), in the text's colour. */
@@ -864,17 +864,6 @@
 }
 .wiki-inactive {
   opacity: 0.55;
-}
-.wiki-skill {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px 24px;
-}
-.wiki-skill-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 .wiki-text b {
   font-weight: 600;

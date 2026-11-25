@@ -184,8 +184,6 @@ export const MOBILE: Layout = (() => {
   };
 })();
 
-export const LAYOUTS = { controller: CONTROLLER, mobile: MOBILE };
-
 /** The controller HUD's slot names (the review's default). */
 export const SLOTS = CONTROLLER.slots;
 
@@ -376,7 +374,7 @@ export function staggerOf(p: Px): { full: number; yellow: boolean } {
 }
 
 /** The boss's HP bar: how far from its left it's red (a gap of a few pixels allowed); null if no red shows. */
-export function bossHpOf(p: Px): number | null {
+function bossHpOf(p: Px): number | null {
   let end = 0;
   let gap = 0;
   for (let x = 0; x < p.width; x++) {
@@ -425,7 +423,7 @@ export function measure(t: number, right: Px, centre: Px, banner: Px, clock?: Px
 }
 
 /** A banner's art as 24×9 cells of mean colour (between its edges). */
-export function artOf(p: Px, layout: Layout = CONTROLLER): number[] {
+function artOf(p: Px, layout: Layout = CONTROLLER): number[] {
   const [y0, y1] = layout.bannerEdges;
   const span = p.width - 23;
   const out: number[] = [];

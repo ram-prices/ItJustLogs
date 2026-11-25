@@ -28,7 +28,7 @@ import { buildBackup, type Backup } from './io';
  *   deletions travel as settings.deletedRuns. Simulator results stay local.
  */
 
-export type SyncStatus = 'off' | 'idle' | 'syncing' | 'reconnect' | 'paused' | 'error';
+type SyncStatus = 'off' | 'idle' | 'syncing' | 'reconnect' | 'paused' | 'error';
 
 let meta = loadSyncMeta();
 let status: SyncStatus = !meta.on ? 'off' : drive.currentToken() || drive.refreshesSilently() ? 'idle' : 'reconnect';

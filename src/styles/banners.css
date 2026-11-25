@@ -184,20 +184,6 @@
   letter-spacing: 0.02em;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
 }
-.banner-current {
-  position: absolute;
-  z-index: 1;
-  top: 12px;
-  right: 12px;
-  height: 20px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 9999px;
-  background: var(--link);
-  color: #fff;
-  font: 500 12px/1 var(--font-sans);
-}
 /* Rate-up line over the art: an icon and the name, nothing else. A check
    follows once you have it. */
 .banner-rateup {
@@ -653,9 +639,6 @@
 .banner-body .metric {
   padding: 16px 20px;
 }
-.banner-body .metric:has(.banner-dates) {
-  grid-column: 1 / -1;
-}
 .banner-body .metric-value {
   font-size: 24px;
   line-height: 32px;
@@ -703,24 +686,12 @@
 .item-name .badge {
   flex-shrink: 0;
 }
-.banner-dates {
-  font-size: 16px;
-  line-height: 32px;
-  letter-spacing: -0.16px;
-}
 .ellipsis {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .min0 {
-  min-width: 0;
-}
-.status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font: 400 14px/20px var(--font-sans);
   min-width: 0;
 }
 
@@ -1268,9 +1239,6 @@ code {
     font-size: 12px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-  }
-  .metric:has(.banner-dates) {
-    grid-column: 1 / -1;
   }
   .hide-sm {
     display: none;

@@ -240,7 +240,7 @@ export const ALLEIKHREOS: Enemy = {
   phaseHp: 2_476_341,
 };
 /** Each phase's HP (Lv 90; the second starts at full when the first runs out), so both. */
-export const ALLEIKHREOS_HP = 2_476_341 * 2;
+const ALLEIKHREOS_HP = 2_476_341 * 2;
 
 /**
  * Skydrummer in Echoes of War's "Howling of Undying Beasts" (eny_0082_hsbear_race007: DungeonTable
@@ -253,7 +253,7 @@ export const ALLEIKHREOS_HP = 2_476_341 * 2;
  * Stage rules as endfield.wiki.gg/wiki/Howling_of_Undying_Beasts lists them (Brutal: no Enraged state, 50 Resistance to all
  * elements on entering battle, better stats, HP Treatment tacticals only; the bonus goal is a clear within 3 minutes).
  */
-export const SKYDRUMMER: Enemy = {
+const SKYDRUMMER: Enemy = {
   // Echoes of War: no food (only HP Treatment tacticals and consumables), a start button before the fight.
   food: false,
   prep: true,
@@ -276,7 +276,7 @@ export const SKYDRUMMER: Enemy = {
  * (SpawnerConfig sc_indie_tower001_43000010047/48/49) give it buff_dung_maxhp_01 at birth with ratio 2.6, a MaxHp
  * Multiplier (+260%); the owner's Brutal recording agrees (its first Finisher, 296,434, took 7.7% of the bar).
  */
-export const SKYDRUMMER_HP = { brutal: 3_962_146, hard: 2_196_709, normal: 1_069_218 };
+const SKYDRUMMER_HP = { brutal: 3_962_146, hard: 2_196_709, normal: 1_069_218 };
 
 /**
  * YSTF Captain Blightshade in Echoes of War's "Glaiver File: Yinglung" (eny_0124_kltdcap_tower016: DungeonTable
@@ -339,7 +339,7 @@ export const knownEnemy = (e: Enemy) => {
 export const enemySeen = (name?: string) => (name ? ENEMIES.find((e) => e.seen.test(name)) : undefined);
 
 /** Fights the search plays at each effort: the priority list first, then press by press (rotation.ts beam). */
-export const EFFORT: Record<Effort, { list: number; width: number; passes: number; budget: number }> = {
+const EFFORT: Record<Effort, { list: number; width: number; passes: number; budget: number }> = {
   quick: { list: 80, width: 2, passes: 1, budget: 1200 },
   normal: { list: 200, width: 4, passes: 2, budget: 5000 },
   thorough: { list: 300, width: 4, passes: 3, budget: 12000 },
@@ -349,7 +349,7 @@ const ELEMENT: Record<string, string> = { cryst: 'Cryo', natural: 'Nature', puls
 const REACTION: Record<string, string> = { cryst: 'Solidification', natural: 'Corrosion', pulse: 'Electrification', fire: 'Combustion' };
 
 /** Where a hit's damage comes from, as the player knows it. */
-export function sourceOf(skillId: string, skillKind?: string): string {
+function sourceOf(skillId: string, skillKind?: string): string {
   const reaction = /^buff_common_(?:try_)?([a-z]+)_([a-z]+)_/.exec(skillId);
   if (reaction && ELEMENT[reaction[1]]) return reaction[1] === reaction[2] && !/frozen/.test(skillId) ? `${ELEMENT[reaction[1]]} Burst` : (REACTION[reaction[1]] ?? 'Reaction');
   if (/^(buff_)?(sk_)?wpn_|equipsuit/.test(skillId)) return 'Weapon and gear';
@@ -692,7 +692,7 @@ export interface BuffSpan {
  * The buffs shown on each operator and the enemy (`BuffSpan`), sampled as a fight goes (`note` at each sample, seconds
  * on the fight's clock): stretches still open by key. A replay and the Simulator's shown fight both keep them.
  */
-export function buffRecorder(): { buffs: BuffSpan[]; note: (w: World, t: number) => void } {
+function buffRecorder(): { buffs: BuffSpan[]; note: (w: World, t: number) => void } {
   const buffs: BuffSpan[] = [];
   const holding = new Map<string, BuffSpan>();
   const note = (w: World, t: number) => {
@@ -813,7 +813,7 @@ function finisherFrames(w: World, slot: number): number {
  * them (CharBreakStageTable: stage 0–4 up to level 20/40/60/80/90, skill ranks up to 1/3/6/9/12). A level at a stage's
  * cap (80) takes the lower stage: promoting and not levelling is rare.
  */
-export function promotionOf(b: SimBuild): number {
+function promotionOf(b: SimBuild): number {
   const level = b.level ?? 90;
   const rank = Math.max(0, ...Object.values(b.ranks ?? {}).map((x) => x ?? 0));
   const stages: [number, number][] = [[20, 1], [40, 3], [60, 6], [80, 9], [90, 12]];

@@ -31,7 +31,7 @@ export interface ScheduleBanner {
   needsReview?: boolean;
 }
 
-export interface ScheduleVersion {
+interface ScheduleVersion {
   name: string;
   release: ServerTimes | null;
   maintenance: ServerTimes | null;

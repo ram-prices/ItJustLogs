@@ -26,7 +26,9 @@ event gets a built page with its Discord embed (`pageCopies` in
   screen readers), Contracts.
 - `docs/income.md`: Stats → By patch free pull income.
 - `docs/pages.md`: built pages, Discord embeds, event pages, legacy links.
-- `docs/hub.md`: the coordinator/deployer hub session, its rules and the current task queue.
+- `docs/testing.md`: test servers, preview data, off-screen checks, browser-pane and editing traps.
+- `docs/hub.md`: coordinator sessions: project rules, open items, parked ideas, the Android apps.
+- `docs/history-handoff.md`: what was tried, removed or ruled out, and why.
 - `docs/new-version.md`: checklist for a new game version (dump stages, which art paths the site
   actually loads, wiki pull request, CDN timing).
 

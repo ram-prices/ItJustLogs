@@ -26,7 +26,7 @@ const foeName = (foe: (typeof ENEMIES)[number]) => foe.name.replace(/\s*\(.*$/, 
 /** Seconds from the timeline's start (0, or a press cast before the stopwatch's 0) to its end. */
 const spanOf = (seconds: number) => seconds - page.tlStart;
 /** Where the timeline starts for these tracks: a whole second at least half a second before the earliest press. */
-export function startOf(...tracks: ({ presses: { frame: number }[]; strikes?: { frame: number }[] } | undefined)[]): number {
+function startOf(...tracks: ({ presses: { frame: number }[]; strikes?: { frame: number }[] } | undefined)[]): number {
   const first = Math.min(0, ...tracks.flatMap((t) => [...(t?.presses ?? []), ...(t?.strikes ?? [])].map((x) => x.frame)));
   return first < 0 ? Math.floor(first / FPS - 0.5) : 0;
 }

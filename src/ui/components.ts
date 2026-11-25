@@ -8,7 +8,7 @@ import { tintFor } from './tint';
  * can move apart from the backdrop (ui/parallax.ts). Until a banner's layers
  * exist, its flat art (`flat`) takes their place (common.ts). Null for other banners.
  */
-export function issueArt(poolId: string, flat: string): Html | null {
+function issueArt(poolId: string, flat: string): Html | null {
   const l = issueLayerUrls(poolId);
   if (!l) return null;
   const layer = (cls: string, src: string) =>
@@ -26,7 +26,7 @@ const parallaxOn = (): boolean =>
  * pictures can move: phones and still settings load the one flat file.
  * Falls back to the flat art (`flat`) if a layer fails (common.ts).
  */
-export function operatorArt(poolId: string, flat: string): Html | null {
+function operatorArt(poolId: string, flat: string): Html | null {
   const l = operatorLayerUrls(poolId);
   if (!l || !parallaxOn()) return null;
   const layer = (cls: string, src: string) =>
@@ -294,7 +294,6 @@ export function heroGlow(kind: Kind, itemId: string): Html {
   return html`<div class="wiki-hero-glow" data-hero-tint="${src}" ${raw(kind === 'char' ? 'data-hero-tint-skin' : '')} style="--banner-tint:${tintFor(src)}" aria-hidden="true"></div>`;
 }
 
-export const RARITY_COLOR: Record<number, string> = { 6: 'var(--r6)', 5: 'var(--r5)', 4: 'var(--r4)', 3: 'var(--r3)' };
 /**
  * A picture with its rarity on it, as the game shows it: a band of the
  * rarity's colour along the bottom, glowing up behind the art. Used wherever
@@ -306,9 +305,6 @@ export const rarityArt = (img: Html, r: number, cls = ''): Html =>
 /** A Database list tile's picture with its rarity on it: no glow, and 6★ ones get the game's rainbow smoke. */
 export const tileArt = (kind: Kind, id: string, r: number): Html =>
   rarityArt(itemImg(kind, id, 'wiki-tile-portrait'), r, r === 6 ? 'wiki-tile-art weap smoke' : 'wiki-tile-art weap');
-
-export const rarity = (r: number): Html =>
-  html`<span class="rarity"><span class="dot" style="background:${RARITY_COLOR[r] ?? 'var(--muted)'}"></span>${r}${stars(1)}</span>`;
 
 /** Status colour for a pity-like value: calm until it gets close to the cap. */
 export function heat(value: number, max: number): string {

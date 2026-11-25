@@ -7,7 +7,7 @@ import { nameSlug } from './wiki';
  * mission's lines are in its own file, fetched when its page opens.
  */
 
-export interface StoryAttribution {
+interface StoryAttribution {
   source: string;
   url: string;
   dumper: string;
@@ -22,12 +22,12 @@ export interface StorySection {
   missions: string[];
 }
 
-export interface StoryGroup {
+interface StoryGroup {
   title: string;
   sections: StorySection[];
 }
 
-export interface StoryMissionInfo {
+interface StoryMissionInfo {
   name: string;
   lines: number;
   scenes: number;

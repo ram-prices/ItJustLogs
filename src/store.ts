@@ -652,7 +652,7 @@ export interface SavedAvatar {
   box?: AvatarBox;
   edit?: AvatarEdit;
 }
-export const MAX_SAVED_AVATARS = 12;
+const MAX_SAVED_AVATARS = 12;
 const AVATAR_HISTORY = 'avatar:history';
 export const loadAvatarHistory = (): Promise<{ list: SavedAvatar[]; current?: string }> =>
   idb<{ list: SavedAvatar[]; current?: string } | undefined>('images', 'readonly', (s) => s.get(AVATAR_HISTORY))

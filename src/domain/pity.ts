@@ -19,9 +19,9 @@ export const CHARTERED_GUARANTEE = 120;
 /** Pulls into a limited Arsenal Issue that guarantee its rate-up, once per banner. */
 export const WEAPON_GUARANTEE = 80;
 
-export const MAX_PULLS = 1500;
+const MAX_PULLS = 1500;
 
-export function sixStarChance(p: PityProfile, pity: number): number {
+function sixStarChance(p: PityProfile, pity: number): number {
   if (pity >= p.hardPity) return 1;
   const soft = pity > p.softPityStart ? 0.05 * (pity - p.softPityStart) : 0;
   return Math.min(1, p.baseRate + soft);
@@ -66,7 +66,7 @@ export function rateUpPmf(p: PityProfile, opts: PmfOptions = {}): Float64Array {
 }
 
 /** Distribution of the sum of two independent waits, truncated to the shorter length. */
-export function convolve(a: Float64Array, b: Float64Array): Float64Array {
+function convolve(a: Float64Array, b: Float64Array): Float64Array {
   const len = Math.min(a.length, b.length);
   const out = new Float64Array(len);
   for (let i = 0; i < len; i++) {

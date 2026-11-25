@@ -79,8 +79,7 @@ input.sim-run-value-edit {
   font-size: 16px;
 }
 .sim-member-head,
-.sim-op,
-.sim-weapon {
+.sim-op {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -125,15 +124,6 @@ input.sim-run-value-edit {
 .sim-portrait.sm {
   width: 28px;
   height: 28px;
-}
-.sim-weapon-img {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-  flex: none;
-}
-.sim-weapon > span {
-  flex: 1;
 }
 .sim-gear {
   display: flex;
@@ -762,9 +752,6 @@ input.sim-run-value-edit {
   mask: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/icons/stagger/poise-node.png) center / contain no-repeat;
   pointer-events: none;
 }
-.sim-boss-row.folded {
-  grid-template-rows: auto;
-}
 /* Hide/show buttons for the video's bars and the discrepancies, and the list under the bars. */
 .sim-fold-btn {
   display: inline-flex;
@@ -1249,9 +1236,6 @@ input.sim-run-value-edit {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-.sim-side-run .material-symbols-rounded {
-  font-size: 14px;
 }
 .sim-side-run.draft > .label-14 {
   color: var(--amber);

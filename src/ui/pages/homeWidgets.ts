@@ -42,7 +42,7 @@ interface Ctx {
   redraw: () => void;
 }
 
-export type WidgetSize = 4 | 6 | 8 | 12;
+type WidgetSize = 4 | 6 | 8 | 12;
 /** Where a narrower widget sits in its row: left (starting a new row), centre or right; none picked: right after the one before it. */
 const PLACES: ['left' | 'center' | 'right', string, string][] = [
   ['left', 'align_horizontal_left', 'Left'],

@@ -32,7 +32,7 @@ export interface ExtraCopy {
 }
 
 /** Everyone has these from the story, at least at P0. Used until the player edits the list. */
-export const DEFAULT_EXTRAS: ExtraCopy[] = [
+const DEFAULT_EXTRAS: ExtraCopy[] = [
   { id: 'chr_0003_endminf', copies: 1, note: 'Story' },
   { id: 'chr_0005_chen', copies: 1, note: 'Story' },
   { id: 'chr_0004_pelica', copies: 1, note: 'Story' },

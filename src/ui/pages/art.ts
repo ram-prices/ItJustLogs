@@ -17,10 +17,10 @@ import { html, render, type Html } from '../html';
  */
 
 export type ArtPlace = 'banner';
-export const ART_PLACES: { place: ArtPlace; label: string; hint: string }[] = [{ place: 'banner', label: 'Banner', hint: 'Across the top of the page' }];
+const ART_PLACES: { place: ArtPlace; label: string; hint: string }[] = [{ place: 'banner', label: 'Banner', hint: 'Across the top of the page' }];
 
 /** Where a picture shows. Pictures saved before the storage box have no entry and are banner pictures; new uploads start with none. */
-export const placesOf = (key: string): ArtPlace[] => (state.settings.artPlaces?.[key] as ArtPlace[] | undefined) ?? ['banner'];
+const placesOf = (key: string): ArtPlace[] => (state.settings.artPlaces?.[key] as ArtPlace[] | undefined) ?? ['banner'];
 
 /** Where a banner picture sits until moved: centred, a little above the middle (faces usually are). */
 const BANNER_POS: [number, number] = [50, 30];
@@ -55,7 +55,7 @@ export interface Art {
 const typeOf = (mime: string): Art['type'] => (mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'file');
 
 /** The link an item was saved from, if any (only items saved before the storage box have one). */
-export const sourceOf = (key: string): string | undefined => state.settings.artSources?.[key];
+const sourceOf = (key: string): string | undefined => state.settings.artSources?.[key];
 
 /** A file's name: the one it was uploaded with, else one made from its type. */
 function nameOf(a: Art): string {
@@ -119,7 +119,7 @@ export function forgetLoadedArt(opId?: string): void {
 }
 
 /** The operator's pictures that show in `place`. */
-export const artIn = (opId: string, place: ArtPlace, redraw: () => void): Art[] =>
+const artIn = (opId: string, place: ArtPlace, redraw: () => void): Art[] =>
   artOf(opId, redraw).filter((a) => a.type === 'image' && placesOf(a.id).includes(place));
 
 /** The picture `place` shows: a random one, kept until the page opens again or Shuffle is pressed. */

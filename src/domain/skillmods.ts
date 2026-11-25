@@ -125,7 +125,7 @@ const wordsOf = (s: string) =>
  * of the label, allowing for word forms (Electrification / Electrify: a
  * shared start of at least 6 letters, or the whole shorter word).
  */
-export function wordsMatch(phrase: string, label: string): boolean {
+function wordsMatch(phrase: string, label: string): boolean {
   const want = wordsOf(phrase);
   const have = wordsOf(label);
   if (!want.length) return false;

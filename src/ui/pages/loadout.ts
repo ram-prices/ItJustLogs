@@ -68,7 +68,7 @@ function slotTile(
 export const tuningFile = (redraw: () => void = () => {}): WeaponTuningFile | null => wikiFile<WeaponTuningFile>('weapon-tuning.json', redraw, 'combat').data;
 
 /** A weapon's tuning stage as the player set it (unset: fully tuned). */
-export const tuningStageOf = (wpnId: string): number => Math.max(0, Math.min(TUNING_MAX, Math.floor(state.settings.weaponTuning?.[wpnId] ?? TUNING_MAX)));
+const tuningStageOf = (wpnId: string): number => Math.max(0, Math.min(TUNING_MAX, Math.floor(state.settings.weaponTuning?.[wpnId] ?? TUNING_MAX)));
 
 /** The essence levels saved for a weapon (none: no essence); a save that held ranks is read as fully tuned. */
 function essenceSaved(wpnId: string, w: WikiWeapon, potential: number | null, t?: WeaponTuning): number[] | undefined {
@@ -145,7 +145,7 @@ export function setMaxEssence(wpnId: string, on: boolean): void {
 }
 
 /** One skill's essence level on a weapon (0 to its most). Maxed Essence gives way to the levels it stood for. */
-export function setWeaponEssence(wpnId: string, i: number, level: number): void {
+function setWeaponEssence(wpnId: string, i: number, level: number): void {
   const { w, potential } = weaponOf(wpnId);
   if (!w || i < 0 || i >= w.skills.length) return;
   const b = weaponBuildOf(wpnId, w, potential);
@@ -155,7 +155,7 @@ export function setWeaponEssence(wpnId: string, i: number, level: number): void 
 }
 
 /** A weapon's tuning stage (0–4; 4, fully tuned, is the default and isn't saved). */
-export function setTuning(wpnId: string, stage: number): void {
+function setTuning(wpnId: string, stage: number): void {
   const all = { ...state.settings.weaponTuning };
   const s = Math.max(0, Math.min(TUNING_MAX, Math.floor(stage)));
   if (s === TUNING_MAX) delete all[wpnId];
@@ -184,7 +184,7 @@ export const essenceTag = (wpnId: string, w?: WikiWeapon, potential: number | nu
  * wiki/weapon-summaries.json, filled at its level; a branching one by the operator's attribute totals, `attr`).
  * Tuning and essence are kept per weapon and set on its page.
  */
-export function weaponPicker(
+function weaponPicker(
   wpnId: string,
   w: WikiWeapon,
   potential: number | null,
@@ -224,7 +224,7 @@ export function pickEssenceNotch(wpnId: string, skill: number, n: number): void 
 export const pickTuning = (wpnId: string, stage: number): void => setTuning(wpnId, tuningStageOf(wpnId) === stage ? stage - 1 : stage);
 
 /** A gear stat's value as the game writes it: "+32", fractions as percents ("+41.4%"). */
-export const gearValue = (v: number | undefined): string => (v == null ? '' : v < 1 ? `+${Math.round(v * 1000) / 10}%` : `+${v.toLocaleString()}`);
+const gearValue = (v: number | undefined): string => (v == null ? '' : v < 1 ? `+${Math.round(v * 1000) / 10}%` : `+${v.toLocaleString()}`);
 
 /**
  * A gear piece's stats as the game lists them: each one's Artifice mark (`mark`: the mark, or a control over it; none
@@ -508,7 +508,7 @@ const fmtFlat = (n: number) => (Number.isInteger(n) ? n : Math.round(n * 10) / 1
 const fmtPct = (n: number) => `${Math.round(n * 10) / 10}%`;
 
 /** "+87 +14.7%" after a value, with where each part comes from on hover. */
-export function bonusChip(b: Bonus | undefined): Html {
+function bonusChip(b: Bonus | undefined): Html {
   if (!b) return html``;
   const parts = [b.flat ? `+${fmtFlat(b.flat)}` : '', b.pct ? `+${fmtPct(b.pct)}` : ''].filter(Boolean).join(' ');
   const why = tip('', b.sources.map((s) => tipRow(s.from, [s.flat ? `+${fmtFlat(s.flat)}` : '', s.pct ? `+${fmtPct(s.pct)}` : ''].filter(Boolean).join(' '))));

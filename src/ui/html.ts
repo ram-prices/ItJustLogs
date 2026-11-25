@@ -116,15 +116,11 @@ export function restoreFocus(scope: Element, mark: FocusMark | null): boolean {
   return false;
 }
 
-export const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document): T | null =>
-  root.querySelector<T>(sel);
-
 // ---------------------------------------------------------------------------
 // Formatting
 // ---------------------------------------------------------------------------
 
 export const fmtInt = (n: number): string => n.toLocaleString();
-export const fmtPct = (x: number, digits = 1): string => `${(x * 100).toFixed(digits)}%`;
 
 export function fmtDate(ts: number, withTime = false): string {
   if (!ts) return '';

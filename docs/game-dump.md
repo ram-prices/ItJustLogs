@@ -7,6 +7,22 @@ Used for ef-assets art and data; the site itself never reads it.
 - Dumper: `dumper\dump.py` plus parsers, based on Escartem's DataDumper (`dumper\SOURCE.md`).
 - The game is only read, never modified. Runs are incremental.
 
+## Online sources
+
+- EndfieldData, the community datamine (`https://git.escartem.moe/Endfield/EndfieldData`): raw files
+  at `.../raw/branch/master/<path>`, listings at `api/v1/repos/Endfield/EndfieldData/contents/<dir>?ref=master`.
+  It returns 403 to Python's default User-Agent (curl and Node's fetch pass). Dialogue keys are
+  `dlg_<missionId>_<scene>[<branch>]_<line>`; `{F}…{M}…` is female/male Endministrator wording.
+  Reply placement within a scene is in neither dump (per-scene timeline assets).
+- Official news feed, public and unauthenticated:
+  `GET https://web-news.gryphline.com/api/bulletin?lang=en-us&code=arknights_endfield_official&page=N&pageSize=M`,
+  one post at `.../api/bulletin/{cid}?lang=en-us&code=arknights_endfield_official` (HTML in `.data`).
+  Needs only a User-Agent. Titles: "[Version] Version Update Notes" (new events), "Version
+  Pre-Download & Update Notice" (maintenance window), "Version DEV Comm".
+- Only ever poll public endpoints. Never tie a request to the owner's game account (no token,
+  cookie or account header): ban risk. Gacha history (`ef-webview.gryphline.com/api/record/...`)
+  is account-tied; only the exporter script talks to it, run by the player.
+
 ## Running it
 
 - `run_all.bat ["<game folder>"]` runs every stage. It finds the install itself.

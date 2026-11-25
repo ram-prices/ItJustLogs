@@ -10,15 +10,8 @@
 /** One essence stat and its level. */
 export type EssenceStat = [stat: string, level: number];
 
-/**
- * The player's essences, kept in settings: each kind (its stats, as
- * essenceKey writes them) and how many they have. Identical essences fit
- * the same weapons, so kinds are what matter; counts are as read.
- */
-export type EssenceStash = Record<string, number>;
-
 /** The game's stat names, by the slot they fill on weapons (from the wiki's essence list and weapon skills). */
-export const ESSENCE_STATS = {
+const ESSENCE_STATS = {
   attribute: ['Strength', 'Agility', 'Intellect', 'Will', 'Main Attribute'],
   secondary: ['ATK', 'HP', 'Physical DMG', 'Heat DMG', 'Electric DMG', 'Cryo DMG', 'Nature DMG', 'Critical Rate', 'Arts Intensity', 'ULT Efficiency', 'Arts DMG', 'Treatment Efficiency'],
   skill: ['Assault', 'Suppression', 'Pursuit', 'Crusher', 'Inspiring', 'Combative', 'Brutality', 'Infliction', 'Medicant', 'Fracture', 'Detonate', 'Twilight', 'Flow', 'Efficacy'],

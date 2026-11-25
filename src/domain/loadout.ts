@@ -71,7 +71,7 @@ export function withArtifice(l: Loadout | undefined, slot: GearSlot, g: WikiGear
 }
 
 /** The game's highest Artifice level for one stat (EquipConst maxAttrEnhanceLevel). */
-export const ARTIFICE_MAX = 3;
+const ARTIFICE_MAX = 3;
 
 /**
  * Artifice per stat from what a save holds: a list (per stat), one number (saves from before per-stat Artifice, which
@@ -248,7 +248,7 @@ export interface Bonus {
 }
 
 /** A weapon skill's highest level (fully tuned, or the own skill at P5). */
-export const WEAPON_SKILL_RANK = 9;
+const WEAPON_SKILL_RANK = 9;
 const POTENTIAL_SKILL_BASE_CAP = 4;
 
 /** The operator fields the bonuses read. */
@@ -391,8 +391,8 @@ export function operatorBonuses(
 // ---------------------------------------------------------------------------
 
 /** ATK % per point of the main and the secondary attribute (the game's "Attribute Bonuses"). */
-export const MAIN_ATTRIBUTE_ATK = 0.5;
-export const SECONDARY_ATTRIBUTE_ATK = 0.2;
+const MAIN_ATTRIBUTE_ATK = 0.5;
+const SECONDARY_ATTRIBUTE_ATK = 0.2;
 
 /** A stat with its bonus: (base + flat) × (1 + %). */
 export const statTotal = (base: number, b?: Bonus): number => (base + (b?.flat ?? 0)) * (1 + (b?.pct ?? 0) / 100);
@@ -413,7 +413,7 @@ export function atkTotal(operatorAtk: number, atk: Bonus | undefined, main: numb
 }
 
 /** HP per point of Strength (the game's "HP from STR"). */
-export const HP_PER_STRENGTH = 5;
+const HP_PER_STRENGTH = 5;
 /** Treatment Received Bonus (%) per point of Will. */
 export const TREATMENT_PER_WILL = 0.1;
 

@@ -18,7 +18,7 @@
  */
 import { solveModel, type Row, type Solver } from './lp';
 
-export interface AicItem {
+interface AicItem {
   name: string;
   phase: 'solid' | 'liquid' | 'gas';
   /** Regions whose depot holds it. */
@@ -27,7 +27,7 @@ export interface AicItem {
   transfer?: string[];
 }
 
-export interface AicMachine {
+interface AicMachine {
   name: string;
   power: number;
   /** Protocol Capacity it takes. */
@@ -39,7 +39,7 @@ export interface AicMachine {
   regions?: string[];
 }
 
-export interface AicRecipe {
+interface AicRecipe {
   id: string;
   machine: string;
   seconds: number;
@@ -90,7 +90,7 @@ export interface Site {
   nodes: Record<string, number>;
 }
 
-export interface Target {
+interface Target {
   item: string;
   perMin: number;
   /** The region whose depot gets it (ignored without sites). */
@@ -175,7 +175,7 @@ export interface Plan {
 const perMin = (count: number, seconds: number) => (count * 60) / seconds;
 
 /** The recipes able to make an item (not excluded). */
-export function makers(data: AicData, item: string, exclude: readonly string[] = []): AicRecipe[] {
+function makers(data: AicData, item: string, exclude: readonly string[] = []): AicRecipe[] {
   return data.recipes.filter((r) => !exclude.includes(r.id) && r.out.some(([id]) => id === item));
 }
 

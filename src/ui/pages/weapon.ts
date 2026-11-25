@@ -17,7 +17,7 @@ import { accordion, copyLinkButton, credit, crumbs, databaseTabs, external, info
  */
 
 /** Link to a weapon's info page (or the list of all of them). */
-export const weaponInfoHref = (id?: string): string => infoHref('weap', id);
+const weaponInfoHref = (id?: string): string => infoHref('weap', id);
 
 // ---------------------------------------------------------------------------
 // Index: every weapon

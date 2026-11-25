@@ -3,7 +3,7 @@ import { canonicalPoolId, comparePatches, isIssuePool, patchOf, type PatchRef } 
 import { isWeaponBanner, timeOn, type Schedule } from './schedule';
 import type { BannerDb } from './types';
 
-export interface PatchBanner {
+interface PatchBanner {
   /** Null for a scheduled banner whose pool id isn't known (reruns that have no pool of their own yet). */
   poolId: string | null;
   name: string;

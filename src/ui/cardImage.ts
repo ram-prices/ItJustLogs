@@ -27,7 +27,7 @@ const skip = (node: Node) => !(node instanceof Element && node.matches('.ctx-men
  * The card as a PNG: at rest (no hover glow or lift) and with square corners,
  * which `.capturing` sets while it's drawn.
  */
-export async function render(el: HTMLElement): Promise<Blob> {
+async function render(el: HTMLElement): Promise<Blob> {
   const { toBlob } = await import('html-to-image');
   el.classList.add('capturing');
   try {

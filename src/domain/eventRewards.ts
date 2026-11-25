@@ -14,7 +14,7 @@ import type { WikiAttribution } from './wiki';
 export type Reward = [item: string, count: number | null];
 
 /** A stage of an event: from `start` (server time; null: the event's start) until the next one's start, the last until the event ends. */
-export interface EventPhase {
+interface EventPhase {
   name: string;
   start: ServerTimes | null;
   about: string;
@@ -49,8 +49,8 @@ export interface EventRewardsFile {
 }
 
 /** Oroberyl per Headhunting pull, and per Origeometry (from the wiki's Headhunting and Origeometry pages). */
-export const OROBERYL_PER_PULL = 500;
-export const OROBERYL_PER_ORIGEOMETRY = 75;
+const OROBERYL_PER_PULL = 500;
+const OROBERYL_PER_ORIGEOMETRY = 75;
 
 /**
  * What an event's totals come to in limited Headhunting pulls: Oroberyl (and

@@ -105,7 +105,7 @@ const isShortLink = (segment: string) => /^[a-z0-9][a-z0-9-]*$/i.test(segment) &
  * saved tab views still open. Ids stay ids here; the router swaps them for
  * names once it can.
  */
-export function currentPath(path: string): string {
+function currentPath(path: string): string {
   const [page = '', a, b] = path.replace(/^\/+|\/+$/g, '').split('/');
   const p = page.toLowerCase();
   const tail = (x?: string) => (x ? `/${x}` : '');

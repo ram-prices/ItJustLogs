@@ -68,12 +68,6 @@ function focusSearch(input: HTMLInputElement): void {
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
-/** Keeps typing going into the search after a redraw replaced its input (app.ts draw). */
-export function refocusListSearch(): void {
-  const input = document.querySelector<HTMLInputElement>('[data-list-search]');
-  if (input) focusSearch(input);
-}
-
 // The big letters in the middle of the screen.
 let overlay: HTMLElement | null = null;
 let fade: ReturnType<typeof setTimeout> | undefined;

@@ -25,8 +25,8 @@ export interface Pull {
 }
 
 /** 'other': a pool that is none of the known kinds (no pool id in the export, or a kind the game added later). */
-export type CharCategory = 'chartered' | 'joint' | 'basic' | 'newHorizons' | 'other';
-export type WeapCategory = 'limited' | 'constant';
+type CharCategory = 'chartered' | 'joint' | 'basic' | 'newHorizons' | 'other';
+type WeapCategory = 'limited' | 'constant';
 export type Category = CharCategory | WeapCategory;
 
 /** How a 6★ pull on a rate-up banner resolved. */

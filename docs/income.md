@@ -44,3 +44,11 @@ patch is opened. Headhunting counts limited pulls (Basic HH Permits are
 listed apart, as community pull counts do). The current patch is projected
 to the next version's release, or else its last banner or event end.
 Toggles (setting `paidIncome`) add Originium Supply, Protocol Customized
+and the Monthly Pass.
+
+Income sources not added (no source found yet): Early Warning Terminals, Etchspace crates, dated
+compensations, extra surveys, Operator Guides, a second Authority Level set.
+
+Wording (owner, 2026-10-20): breakdown lines are terse, `Name: amount (N pulls)`, pull currencies
+only (Oroberyl, Origeometry, HH Permits, Arsenal Tickets). No prices, guide links or asides; mark
+estimates and partials with badges or `≈`/`*` and a hover title, not sentences.

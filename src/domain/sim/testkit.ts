@@ -59,7 +59,7 @@ export type WikiOp = {
 };
 
 /** "180%" → 1.8, "0.018%" → 0.00018, "10" → 10. */
-export const num = (s: string): number => (s.trim().endsWith('%') ? Number(s.trim().slice(0, -1)) / 100 : Number(s));
+const num = (s: string): number => (s.trim().endsWith('%') ? Number(s.trim().slice(0, -1)) / 100 : Number(s));
 
 /** The numbers marked in a text, in order: ⟦num|1.2⟧ → 1.2, ⟦num|-15%⟧ → -0.15 (`kind` stagger: ⟦stagger|18⟧). */
 export const textNums = (text: string, kind = 'num'): number[] =>
@@ -156,7 +156,7 @@ export function actions(skill: any, type: string): { frame: number; end: number;
  * stepRun), and a skill that has ended holds no one (`busy`): Typhoeus's ultimate_skillfloating, exclusiveFrame 105,
  * durationFrame 92, its last entry (AllowNextSkillAction) at 100, frees her at 100.
  */
-export const freeFrame = (skill: any, jumps: Jump[] = []): number => {
+const freeFrame = (skill: any, jumps: Jump[] = []): number => {
   const marks = actions(skill, 'MarkCanInterrupt').map((m) => m.frame);
   const exclusive = skill?.exclusiveFrame ?? 0;
   const entries: any[] = skill?.actionGroupData?.timelineActions ?? [];
@@ -188,7 +188,7 @@ export interface Jump {
 }
 
 /** An ultimate's cut-in: its UltimateTimeAction with time scale 0, in frames. */
-export const cutIn = (skill: any): number => {
+const cutIn = (skill: any): number => {
   const a = actions(skill, 'UltimateTimeAction').find((x) => Number(x.data.timeScale ?? 1) === 0);
   return a ? a.end - a.frame : 0;
 };
@@ -564,9 +564,6 @@ export class Probe {
     return this.buffs.find((b) => b.press === press && id.test(b.id) && (!on || b.on === on));
   }
 }
-
-/** A probe for one operator (its combat data loaded). */
-export const probe = async (id: string, setup: Setup = {}): Promise<Probe> => new Probe(await simData([id]), id, setup);
 
 // ---------------------------------------------------------------------------
 // Rules: an operator's table rows

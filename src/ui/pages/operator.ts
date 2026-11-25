@@ -83,7 +83,7 @@ function finalStrikeTable(rows: { id: string; name: string }[]): Html {
 }
 
 /** Link to an operator's info page (or the list of all of them). */
-export const operatorInfoHref = (id?: string): string => infoHref('char', id);
+const operatorInfoHref = (id?: string): string => infoHref('char', id);
 
 // ---------------------------------------------------------------------------
 // Index: every operator

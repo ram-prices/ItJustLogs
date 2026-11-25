@@ -621,7 +621,6 @@ a.six-item {
   .wiki-hero-link {
     margin-left: auto;
   }
-  .wiki-skill,
   .wiki-list li {
     padding: 16px;
   }
@@ -1008,9 +1007,6 @@ a.ladder-row:focus-visible {
 }
 .wiki-note {
   margin-top: 10px;
-}
-.wiki-skill .wiki-note {
-  margin-top: auto;
 }
 
 /* Index tiles: Potential tag on owned ones; the rest fade once there's an import. */

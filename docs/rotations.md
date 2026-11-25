@@ -2,6 +2,24 @@
 
 Everything about the team DPS sim, the gameplay-recording Parser and parsed runs (read before any work in `src/domain/sim/`, `rotationReader`, `pages/rotations.ts` and `pages/rotations/`).
 
+Owner's goals and rules (more, with reasons, in `docs/history-handoff.md`):
+- Purpose: teach button order, not min-maxing. Highest DPS first, ease of execution later. A clearly
+  bad team should come out with poor DPS.
+- The sim derives everything itself (an interpreter of the game's skill and buff data, not hand rules
+  per operator). Community results only check a result after it exists; never feed in a community
+  rotation, build or damage split, or tune toward one. Recordings confirm mechanics only.
+- Game rules the owner set: AI teammates' attacks are estimated; swapping in starts a fresh attack
+  chain; no swapping to an operator mid-skill; released operators only.
+- "R4" in community terms = the weapon's third skill at level 4 = Potential 0.
+- Settled: the stage timer runs through ultimate cut-ins, the fight clock (SP, buffs, Stagger,
+  cooldowns) does not: keep the cut-in freeze, no regeneration inside it. Transcript SP is the flat
+  game amount per action; regeneration shows only in the bar level after. Show the game's values (SP
+  gained 20), never raw readings (19).
+- Engine rule changes: clean and revertable; replay every saved run and report before/after.
+- Checking sources: the community sheet `https://docs.google.com/spreadsheets/d/1NHs-XbKG02eLdyIs9Ntn4-xqcOjQesu2HOg1OrUkPW8`
+  (CSV via `/gviz/tq?tqx=out:csv&gid=…`). Its clock is SP-recovery time, not fight time; it assumes
+  start SP 224, Stagger 320, dodge SP and hand-set reactions, so its DPS overstates real DPS.
+
 - Files: `ui/pages/rotations.ts` is the page (`rotationsPage`, `simAction`, `simChange`, `parserFiles`); its parts
   are in `ui/pages/rotations/`: `state.ts` (every piece of page state in one `page` object, plus the settings
   helpers), `text.ts` (number and time formats), `track.ts` (a `Track`: a sim result or a recording on the fight's
@@ -58,7 +76,9 @@ Everything about the team DPS sim, the gameplay-recording Parser and parsed runs
   each chain): GroupAIConfig
   Default_GroupAITargetNotMain deals 5 s Attacker roles by mode (Radical/Moderate/Steady/SingleOne, weighed the same:
   the data doesn't say how a mode is picked), AIGlobalSetting the delays. Only the controlled operator's Final Strikes
-  give SP and trigger combos. The data's share is ≈ 0.59 (`GUARD_DATA_SHARE`, a ceiling: they also move and dodge);
+  give SP and trigger combos. The data's share is ≈ 0.59 (modes Radical 3 teammates every 3.2 s, Moderate 2 every 6 s, Steady 2 every 4.2 s,
+  SingleOne 1 every 12 s, each role 5 s: (3 + 2·5/6 + 2 + 1·5/12) / 4 / 3; a ceiling, since they also move and dodge;
+  the unused `GUARD_DATA_SHARE` constant was removed from engine.ts on 2026-11-25);
   0.4 is fitted to the owner's two recordings at the owner's request, by kill time (damage sums mislead: a phase's
   damage is capped at its HP, so Alleikhreos's phase 1 says nothing): at 0.4 the sim killed the Skydrummer at 2:27.4
   (the game 2:27.4) and Alleikhreos at 2:20.6 (2:21). That fit used the Skydrummer's HUD blackouts as stopwatch pauses

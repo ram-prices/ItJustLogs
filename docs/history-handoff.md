@@ -10,9 +10,8 @@ dump-only event dates, version 1.7, Kay in the sim) were made by other sessions.
 those touch a topic below, the later commit and current CLAUDE.md win; I mark such spots
 "later work exists".
 
-Sources that outrank this file: `CLAUDE.md`, the area docs in `docs/`, git history, and the
-memory folder `C:\Users\Albert\.claude\projects\C--Users-Albert-Development-ItJustLogs\memory\`
-(`MEMORY.md` is its index; each note is one rule with its reason).
+Sources that outrank this file: `CLAUDE.md`, the area docs in `docs/` and git history. (The old
+per-rule memory folder was folded into these docs on 2026-11-25 and archived.)
 
 ---
 
@@ -120,7 +119,7 @@ Editing traps
 - **Cloud sessions** for workers: not used, they can't report back.
 - **A search app bar on the native Android app's tab pages**: tried and reverted.
 - **Password-locked AIC optimizer and story summaries**: an idea parked in
-  `later-ideas.md`, not started. So are AIC schematic layouts and depot belt cost.
+  `docs/hub.md` (Parked ideas), not started. So are AIC schematic layouts and depot belt cost.
 - **Engine "regenerating through" slow motion or cut-ins** in the sim or in
   `tools/ai-parser/build.mjs`: settled, don't.
 
@@ -169,8 +168,9 @@ Editing traps
   routes still open directly. Contracts is on by default with its own checkbox (later
   commits mention "hidden tabs by default"; check current state).
 - Settings, Backgrounds tiles span the full card (`987ea1b`).
-- Revert point before the modular Home: commit `bfe6d1c` plus a named stash (see
-  `revert-point-modular-home.md`). The owner may ask to look at it.
+- Revert point before the modular Home: commit `bfe6d1c` plus the stash "pre-modular-home:
+  Arsenals + Arsenal Issues renames on top of bfe6d1c". To look at it, set aside local changes,
+  `git switch -c pre-modular-home bfe6d1c`, then `git stash apply` that stash (`git stash list`).
 
 ### Database and operators
 - Operator and weapon info comes from the weekly wiki snapshot in ef-assets. A brand-new

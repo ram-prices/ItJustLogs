@@ -12,7 +12,7 @@ import { html, render, type Html } from '../html';
  * sections (sortGroups). Saved in settings.
  */
 
-export type SortKey = 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'released' | 'element' | 'weapon' | 'class';
+type SortKey = 'rarity' | 'name' | 'acquired' | 'potential' | 'owned' | 'released' | 'element' | 'weapon' | 'class';
 export interface SortSpec {
   key: SortKey;
   desc: boolean;

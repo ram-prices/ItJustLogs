@@ -9,7 +9,7 @@ import { whenNear } from './near';
 import { itemIconUrl } from '../domain/banners';
 
 /** Shown until the art has loaded (or if the colour can't be read). */
-export const DEFAULT_TINT = 'rgba(255, 255, 255, 0.1)';
+const DEFAULT_TINT = 'rgba(255, 255, 255, 0.1)';
 
 const cache = new Map<string, string>();
 
@@ -430,7 +430,7 @@ function mixRgb(c: string, base: string, keep: number): string {
   return `rgb(${[0, 1, 2].map((i) => Math.round(a[i] * keep + b[i] * (1 - keep))).join(', ')})`;
 }
 
-export function paintCardAmbients(): void {
+function paintCardAmbients(): void {
   for (const box of document.querySelectorAll<HTMLElement>('[data-card-ambient]')) {
     // Outside the card (beside it in its wrap) or inside it.
     const card = box.closest<HTMLElement>('.char-card') ?? box.parentElement?.querySelector<HTMLElement>('.char-card');

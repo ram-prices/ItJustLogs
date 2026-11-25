@@ -57,7 +57,7 @@ export interface Criterion {
   firstClear: number;
 }
 
-export interface WaveEnemy {
+interface WaveEnemy {
   id: string;
   count: number;
 }
@@ -90,7 +90,7 @@ export interface Mission {
   opens: ServerTimes | null;
 }
 
-export interface ShopItem {
+interface ShopItem {
   id: string;
   item: string;
   count: number;

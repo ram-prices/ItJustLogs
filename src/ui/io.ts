@@ -146,7 +146,7 @@ const hasPulls = (h: PullHistory | null | undefined): h is PullHistory => !!h &&
  * sync deletes whatever those name, in Drive and on every device, so an old or
  * someone else's backup must never bring its own. This browser's stay.
  */
-export function importableSettings(s: unknown): Partial<Settings> | null {
+function importableSettings(s: unknown): Partial<Settings> | null {
   if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
   const out = { ...(s as Partial<Settings>) };
   delete out.deletedArt;

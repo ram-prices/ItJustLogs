@@ -43,8 +43,8 @@ export interface Preview {
 }
 
 /** An item's Database page; `slug` is its name slug (itemSlugs), else its id. */
-export const operatorUrl = (slug: string): string => `${SITE_URL}/database/operators/${encodeURIComponent(slug)}`;
-export const weaponUrl = (slug: string): string => `${SITE_URL}/database/arsenals/${encodeURIComponent(slug)}`;
+const operatorUrl = (slug: string): string => `${SITE_URL}/database/operators/${encodeURIComponent(slug)}`;
+const weaponUrl = (slug: string): string => `${SITE_URL}/database/arsenals/${encodeURIComponent(slug)}`;
 
 // ---------------------------------------------------------------------------
 // Wiki markup → text
@@ -228,16 +228,6 @@ export function operatorDiscord(id: string, o: ShareOperator): string {
   return clip([head, ...parts, tail].join('\n\n'), DISCORD_CHARS);
 }
 
-/** One skill, for copying from its card. */
-export function operatorSkillDiscord(id: string, o: ShareOperator, skill: ShareOperator['skills'][number]): string {
-  const text = [
-    `**${md(o.name)}** · ${md(skill.type)} · **${md(skill.name)}**`,
-    skillText(skill.description),
-    footer(operatorUrl(id)),
-  ].filter(Boolean);
-  return clip(text.join('\n'), DISCORD_CHARS);
-}
-
 // ---------------------------------------------------------------------------
 // Weapons
 // ---------------------------------------------------------------------------
@@ -300,7 +290,7 @@ const header = (content: string, image: string): Component =>
   image ? { type: 9, components: [textDisplay(content)], accessory: { type: 11, media: { url: image } } } : textDisplay(content);
 
 /** The payload as written into the page: `<` escaped so it can't end the script element. */
-export const embedJson = (e: ComponentEmbed): string => JSON.stringify(e).replace(/</g, '\\u003c');
+const embedJson = (e: ComponentEmbed): string => JSON.stringify(e).replace(/</g, '\\u003c');
 export const embedBytes = (e: ComponentEmbed): number => utf8Bytes(embedJson(e));
 /** Bytes a string takes inside the payload (quotes, backslashes and \n are escaped). */
 const jsonBytes = (s: string): number => utf8Bytes(JSON.stringify(s).replace(/</g, '\\u003c')) - 2;

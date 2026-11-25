@@ -40,7 +40,7 @@ export interface AnalyzedPull extends Pull {
   bannerName: string;
 }
 
-export interface RewardMilestone {
+interface RewardMilestone {
   /** Pull (or Arsenal set) the reward lands on. */
   at: number;
   name: string;
@@ -48,7 +48,7 @@ export interface RewardMilestone {
   copy: boolean;
 }
 
-export interface RewardTrack {
+interface RewardTrack {
   label: string;
   /** Pulls (Arsenal: sets) made toward the next reward. */
   progress: number;
@@ -77,7 +77,7 @@ function fixedRewards(label: string, every: number, done: number, copy: boolean)
   };
 }
 
-export interface Meter {
+interface Meter {
   label: string;
   value: number;
   max: number;
@@ -106,7 +106,7 @@ export interface BannerSummary {
   isLatest: boolean;
 }
 
-export interface KindStats {
+interface KindStats {
   pulls: number;
   sixStars: number;
   fiveStars: number;
@@ -160,7 +160,7 @@ function pityScope(kind: Kind, category: Category, poolId: string): string {
  */
 export const WEAPON_SET = 10;
 export const WEAPON_PITY_SETS = 4;
-export const WEAPON_GUARANTEE_SETS = WEAPON_GUARANTEE / WEAPON_SET; // 8
+const WEAPON_GUARANTEE_SETS = WEAPON_GUARANTEE / WEAPON_SET; // 8
 export const setOf = (pull: number) => Math.ceil(pull / WEAPON_SET);
 
 /**

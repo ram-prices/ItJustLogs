@@ -572,7 +572,7 @@ const LATE = 3 * FPS;
  * Keeping an input back (slot -1: every operator's) until a frame, or sooner when something happens: the enemy
  * is Staggered, or another operator casts an ultimate. Nothing presses it meanwhile, not even the list.
  */
-export interface Hold {
+interface Hold {
   slot: number;
   input: Input;
   from: number;
@@ -581,7 +581,7 @@ export interface Hold {
 }
 
 /** What can be done at a moment: press an input, hold back (basic attacks only) for some frames, or keep an input back. */
-export type Choice = Press | { frame: number; wait: number } | { hold: Hold };
+type Choice = Press | { frame: number; wait: number } | { hold: Hold };
 
 /** Whether an input is kept back now. */
 function held(w: World, holds: Hold[], slot: number, input: Input): boolean {

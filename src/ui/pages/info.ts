@@ -31,8 +31,8 @@ import { fmtDate, html, raw, type Html } from '../html';
  */
 
 /** Where each kind lives: /database/operators, /banner/headhunting. */
-export const DATABASE_PATH: Record<Kind, string> = { char: 'operators', weap: 'arsenals' };
-export const BANNER_PATH: Record<Kind, string> = { char: 'headhunting', weap: 'arsenal' };
+const DATABASE_PATH: Record<Kind, string> = { char: 'operators', weap: 'arsenals' };
+const BANNER_PATH: Record<Kind, string> = { char: 'headhunting', weap: 'arsenal' };
 /** What the banners view of each kind is called (its side tab and title). */
 const BANNERS_LABEL: Record<Kind, string> = { char: 'Headhunting', weap: 'Issues' };
 const WIKI_FILE: Record<Kind, string> = { char: 'operators.json', weap: 'weapons.json' };
@@ -419,7 +419,7 @@ export function potentialStar(potential: number, cls = 'pot-star'): Html {
   return src ? html`<img class="${cls}" src="${src}" alt="${level}" title="Your Potential: ${level}" />` : pips(potential);
 }
 
-export function pips(potential: number): Html {
+function pips(potential: number): Html {
   return html`<span class="wiki-pips" role="img" aria-label="P${Math.max(potential, 0)} of P${MAX_POTENTIAL}">
     ${Array.from({ length: MAX_POTENTIAL }, (_, i) => html`<i class="${i < potential ? 'on' : ''}"></i>`)}
   </span>`;
@@ -569,7 +569,7 @@ export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned
  * Potential as the game counts it: P0 for the first copy, one more per
  * duplicate, P5 at max (6 copies).
  */
-export const potentialLevel = (owned: Owned): string => `P${Math.max(owned.potential, 0)}`;
+const potentialLevel = (owned: Owned): string => `P${Math.max(owned.potential, 0)}`;
 
 /** Small Potential/copies tag for index tiles. */
 export function ownedTag(owned: Owned | undefined): Html {

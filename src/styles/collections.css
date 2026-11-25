@@ -675,14 +675,6 @@ main.searching .collection-pane:not(:has([data-search-item]:not([hidden]))) {
   background: color-mix(in srgb, var(--green) 16%, transparent);
   color: var(--green);
 }
-.essence-fit {
-  min-width: 30px;
-  font: 600 12px/18px var(--font-sans);
-  color: var(--amber);
-}
-.essence-fit.full {
-  color: var(--green);
-}
 .essence-fits {
   display: flex;
   flex-wrap: wrap;

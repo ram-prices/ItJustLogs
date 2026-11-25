@@ -116,13 +116,13 @@ const median = (xs: number[]) => {
   return s.length ? s[Math.floor((s.length - 1) / 2)] : 0;
 };
 
-export interface Extra {
+interface Extra {
   label: string;
   note: string;
   sources: string[];
 }
 
-export interface ModeReward {
+interface ModeReward {
   name: string;
   /** Where the amounts come from: the official `notes`, or the `wiki`. */
   from: 'notes' | 'wiki';
@@ -136,7 +136,7 @@ export interface ModeReward {
   estimated?: boolean;
 }
 
-export interface Area {
+interface Area {
   area: string;
   url: string;
   /** The wiki's crate count. */
@@ -147,7 +147,7 @@ export interface Area {
   rewards?: Record<string, number>;
 }
 
-export interface Quest {
+interface Quest {
   name: string;
   type: string;
   url: string;
@@ -164,7 +164,7 @@ export const PAID_INCOME: PaidIncome[] = ['originium', 'customized', 'monthly'];
 export const TICKETS_PER_ISSUE = 1980;
 
 /** Arsenal Tickets every Headhunting result gives, by rarity (the wiki's Arsenal Ticket page). */
-export const TICKETS_PER_HEADHUNT: Record<number, number> = { 4: 20, 5: 200, 6: 2000 };
+const TICKETS_PER_HEADHUNT: Record<number, number> = { 4: 20, 5: 200, 6: 2000 };
 
 /** Server time zones (hours from UTC) and the daily reset hour, server time. */
 const SERVER_UTC_OFFSET: Record<Server, number> = { americas: -5, asia: 8 };
@@ -229,7 +229,7 @@ export function patchWindows(schedule: Schedule, server: Server, now: number): P
   });
 }
 
-export interface OneTimeReward {
+interface OneTimeReward {
   name: string;
   section: 'modes' | 'exploration' | 'mailbox';
   url: string;
@@ -241,7 +241,7 @@ export interface OneTimeReward {
   until?: string;
 }
 
-export type IncomeSource =
+type IncomeSource =
   | 'events'
   | 'quests'
   | 'modes'

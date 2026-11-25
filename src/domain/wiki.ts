@@ -12,7 +12,7 @@
  * Version Guide (ef-assets wiki/previews.json, scripts/guide-previews.mjs).
  * The wiki's entry replaces a preview once it exists.
  */
-export interface PreviewBanner {
+interface PreviewBanner {
   name: string | null;
   poolId: string | null;
 }
@@ -49,7 +49,7 @@ export interface WikiAttribution {
   fetched: string;
 }
 
-export interface WikiCost {
+interface WikiCost {
   item: string;
   count: number;
 }

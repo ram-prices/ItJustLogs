@@ -9,7 +9,7 @@ const truthy = (v: unknown): boolean => v === true || v === 1 || v === 'true' ||
  * (Tokens), `gift_weapon` (Arsenal rate-up copies) and `gift_weapon_box`
  * (Selectors). Anything else `gift_*` is treated the same way.
  */
-export function isGift(r: RawRecord): boolean {
+function isGift(r: RawRecord): boolean {
   return typeof r.kind === 'string' && r.kind.startsWith('gift_');
 }
 
@@ -41,7 +41,7 @@ function groupKey(r: RawRecord, kind: Kind): string {
  * Identity of each record in a list: time + item + occurrence. The n-th record
  * (0-based, in list order) with a given time + item gets `ts|item|n`.
  */
-export function recordKeys(list: RawRecord[], kind: Kind): string[] {
+function recordKeys(list: RawRecord[], kind: Kind): string[] {
   const seen = new Map<string, number>();
   return list.map((r) => {
     const g = groupKey(r, kind);
@@ -66,7 +66,7 @@ export function dropShadowedDuplicates(list: RawRecord[], kind: Kind): RawRecord
 }
 
 /** `key` is unique per pull: seqId when the record has one, else its occurrence key. */
-export function normalize(r: RawRecord, kind: Kind, occurrence?: string): Pull {
+function normalize(r: RawRecord, kind: Kind, occurrence?: string): Pull {
   const itemId = str(kind === 'char' ? r.charId : r.weaponId) || str(r.itemId);
   const name =
     str(kind === 'char' ? r.charName : r.weaponName) || str(r.nameText) || str(r.name) || itemId || 'Unknown';
@@ -101,7 +101,7 @@ function sortOldestFirst<T extends { ts: number; seq: number }>(list: T[]): T[] 
 }
 
 /** Oldest first. The API returns newest first, but don't rely on input order beyond ties. */
-export function chronological(pulls: Pull[]): Pull[] {
+function chronological(pulls: Pull[]): Pull[] {
   return sortOldestFirst(pulls);
 }
 
@@ -257,7 +257,7 @@ export interface HistoryMatch {
 }
 
 /** Below this share of matching pulls in the shared period, a file is treated as another player's. */
-export const SAME_PLAYER_SHARE = 0.9;
+const SAME_PLAYER_SHARE = 0.9;
 
 /**
  * Checks that an import comes from the same account as the saved history: two

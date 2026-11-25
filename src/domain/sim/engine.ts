@@ -25,25 +25,12 @@ export const FPS = 30;
 const TICK_EPS = 1e-6;
 
 /**
- * The guard AI's Attacker roles (GroupAIConfig Default_GroupAITargetNotMain, Character): per mode, how many of the
- * three teammates get one and how often it's dealt; each lasts 5 s. How the game picks a mode isn't in the data:
- * the four weigh the same here. Each teammate's share of the time attacking: (3 + 2·5/6 + 2 + 1·5/12) / 4 / 3 ≈ 0.59.
- */
-const GUARD_MODES = [
-  { count: 3, tick: 3.2 }, // Radical
-  { count: 2, tick: 6 }, // Moderate
-  { count: 2, tick: 4.2 }, // Steady
-  { count: 1, tick: 12 }, // SingleOne
-];
-const GUARD_LIFE = 5;
-export const GUARD_DATA_SHARE = GUARD_MODES.reduce((n, m) => n + m.count * Math.min(1, GUARD_LIFE / m.tick), 0) / GUARD_MODES.length / 3;
-/**
  * The share used: two thirds of the data's, fitted to the owner's two recordings by when the boss dies (the
  * stopwatch's end; damage sums can't be compared, a phase's is capped at its HP): at 0.4 the sim kills the
  * Skydrummer at 2:27.4 (the game: 2:27.4) and Alleikhreos at 2:20.6 (2:21), at 0.59 at 2:24.5 and 2:20.1, at 0.2
  * neither in time. Moving, dodging and repositioning take the rest of an Attacker role.
  */
-export const GUARD_SHARE = 0.4;
+const GUARD_SHARE = 0.4;
 /** The span (s) each teammate's attacking window repeats over: the Moderate mode's tick. */
 const GUARD_PERIOD = 6;
 
@@ -78,7 +65,7 @@ export interface Bundle {
 }
 
 /** A blackboard that falls back to entities' (for EntityBB_ keys): the first that has the key. */
-export class BB extends Map<string, number> {
+class BB extends Map<string, number> {
   fallbacks: Map<string, number>[];
   constructor(...fallbacks: (Map<string, number> | undefined)[]) {
     super();
@@ -365,7 +352,7 @@ const STATUS_TAG: Record<number, string> = { [-1110095722]: 'Combustion', [-4212
 /** An element's infliction as the game names it (HyperlinkTextTable's ba.*onchar terms). */
 export const INFLICTION_NAME: Record<(typeof ELEMENTS)[number], string> = { Fire: 'Heat Infliction', Cryst: 'Cryo Infliction', Pulse: 'Electric Infliction', Natural: 'Nature Infliction' };
 /** A Susceptibility's or Amp's kind as the game's terms name it (ba.crystvul "Cryo Susceptibility", ba.spellenhance "Arts Amp"). */
-export const EFFECT_KIND: Record<string, string> = { Spell: 'Arts', Fire: 'Heat', Cryst: 'Cryo', Crystal: 'Cryo', Pulse: 'Electric', Natural: 'Nature', Physical: 'Physical' };
+const EFFECT_KIND: Record<string, string> = { Spell: 'Arts', Fire: 'Heat', Cryst: 'Cryo', Crystal: 'Cryo', Pulse: 'Electric', Natural: 'Nature', Physical: 'Physical' };
 
 /** The Susceptibility, Amp and Haste effects on an entity now (as `deal` counts them), each with the game's name. */
 export function effectsShown(e: Entity, frame: number): { id: string; name: string }[] {

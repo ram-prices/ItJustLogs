@@ -883,16 +883,6 @@ select.input {
 .item-icon.weapon {
   object-fit: contain;
 }
-.rarity {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-variant-numeric: tabular-nums;
-}
-.rarity .dot {
-  width: 6px;
-  height: 6px;
-}
 
 /* ---------- Popups: hover tips and right-click menus -------------------- */
 /* One dark panel for both: `data-tip` tooltips (charts.ts `tip`, `tipNote`,

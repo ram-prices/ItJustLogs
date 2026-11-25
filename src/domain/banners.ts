@@ -5,7 +5,7 @@ export const EF_ASSETS = 'https://raw.githubusercontent.com/ram-prices/ef-assets
 const JSDELIVR = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets';
 /** The pictures, on jsDelivr. Its limit is 50 MB per ref and main is over it, so ef-assets publishes them to branches under it (scripts/cdn-branches.sh). */
 export const EF_ASSETS_CDN = `${JSDELIVR}@cdn`;
-export const EF_ASSETS_FULL_CDN = `${JSDELIVR}@cdn-full`;
+const EF_ASSETS_FULL_CDN = `${JSDELIVR}@cdn-full`;
 export const EF_ASSETS_POTENTIAL_CDN = `${JSDELIVR}@cdn-potential`;
 /** Data files on jsDelivr, the fallback when raw.githubusercontent fails. */
 export const EF_ASSETS_DATA_CDN = `${JSDELIVR}@main`;
@@ -86,7 +86,7 @@ export interface PatchRef {
   minor: number;
 }
 
-export const PERMANENT_PATCH: PatchRef = { key: 'Permanent', major: -1, minor: -1 };
+const PERMANENT_PATCH: PatchRef = { key: 'Permanent', major: -1, minor: -1 };
 
 /**
  * Pool ids encode their patch: special_1_4_2 → 1.4, weponbox_1_0_1 → 1.0. Constant/standard pools have none.

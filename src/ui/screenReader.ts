@@ -68,7 +68,7 @@ export async function recognize(pictures: HTMLCanvasElement[], chars?: string): 
  * reads the same. Nothing is cut out by position; menus and pictures read as
  * stray words, which matching against the known names ignores.
  */
-export const READ_HEIGHT = 1080;
+const READ_HEIGHT = 1080;
 /** Seconds between the frames read from a recording (unless a reader asks for another step). */
 const STEP = 0.5;
 
@@ -149,7 +149,7 @@ export function pickMedia(then: (files: File[]) => void): void {
 }
 
 /** An area of a frame (at READ_HEIGHT), to read alone. */
-export interface Area {
+interface Area {
   x0: number;
   y0: number;
   x1: number;
