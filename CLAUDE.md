@@ -139,9 +139,13 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
   (snapshot in `src/data/` for offline/tests, refreshed at runtime). Fix bad
   banner data there, not with special cases here.
 - The banner schedule is ef-assets `schedule.json` (snapshot in `src/data/`,
-  types and helpers in `domain/schedule.ts`). ef-assets builds it from the
-  official news feed with `scripts/update-schedule.mjs` (a workflow runs it
-  every 3 days and opens a PR). Times are per server: dated banners open at
+  types and helpers in `domain/schedule.ts`), the single hand-editable master:
+  every entry has a `source`, event dates come from the dump (the TimeRangeTable
+  row; wiki only for past events the dump lacks). ef-assets
+  `scripts/update-schedule.mjs` (a workflow runs it every 3 days and opens a PR)
+  writes the news feed's own result to `schedule-news.json` (regenerated, never
+  edited) and fills in entries `schedule.json` lacks, `source: "news feed"`,
+  until verified; any other source is never overwritten. Times are per server: dated banners open at
   the same local time on Americas/Europe (UTC-5) and Asia (UTC+8), 13 hours
   apart; version updates are one instant. `end` is null while it depends on
   an unannounced banner. `events` come from each version's update notes
@@ -151,4 +155,5 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
   else an icon. Arsenal Issue art is `issues/<weapon>.webp` (text-free,
   made with ef-assets `scripts/issue-banner.py`). The player's server is a setting (guessed from the
   time zone until chosen).
+- **Game data: the EndfieldData dump is the primary source.** When verifying event timings, engine rules, or any game value, always confirm against the dump tables (`C:\Users\Albert\Development\EndfieldDataDump\output\Data\TableCfg\`), not the site's `src/data/` snapshot, ef-assets `schedule.json`/`wiki/*.json`, or the wiki — those are derivative and may lag or be wrong. Footage only confirms mechanics, never a DPS target.
 - `fixtures/` is gitignored and holds the owner's real export. Never commit it.

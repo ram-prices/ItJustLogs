@@ -3,7 +3,7 @@
 What `domain/income.ts` counts for each version, and where the numbers come from (read when touching income or Stats).
 
 Stats → By patch adds each version's free pulls (`domain/income.ts`): its
-events (plus events.json `extra`: the wiki's mid-version events, by start), daily missions and Weekly Routine for every day and week of the
+events (only those in the schedule; events.json `extra`, the wiki's own list with the wiki's dates, isn't counted, only used for typical amounts by type; an event missing from the schedule is added to ef-assets `schedule.json`, the hand-edited master, with dates from the game dump and its row as `source`), daily missions and Weekly Routine for every day and week of the
 version (resets at 04:00 server time), the Protocol Pass free track, the
 maintenance compensation in its official Version Update Notes and the
 permanent missions it released (main story by the notes' "available up to",

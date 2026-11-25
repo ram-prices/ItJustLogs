@@ -17,6 +17,10 @@ Used for ef-assets art and data; the site itself never reads it.
 ## Output (`output\`)
 
 - `Data\TableCfg\*.json`: game tables. Strings are `{id, text}`; look up `id` in `I18nTextTable_EN.json`.
+  Event timings: `ActivityTable` is keyed by activity id, its `name` is an i18n text id (resolve it in
+  `I18nTextTable_EN`); `TimeRangeTable` is keyed `time_<activityId>` with a `timeRangeList` (index
+  0/1 = Asia, 2 = Americas/Europe; an empty `closeTime` = permanent). An activity's row is its
+  ActivityTable `timeId`. Every event in ef-assets `schedule.json` names its row in `source`.
 - `Data\LuaScripts\`: decrypted UI and game Lua.
 - `jsondata\{Persistent,StreamingAssets}\`: `SkillData`, `BuffData`, `SpawnerConfig`, `LevelData`, `LevelScriptData`.
 - `bundles\{Persistent,StreamingAssets}\Bundle\...\<hash>\`: decrypted bundles, each with `CAB-*` and `manifest.json`.
@@ -36,4 +40,7 @@ Used for ef-assets art and data; the site itself never reads it.
   keyed by name can return the old copy. Open the `Persistent` bundle by its own path first.
 - Text with ids in `I18nTextServerTimeIdTable` comes from the server (`I18nServerTextManager`), so dumps lack it.
 - `TimeRangeTable` lists local times: entries 0 and 1 are UTC+8, entry 2 is UTC-5.
+- Table and text ids are 64-bit integers: plain `JSON.parse` rounds them (negative ids lose
+  precision, so lookups silently miss). Parse with a reviver that keeps the exact source for unsafe
+  integers (Node 21+ `context.source`, match `/^-?\d+$/`), or use Python.
 - Run scratch Python with `-I`, from outside the dump. Don't pipe heredocs into Python here: it hung.

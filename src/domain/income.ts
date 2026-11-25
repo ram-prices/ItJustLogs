@@ -406,16 +406,9 @@ export function patchIncome(
         plus(totals, t);
         counted.push({ id: e.id, name: e.name, pulls: pullsOf(t).pulls, totals: t, partial: fill ? false : !r || !!r.partial, ...(fill ? { estimated: true } : {}) });
       }
-      // Events the schedule doesn't list (announced mid-version): by when they start.
-      for (const x of Object.values(events.extra ?? {})) {
-        const start = Date.parse(x.start[server] ?? x.start.asia ?? '');
-        if (Number.isNaN(start) || start > windows[windows.length - 1].end || at(start) !== i) continue;
-        if (x.end && gone(Date.parse(x.end[server] ?? x.end.asia ?? ''))) continue;
-        const fill = x.partial && !pullsOf(x.totals).pulls ? typical(x.type) : undefined;
-        const t = fill ?? x.totals;
-        plus(totals, t);
-        counted.push({ url: x.url, name: x.name, pulls: pullsOf(t).pulls, totals: t, partial: fill ? false : !!x.partial, ...(fill ? { estimated: true } : {}) });
-      }
+      // Events the schedule doesn't list (the wiki's `extra`) aren't counted: their dates would be the
+      // wiki's, and event dates come only from the game dump (via ef-assets schedule.json). An event
+      // verified in the dump goes into schedule-extras.json and is counted above like the rest.
       if (counted.length)
         lines.push({
           source: 'events',

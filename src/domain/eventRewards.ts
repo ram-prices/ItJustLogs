@@ -7,7 +7,7 @@
  * currency only the event hands out (AIC Support's Goods Exchange): its whole
  * stock is counted. Pure logic, no DOM.
  */
-import type { Schedule, ServerTimes } from './schedule';
+import type { ServerTimes } from './schedule';
 import type { WikiAttribution } from './wiki';
 
 /** An item and how many; null when the wiki doesn't say. */
@@ -46,22 +46,6 @@ export interface EventRewardsFile {
   events: Record<string, EventRewards>;
   /** Events the wiki lists but schedule.json doesn't (announced mid-version), by wiki page, with their UTC start per server. */
   extra?: Record<string, EventRewards & { type: string; start: { asia: string | null; americas: string | null }; end?: { asia: string | null; americas: string | null } }>;
-}
-
-/**
- * The schedule with the wiki's end given to each event the update notes leave
- * open ("until the next version update"), when the wiki has one. The same
- * object back for the same inputs.
- */
-let lastEnds: { s: Schedule; file: EventRewardsFile | null | undefined; out: Schedule } | null = null;
-export function withWikiEnds(s: Schedule, file: EventRewardsFile | null | undefined): Schedule {
-  if (lastEnds && lastEnds.s === s && lastEnds.file === file) return lastEnds.out;
-  const out =
-    file && s.events?.some((e) => !e.end && e.id != null && file.events[e.id]?.end)
-      ? { ...s, events: s.events.map((e) => (!e.end && e.id != null && file.events[e.id]?.end ? { ...e, end: file.events[e.id].end! } : e)) }
-      : s;
-  lastEnds = { s, file, out };
-  return out;
 }
 
 /** Oroberyl per Headhunting pull, and per Origeometry (from the wiki's Headhunting and Origeometry pages). */

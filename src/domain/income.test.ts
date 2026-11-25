@@ -198,14 +198,13 @@ describe('free income per patch', () => {
     expect(launch.arsenal).toBeCloseTo((1390 / 1980) * 10);
 
     // Second: an event missing from the wiki file still counts (as partial); so does one not started yet.
+    // The wiki-only 'Mid Sign-In' (its dates would be the wiki's) doesn't: event dates come only from the schedule.
     const ev = by(second).events;
     expect(ev.events!.map((e) => [e.name, e.pulls, e.partial])).toEqual([
       ['Sign-in', 7, false],
       ['Not on the wiki', 0, true],
       ['Later', 0.6, false],
-      ['Mid Sign-In', 1, false],
     ]);
-    expect(ev.events!.at(-1)!.url).toBe('https://wiki/Mid');
     // One new Chartered banner: its Combat Drills (Issues don't count).
     expect(by(second).combatDrills).toMatchObject({ count: 1, totals: { Oroberyl: 100 } });
     expect(by(second).pass.totals['Basic HH Permit']).toBe(2);
@@ -224,10 +223,11 @@ describe('free income per patch', () => {
     expect(by(second).aurylene).toMatchObject({ totals: { Origeometry: 2 }, partial: true, note: "Wuling's table ends at 190" });
     expect(by(second).livestream).toMatchObject({ totals: { Oroberyl: 1000 }, estimate: true });
     // 1,300 events + 4,200 daily + 1,500 weekly + 600 pass + 900 compensation + 200 + 150 quests + 1,000 crates
-    // + 600 modes + 320 outpost + 150 Aurylene + 1,000 livestream + 300 survey + 500 mid-version sign-in
-    // + 100 Combat Drills = 12,820 Oroberyl, plus 5 Sign-in permits; Basic HH Permits apart.
-    expect(second.headhunting).toBeCloseTo(12820 / 500 + 5);
-    expect(second.basic).toBe(4); // the pass's 2 and the mid-version sign-in's 2
+    // + 600 modes + 320 outpost + 150 Aurylene + 1,000 livestream + 300 survey
+    // + 100 Combat Drills = 12,320 Oroberyl, plus 5 Sign-in permits; Basic HH Permits apart.
+    // (The wiki-only mid-version sign-in isn't counted: no dump-verified date.)
+    expect(second.headhunting).toBeCloseTo(12320 / 500 + 5);
+    expect(second.basic).toBe(2); // the pass's 2
   });
 
   it('adds the paid pass tiers and the Monthly Pass only when asked', () => {

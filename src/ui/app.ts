@@ -21,7 +21,6 @@ import { syncVideoBackground } from './videoBackground';
 import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, sixShimmerCascade, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
-import { withWikiEnds, type EventRewardsFile } from '../domain/eventRewards';
 import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
 import { installStorage, openArtViewer, resetArtPick, shuffleArt, storageAction } from './pages/art';
 import { openPotentialArtPicker } from './pages/potentialArt';
@@ -381,7 +380,8 @@ function page(route: Route): Html {
   }
   // Banner cards link rate-up weapons that have a page (rateUpNames).
   if (route.page === 'home' || (route.page === 'arsenal' && !route.info)) slugsOf('weap', draw);
-  if (route.page === 'home') return homePage(withWikiEnds(state.schedule, wikiFile<EventRewardsFile>('events.json', draw).data), currentServer(), a, draw);
+  // Event dates come only from the schedule (game dump via ef-assets), never the wiki's.
+  if (route.page === 'home') return homePage(state.schedule, currentServer(), a, draw);
   // The game's medals and Findings: wiki data plus what the player ticked off; no import needed.
   if (route.page === 'achievements') return achievementsPage(draw);
   if (route.page === 'archives') return archivesPage(draw);

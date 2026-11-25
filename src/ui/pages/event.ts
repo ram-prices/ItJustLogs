@@ -1,5 +1,5 @@
 import { cdnUrl } from '../../domain/banners';
-import { fmtPulls, pullsOf, withWikiEnds, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
+import { fmtPulls, pullsOf, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
 import { claimDaysLeft } from '../../domain/income';
 import { hasDailyRewards, SERVER_LABEL, timeOn, type Schedule, type Server, type ScheduleEvent } from '../../domain/schedule';
 import { currentServer, state } from '../../state';
@@ -19,8 +19,8 @@ import { storySlugs, type StoryIndex } from '../../domain/story';
  * the wiki splits into phases lists them, with the one running now marked.
  */
 
-export const eventOf = (id: string | undefined, file?: EventRewardsFile | null): ScheduleEvent | undefined =>
-  id === undefined ? undefined : withWikiEnds(state.schedule, file).events?.find((e) => String(e.id) === id);
+export const eventOf = (id: string | undefined): ScheduleEvent | undefined =>
+  id === undefined ? undefined : state.schedule.events?.find((e) => String(e.id) === id);
 
 /**
  * An event's tags (Home's rows and its own page): Limited or Permanent (the
@@ -153,7 +153,7 @@ function storySection(name: string, redraw: () => void): Html {
 
 export function eventPage(id: string | undefined, redraw: () => void): Html {
   const file = wikiFile<EventRewardsFile>('events.json', redraw);
-  const e = eventOf(id, file.data);
+  const e = eventOf(id);
   const server = currentServer();
   if (!e)
     return html`<div class="page-header"><div class="container page-header-inner"><div class="min0"><h1 class="heading-32">Event not found</h1>

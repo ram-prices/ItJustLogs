@@ -100,7 +100,7 @@ Only two linked sessions remain; the owner archived the rest.
   image-link downloading removed; Pull history as one Potential ladder; operator page in three
   columns with Storage above Profile; Drive tokens from the Android app (`window.IJLAndroid`, `drive.ts`, `ui/sync.ts`);
   schedule snapshot refresh with `ScheduleEvent.source` (Sanctuary of Ink dates
-  via ef-assets `schedule-overrides.json`); built-site fix for the operator banner fade (`border-image-source: none`);
+  from the game dump, now kept in ef-assets `schedule.json` itself); built-site fix for the operator banner fade (`border-image-source: none`);
   operator hero fade on Firefox (`ui/heroFade.ts`), dark by 60%, no parallax on
   the operator page; banner art Custom/Auto and tall header for every banner art; art only as the
   banner (box lists everything, plays videos); art source links (e.g. X posts) kept in
