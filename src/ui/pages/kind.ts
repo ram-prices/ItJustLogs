@@ -28,9 +28,6 @@ const LUCK_COLOR: Record<LuckTier, string> = {
 };
 const luckWord = (t: LuckTier): Html => html`<span class="luck-word" style="color:${LUCK_COLOR[t]}">${LUCK_LABEL[t]}</span>`;
 
-/** Corner marks on a 6★ tile: a "new" sparkle (top left) and a rate-up chevron (top right). Both sit on a dark badge so they read over the art. */
-const sixFlags = (isNew: boolean, isRateUp: boolean, isWeap = false): Html =>
-  html`${isNew ? html`<span class="six-flag new" role="img" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isRateUp ? html`<span class="six-flag rateup${isWeap ? ' weap' : ''}" role="img" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}`;
 
 
 /** Basic Headhunting always leads; everything else is most recent first. */
@@ -190,6 +187,15 @@ interface TokenEntry {
 /** The Potential a copy brought: P0 for the first, up to P5; spare copies past that as +1, +2... */
 const copyLabel = (copy: number): string => (copy > MAX_COPIES ? `+${copy - MAX_COPIES}` : `P${copy - 1}`);
 
+/**
+ * A 6★ portrait's mark: a small tab flush in its top left corner (inside the
+ * tile's ring) holding the Potential ("P0", "+1"). On a rate-up it takes the
+ * tile's ring colour (`up`), else it is a neutral dark tab. Rate-up has no mark of its
+ * own here: the tinted ring and the tooltip say it. Nothing without a Potential.
+ */
+const sixTag = (copy: number | undefined, isRateUp: boolean): Html =>
+  copy ? html`<span class="six-tag${isRateUp ? ' up' : ''}" role="img" aria-label="${copyLabel(copy)}">${copyLabel(copy)}</span>` : html``;
+
 /** Each pulled copy's number (which copy of that operator or weapon it was), by pull. */
 function copiesByPull(a: Analysis, kind: Kind): Map<AnalyzedPull, number> {
   const out = new Map<AnalyzedPull, number>();
@@ -230,8 +236,6 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
   const tokens = tokensOf(a, kind);
   const rewards = !tokens.length ? '' : kind === 'char' ? ` · ${tokens.length} Token${tokens.length > 1 ? 's' : ''}` : ` · ${tokens.length} rate-up cop${tokens.length > 1 ? 'ies' : 'y'}`;
   const copies = copiesByPull(a, kind);
-  // Its Potential in the portrait's corner.
-  const pot = (copy: number | undefined) => (copy ? html`<span class="six-pot">${copyLabel(copy)}</span>` : '');
   // Weapons from one set of ten (same banner, same set) together.
   const setKey = (x: AnalyzedPull) => (x.kind === 'weap' && x.bannerPull != null ? `${x.poolId}:${setOf(x.bannerPull)}` : null);
   const groups: AnalyzedPull[][] = [];
@@ -243,8 +247,8 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
   const max = kind === 'char' ? 80 : WEAPON_PITY_SETS;
   const open = sixOpen.has(kind);
   // The one-time shimmer (banners.css six-shimmer): only a rate-up tile gets
-  // the diagonal light band across its portrait; new-only and lucky-only tiles
-  // keep their corner marks but don't shimmer. The band ripples down the strip
+  // the diagonal light band across its portrait; other tiles don't shimmer.
+  // The band ripples down the strip
   // (--win-delay, measured by sixShimmerCascade after render: top-left tiles
   // first, bottom-right last). It plays once per page open (lit, reset with
   // the card entrances) and keeps its class through the startup's redraws;
@@ -271,7 +275,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
           const n = t.at == null ? null : kind === 'weap' ? setOf(t.at) : t.at;
           const at = n != null ? `${n}${t.estimated ? ' (estimated)' : ''}` : 'Not in your history';
           const name = kind === 'char' ? `${t.name}'s Token` : `${t.name} (rate-up copy)`;
-          return html`<a class="six-item token" href="${infoHref(kind, t.id)}" data-tip="${tip(name, [tipRow('Banner', t.bannerName), ...(t.ts ? [tipRow('Date', fmtDate(t.ts, true))] : []), tipRow(kind === 'weap' ? 'Set' : 'Pull', at)])}" aria-label="${name}"><span class="six-art">${itemImg(kind, t.id, 'six-portrait')}${pot(t.copy)}</span><span class="six-pity">${kind === 'char' ? TOKEN_GLYPH : icon('redeem')}${n ?? '–'}</span></a>`;
+          return html`<a class="six-item token" href="${infoHref(kind, t.id)}" data-tip="${tip(name, [tipRow('Banner', t.bannerName), ...(t.ts ? [tipRow('Date', fmtDate(t.ts, true))] : []), tipRow(kind === 'weap' ? 'Set' : 'Pull', at)])}" aria-label="${name}"><span class="six-art">${itemImg(kind, t.id, 'six-portrait')}${sixTag(t.copy, false)}</span><span class="six-pity">${kind === 'char' ? TOKEN_GLYPH : icon('redeem')}${n ?? '–'}</span></a>`;
         }
         g = g!;
         const p = g[0];
@@ -283,18 +287,13 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         const byOperator = p.kind === 'char' && /^(?:special|rerun_chr)_/.test(p.poolId);
         const tintUrl = up ? (up.kind === 'weap' ? itemIconUrl('weap', up.itemId) : byOperator ? itemIconUrl('char', up.itemId) : bannerArtUrl(up.poolId)) : null;
         const known = tintUrl ? sixTintFor(tintUrl) : null;
-        const title = (x: AnalyzedPull) => tip(x.name, [tipRow('Banner', x.bannerName), tipRow('Date', fmtDate(x.ts, true))]);
-        // The win marks: a "new" sparkle and a rate-up chevron in the portrait's
-        // corners (on a shared set, each weapon's own — the chevron on its rate-up,
-        // a star on each new copy).
-        const isNew = g.some((x) => x.isNew);
-        const flags = sixFlags(isNew, !!up, p.kind === 'weap');
+        const title = (x: AnalyzedPull) => tip(x.name, [...(x.isRateUp ? [tipRow('Result', 'Rate-up')] : []), tipRow('Banner', x.bannerName), tipRow('Date', fmtDate(x.ts, true))]);
         const style = known ? `--six-tint:${known}` : '';
         const tintAttrs = html`${tintUrl ? html`data-six-tint="${tintUrl}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : ''}${tintUrl && style ? ' ' : ''}${style ? html`style="${style}"` : ''}`;
         const cls = `six-item${up ? ' rateup' : ''}${win ? ' win' : ''}`;
         const pity = html`<span class="six-pity">${p.pity === null ? html`<i class="free"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
         // Portraits open that operator's or weapon's info page.
-        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${pot(copies.get(p))}${flags}</span>${pity}</a>`;
+        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${sixTag(copies.get(p), p.isRateUp)}</span>${pity}</a>`;
         // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
         const step = 100 / g.length;
         const blend = Math.min(10, step / 3);
@@ -305,7 +304,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
           })
           .join(', ');
         return html`<div class="${cls} shared" data-tip="${g.map(title).join('')}" ${tintAttrs}>
-          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}${sixFlags(x.isNew, x.isRateUp, x.kind === 'weap')}</a>`)}</span></span>
+          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${sixTag(copies.get(x), x.isRateUp)}</a>`)}</span></span>
           ${pity}
         </div>`;
       })}

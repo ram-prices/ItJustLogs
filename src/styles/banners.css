@@ -1447,61 +1447,46 @@ code {
   font-size: 14px;
   color: var(--r6);
 }
-/* The portrait and its Potential in the lower left corner (kind.ts sixStrip). */
+/* The portrait and its Potential tab (kind.ts sixStrip, sixTag). Rate-up has no
+   mark of its own: it is the tile's tinted ring (.six-item.rateup). */
 .six-art {
   position: relative;
   display: block;
   line-height: 0;
   transition: transform 0.15s var(--ease);
 }
-.six-pot {
+/* The Potential tab ("P0", "+1"): part of the tile's frame, in the portrait's
+   top left corner. It reaches out over the ring (--w, the ring's width: 1px
+   border on a plain tile, 2px on a rate-up and on a shared set's oval) with its
+   top left radius the ring's outer radius (10px + --w), so it is one shape with
+   the ring by construction, with no seam from two edges meeting. --x is how far
+   it reaches left; the padding grows by the same so the text stays put. Its
+   bottom right is rounded 8px, the other two corners are square. Neutral dark by
+   default; on a rate-up (.up) it takes the ring's colour (--six-tint as the ring
+   uses it, so it follows the tint computed later). White text with a faint dark
+   shadow so it reads on the lightest tints. */
+.six-tag {
+  --w: 1px;
+  --x: var(--w);
   position: absolute;
-  left: 3px;
-  bottom: 3px;
-  padding: 2px 4px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.65);
+  top: calc(-1 * var(--w));
+  left: calc(-1 * var(--x));
+  z-index: 1;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: calc(17px + var(--w));
+  padding: var(--w) 6px 0 calc(5px + var(--x));
+  border-radius: calc(10px + var(--w)) 0 8px 0;
+  background: rgba(0, 0, 0, 0.75);
   color: #fff;
   font: 600 10px/1 var(--font-sans);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
-/* Corner marks on a 6★ tile (kind.ts sixFlags): a "new" sparkle top left, a
-   rate-up chevron top right. Each sits on a small dark badge (80% opaque) so
-   it reads over busy operator art; they sit on the portrait (single) or the
-   heads oval (shared) and lift with it. */
-.six-flag {
-  position: absolute;
-  top: 3px;
-  z-index: 1;
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 3px;
-  border-radius: 9px;
-  background: rgba(0, 0, 0, 0.8);
-  pointer-events: none;
-}
-.six-flag .icon {
-  font-size: 14px;
-  line-height: 1;
-}
-.six-flag.new {
-  left: 3px;
-  color: var(--amber);
-}
-/* The chevron takes the rate-up's own colour (operators teal, weapons
-   purple) in a heavier weight, so it pops over any background; the banner's
-   colour stays on the tile's ring. */
-.six-flag.rateup {
-  right: 3px;
-  color: var(--ars);
-}
-.six-flag.rateup.weap {
-  color: var(--op);
-}
-.six-flag.rateup .icon {
-  font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
+.six-tag.up {
+  --w: 2px;
+  background: var(--six-tint, var(--r6));
 }
 .six-item:hover .six-art {
   transform: translateY(-2px);
@@ -1521,10 +1506,11 @@ code {
   background: var(--ring, var(--gray-alpha-400));
   transition: transform 0.15s var(--ease);
 }
+/* Not clipped, so the first tab can reach over the oval's ring; the end
+   portraits are rounded to the oval's inner radius instead. */
 .six-heads-in {
   display: flex;
   border-radius: 10px;
-  overflow: hidden;
   background: var(--gray-100);
 }
 .six-heads .six-portrait,
@@ -1532,6 +1518,24 @@ code {
   border-radius: 0;
   background: none;
   box-shadow: none;
+}
+.six-heads-in > .six-art:first-child .six-portrait {
+  border-radius: 10px 0 0 10px;
+}
+.six-heads-in > .six-art:last-child .six-portrait {
+  border-radius: 0 10px 10px 0;
+}
+/* A set's tabs reach over the oval's 2px ring along the top. The first one also
+   follows the oval's rounding at the left (12px) and reaches over its left edge;
+   inner ones are square there and start at their portrait's edge. */
+.six-heads .six-tag {
+  --w: 2px;
+  --x: 0px;
+  border-top-left-radius: 0;
+}
+.six-heads-in > .six-art:first-child .six-tag {
+  --x: 2px;
+  border-top-left-radius: 12px;
 }
 .six-item.shared:hover .six-art {
   transform: none;
