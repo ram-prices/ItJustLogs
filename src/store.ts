@@ -2,7 +2,7 @@ import { withoutRetiredPlaces } from './domain/artMeta';
 import { withStorageItems } from './domain/storage';
 import snapshot from './data/banners.snapshot.json';
 import scheduleSnapshot from './data/schedule.snapshot.json';
-import { EF_ASSETS, EF_ASSETS_DATA_CDN } from './domain/banners';
+import { dataUrls } from './domain/banners';
 import type { Selection } from './domain/contracts';
 import type { PaidIncome } from './domain/income';
 import type { Loadout } from './domain/loadout';
@@ -475,9 +475,9 @@ export const refreshSchedule = (): Promise<Schedule | null> => refreshFile<Sched
 
 /** Fetches an ef-assets file and caches it; resolves null if offline or unchanged. */
 async function refreshFile<T>(file: string, key: string): Promise<T | null> {
-  for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
+  for (const url of dataUrls(file)) {
     try {
-      const res = await fetch(`${base}/${file}`, { signal: AbortSignal.timeout(6000), cache: 'no-cache' });
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000), cache: 'no-cache' });
       if (!res.ok) continue;
       const data = (await res.json()) as T;
       const before = localStorage.getItem(key);
@@ -522,9 +522,9 @@ export function loadWikiFile<T>(file: string, dir = 'wiki'): Promise<T> {
   }
   if (!p) {
     p = (async () => {
-      for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
+      for (const url of dataUrls(key)) {
         try {
-          const res = await fetch(`${base}/${key}`, { signal: AbortSignal.timeout(10000) });
+          const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
           if (res.ok) {
             wikiFailures.delete(key);
             return (await res.json()) as T;

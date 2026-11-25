@@ -17,7 +17,9 @@ out) and `docs/testing.md`.
 - Deploying: only when the owner says "deploy", for that batch only, following CLAUDE.md →
   Deploying. "Deploy once workers are finished" means wait until every worker is idle.
 - ef-assets (images, game data) may be pushed directly by workers as `ram-prices` /
-  `celestriad@pm.me`. Site changes stay local until a deploy.
+  `celestriad@pm.me`, from the permanent checkout `C:\Users\Albert\Development\EF Assets` (rules in
+  CLAUDE.md → Deploying: clean and pulled first, one worker at a time, a worktree for parallel work).
+  Name the folder in every ef-assets brief. Site changes stay local until a deploy.
 
 ## Practical rules
 
@@ -41,16 +43,12 @@ out) and `docs/testing.md`.
 
 ## Things a new coordinator must know
 
-- **jsDelivr 50 MB limit.** ef-assets `main` is about 157 MB, so pictures are served from the
-  `cdn`, `cdn-full` and `cdn-potential` branches (see CLAUDE.md). A new picture reaches `cdn` about a
-  minute after a push; the raw.githubusercontent fallback covers the gap. Sizes on 2026-11-25: `cdn`
-  38.6 MB, `cdn-full` 27.1 MB, `cdn-potential` 26.6 MB; full and Potential art grow about 2.3 MB per
-  new operator across both. When one nears 45 MB, a new branch plus `cdnBase` in
-  `src/domain/banners.ts` is needed. Proposed instead (owner deciding, 2026-11-25): serve ef-assets
-  from Cloudflare Pages (free: 20,000 files, 25 MiB each; ef-assets is about 2,200 files), linked to
-  the repo, at e.g. `assets.itjustlogs.dev`, with a `_headers` cache rule; then the cdn branches go. ef-assets should have only `main` and those
-  three: each cdn branch is one parentless commit, force-pushed by `scripts/cdn-branches.sh`, never
-  edited. Its workflows commit straight to `main` (no pull request branches).
+- **ef-assets hosting.** Since 2026-11-25 the site loads every ef-assets file from Cloudflare Pages
+  at `assets.itjustlogs.dev` (deployed from `main` on every push; free plan: 20,000 files, 25 MiB
+  each; ef-assets is about 2,200 files), with raw.githubusercontent as the fallback (see CLAUDE.md).
+  Cache rules are ef-assets' `_headers`. The old jsDelivr `cdn`, `cdn-full` and `cdn-potential`
+  branches and their `scripts/cdn-branches.sh` workflow stay until the site change is deployed and
+  live, then go (open item). Its workflows commit straight to `main` (no pull request branches).
 - **Contingency Contract.** One stage per season, Test Criteria worth 1–3 points. Data: ef-assets
   `cc/index.json`, `cc/seasons/<id>.json`, schema and share-code spec in `cc/README.md`. Site:
   `src/domain/contracts.ts`, `src/ui/pages/contracts.ts`, `src/styles/contracts.css`, `docs/tabs.md`.

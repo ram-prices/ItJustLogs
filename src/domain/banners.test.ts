@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoryOf, cdnUrl, EF_ASSETS, EF_ASSETS_CDN, itemIconUrl, lookupBanner, mirrorUrl, operatorFullUrl } from './banners';
+import { assetUrl, bannerArtUrl, categoryOf, dataUrls, EF_ASSETS, EF_ASSETS_GITHUB, itemIconUrl, lookupBanner, mirrorUrl, operatorCardUrl, operatorFullUrl, operatorLayerUrls, setGameArtPools } from './banners';
 import { kthCopyPmf, WEAPON } from './pity';
 import type { BannerDb } from './types';
 
@@ -37,33 +37,42 @@ describe('copy PMF cache', () => {
   });
 });
 
-const CDN = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets';
+const PAGES = 'https://assets.itjustlogs.dev';
+const GITHUB = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
 
-describe('ef-assets on jsDelivr', () => {
-  it('keeps every picture on a branch under its 50 MB limit, never on main', () => {
-    expect(itemIconUrl('char', 'chr_0016_laevat')).toBe(`${CDN}@cdn/operators/chr_0016_laevat.webp`);
-    expect(operatorFullUrl('chr_0016_laevat')).toBe(`${CDN}@cdn-full/operators/full/chr_0016_laevat.webp`);
-    expect(cdnUrl(`${EF_ASSETS}/events/a.webp`)).toBe(`${EF_ASSETS_CDN}/events/a.webp`);
-    expect(cdnUrl(`${EF_ASSETS}/operators/full/a.webp`)).toBe(`${CDN}@cdn-full/operators/full/a.webp`);
-    expect(cdnUrl(`${EF_ASSETS}/operators/potential/a.webp`)).toBe(`${CDN}@cdn-potential/operators/potential/a.webp`);
+describe('ef-assets URLs', () => {
+  it('loads every picture from the Pages site, with the version tags', () => {
+    expect(EF_ASSETS).toBe(PAGES);
+    expect(EF_ASSETS_GITHUB).toBe(GITHUB);
+    expect(itemIconUrl('char', 'chr_0016_laevat')).toBe(`${PAGES}/operators/chr_0016_laevat.webp?v=2`);
+    expect(itemIconUrl('char', 'chr_0034_typhoeus')).toBe(`${PAGES}/operators/chr_0034_typhoea.webp?v=2`);
+    expect(itemIconUrl('weap', 'wpn_a')).toBe(`${PAGES}/arsenals/wpn_a.webp`);
+    expect(operatorCardUrl('chr_0034_typhoeus')).toBe(`${PAGES}/operators/bust-3/chr_0034_typhoea.webp`);
+    expect(operatorFullUrl('chr_0016_laevat')).toBe(`${PAGES}/operators/full/chr_0016_laevat.webp`);
+    setGameArtPools({ special_1_7_1: { gameArt: true, gameArtV: 'abc123' } } as unknown as BannerDb);
+    expect(bannerArtUrl('special_1_7_1')).toBe(`${PAGES}/banners/game/special_1_7_1.webp?v=abc123`);
+    expect(operatorLayerUrls('special_1_7_1')?.op).toBe(`${PAGES}/banners/game/layers/special_1_7_1-op.webp?v=abc123`);
+    setGameArtPools({} as BannerDb);
   });
 
-  it('mirrors a picture back to raw GitHub from any branch', () => {
-    for (const path of ['operators/a.webp', 'operators/full/a.webp', 'operators/potential/a.webp', 'icons/index.json']) {
-      const raw = `${EF_ASSETS}/${path}`;
-      expect(mirrorUrl(mirrorUrl(raw)!)).toBe(raw);
-    }
-    expect(mirrorUrl(`${CDN}@main/icons/a.png`)).toBe(`${EF_ASSETS}/icons/a.png`);
+  it('moves the URLs data gives (GitHub, old jsDelivr branches) to the Pages site', () => {
+    expect(assetUrl(`${GITHUB}/events/a.webp`)).toBe(`${PAGES}/events/a.webp`);
+    expect(assetUrl(`${GITHUB}/collections/medals/a.webp`)).toBe(`${PAGES}/collections/medals/a.webp`);
+    expect(assetUrl('https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn-full/operators/full/a.webp')).toBe(`${PAGES}/operators/full/a.webp`);
+    expect(assetUrl(`${PAGES}/events/a.webp`)).toBe(`${PAGES}/events/a.webp`);
   });
 
-  it('leaves the data folders on main, which the picture branches lack', () => {
-    for (const path of ['banners.json', 'schedule.json', 'wiki/operators.json', 'combat/skills.json', 'story/search.json']) {
-      expect(mirrorUrl(`${EF_ASSETS}/${path}`)).toBe(`${CDN}@main/${path}`);
+  it('falls back from the Pages site to GitHub and back, for pictures and data alike', () => {
+    for (const path of ['operators/a.webp?v=2', 'operators/full/a.webp', 'banners.json', 'wiki/operators.json', 'combat/skills.json']) {
+      expect(mirrorUrl(`${PAGES}/${path}`)).toBe(`${GITHUB}/${path}`);
+      expect(mirrorUrl(`${GITHUB}/${path}`)).toBe(`${PAGES}/${path}`);
     }
+    expect(dataUrls('schedule.json')).toEqual([`${PAGES}/schedule.json`, `${GITHUB}/schedule.json`]);
   });
 
   it('passes other URLs through', () => {
     expect(mirrorUrl('https://example.com/a.webp')).toBeNull();
-    expect(cdnUrl('https://example.com/a.webp')).toBe('https://example.com/a.webp');
+    expect(mirrorUrl('https://assets.itjustlogs.dev.evil.com/a.webp')).toBeNull();
+    expect(assetUrl('https://example.com/a.webp')).toBe('https://example.com/a.webp');
   });
 });

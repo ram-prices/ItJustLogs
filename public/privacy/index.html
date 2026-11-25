@@ -79,7 +79,7 @@
     <main>
       <a class="back" href="/">&larr; ItJustLogs</a>
       <h1>Privacy policy</h1>
-      <p class="muted">Effective October 20, 2026</p>
+      <p class="muted">Effective November 25, 2026</p>
 
       <p>
         ItJustLogs (<a href="https://itjustlogs.dev">itjustlogs.dev</a>) is a free, fan-made pull-history tracker for
@@ -164,11 +164,15 @@
       <ul>
         <li>Google Fonts (fonts.googleapis.com, fonts.gstatic.com) for the typeface and icons.</li>
         <li>
-          GitHub and jsDelivr (raw.githubusercontent.com, cdn.jsdelivr.net) for banner names, the schedule, game data and
-          art, Home's background clip, and the text reader.
+          Cloudflare (assets.itjustlogs.dev, on Cloudflare Pages) for banner names, the schedule, game data and art, and
+          Home's background clip, with GitHub (raw.githubusercontent.com) as the fallback when it can't be reached.
         </li>
+        <li>jsDelivr (cdn.jsdelivr.net) for the text reader and the AIC planner, only when you use them.</li>
         <li>Gryphline's image server (web-static.hg-cdn.com) for art of new banners and events.</li>
-        <li>The Arknights: Endfield Wiki (endfield.wiki.gg) for medal and Archive pictures.</li>
+        <li>
+          Medal and Archive pictures are copies from the Arknights: Endfield Wiki (endfield.wiki.gg), loaded from
+          assets.itjustlogs.dev like the other art, with GitHub as the fallback; your browser doesn't contact the wiki.
+        </li>
         <li>Project Naptha's server (tessdata.projectnaptha.com) for the text reader's language data, only when you use it.</li>
         <li>GitHub Pages, which hosts the site.</li>
       </ul>

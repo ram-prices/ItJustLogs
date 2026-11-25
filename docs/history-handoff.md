@@ -25,7 +25,8 @@ Committing and deploying
   anything under `public/_tmp/`. Stage by name, never `git add -A`.
 - No PRs for the site; `gh` isn't installed. The owner never sees bot pull requests.
 - ef-assets is different: it may be pushed directly, as `ram-prices` / `celestriad@pm.me`,
-  from a fresh clone in the session scratchpad (there is no permanent checkout).
+  from its permanent checkout `C:\Users\Albert\Development\EF Assets` (since 2026-11-25; before
+  that, throwaway scratchpad clones, which piled up in Temp and were sometimes left dirty).
 
 Real data
 - Ports 5173 (a friend's pulls) and 5174 (the owner's pulls) are view-only. Never change
@@ -145,6 +146,11 @@ Editing traps
   images (10-minute cache), trimming (served pictures alone are 88 MB), a second repo.
 - A new picture reaches `cdn` about a minute after a push; the raw.githubusercontent
   fallback covers the gap. Each new operator adds about 2.3 MB across the two art branches.
+- Replaced 2026-11-25: ef-assets on Cloudflare Pages (`assets.itjustlogs.dev`, ef-assets
+  `_headers`: pictures a day, JSON revalidated) for pictures and data alike, GitHub raw as
+  the fallback; `cdnBase`, `EF_ASSETS_CDN` and the branch split left the site. Why: the
+  branches would need a fourth one soon (45 MB each), jsDelivr's week-long browser cache
+  made every fixed picture need a new URL, and one host is simpler.
 - 1.7 lesson (from CLAUDE.md, later work): file checks passed while cards were blank
   because art sat in folders the site doesn't load. Check live pages.
 

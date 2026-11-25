@@ -6,7 +6,7 @@
  * phones and Save-Data get the clip's first frame instead, so the video itself
  * is never downloaded there.
  */
-import { EF_ASSETS, EF_ASSETS_CDN } from '../domain/banners';
+import { EF_ASSETS, mirrorUrl } from '../domain/banners';
 import { state } from '../state';
 
 interface BackgroundIndex {
@@ -16,8 +16,8 @@ interface BackgroundIndex {
   default: string[];
 }
 
-/** jsDelivr: it sends video files with their own type, which <video> needs. In dev, `localStorage['ijl.backgrounds']` can point elsewhere. */
-const BASE = (import.meta.env.DEV && localStorage.getItem('ijl.backgrounds')) || `${EF_ASSETS_CDN}/backgrounds`;
+/** ef-assets' Pages site (it sends video files with their own type, which <video> needs). In dev, `localStorage['ijl.backgrounds']` can point elsewhere. */
+const BASE = (import.meta.env.DEV && localStorage.getItem('ijl.backgrounds')) || `${EF_ASSETS}/backgrounds`;
 
 let index: BackgroundIndex | null = null;
 let loading = false;
@@ -37,8 +37,11 @@ const playing = () =>
 function load(): void {
   if (loading) return;
   loading = true;
-  // The list is data: raw.githubusercontent stays fresh within minutes, while jsDelivr kept an old list for up to a week.
-  fetch(`${(import.meta.env.DEV && localStorage.getItem('ijl.backgrounds')) || `${EF_ASSETS}/backgrounds`}/index.json`)
+  // The list is JSON, revalidated on every load; GitHub when the Pages site fails.
+  const list = `${BASE}/index.json`;
+  fetch(list)
+    .then((r) => (r.ok ? r : fetch(mirrorUrl(list) ?? list)))
+    .catch(() => fetch(mirrorUrl(list) ?? list))
     .then((r) => (r.ok ? (r.json() as Promise<BackgroundIndex>) : null))
     .then((data) => {
       index = data ?? { clips: {}, operators: {}, default: [] };
@@ -79,10 +82,13 @@ function show(clip: string): void {
     video.replaceChildren();
     video.removeAttribute('src');
     if (play) {
-      for (const [ext, type] of [['webm', 'video/webm; codecs="vp9"'], ['mp4', 'video/mp4']]) {
+      // A <source> that fails moves on to the next, so GitHub's copies come last.
+      const urls = [`${BASE}/${clip}.webm`, `${BASE}/${clip}.mp4`];
+      for (const url of [...urls, ...urls.map(mirrorUrl)]) {
+        if (!url) continue;
         const source = document.createElement('source');
-        source.src = `${BASE}/${clip}.${ext}`;
-        source.type = type;
+        source.src = url;
+        source.type = url.endsWith('.webm') ? 'video/webm; codecs="vp9"' : 'video/mp4';
         video.append(source);
       }
       video.preload = 'auto';
@@ -91,6 +97,11 @@ function show(clip: string): void {
       video.preload = 'none';
       const poster = new Image();
       poster.onload = () => video?.classList.add('shown');
+      poster.onerror = () => {
+        poster.onerror = null;
+        const other = mirrorUrl(poster.src);
+        if (other && video) poster.src = video.poster = other;
+      };
       poster.src = video.poster;
     }
     video.load();

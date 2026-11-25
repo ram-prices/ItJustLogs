@@ -1,7 +1,7 @@
 import { FPS } from '../../../domain/sim/engine';
 import { type BuffSpan, ENEMIES, INPUT_NAME, type SimResult } from '../../../domain/sim/team';
 import { icon, itemImg, metric, metrics } from '../../components';
-import { EF_ASSETS_CDN } from '../../../domain/banners';
+import { EF_ASSETS } from '../../../domain/banners';
 import { html, type Html } from '../../html';
 import { tip, tipRow } from '../../charts';
 import { page, type VideoStep } from './state';
@@ -10,7 +10,7 @@ import { formLength, formOf, simTrack, steps, tipDmg, tipSp, type Track } from '
 import { buffRows, buffsPanel } from './buffs';
 import { bossRow, playControls, preparePlay, spRow } from './player';
 
-const foeIcon = (foe: (typeof ENEMIES)[number]) => `${EF_ASSETS_CDN}/icons/enemies/${foe.icon}.webp`;
+const foeIcon = (foe: (typeof ENEMIES)[number]) => `${EF_ASSETS}/icons/enemies/${foe.icon}.webp`;
 /**
  * A boss's face: its picture zoomed in on the face (ENEMIES `face`), as a box's background (the share each way that
  * puts the face in the box's middle).

@@ -59,7 +59,11 @@ Only when the owner says "deploy" (that batch only; afterwards changes stay loca
 5. Confirm: poll `https://api.github.com/repos/ram-prices/ItJustLogs/actions/runs?head_sha=<sha>`
    for `"conclusion": "success"` (in the background).
 
-ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@pm.me`.
+ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@pm.me`, from its
+permanent checkout `C:\Users\Albert\Development\EF Assets` (quote the path: it has a space). Before
+working there: `git status` must be clean and `git pull --ff-only` first; if it's dirty, stop and
+report, never reset someone else's changes. One worker at a time; parallel ef-assets work goes in a
+`git worktree` of it. Leave it clean (committed and pushed, or nothing changed) when done.
 
 After a game update, follow `docs/new-version.md`, and check the live pages (Home's banners, new
 banner and database pages) before calling it done: in 1.7 every file check passed while cards were
@@ -134,18 +138,16 @@ ef-assets' workflows report problems in its "ef-assets: needs attention" issue.
   (`domain/wiki.ts` has the types and the text markup). It's CC BY-SA 4.0:
   any page showing it must credit "endfield.wiki.gg, CC BY-SA 4.0". Too big
   for localStorage, so it's fetched on demand (`loadWikiFile` in store.ts).
-- ef-assets pictures (portraits, gear, banner art and layers, item icons,
-  schedule art via `cdnUrl`, backgrounds) load from jsDelivr
-  (`EF_ASSETS_CDN`: browsers keep them a week; a changed file reaches the CDN
-  within 12 hours, or purge `https://purge.jsdelivr.net/gh/ram-prices/ef-assets@<branch>/<path>`;
-  a browser's copy only goes with a new URL, see "Stale pictures" in `docs/new-version.md`;
-  game-screen banner art gets one by itself through banners.json's `gameArtV`).
-  jsDelivr refuses refs over 50 MB, so they come from ef-assets branches under it, not main:
-  `cdn`, `cdn-full` and `cdn-potential`, rebuilt from main by its `scripts/cdn-branches.sh`
-  (fails over 45 MB; a new branch also needs `cdnBase` in banners.ts). The rest:
-  data files (`schedule.json`, `banners.json`, `wiki/*`, `icons/index.json`)
-  from raw.githubusercontent (`EF_ASSETS`, fresh within minutes). A failed
-  load tries the other mirror once (`mirrorUrl`, `data-fallback` images).
+- Every ef-assets file, pictures and data alike, loads from `https://assets.itjustlogs.dev`
+  (`EF_ASSETS` in banners.ts): Cloudflare Pages deploys ef-assets' main there on every push
+  (about a minute), the whole repo at the root, so paths are the repo's. Its `_headers` let
+  browsers keep pictures and clips a day and revalidate JSON on every load. A browser's copy
+  of a changed picture only goes with a new URL (see "Stale pictures" in `docs/new-version.md`;
+  game-screen banner art gets one by itself through banners.json's `gameArtV`, portraits
+  through `PORTRAIT_V`). URLs that data gives on GitHub (schedule art, the medal and Archive
+  snapshots) go through `assetUrl`. A failed load tries GitHub once (`EF_ASSETS_GITHUB`,
+  raw.githubusercontent: `mirrorUrl`, `data-fallback` images, `dataUrls` for fetches); CSS
+  masks have no fallback. jsDelivr serves only Tesseract.js and HiGHS now.
   The screen readers, the cropper and the Essences page are loaded on first
   use (`lazy` in app.ts, dynamic imports), so every visit downloads less.
 - Banner names/rate-ups come from `ram-prices/ef-assets/banners.json`

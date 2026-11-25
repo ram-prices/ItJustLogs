@@ -4,7 +4,7 @@
  * the longer "Copy to Discord" text on the info pages. No DOM, so the build
  * can use it too (imports carry .ts extensions for Vite's config loader).
  */
-import { EF_ASSETS_CDN } from './banners.ts';
+import { assetUrl, EF_ASSETS, operatorIconUrl } from './banners.ts';
 import type { Season } from './contracts.ts';
 import { isScheduleBanner, isWeaponBanner, KIND_LABEL, SERVER_LABEL, timeOn, type ScheduleItem, type Server, type ServerTimes } from './schedule.ts';
 import { fmtSkillValue, parseMarkup, splitPlaceholders, wikiId, type WikiOperator, type WikiWeapon, type WikiWeaponSkill } from './wiki.ts';
@@ -203,7 +203,7 @@ export function operatorPreview(id: string, o: ShareOperator, slug = id): Previe
   return {
     title: clip(`${o.name} · ${stars(o.rarity)} ${o.class}`, TITLE_BYTES, utf8Bytes),
     description: fitLines([facts, ...(o.tags.length ? [o.tags.join(' · ')] : [])], skills),
-    image: `${EF_ASSETS_CDN}/operators/${wikiId(id)}.webp`,
+    image: operatorIconUrl(wikiId(id)),
     url: operatorUrl(slug),
     color: ELEMENT_COLOR[o.element] ?? RARITY_COLOR[o.rarity] ?? RARITY_COLOR[6],
   };
@@ -243,7 +243,7 @@ export function weaponPreview(id: string, w: ShareWeapon, slug = id): Preview {
   return {
     title: clip(`${w.name} · ${stars(w.rarity)} ${w.type}`, TITLE_BYTES, utf8Bytes),
     description: clip(lines.filter(Boolean).join('\n'), PREVIEW_BYTES, utf8Bytes),
-    image: `${EF_ASSETS_CDN}/arsenals/${id}.webp`,
+    image: `${EF_ASSETS}/arsenals/${id}.webp`,
     url: weaponUrl(slug),
     color: RARITY_COLOR[w.rarity] ?? RARITY_COLOR[6],
   };
@@ -379,7 +379,7 @@ export function schedulePreview(i: ScheduleItem, path: string): Preview {
   return {
     title: clip(`${i.name} · ${scheduleLabel(i)}`, TITLE_BYTES, utf8Bytes),
     description: clip(lines.join('\n'), PREVIEW_BYTES, utf8Bytes),
-    image: i.art ?? '',
+    image: i.art ? assetUrl(i.art) : '',
     url: `${SITE_URL}${path}`,
     color: scheduleColor(i),
   };
@@ -442,7 +442,7 @@ export function seasonPreview(s: Season, path: string): Preview {
   return {
     title: clip(path === '/contracts' ? CONTRACT_TITLE : s.fullName, TITLE_BYTES, utf8Bytes),
     description: clip(lines.join('\n'), PREVIEW_BYTES, utf8Bytes),
-    image: `${EF_ASSETS_CDN}/${s.art}`,
+    image: `${EF_ASSETS}/${s.art}`,
     url: `${SITE_URL}${path}`,
     color: '#e5484d',
   };

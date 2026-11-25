@@ -55,7 +55,9 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     from the EndfieldDataDump checkout; it puts tightly packed sprites back on
     their full rect so nothing stretches); ef-assets `scripts/site-art.mjs` sets
     the flag once the file and both layers are there, with a `gameArtV` fingerprint the three URLs carry as
-    `?v=` (a malformed one is ignored), so changed art is never shown from a browser's old copy. Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
+    `?v=` (a malformed one is ignored), so changed art is never shown from a browser's old copy. Every ef-assets
+    picture, CSS masks included, is an `https://assets.itjustlogs.dev/<repo path>` URL (`EF_ASSETS`), never
+    jsDelivr; `<img data-fallback>` retries it on GitHub raw once (`installImageFallback`, `mirrorUrl`). Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
     art). Unpulled Headhunting cards prefer it over the schedule's `art`.
     Discord embeds still use the schedule's `art`.
    - An operator whose icon's dominant hue is a small accent rather than their

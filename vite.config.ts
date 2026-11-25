@@ -5,7 +5,7 @@ import { join } from 'node:path';
 /// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
 import { configDefaults } from 'vitest/config';
-import { EF_ASSETS, EF_ASSETS_CDN } from './src/domain/banners.ts';
+import { dataUrls, EF_ASSETS } from './src/domain/banners.ts';
 import {
   embedBytes,
   embedTag,
@@ -94,12 +94,12 @@ function slim(ops: Record<string, ShareOperator>, wpns: Record<string, ShareWeap
   return { operators, weapons };
 }
 
-/** An ef-assets file (raw.githubusercontent, then jsDelivr). */
+/** An ef-assets file (assets.itjustlogs.dev, then raw.githubusercontent). */
 async function fetchAsset<T>(path: string): Promise<T> {
   let error: unknown;
-  for (const base of [EF_ASSETS, EF_ASSETS_CDN]) {
+  for (const url of dataUrls(path)) {
     try {
-      const res = await fetch(`${base}/${path}`, { signal: AbortSignal.timeout(20000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
       if (res.ok) return (await res.json()) as T;
       error = new Error(`${res.status} ${res.statusText}`);
     } catch (e) {
@@ -338,10 +338,11 @@ function pageCopies(): Plugin {
  * an API) must be added here, or the browser blocks it.
  *
  * Where each origin is used:
- * - cdn.jsdelivr.net: ef-assets pictures, videos and data mirror (domain/banners.ts),
- *   CSS masks, Tesseract.js with its worker, core (WebAssembly) and language data
- *   (ui/screenReader.ts), HiGHS (ui/aicWorker.ts).
- * - raw.githubusercontent.com: ef-assets data files, and the pictures' fallback mirror.
+ * - assets.itjustlogs.dev: ef-assets (Cloudflare Pages), its pictures, videos and data
+ *   files (domain/banners.ts) and the CSS masks.
+ * - raw.githubusercontent.com: the same ef-assets files on GitHub, the fallback (mirrorUrl).
+ * - cdn.jsdelivr.net: Tesseract.js with its worker, core (WebAssembly) and language data
+ *   (ui/screenReader.ts), HiGHS (ui/aicWorker.ts). Scripts and fetches only.
  * - web-static.hg-cdn.com: event art the official schedule links to (schedule.json `art`).
  * - accounts.google.com/gsi/, www.googleapis.com, oauth2.googleapis.com: Google
  *   sign-in and Drive sync (drive.ts); Google's documented GIS policy plus token revoke.
@@ -362,13 +363,14 @@ function contentSecurityPolicy(): Plugin {
           .map(([, , body]) => `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`);
         const jsdelivr = 'https://cdn.jsdelivr.net';
         const raw = 'https://raw.githubusercontent.com';
+        const assets = new URL(EF_ASSETS).origin;
         const policy = [
           "default-src 'self'",
           `script-src 'self' ${hashes.join(' ')} ${jsdelivr} https://accounts.google.com/gsi/client 'wasm-unsafe-eval'`,
           "worker-src 'self' blob:",
-          `connect-src 'self' ${raw} ${jsdelivr} https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com blob: data:`,
-          `img-src 'self' data: blob: ${jsdelivr} ${raw} https://web-static.hg-cdn.com`,
-          `media-src 'self' blob: ${jsdelivr} ${raw}`,
+          `connect-src 'self' ${assets} ${raw} ${jsdelivr} https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com blob: data:`,
+          `img-src 'self' data: blob: ${assets} ${raw} https://web-static.hg-cdn.com`,
+          `media-src 'self' blob: ${assets} ${raw}`,
           "font-src 'self' https://fonts.gstatic.com",
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
           'frame-src https://accounts.google.com/gsi/',

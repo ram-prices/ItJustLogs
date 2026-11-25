@@ -1,14 +1,16 @@
 import type { Schedule } from './schedule.ts';
 import type { BannerDb, BannerDbEntry, Category, Kind } from './types.ts';
 
-export const EF_ASSETS = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
-const JSDELIVR = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets';
-/** The pictures, on jsDelivr. Its limit is 50 MB per ref and main is over it, so ef-assets publishes them to branches under it (scripts/cdn-branches.sh). */
-export const EF_ASSETS_CDN = `${JSDELIVR}@cdn`;
-const EF_ASSETS_FULL_CDN = `${JSDELIVR}@cdn-full`;
-export const EF_ASSETS_POTENTIAL_CDN = `${JSDELIVR}@cdn-potential`;
-/** Data files on jsDelivr, the fallback when raw.githubusercontent fails. */
-export const EF_ASSETS_DATA_CDN = `${JSDELIVR}@main`;
+/**
+ * ef-assets, pictures and data alike: Cloudflare Pages deploys its main branch here on every push
+ * (the whole repo at the root, so paths are the repo's). Its `_headers` let browsers keep a picture
+ * a day and revalidate JSON every time.
+ */
+export const EF_ASSETS = 'https://assets.itjustlogs.dev';
+/** The same files on GitHub: the fallback when the Pages site fails (mirrorUrl), and the ref-pinned source for tests. */
+export const EF_ASSETS_GITHUB = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
+/** Old ef-assets URLs (jsDelivr branches) that data or saved settings may still hold; assetUrl maps them. */
+const JSDELIVR = 'https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@';
 
 /** The game spells weapon pools "weponbox_" for limited issues but "weaponbox_" for constant ones. */
 export function canonicalPoolId(poolId: string): string {
@@ -131,21 +133,33 @@ export function isRateUpItem(info: BannerInfo | null, itemId: string, name: stri
 // Asset URLs
 // ---------------------------------------------------------------------------
 
+/**
+ * The operator portraits' version (ef-assets operators/<id>.webp, the game's
+ * remote icon from its operator-icons.py since 2): browsers keep a picture
+ * a day (ef-assets _headers), so replacing the files only shows everywhere once their URL changes.
+ * Bump it whenever existing portraits are replaced.
+ */
+const PORTRAIT_V = '2';
+
+/** ef-assets stores Typhoeus' pictures under the game's other id for him. */
+const pictureId = (id: string): string => (id === 'chr_0034_typhoeus' ? 'chr_0034_typhoea' : id);
+
+/** An operator's square portrait (ef-assets operators/), by the id ef-assets files it under. */
+export const operatorIconUrl = (pictureId: string): string => `${EF_ASSETS}/operators/${pictureId}.webp?v=${PORTRAIT_V}`;
+
 export function itemIconUrl(kind: Kind, itemId: string): string {
   if (!itemId) return '';
-  // ef-assets stores Typhoeus' portrait under the game's other id for him.
-  const id = itemId === 'chr_0034_typhoeus' ? 'chr_0034_typhoea' : itemId;
-  return `${EF_ASSETS_CDN}/${kind === 'char' ? 'operators' : 'arsenals'}/${id}.webp`;
+  return kind === 'char' ? operatorIconUrl(pictureId(itemId)) : `${EF_ASSETS}/arsenals/${itemId}.webp`;
 }
 
 /** An operator's card art: the official site's picture (ef-assets operators/bust-3/, from operator-cards.py). */
-export const operatorCardUrl = (id: string): string => itemIconUrl('char', id).replace('/operators/', '/operators/bust-3/');
+export const operatorCardUrl = (id: string): string => `${EF_ASSETS}/operators/bust-3/${pictureId(id)}.webp`;
 
 /** An operator's full art: the game's character portrait, the operator in their splash motif on a transparent background (ef-assets operators/full/, from operator-full.py, at the game's own size since cards zoom it). */
-export const operatorFullUrl = (id: string): string => itemIconUrl('char', id).replace(`${EF_ASSETS_CDN}/operators/`, `${EF_ASSETS_FULL_CDN}/operators/full/`);
+export const operatorFullUrl = (id: string): string => `${EF_ASSETS}/operators/full/${pictureId(id)}.webp`;
 
 /** A gear piece's icon (ef-assets gear/, from scripts/gear-icons.py). */
-export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
+export const gearIconUrl = (gearId: string): string => `${EF_ASSETS}/gear/${gearId}.webp`;
 
 /**
  * Fallback for a banners.json without any `gameArt` flag (an old cached copy):
@@ -186,10 +200,10 @@ export function setGameArtPools(db: BannerDb): void {
 
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
-  if (GAME_ART.has(id)) return `${EF_ASSETS_CDN}/banners/game/${id}.webp${gameArtQuery(id)}`;
+  if (GAME_ART.has(id)) return `${EF_ASSETS}/banners/game/${id}.webp${gameArtQuery(id)}`;
   // Constant Issues have ef-assets art (rebuilt from the weapon render); other constant pools don't.
   if (id.includes('constant') && !id.startsWith('weaponbox_constant_')) return null;
-  return `${EF_ASSETS_CDN}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
+  return `${EF_ASSETS}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
 }
 
 /**
@@ -201,7 +215,7 @@ export function issueLayerUrls(poolId: string): { back: string; weapon: string; 
   const id = canonicalPoolId(poolId);
   // RE-Factor Issues (rerun_wpn_) too: until ef-assets has their layers, the flat art stands in (components.ts issueArt).
   if (!isIssuePool(id) && !id.startsWith('weaponbox_constant_')) return null;
-  const at = `${EF_ASSETS_CDN}/banners/layers/`;
+  const at = `${EF_ASSETS}/banners/layers/`;
   return { back: `${at}issue-back.webp`, weapon: `${at}${id}.webp`, front: `${at}issue-front.webp` };
 }
 
@@ -213,30 +227,33 @@ export function issueLayerUrls(poolId: string): { back: string; weapon: string; 
 export function operatorLayerUrls(poolId: string): { back: string; op: string } | null {
   const id = canonicalPoolId(poolId);
   if (!GAME_ART.has(id)) return null;
-  const at = `${EF_ASSETS_CDN}/banners/game/layers/${id}`;
+  const at = `${EF_ASSETS}/banners/game/layers/${id}`;
   const q = gameArtQuery(id);
   return { back: `${at}-back.webp${q}`, op: `${at}-op.webp${q}` };
 }
 
 /**
- * Pictures come from jsDelivr (browsers keep them a week; raw.githubusercontent
- * lets them keep a file for five minutes, so every visit re-asked for every
- * portrait), data files from raw.githubusercontent (fresh within minutes).
- * A changed picture reaches jsDelivr within 12 hours, a new one at once:
- * until the CDN has it, the load fails and the other mirror is tried.
+ * An ef-assets URL on the other host: assets.itjustlogs.dev ↔ raw.githubusercontent. A failed load
+ * (`data-fallback` pictures, data fetches) tries it once. Null for any other URL.
  */
 export function mirrorUrl(url: string): string | null {
-  if (url.startsWith(EF_ASSETS)) return cdnBase(url.slice(EF_ASSETS.length + 1)) + url.slice(EF_ASSETS.length);
-  if (url.startsWith(`${JSDELIVR}@`)) return EF_ASSETS + url.slice(url.indexOf('/', JSDELIVR.length));
+  if (url.startsWith(`${EF_ASSETS}/`)) return EF_ASSETS_GITHUB + url.slice(EF_ASSETS.length);
+  if (url.startsWith(`${EF_ASSETS_GITHUB}/`)) return EF_ASSETS + url.slice(EF_ASSETS_GITHUB.length);
   return null;
 }
 
-/** Where jsDelivr serves an ef-assets path from: the same split as ef-assets scripts/cdn-branches.sh. */
-function cdnBase(path: string): string {
-  if (path.startsWith('operators/full/')) return EF_ASSETS_FULL_CDN;
-  if (path.startsWith('operators/potential/')) return EF_ASSETS_POTENTIAL_CDN;
-  return !path.includes('/') || /^(combat|story|wiki|scripts)\//.test(path) ? EF_ASSETS_DATA_CDN : EF_ASSETS_CDN;
+/**
+ * An ef-assets URL some data gives (schedule.json and the medal snapshot link raw.githubusercontent;
+ * old copies may hold a jsDelivr branch URL) on the site's host. Any other URL is left as it is.
+ */
+export function assetUrl(url: string): string {
+  if (url.startsWith(`${EF_ASSETS_GITHUB}/`)) return EF_ASSETS + url.slice(EF_ASSETS_GITHUB.length);
+  if (url.startsWith(JSDELIVR)) {
+    const path = url.indexOf('/', JSDELIVR.length);
+    return path < 0 ? url : EF_ASSETS + url.slice(path);
+  }
+  return url;
 }
 
-/** A picture URL the schedule gives (raw.githubusercontent) as its jsDelivr one. */
-export const cdnUrl = (url: string): string => (url.startsWith(EF_ASSETS) ? mirrorUrl(url)! : url);
+/** Both hosts' URL for each data file, in order: Pages, then GitHub. */
+export const dataUrls = (path: string): string[] => [`${EF_ASSETS}/${path}`, `${EF_ASSETS_GITHUB}/${path}`];

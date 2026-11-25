@@ -1,4 +1,4 @@
-import { EF_ASSETS_CDN } from '../../domain/banners';
+import { EF_ASSETS } from '../../domain/banners';
 import {
   blockOf,
   decodeShareCode,
@@ -40,7 +40,7 @@ import { external, wikiFile } from './info';
 
 const NOT_KNOWN = 'Not yet known';
 
-const asset = (path: string): string => `${EF_ASSETS_CDN}/${path}`;
+const asset = (path: string): string => `${EF_ASSETS}/${path}`;
 
 const statusBadge = (s: Season, now: number, server: Server): Html => {
   const status = seasonStatus(s, now, server);

@@ -543,7 +543,7 @@ select option {
   position: absolute;
   inset: auto 0 2.5px;
   height: 29.6px;
-  background: url(https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/effects/six-star/smoke-loop-3.webp) 0 0 / 100% 100%;
+  background: url(https://assets.itjustlogs.dev/effects/six-star/smoke-loop-3.webp) 0 0 / 100% 100%;
 }
 .rarity-art.smoke > img {
   position: relative;

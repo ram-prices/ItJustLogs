@@ -1,5 +1,5 @@
 import { copyPmf, LUCK_LABEL, luckTier, setOf, WEAPON_PITY_SETS, type AnalyzedPull, type Analysis, type BannerSummary, type LuckTier } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId, CATEGORY_LABEL, cdnUrl, EF_ASSETS_CDN, itemIconUrl, lookupBanner, patchOf } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, CATEGORY_LABEL, assetUrl, EF_ASSETS, itemIconUrl, lookupBanner, patchOf } from '../../domain/banners';
 import { sixTintFor, tintFor } from '../tint';
 import { luckGraph, tip, tipNote, tipRow } from '../charts';
 import { bannerEnded, poolStarts, unpulledBanners, type CatalogBanner } from '../../domain/catalog';
@@ -357,7 +357,7 @@ function unpulledCard(c: CatalogBanner, i = 0): Html {
   const weaponId = c.rateUpIds.find((id) => id.startsWith('wpn_'));
   const weapon = weaponId ? itemIconUrl('weap', weaponId) : '';
   // Headhunting cards show the pool's banner art (the game's own layout) like pulled ones.
-  const url = (c.kind === 'char' && c.poolId ? bannerArtUrl(c.poolId) : null) ?? (c.art ? cdnUrl(c.art) : null) ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
+  const url = (c.kind === 'char' && c.poolId ? bannerArtUrl(c.poolId) : null) ?? (c.art ? assetUrl(c.art) : null) ?? (c.poolId ? bannerArtUrl(c.poolId) : null) ?? '';
   // Coloured like a pulled card: from its one rate-up when it has one (see
   // tintWeaponCards), else from the art.
   const operators = c.rateUpIds.filter((id) => id.startsWith('chr_'));
@@ -498,8 +498,8 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
 
 /** Banners whose flat art has lettering beside the faces: a text-free crop for the page's header (ef-assets banners/game/). */
 const HERO_ART: Record<string, string> = {
-  standard: `${EF_ASSETS_CDN}/banners/game/standard.webp`,
-  beginner: `${EF_ASSETS_CDN}/banners/game/beginner.webp`,
+  standard: `${EF_ASSETS}/banners/game/standard.webp`,
+  beginner: `${EF_ASSETS}/banners/game/beginner.webp`,
 };
 
 /**
@@ -545,7 +545,7 @@ export function bannerPage(kind: Kind, id: string, a: Analysis, opts: ListOption
   // A Joint banner's several rate-ups read as a count, like the card's chip; one rate-up links to its page.
   const many = rateUps.length > 1 && (b ? b.category === 'joint' : true);
   const rateUpValue = many ? `${rateUps.length} rate-ups` : rateUpNames(kind, rateUps, rateUpIds);
-  const schedArt = s?.art ? cdnUrl(s.art) : '';
+  const schedArt = s?.art ? assetUrl(s.art) : '';
   // Headhunting: the game's banner layout; Issues: the text-free Issue art. Each falls back to the other.
   const faces = HERO_ART[pool];
   const [art, alt] = faces ? [faces, bannerArtUrl(pool) ?? ''] : kind === 'weap' && schedArt ? [schedArt, bannerArtUrl(pool) ?? ''] : [bannerArtUrl(pool) ?? schedArt, schedArt];

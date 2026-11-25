@@ -1,4 +1,4 @@
-import { cdnUrl } from '../../domain/banners';
+import { assetUrl } from '../../domain/banners';
 import { fmtPulls, pullsOf, type EventRewards, type EventRewardsFile, type Reward } from '../../domain/eventRewards';
 import { claimDaysLeft } from '../../domain/income';
 import { hasDailyRewards, SERVER_LABEL, timeOn, type Schedule, type Server, type ScheduleEvent } from '../../domain/schedule';
@@ -163,7 +163,7 @@ export function eventPage(id: string | undefined, redraw: () => void): Html {
   const end = timeOn(e.end, server);
   const when = start ? `${fmtDate(start, true)}${end ? ` – ${fmtDate(end, true)}` : ''}` : 'Dates not announced';
   return html`<section class="wiki-hero art-hero event-hero${e.art ? ' has-art' : ''}">
-      ${e.art ? html`<img class="wiki-hero-art" src="${cdnUrl(e.art)}" alt="" decoding="async" data-fallback />` : ''}
+      ${e.art ? html`<img class="wiki-hero-art" src="${assetUrl(e.art)}" alt="" decoding="async" data-fallback />` : ''}
       <div class="container wiki-hero-inner">
         <div class="min0 wiki-hero-text">
           <nav class="breadcrumb wiki-crumbs" aria-label="Breadcrumb"><a href="/">Home</a>${icon('chevron_right')}<span class="wiki-em">${e.type}</span></nav>

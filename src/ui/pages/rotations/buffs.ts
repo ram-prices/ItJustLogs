@@ -1,6 +1,6 @@
 import { FPS } from '../../../domain/sim/engine';
 import type { BuffSpan } from '../../../domain/sim/team';
-import { EF_ASSETS, EF_ASSETS_CDN, mirrorUrl } from '../../../domain/banners';
+import { EF_ASSETS, mirrorUrl } from '../../../domain/banners';
 import { html, type Html } from '../../html';
 import { tip, tipRow } from '../../charts';
 import { page } from './state';
@@ -83,7 +83,7 @@ function buffIcon(b: BuffSpan): string | undefined {
       : b.id.startsWith('inflict_')
         ? INFLICT_SPRITE[b.id.slice(8)]
         : page.buffIcons?.[b.id];
-  return sprite ? `${EF_ASSETS_CDN}/icons/buffs/${sprite}.webp` : undefined;
+  return sprite ? `${EF_ASSETS}/icons/buffs/${sprite}.webp` : undefined;
 }
 
 /**

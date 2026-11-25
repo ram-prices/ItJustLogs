@@ -16,7 +16,9 @@ embed (`<script id="discord:component-embed">`, max 3,000 bytes: header with
 portrait, every skill fitted, wiki credit link) and Open Graph tags as its
 fallback (Discord runs no script). Built by `domain/share.ts`, fitted to
 Discord's limits (OG description 350 bytes, title 70 bytes), which also
-builds the (now unused) "Copy to Discord" text. If
+builds the (now unused) "Copy to Discord" text. The build fetches ef-assets
+data from `assets.itjustlogs.dev`, then GitHub raw (`fetchAsset`, `dataUrls`), and every
+embed picture is an `assets.itjustlogs.dev` URL (schedule art through `assetUrl`). If
 ef-assets can't be fetched it uses `src/data/wiki-share.snapshot.json`, which
 local builds refresh. New operators get a preview only after a rebuild.
 Every banner and event in ef-assets `schedule.json` gets one too:

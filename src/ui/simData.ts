@@ -5,20 +5,20 @@
  * fight workers (each fetches its own copy; the browser's cache serves the
  * repeats).
  */
-import { EF_ASSETS, EF_ASSETS_DATA_CDN } from '../domain/banners';
+import { dataUrls } from '../domain/banners';
 import type { GearData, WeaponData } from '../domain/sim/build';
 import type { SimData, SimRequest } from '../domain/sim/team';
 
 const files = new Map<string, Promise<unknown>>();
 
-/** A combat file, from raw GitHub first, then jsDelivr. */
+/** A combat file, from ef-assets' Pages site first, then GitHub. */
 function get<T>(path: string): Promise<T> {
   let p = files.get(path) as Promise<T> | undefined;
   if (!p) {
     p = (async () => {
-      for (const base of [EF_ASSETS, EF_ASSETS_DATA_CDN]) {
+      for (const url of dataUrls(`combat/${path}`)) {
         try {
-          const res = await fetch(`${base}/combat/${path}`);
+          const res = await fetch(url);
           if (res.ok) return (await res.json()) as T;
         } catch {
           /* the other mirror */

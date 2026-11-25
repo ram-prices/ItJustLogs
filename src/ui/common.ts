@@ -26,11 +26,15 @@ export function installImageFallback(): void {
     'error',
     (e) => {
       const img = e.target;
-      if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-fallback')) return;
+      if (!(img instanceof HTMLImageElement)) return;
+      // Any ef-assets picture tries the other host once (assets.itjustlogs.dev ↔ GitHub); the rest of
+      // the chain is for pictures marked `data-fallback` only.
       const next = !img.dataset.retried && mirrorUrl(img.src);
       if (next) {
         img.dataset.retried = '1';
         img.src = next;
+      } else if (!img.hasAttribute('data-fallback')) {
+        return;
       } else if (img.closest<HTMLElement>('.issue-art[data-flat], .op-art[data-flat]')) {
         // A banner whose layers don't exist (or failed): its flat art instead.
         const layers = img.closest<HTMLElement>('.issue-art, .op-art')!;

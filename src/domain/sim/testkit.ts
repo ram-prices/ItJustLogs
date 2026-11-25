@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { EF_ASSETS } from '../banners';
+import { EF_ASSETS_GITHUB } from '../banners';
 import { FPS, World, type Input, type Entity, type Enemy } from './engine';
 import { teamOf, type SimBuild, type SimData, type SimRequest } from './team';
 
@@ -13,7 +13,7 @@ import { teamOf, type SimBuild, type SimData, type SimRequest } from './team';
 
 const DIR = process.env.EF_ASSETS_DIR?.replace(/[\\/]?$/, '/');
 const REF = process.env.EF_ASSETS_REF;
-const REMOTE = REF ? EF_ASSETS.replace(/\/main$/, `/${REF}`) : EF_ASSETS;
+const REMOTE = REF ? EF_ASSETS_GITHUB.replace(/\/main$/, `/${REF}`) : EF_ASSETS_GITHUB;
 const cache = new Map<string, Promise<any>>();
 export const asset = (path: string): Promise<any> => {
   if (!cache.has(path))

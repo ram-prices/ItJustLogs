@@ -1,4 +1,4 @@
-import { EF_ASSETS, EF_ASSETS_CDN, issueLayerUrls, itemIconUrl, operatorLayerUrls, mirrorUrl, operatorCardUrl } from '../domain/banners';
+import { EF_ASSETS, issueLayerUrls, itemIconUrl, operatorLayerUrls, mirrorUrl, operatorCardUrl } from '../domain/banners';
 import type { Kind } from '../domain/types';
 import { escape, html, raw, type Html } from './html';
 import { tintFor } from './tint';
@@ -183,10 +183,10 @@ function probeMaskIcons(redraw: () => void): void {
       const probe = new Image();
       probe.onload = () => resolve(false);
       probe.onerror = () => {
-        for (const file of files) mirrored.add(`${EF_ASSETS_CDN}/icons/${file}`);
+        for (const file of files) mirrored.add(`${EF_ASSETS}/icons/${file}`);
         resolve(true);
       };
-      probe.src = `${EF_ASSETS_CDN}/icons/${files[0]}`;
+      probe.src = `${EF_ASSETS}/icons/${files[0]}`;
     });
   });
   void Promise.all(probes).then((failed) => failed.some(Boolean) && redraw());
@@ -196,7 +196,7 @@ export function iconOf(kind: IconKind, name: string): string | null {
   const files = icons?.[kind];
   const file = files?.[name] ?? files?.[name.replace(/s$/, '')];
   if (!file) return null;
-  const url = `${EF_ASSETS_CDN}/icons/${file}`;
+  const url = `${EF_ASSETS}/icons/${file}`;
   return mirrored.has(url) ? mirrorUrl(url)! : url;
 }
 
@@ -207,7 +207,7 @@ export function colorOf(name: string): string | null {
 }
 
 /** Oroberyl's icon, shown before ef-assets icons/index.json has loaded. */
-export const OROBERYL_ICON = `${EF_ASSETS_CDN}/icons/items/oroberyl.webp`;
+export const OROBERYL_ICON = `${EF_ASSETS}/icons/items/oroberyl.webp`;
 
 /** An item's name with its game icon; Oroberyl also in its colour: "[icon] Oroberyl". */
 export function itemName(name: string): Html {

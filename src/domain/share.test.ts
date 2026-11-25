@@ -53,7 +53,7 @@ describe('link previews', () => {
     expect(arcane.description.match(/Jadecrushing Grid/g)).toHaveLength(1);
     const typhoeus = operatorPreview('chr_0034_typhoeus', operators.chr_0034_typhoea);
     expect(typhoeus.url).toBe('https://itjustlogs.dev/database/operators/chr_0034_typhoeus');
-    expect(typhoeus.image).toMatch(/chr_0034_typhoea\.webp$/);
+    expect(typhoeus.image).toMatch(/\/operators\/chr_0034_typhoea\.webp\?v=\d+$/);
   });
 
   it('fills weapon values as rank ranges and drops footnotes', () => {

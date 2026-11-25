@@ -438,7 +438,7 @@ Owner's goals and rules (more, with reasons, in `docs/history-handoff.md`):
   values in their first markup (`barsNow`, `spNow`): playback's end redraws the page, which had flashed full HP.
   Each buff's game icon: ef-assets icons/buffs/index.json (buff id → sprite, BuffData `iconConfig._spritePath`, buffs
   with `hasIcon`; `loadBuffIcons`), Susceptibility/Amp/Haste as icon_battle_affix_<kind>_vulnerable|enhance|speedup,
-  inflictions as their element's orb; the images are ef-assets icons/buffs/<sprite>.webp on jsDelivr (its
+  inflictions as their element's orb; the images are ef-assets icons/buffs/<sprite>.webp on assets.itjustlogs.dev (its
   scripts/buff-icons.py exports them from the dump's ui/sprites/bufficon bundle; a letter shows until they load).
   Under the timeline (a parsed run's and the Simulator's, whose lanes are portraits too and whose Enemy lane and row
   show its request's boss, `page.laneFoe`, the training dummy when it names none), "Buffs at <time>" (`buffsPanel`) has a fixed row per operator and the boss: its

@@ -37,6 +37,12 @@ is one that was missed then.
 | Arsenal / RE-Factor Issue | `banners/<pool>.webp` (a copy of `issues/<weapon>.webp`, automatic) + `banners/layers/<pool>.webp` | `issue-banner.py`, then `issue-layers.py` (the schedule workflow runs it) |
 | Any pool without the above | `banners/<pool>.webp` | copy of `headhunting/<operator>.webp` (automatic) |
 
+The square operator portrait (`operators/<id>.webp`: 6★ strip, ruler, Loadout, lists, Discord embeds) is the
+game's remote icon, `<dump>/output/v*-bundle-assets/Characters/charremoteicon/icon_<id>.png` with its faded
+edge cut off (~155px): `python scripts/operator-icons.py <EndfieldDataDump> <id>` in ef-assets, before the
+first push (a later replacement keeps the URL; see "Stale pictures"). The weekly wiki workflow's
+`portraits.py` only fills one in (the wiki's 120px icon) when it's still missing.
+
 Operator portraits in Database → Operators (`operators/bust-3/<id>.webp`) always come from the official
 page https://endfield.gryphline.com/en-us/operator (`operator-cards.py`; the owner's rule), never another
 source. A new operator appears there some days after release: re-run it then (the weekly wiki workflow does).
@@ -63,9 +69,10 @@ leaves story/ alone until the community dump has every mission). Then here:
 ## After
 
 - After pushing art made locally, run `node scripts/site-art.mjs` and commit
-  banners.json with it (or let the next workflow run do it); the cdn-branches
-  workflow publishes on every push to main. By hand: `scripts/cdn-branches.sh`, Git Bash. New files
-  appear at once; a changed one needs the steps in "Stale pictures" below.
+  banners.json with it (or let the next workflow run do it). Cloudflare Pages deploys
+  ef-assets to `assets.itjustlogs.dev` on every push to main, in about a minute; until then a new
+  file fails there and the site falls back to raw.githubusercontent. New files need nothing
+  more; a changed one needs the steps in "Stale pictures" below.
 - Check the live pages, not just the files: Home's open banners, each new
   banner page, each new operator/weapon database page. Look at each card in a
   screenshot: a Headhunting card showing only its backdrop (no operator in
@@ -74,15 +81,12 @@ leaves story/ alone until the community dump has every mission). Then here:
 
 ## Stale pictures (a fixed file that still shows the old one)
 
-Two caches sit between ef-assets and a visitor, and they need different fixes:
-
-1. **jsDelivr's CDN** keeps a changed file at the same `@cdn` path up to 12 hours.
-   Purging (`https://purge.jsdelivr.net/gh/ram-prices/ef-assets@<branch>/<path>`)
-   usually clears it within minutes.
-2. **Each visitor's browser** keeps a jsDelivr file for a week, and nothing on our
-   side can clear it. Only a **new URL** works. In 1.7 browsers that had loaded
-   Kay's first, empty `-op` layer kept showing a backdrop-only card after the
-   CDN served the fixed file.
+The files come from Cloudflare Pages (`assets.itjustlogs.dev`). Its edge serves a new
+deploy at once (no purge step); the cache that matters is **each visitor's browser**,
+which keeps a picture or clip for a day (ef-assets `_headers`: `max-age=86400`; JSON is
+revalidated on every load). Nothing on our side can clear that copy: within the day only
+a **new URL** works. In 1.7 (on jsDelivr, a week then) browsers that had loaded Kay's
+first, empty `-op` layer kept showing a backdrop-only card after the fixed file was out.
 
 What has a new URL on its own:
 - **Game-screen Headhunting art** (`banners/game/<pool>.webp` and both layers):
@@ -93,24 +97,29 @@ What has a new URL on its own:
   banners.json is pushed. No deploy needed.
 - **Operator cards** (`operators/bust-3/`): a new folder name whenever the art
   changes (`operator-cards.py`).
+- **Operator portraits** (`operators/<id>.webp`): every URL carries `?v=PORTRAIT_V`
+  (`src/domain/banners.ts`). After replacing existing portraits (a re-run of
+  `operator-icons.py` over old operators), bump it and deploy.
+  A brand-new operator's file needs nothing.
 
 Everything else (`banners/<pool>.webp`, Issue layers in `banners/layers/`,
-`operators/`, `events/`, icons) keeps its URL: get it right before the first
+`operators/full/`, `events/`, icons) keeps its URL: get it right before the first
 push. To replace one, give it a new file name and update what points at it, or
 add a fingerprint the same way as `gameArtV`.
 
-Finding which cache is stale: compare the clone's file size with
-`Invoke-WebRequest https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/<path>`
-(`RawContentLength`) and with the browser (open the image URL in the browser panel:
-a blank picture at the right size is a cached empty copy). Bytes right on the CDN
-but wrong in the browser: the URL has to change.
+Finding which copy is stale: compare the clone's file size with
+`curl.exe -sI https://assets.itjustlogs.dev/<path>` (`Content-Length`; a 404 or an old
+size means the Pages deploy hasn't finished or failed: check it in ef-assets' Cloudflare
+Pages dashboard) and with the browser (open the image URL in the browser panel: a blank
+picture at the right size is a cached empty copy). Bytes right on the server but wrong in
+the browser: the URL has to change.
 
 Never hold a banner back to wait for a cache (Kay's flag was once parked "until
-jsDelivr catches up", the owner's correction): check what the CDN serves now,
-purge or change the URL, and check the live card.
+jsDelivr catches up", the owner's correction): check what the server sends now,
+change the URL if needed, and check the live card.
 
 Related gotchas from the same day:
-- raw.githubusercontent serves a just-pushed file stale for up to ~5 minutes. Copy
+- raw.githubusercontent (the fallback) serves a just-pushed file stale for up to ~5 minutes. Copy
   `src/data/*.snapshot.json` from the ef-assets clone instead of downloading it
   right after a push.
 - The OpenChamber browser panel can capture a blank page when a tab is reloaded

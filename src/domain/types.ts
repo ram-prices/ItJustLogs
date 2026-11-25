@@ -41,7 +41,7 @@ export interface BannerDbEntry {
   gameArt?: boolean;
   /**
    * A fingerprint of that art's three files (site-art.mjs), added to their URLs so a changed picture gets a new
-   * address: browsers keep a jsDelivr file a week, and in 1.7 they kept an empty operator layer.
+   * address: browsers keep an ef-assets picture a day (a jsDelivr one a week, and in 1.7 they kept an empty operator layer).
    */
   gameArtV?: string;
 }

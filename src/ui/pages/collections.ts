@@ -1,3 +1,4 @@
+import { assetUrl } from '../../domain/banners';
 import { ARCHIVE_CATEGORIES, FINDING_CATEGORIES, MEDAL_CATEGORIES, medalImage, type Finding, type FindingFile, type Medal, type MedalFile, type MedalProgress } from '../../domain/collections';
 import COLLECTION_IDS from '../../data/collectionIds.json';
 import { state, updateSettings } from '../../state';
@@ -190,7 +191,7 @@ function medalRow(m: Medal, p: MedalProgress | undefined): Html {
   const img = medalImage(m, p);
   const desc = p?.tier && m.reforge[p.tier - 2]?.desc ? m.reforge[p.tier - 2].desc : m.desc;
   return html`<div class="medal card${got ? ' got' : ''}" data-search-item>
-    ${img ? html`<img class="medal-img" src="${img}" alt="" loading="lazy" decoding="async" />` : html`<span class="medal-img"></span>`}
+    ${img ? html`<img class="medal-img" src="${assetUrl(img)}" alt="" loading="lazy" decoding="async" data-fallback />` : html`<span class="medal-img"></span>`}
     <div class="medal-body min0">
       <div class="medal-name">${m.name}${p?.tier ? html` <span class="badge outline">${TIER[p.tier]}</span>` : ''}${p?.trim ? html` <span class="badge outline">Trimmed</span>` : ''}</div>
       ${desc ? html`<p class="copy-13 secondary medal-desc">${lines(desc)}</p>` : ''}
@@ -305,7 +306,7 @@ function findingTile(f: Finding, got: boolean): Html {
   const where = [f.region, f.area].filter(Boolean).join(' · ');
   return html`<div class="finding card${got ? ' got' : ''}" data-search-item>
     <button type="button" class="finding-open" data-action="finding-open" data-value="${f.id}" title="${f.name}">
-      <span class="finding-art">${f.icon ? html`<img src="${f.icon}" alt="" loading="lazy" decoding="async" />` : icon(ARCHIVE_ICON[f.category] ?? 'description')}</span>
+      <span class="finding-art">${f.icon ? html`<img src="${assetUrl(f.icon)}" alt="" loading="lazy" decoding="async" data-fallback />` : icon(ARCHIVE_ICON[f.category] ?? 'description')}</span>
       <span class="finding-name">${f.name}</span>
       <span class="finding-where label-12 secondary">${where || f.unlock?.replace(/^Complete the (?:main |side )?mission\s*/i, '') || f.type || ''}</span>
     </button>
@@ -375,7 +376,7 @@ function openFinding(id: string): void {
         <button type="button" class="btn tertiary sm" data-close aria-label="Close">${icon('close')}</button>
       </div>
       <div class="finding-dialog-body">
-        ${f.image ? html`<img class="finding-picture" src="${f.image}" alt="" decoding="async" />` : ''}
+        ${f.image ? html`<img class="finding-picture" src="${assetUrl(f.image)}" alt="" decoding="async" data-fallback />` : ''}
         ${f.text ? html`<div class="copy-14 finding-text">${f.text.split(/\n{2,}/).map((p) => html`<p>${lines(p)}</p>`)}</div>` : f.source === 'game' ? '' : html`<p class="copy-14 secondary">No text on the wiki yet.</p>`}
       </div>
       <div class="finding-dialog-foot">

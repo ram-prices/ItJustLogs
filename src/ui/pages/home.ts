@@ -1,5 +1,5 @@
 import type { Analysis, BannerSummary } from '../../domain/analyze';
-import { bannerArtUrl, canonicalPoolId, cdnUrl, EF_ASSETS_CDN } from '../../domain/banners';
+import { bannerArtUrl, canonicalPoolId, assetUrl, EF_ASSETS } from '../../domain/banners';
 import { currentSeason, encodeShareCode, nextDate, phaseOf, seasonStatus, STATUS_LABEL, STATUS_TONE, totalOf, type SeasonFile, type SeasonIndex } from '../../domain/contracts';
 import type { EventRewards, EventRewardsFile } from '../../domain/eventRewards';
 import {
@@ -56,7 +56,7 @@ export function span(ms: number): string {
 }
 
 /** ef-assets' 1024px art when the pool is known, else the announcement cover. */
-const artOf = (b: ScheduleBanner): string | null => (b.poolId && bannerArtUrl(b.poolId)) || (b.art ? cdnUrl(b.art) : null);
+const artOf = (b: ScheduleBanner): string | null => (b.poolId && bannerArtUrl(b.poolId)) || (b.art ? assetUrl(b.art) : null);
 
 /** Your banner card for a schedule entry, if you've pulled on it. */
 function summaryFor(b: ScheduleBanner, a: Analysis | null): BannerSummary | null {
@@ -168,9 +168,9 @@ function bannerRow(b: ScheduleBanner, now: number, server: Server): Html {
 function eventRow(e: ScheduleEvent, now: number, server: Server, schedule: Schedule, r?: EventRewards): Html {
   // Each event opens its own page (rewards and dates): pages/event.ts.
   return html`<a class="sched-next evt" href="${e.id != null ? `/event/${e.id}` : linkOf(e)}" data-link="${linkOf(e)}" ${e.details ? html`data-tip="${tip(e.name, [tipNote(e.details)])}"` : ''}>
-    ${e.art ? html`<img class="evt-strip" src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback />` : ''}
+    ${e.art ? html`<img class="evt-strip" src="${assetUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback />` : ''}
     ${e.art
-      ? html`<div class="sched-thumb evt-art"><img src="${cdnUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback /><span class="evt-art-type" data-tip="${tip(e.type, [])}">${icon(eventIcon(e))}</span></div>`
+      ? html`<div class="sched-thumb evt-art"><img src="${assetUrl(e.art)}" alt="" loading="lazy" decoding="async" data-fallback /><span class="evt-art-type" data-tip="${tip(e.type, [])}">${icon(eventIcon(e))}</span></div>`
       : html`<div class="sched-thumb sched-evt-icon">${icon(eventIcon(e))}</div>`}
     <div class="sched-next-text min0">
       <div class="sched-next-name ellipsis">${e.name}</div>
@@ -202,10 +202,10 @@ function contractSection(now: number, server: Server, redraw: () => void): Html 
     <div class="section-head"><h2 class="heading-20">Contingency Contract</h2></div>
     <div class="card sched-next-list">
       <a class="sched-next evt" href="${link}" data-link="${link}" data-tip="${tip(s.name, [tipNote(s.desc)])}">
-        <img class="evt-strip" src="${EF_ASSETS_CDN}/${s.banner}" alt="" loading="lazy" decoding="async" data-fallback />
+        <img class="evt-strip" src="${EF_ASSETS}/${s.banner}" alt="" loading="lazy" decoding="async" data-fallback />
         <div class="sched-thumb evt-art">
-          <img src="${EF_ASSETS_CDN}/${s.banner}" alt="" loading="lazy" decoding="async" data-fallback />
-          <span class="evt-art-type"><img class="cc-home-logo" src="${EF_ASSETS_CDN}/cc/art/logo.webp" alt="" loading="lazy" decoding="async" data-fallback /></span>
+          <img src="${EF_ASSETS}/${s.banner}" alt="" loading="lazy" decoding="async" data-fallback />
+          <span class="evt-art-type"><img class="cc-home-logo" src="${EF_ASSETS}/cc/art/logo.webp" alt="" loading="lazy" decoding="async" data-fallback /></span>
         </div>
         <div class="sched-next-text min0">
           <div class="sched-next-name ellipsis">${s.name}</div>

@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { it } from 'vitest';
 import { teamOf, type SimData, type SimRequest } from '../src/domain/sim/team';
 import { World, FPS } from '../src/domain/sim/engine';
-import { EF_ASSETS } from '../src/domain/banners';
+import { EF_ASSETS_GITHUB } from '../src/domain/banners';
 
 /**
  * Writes src/data/final-strikes.json: each operator's basic attack chain as the sim plays it, controlled alone and
@@ -14,7 +14,7 @@ import { EF_ASSETS } from '../src/domain/banners';
 
 const DIR = process.env.COMBAT_DIR;
 const load = async (path: string) =>
-  DIR ? JSON.parse(readFileSync(DIR + path, 'utf8')) : (await fetch(`${EF_ASSETS}/combat/${path}`)).json();
+  DIR ? JSON.parse(readFileSync(DIR + path, 'utf8')) : (await fetch(`${EF_ASSETS_GITHUB}/combat/${path}`)).json();
 
 it.skipIf(!process.env.GEN)(
   'final strikes',
