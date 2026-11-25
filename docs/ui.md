@@ -39,7 +39,7 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     Save-Data get the still frame only. Pictures (banner art, event headers, the
     Character card; not the operator page's header) shift a little against the mouse (`ui/parallax.ts`;
     Arsenal Issues in layers from ef-assets `banners/layers/`, the weapon
-    floating; `GAME_ART` Headhunting cards as backdrop + operator from
+    floating; `gameArt` Headhunting cards as backdrop + operator from
     `banners/game/layers/<pool>-back|op.webp` (`operatorArt`, made by
     `operator-banner.py`: the operator is the layout's `MainRoleImage`, its
     colours solved so the pair stacks back to the flat file), the operator
@@ -48,12 +48,13 @@ The full UI notes: styles, icons, Home widgets, routing and what each page file 
     flat file). Firefox puts moved-only pictures on whole pixels (twitching);
     `transform: perspective(600px) rotateY(0.02deg)` stops it, measured on a
     real screen (a flat `rotate` fixes headless Firefox only).
-  - Banner art (`bannerArtUrl` in `domain/banners.ts`): Headhunting pools in
-    `GAME_ART` use ef-assets `banners/game/<pool id>.webp`, the game's own
+  - Banner art (`bannerArtUrl` in `domain/banners.ts`): Headhunting pools
+    flagged `gameArt` in banners.json (`GAME_ART`, filled by `setGameArtPools`
+    whenever state sets the banner db) use ef-assets `banners/game/<pool id>.webp`, the game's own
     banner screen laid out without text (ef-assets `scripts/operator-banner.py`,
     from the EndfieldDataDump checkout; it puts tightly packed sprites back on
-    their full rect so nothing stretches); add a pool there once its file is
-    made. Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
+    their full rect so nothing stretches); ef-assets `scripts/site-art.mjs` sets
+    the flag once the file and both layers are there. Other pools keep `banners/<pool id>.webp` (operator close-up, Issue
     art). Unpulled Headhunting cards prefer it over the schedule's `art`.
     Discord embeds still use the schedule's `art`.
   - Potential art (`domain/potentialArt.ts`, `ui/pages/potentialArt.ts`): the

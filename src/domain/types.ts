@@ -37,5 +37,7 @@ export interface BannerDbEntry {
   rateUpIds?: string[];
   rateupName?: string[] | string;
   type?: string;
+  /** ef-assets has game-screen art for this pool (banners/game/ and its layers), set by its site-art.mjs. */
+  gameArt?: boolean;
 }
 export type BannerDb = Record<string, BannerDbEntry>;

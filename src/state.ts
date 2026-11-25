@@ -4,6 +4,7 @@ import { analyze, type Analysis } from './domain/analyze';
 import { mergeHistories, parseTimestamp } from './domain/parse';
 import { guessServer, type Schedule, type Server } from './domain/schedule';
 import type { BannerDb, PullHistory } from './domain/types';
+import { setGameArtPools } from './domain/banners';
 import * as store from './store';
 import { sanitizeSettings } from './settingsSanitize';
 
@@ -21,7 +22,8 @@ interface State {
 export const state: State = {
   history: null,
   snapshots: [],
-  db: store.cachedBannerDb(),
+  // The cached db's gameArt flags, so the first render already picks game-screen art.
+  db: withGameArt(store.cachedBannerDb()),
   schedule: store.cachedSchedule(),
   analysis: null,
   settings: store.loadSettings(),
@@ -177,8 +179,13 @@ export async function importHistory(incoming: PullHistory, reason = 'Before impo
   return added;
 }
 
+function withGameArt(db: BannerDb): BannerDb {
+  setGameArtPools(db);
+  return db;
+}
+
 export function setBannerDb(db: BannerDb): void {
-  state.db = db;
+  state.db = withGameArt(db);
   recompute();
   emit();
 }

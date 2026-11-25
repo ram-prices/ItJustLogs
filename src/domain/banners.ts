@@ -148,17 +148,31 @@ export const operatorFullUrl = (id: string): string => itemIconUrl('char', id).r
 export const gearIconUrl = (gearId: string): string => `${EF_ASSETS_CDN}/gear/${gearId}.webp`;
 
 /**
- * Headhunting pools with art laid out from the game's own banner screen
- * (ef-assets banners/game/, made by its operator-banner.py). Add a pool here
- * once its file is there; the others keep their operator close-up.
- * special_1_4_1 (Arcane) is left out: its file draws her about a third too
- * wide (a stretched layer in operator-banner.py) until it's rebuilt.
+ * Fallback for a banners.json without any `gameArt` flag (an old cached copy):
+ * the pools that had game-screen art when the flag was added.
  */
-const GAME_ART = new Set([
+const GAME_ART_FALLBACK = [
   'special_1_0_1', 'special_1_0_2', 'special_1_0_3', 'special_1_1_1', 'special_1_1_2', 'special_1_2_1',
   'special_1_3_1', 'special_1_3_2', 'special_1_4_1', 'special_1_4_2', 'special_1_5_1', 'special_1_6_1', 'special_1_6_2',
-  'rerun_chr_tangtang', 'rerun_chr_yvonne',
-]);
+  'special_1_7_1', 'rerun_chr_tangtang', 'rerun_chr_yvonne', 'rerun_chr_aglina', 'rerun_chr_wulfa',
+];
+
+/**
+ * Headhunting pools with art laid out from the game's own banner screen
+ * (ef-assets banners/game/, made by its operator-banner.py); the others keep
+ * their operator close-up. ef-assets' scripts/site-art.mjs flags them in
+ * banners.json (`gameArt: true`) once the picture and both layers are there,
+ * and holds back any on its HOLD list. state.ts fills this from the banner db at startup and on
+ * every refresh (setGameArtPools).
+ */
+const GAME_ART = new Set<string>(GAME_ART_FALLBACK);
+
+/** Take the game-screen art pools from a banner db's `gameArt` flags; a db with none keeps the fallback. */
+export function setGameArtPools(db: BannerDb): void {
+  const flagged = Object.keys(db).filter((id) => db[id]?.gameArt === true).map(canonicalPoolId);
+  GAME_ART.clear();
+  for (const id of flagged.length ? flagged : GAME_ART_FALLBACK) GAME_ART.add(id);
+}
 
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
@@ -182,7 +196,7 @@ export function issueLayerUrls(poolId: string): { back: string; weapon: string; 
 }
 
 /**
- * A `GAME_ART` banner in two layers (ef-assets banners/game/layers/, from
+ * A game-screen art banner (`gameArt` in banners.json) in two layers (ef-assets banners/game/layers/, from
  * operator-banner.py): the banner without its operator, and the operator on
  * transparency. Stacked they give the flat art. Null for other banners.
  */

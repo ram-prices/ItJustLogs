@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import db from '../data/banners.snapshot.json';
 import { analyze } from './analyze';
-import { canonicalPoolId, categoryOf, isIssuePool, issueLayerUrls, patchOf } from './banners';
+import { bannerArtUrl, canonicalPoolId, categoryOf, isIssuePool, issueLayerUrls, operatorLayerUrls, patchOf, setGameArtPools } from './banners';
 import { compareHistories, dropShadowedDuplicates, mergeHistories, missingPulls, parseHistoryJson } from './parse';
 import { weeklyTimeline, patchStats } from './patches';
 import {
@@ -60,6 +60,24 @@ describe('pity math', () => {
 });
 
 describe('banner ids', () => {
+  it('takes game-screen art from banners.json gameArt flags', () => {
+    try {
+      setGameArtPools({ special_9_0_1: { gameArt: true }, special_9_0_2: {}, special_1_0_1: {} });
+      expect(bannerArtUrl('special_9_0_1')).toMatch(/\/banners\/game\/special_9_0_1\.webp$/);
+      expect(operatorLayerUrls('special_9_0_1')?.op).toMatch(/\/banners\/game\/layers\/special_9_0_1-op\.webp$/);
+      expect(bannerArtUrl('special_9_0_2')).toMatch(/\/banners\/special_9_0_2\.webp$/);
+      expect(operatorLayerUrls('special_9_0_2')).toBeNull();
+      // Unflagged in a db that has flags: no game art, even for a pool on the fallback list.
+      expect(bannerArtUrl('special_1_0_1')).toMatch(/\/banners\/special_1_0_1\.webp$/);
+      // A db without any flag (an old cached copy) keeps the fallback list.
+      setGameArtPools({ special_1_0_1: {} });
+      expect(bannerArtUrl('special_1_0_1')).toMatch(/\/banners\/game\/special_1_0_1\.webp$/);
+      expect(bannerArtUrl('special_1_4_1')).toMatch(/\/banners\/game\/special_1_4_1\.webp$/);
+      expect(bannerArtUrl('special_9_0_1')).toMatch(/\/banners\/special_9_0_1\.webp$/);
+    } finally {
+      setGameArtPools(bannerDb);
+    }
+  });
   it('normalizes the game’s weponbox spelling', () => {
     expect(canonicalPoolId('WeaponBox_1_0_1')).toBe('weponbox_1_0_1');
     expect(canonicalPoolId('weaponbox_constant_1')).toBe('weaponbox_constant_1');

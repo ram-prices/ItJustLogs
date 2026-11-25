@@ -27,6 +27,8 @@ event gets a built page with its Discord embed (`pageCopies` in
 - `docs/income.md`: Stats → By patch free pull income.
 - `docs/pages.md`: built pages, Discord embeds, event pages, legacy links.
 - `docs/hub.md`: the coordinator/deployer hub session, its rules and the current task queue.
+- `docs/new-version.md`: checklist for a new game version (dump stages, which art paths the site
+  actually loads, wiki pull request, CDN timing).
 
 Keep these up to date when you change an area; keep this file short.
 
@@ -56,6 +58,11 @@ Only when the owner says "deploy" (that batch only; afterwards changes stay loca
    for `"conclusion": "success"` (in the background).
 
 ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@pm.me`.
+
+After a game update, follow `docs/new-version.md`, and check the live pages (Home's banners, new
+banner and database pages) before calling it done: in 1.7 every file check passed while cards were
+blank, because the art sat in folders the site doesn't load. The owner never sees bot pull requests;
+ef-assets' workflows report problems in its "ef-assets: needs attention" issue.
 
 ## Layout
 
