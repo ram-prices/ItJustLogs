@@ -27,8 +27,9 @@
 
 /* ---------- Header + tabs (Vercel dashboard) ---------------------------- */
 .header {
-  background: var(--background-100);
-  box-shadow: 0 1px 0 var(--ring);
+  background: var(--header-bg);
+  color: var(--gray-1000);
+  box-shadow: 0 1px 0 var(--header-ring);
   position: sticky;
   top: 0;
   z-index: var(--z-header);
@@ -242,11 +243,17 @@ svg.tab-icon {
 .tab > * {
   position: relative;
 }
+/* The tab row scrolls (overflow-x: auto), which clips an outside ring to its sides: draw it inside. */
+.tab:focus-visible {
+  outline-offset: -3px;
+  border-radius: var(--radius-sm);
+}
 .tab[aria-current='page'] {
   color: var(--gray-1000);
 }
 .tab[aria-current='page']::before {
-  background: var(--gray-alpha-200);
+  background: var(--sel-bg);
+  box-shadow: var(--sel-ring);
 }
 .tab[aria-current='page']::after {
   content: '';
@@ -264,7 +271,7 @@ svg.tab-icon {
 
 /* ---------- Page header band -------------------------------------------- */
 .page-header {
-  background: var(--background-100);
+  background: var(--page);
 }
 .page-header-inner {
   display: flex;
@@ -587,7 +594,7 @@ main {
   gap: 2px;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-border);
-  background: var(--background-200);
+  background: var(--toggle-bg);
 }
 .toggle button {
   white-space: nowrap;
@@ -770,7 +777,7 @@ select.input {
   color: var(--gray-900);
   border-bottom: 1px solid var(--ring);
   white-space: nowrap;
-  background: var(--background-200);
+  background: var(--th-bg);
 }
 .table td {
   height: 52px;

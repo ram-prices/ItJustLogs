@@ -289,9 +289,11 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         const style = known ? `--six-tint:${known}` : '';
         const tintAttrs = html`${tintUrl ? html`data-six-tint="${tintUrl}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : ''}${tintUrl && style ? ' ' : ''}${style ? html`style="${style}"` : ''}`;
         const cls = `six-item${up ? ' rateup' : ''}${win ? ' win' : ''}`;
+        // Names the tile for sixShimmerCarry: a redraw rebuilds it, and its sweep carries on from where it was.
+        const winAttr = win ? html` data-win="${g.map((x) => x.itemId).join('|')}"` : '';
         const pity = html`<span class="six-pity">${p.pity === null ? html`<i class="free"></i>Free` : html`<i style="background:${heat(p.pity, max)}"></i>${p.pity}`}</span>`;
         // Portraits open that operator's or weapon's info page.
-        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${sixTag(copies.get(p), p.isRateUp)}</span>${pity}</a>`;
+        if (g.length === 1) return html`<a class="${cls}" href="${infoHref(p.kind, p.itemId)}" data-tip="${title(p)}" aria-label="${p.name}" ${tintAttrs}${winAttr}><span class="six-art">${itemImg(p.kind, p.itemId, 'six-portrait')}${sixTag(copies.get(p), p.isRateUp)}</span>${pity}</a>`;
         // Its outline: the rate-up's colour around the rate-up, the usual outline around the rest, blending between.
         const step = 100 / g.length;
         const blend = Math.min(10, step / 3);
@@ -301,7 +303,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
             return `${c} ${(i ? i * step + blend : 0).toFixed(1)}%, ${c} ${(i < g.length - 1 ? (i + 1) * step - blend : 100).toFixed(1)}%`;
           })
           .join(', ');
-        return html`<div class="${cls} shared" data-tip="${g.map(title).join('')}" ${tintAttrs}>
+        return html`<div class="${cls} shared" data-tip="${g.map(title).join('')}" ${tintAttrs}${winAttr}>
           <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${sixTag(copies.get(x), x.isRateUp)}</a>`)}</span></span>
           ${pity}
         </div>`;
@@ -335,6 +337,58 @@ export function sixShimmerCascade(): void {
   for (const t of tiles) {
     const norm = span > 0 ? (t.d - min) / span : 0;
     t.el.style.setProperty('--win-delay', `${(norm * 0.8).toFixed(3)}s`);
+  }
+}
+
+/** Each winning tile's name (data-win, plus its place among same-named tiles) in the strip as it is now. */
+function winTiles(): { key: string; el: HTMLElement }[] {
+  const seen = new Map<string, number>();
+  return [...document.querySelectorAll<HTMLElement>('.six-item.win[data-win]')].map((el) => {
+    const base = el.dataset.win!;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return { key: `${base}#${n}`, el };
+  });
+}
+/** The tile's sweep: the animation on its portrait's (or its set's) ::after. */
+const shimmerOf = (el: HTMLElement): CSSAnimation | undefined =>
+  el.getAnimations({ subtree: true }).find((a): a is CSSAnimation => a instanceof CSSAnimation && a.animationName === 'six-shimmer');
+
+/**
+ * Where each winning tile's sweep is, read just before a redraw rebuilds the strip (draw in
+ * app.ts). A rebuilt element starts its CSS animation over, and data keeps arriving just after a
+ * page opens, so without this the sweep played once, then again from the start at the next
+ * redraw. null: the tile's sweep had finished (or isn't running).
+ */
+export function sixShimmerSnapshot(): Map<string, number | null> {
+  const out = new Map<string, number | null>();
+  if (typeof document.getAnimations !== 'function') return out;
+  for (const { key, el } of winTiles()) {
+    const a = shimmerOf(el);
+    // (A sweep the browser hasn't started yet reports no time: it is at 0.)
+    out.set(key, a && a.playState !== 'finished' ? (typeof a.currentTime === 'number' ? a.currentTime : 0) : null);
+  }
+  return out;
+}
+
+/**
+ * Puts each rebuilt tile's sweep back where the snapshot had it (finished, or at the same time),
+ * so it plays through once. Run after sixShimmerCascade, which sets the delay the time counts
+ * from. A tile the snapshot doesn't know is new: it plays from the start.
+ */
+export function sixShimmerCarry(was: Map<string, number | null>): void {
+  if (!was.size || typeof document.getAnimations !== 'function') return;
+  for (const { key, el } of winTiles()) {
+    if (!was.has(key)) continue;
+    const a = shimmerOf(el);
+    if (!a) continue;
+    const t = was.get(key);
+    try {
+      if (t == null) a.finish();
+      else a.currentTime = t;
+    } catch {
+      // not playable: leave it
+    }
   }
 }
 
@@ -496,7 +550,6 @@ export function listPage(kind: Kind, a: Analysis, opts: ListOptions): Html {
 
 /** Banners whose flat art has lettering beside the faces: a text-free crop for the page's header (ef-assets banners/game/). */
 const HERO_ART: Record<string, string> = {
-  standard: `${EF_ASSETS}/banners/game/standard.webp`,
   beginner: `${EF_ASSETS}/banners/game/beginner.webp`,
 };
 

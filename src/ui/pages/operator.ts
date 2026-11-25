@@ -552,9 +552,9 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
   const loadout = loadoutSection(id, a, redraw, o.weapon, (label) => attributeTotal(o, bonuses, label));
   return html`${hero(id, o, owned?.copies ? owned.potential : -1, redraw)}
     <main class="container fade-in wiki-page">
-      <div class="wiki-cols three">
-        <div class="wiki-col">${ownedSection('char', o.name, a, owned, potentialLadder(o))}</div>
-        <div class="wiki-col">${stats}</div>
+      <div class="wiki-cols ${o.stats ? 'three' : 'even'}">
+        <div class="wiki-col">${ownedSection('char', o.name, a, owned, potentialLadder(o), o.headhunting === 'welfare')}</div>
+        ${o.stats ? html`<div class="wiki-col">${stats}</div>` : ''}
         <div class="wiki-col">${loadout}</div>
       </div>
       ${owned?.copies
@@ -572,7 +572,7 @@ function detailPage(id: string, o: WikiOperator, attribution: WikiAttribution, a
             </div>`}
       ${owned?.copies ? html`<section class="section wiki-storage">${storageBox(id, o.name, redraw)}</section>` : ''}
       ${profileSection(o)}
-      ${gameOps?.[id] ? gameCredit() : credit(attribution, o.page)}
+      ${gameOps?.[id] ? gameCredit(o.profile || o.quote || o.tags.length ? { attribution, page: o.page } : undefined) : credit(attribution, o.page)}
     </main>`;
 }
 

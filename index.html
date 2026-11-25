@@ -27,6 +27,8 @@
         var t = JSON.parse(localStorage.getItem('ijl.settings') || '{}').theme || 'dark';
         if (t === 'system') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
         document.documentElement.dataset.theme = t;
+        // The browser's toolbar takes the header's colour (the light theme's header is dark brown).
+        document.querySelector('meta[name="theme-color"]').content = t === 'light' ? '#2a241d' : '#0a0a0a';
       } catch (e) {}
     </script>
   </head>

@@ -5,7 +5,7 @@ import type { WikiOperatorFile, WikiWeaponFile } from '../../domain/wiki';
 import { state, updateSettings } from '../../state';
 import type { HomeWidget } from '../../store';
 import type { HomeWidgetType } from '../../settingsSanitize';
-import { bannerArtUrl, operatorFullUrl } from '../../domain/banners';
+import { bannerArtUrl, operatorCardUrl, operatorFullUrl } from '../../domain/banners';
 import { heroGlow, icon, itemImg, metric, metrics, stars, trait, withStars, emptyState } from '../components';
 import { holdFocus } from '../dialog';
 import { fmtDate, fmtInt, focusMark, html, raw, render, restoreFocus, type Html } from '../html';
@@ -88,6 +88,18 @@ function bannerArtOf(op: string): string | null {
 
 /** The full operator art (ef-assets operators/full/); the stitched banner stands in where it's missing. */
 const fullArtOf = (op: string): string => operatorFullUrl(op);
+
+/**
+ * What stands in when the full art fails to load (common.ts installImageFallback): the
+ * stitched banner, else the official card art (an operator before release or never on
+ * a banner: Mimino). Either one shows as a plain covering picture, not zoomed to the face.
+ */
+const fullArtStandIn = (op: string): Html => {
+  const banner = bannerArtOf(op);
+  return banner
+    ? html`data-alt="${banner}" data-alt-class="stitched"`
+    : html`data-alt="${operatorCardUrl(op)}" data-alt-class="card-art"`;
+};
 
 /** Where each operator's face is in their full art: x and y in image widths (read off the pictures by eye; a lone figure's face reads best near 0.5). */
 const FULL_ART_FACE: Record<string, [number, number]> = {
@@ -583,8 +595,7 @@ function characterWidget(w: HomeWidget, c: Ctx): Html {
   const weapon = facts.includes('weaponDetail') ? weaponDetail(w.op, c.a, c.redraw) : null;
   const style = w.artStyle ?? (full || art ? 'banner' : 'avatar');
   const src = full ?? art?.src;
-  const banner = full ? bannerArtOf(w.op) : null;
-  const picture = html`<span class="char-card-art">${src ? html`<img class="${full ? 'full-art' : ''}" src="${src}" alt="" decoding="async" ${full ? html`style="${faceStyle(w.op)}" data-fallback${banner ? html` data-alt="${banner}" data-alt-class="stitched"` : ''}` : ''} />` : itemImg('char', w.op, 'char-card-portrait')}</span>`;
+  const picture = html`<span class="char-card-art">${src ? html`<img class="${full ? 'full-art' : ''}" src="${src}" alt="" decoding="async" ${full ? html`style="${faceStyle(w.op)}" data-fallback ${fullArtStandIn(w.op)}` : ''} />` : itemImg('char', w.op, 'char-card-portrait')}</span>`;
   // Ambient: with a picture, glows of the colours along its edges, each from its side (as
   // YouTube's ambient mode does, tint.ts tintAmbients); else a glow of the portrait's colour. Inside the card
   // while it has its outline, past it without.
@@ -776,7 +787,7 @@ function configDialog(id: string): void {
           ? html`<div class="field"><span class="label-13">Picture</span>
               <div class="char-pics">
                 <label class="char-pic" title="Portrait"><input type="radio" name="pic" value="" ${raw(!draft.pic ? 'checked' : '')} />${itemImg('char', draft.op, 'char-pic-img')}</label>
-                <label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" data-fallback ${bannerArtOf(draft.op) ? html`data-alt="${bannerArtOf(draft.op)}" data-alt-class="stitched"` : ''} /></label>
+                <label class="char-pic" title="Full art"><input type="radio" name="pic" value="full" ${raw(draft.pic === 'full' ? 'checked' : '')} /><img class="char-pic-img wide" src="${fullArtOf(draft.op)}" alt="" data-fallback ${fullArtStandIn(draft.op)} /></label>
                 ${art.map((x) => html`<label class="char-pic"><input type="radio" name="pic" value="${x.id}" ${raw(draft.pic === x.id ? 'checked' : '')} /><img class="char-pic-img" src="${x.src}" alt="" /></label>`)}
                 <label class="btn secondary sm">${icon('add')}Add pictures<input type="file" accept="image/*" multiple hidden data-art /></label>
               </div>

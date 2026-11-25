@@ -1578,20 +1578,48 @@ code {
   pointer-events: none;
   background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.35) 50%, transparent 68%) no-repeat;
   background-size: 220% 100%;
-  background-position: -24.67% 0;
-  animation: six-shimmer 0.9s ease-out both;
+  background-position: -54.67% 0;
+  opacity: 0;
+  animation: six-shimmer 1.25s both;
   animation-delay: var(--win-delay, 0s);
 }
 .six-item.win .six-heads::after {
   border-radius: 12px;
 }
-/* The band enters fully off the left (124.67%) and exits fully off the right. */
+/* The band is tilted (115deg), so its leading edge sits further along at the
+   box's top than at its bottom: at the old 124.67% / -24.67% "just off the
+   edge" positions its faint tail still reached into the top-left corner before
+   the sweep and the bottom-right corner after it, and stayed there (fill both,
+   and the resting position, so reduced motion too). It now starts and rests
+   30 points further out, where nothing is left inside the box. The sweep itself
+   (124.67% to -24.67%, 0.9s ease-out) is unchanged; the extra 14% at each end
+   moves the band between the resting position and the old start/end. The layer
+   is also invisible (opacity 0) except while the band is on its way, so before
+   the sweep, after it and without it (reduced motion) the pseudo-element
+   paints nothing at all, not even a faint edge on a tile's rounded corners. */
 @keyframes six-shimmer {
-  from {
-    background-position: 124.67% 0;
+  0% {
+    background-position: 154.67% 0;
+    opacity: 0;
+    animation-timing-function: linear;
   }
-  to {
+  0.1% {
+    opacity: 1;
+  }
+  14% {
+    background-position: 124.67% 0;
+    animation-timing-function: ease-out;
+  }
+  86% {
     background-position: -24.67% 0;
+    animation-timing-function: linear;
+  }
+  99.9% {
+    opacity: 1;
+  }
+  100% {
+    background-position: -54.67% 0;
+    opacity: 0;
   }
 }
 @media (max-width: 640px) {

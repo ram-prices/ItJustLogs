@@ -50,6 +50,12 @@ export const EXTRA_PRESETS: { key: string; label: string; extras: ExtraCopy[] }[
     ],
   },
   {
+    // The event also gives Star of Tomorrow (wpn_pistol_0013) at max Potential: add it here once the wiki data has it.
+    key: 'mimino',
+    label: "Workers' Guards: Roll Call (Mimino, maxed)",
+    extras: [{ id: 'chr_0039_mimino', copies: 6, note: "Workers' Guards: Roll Call" }],
+  },
+  {
     key: 'awakening',
     label: 'Awakening Sign-In (Ardelia and Dreams of the Starry Beach)',
     extras: [

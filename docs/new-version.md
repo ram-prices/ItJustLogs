@@ -34,6 +34,7 @@ is one that was missed then.
 | Banner | Site loads | Made by |
 |---|---|---|
 | Chartered / RE-Factor Headhunting | `banners/game/<pool>.webp` + `banners/game/layers/<pool>-back/-op.webp`, and `"gameArt": true` plus its `"gameArtV"` fingerprint on the pool in banners.json (automatic: `site-art.mjs` sets them once all three are there and the `-op` layer is over 10 KB, except pools on its `HOLD` list) | `operator-banner.py` (locally, needs the dump) |
+| Basic Headhunting (`standard`) | the same three files and flags as Chartered | `standard-banner.py` (locally, needs the dump): the pool's 6★ card sprites (`gachapool_card_<name>[_<n>]`, roster from GachaCharPoolContentTable `standard`) evenly spaced over the game's Basic Headhunting backdrop, 2048 wide; our layout, not the game's. Re-run it when the standard roster changes; it stops if a card sprite is missing |
 | Arsenal / RE-Factor Issue | `banners/<pool>.webp` (a copy of `issues/<weapon>.webp`, automatic) + `banners/layers/<pool>.webp` | `issue-banner.py`, then `issue-layers.py` (the schedule workflow runs it) |
 | Any pool without the above | `banners/<pool>.webp` | copy of `headhunting/<operator>.webp` (automatic) |
 
@@ -52,6 +53,15 @@ source. A new operator appears there some days after release: re-run it then (th
 schedule `art` there when the pool file is missing. Also needed per new operator/weapon: `operators/<id>.webp`,
 `operators/full/<id>.webp`, `arsenals/<id>.webp`, and an entry in
 `wiki/operators.json` (`operator-from-game.py` until the wiki has them).
+
+**Announced, not yet released operators** (Mimino in 1.7, an event gift from Dec 16): the dump lists
+them only in ForesightCharGrowthTable (no CharacterTable, skill or Potential rows), and their bundles'
+containers name the remote icon, character portrait and Potential posters without holding any pixels.
+`operator-from-game.py` builds such an entry from that table plus the wiki page (no stats or skills);
+the portrait comes from `portraits.py` (the wiki's 120px icon); there's no full or Potential art.
+Once a dump has the operator's tables and art, run `operator-from-game.py`, `operator-icons.py` (it
+overwrites the portrait: bump `PORTRAIT_V`), `operator-full.py` and `potential-art.py` again (the
+last reads CharacterPotentialTable, so it only finds them then).
 
 Layouts change between versions (1.7 moved the operator to
 `CenterNode/MainRoleLayer`): look at every new layer file, not just the flat one.

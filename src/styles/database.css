@@ -78,7 +78,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 30%, var(--background-100));
+  background: linear-gradient(to bottom, transparent 30%, var(--page));
   z-index: -1;
 }
 .wiki-hero-inner {
@@ -430,7 +430,7 @@
   animation: rise 0.6s var(--ease) both;
 }
 .wiki-hero.has-art::after {
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent 25%, transparent 45%, var(--background-100));
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent 25%, transparent 45%, var(--page));
 }
 /* A vignette over the banner picture: darker toward its edges. */
 .wiki-hero.has-art::before {
@@ -469,8 +469,8 @@
 .wiki-hero.has-art ~ :is(main, .site-footer) {
   position: relative;
   z-index: 1;
-  background: var(--background-100);
-  border-image: linear-gradient(var(--background-100) 0 0) fill 0 / 0 / 0 100vmax;
+  background: var(--page);
+  border-image: linear-gradient(var(--page) 0 0) fill 0 / 0 / 0 100vmax;
 }
 @keyframes pin-fade {
   to {
@@ -522,12 +522,12 @@
   background: linear-gradient(
     to bottom,
     transparent var(--fade-from),
-    color-mix(in srgb, var(--background-100) 8%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.15),
-    color-mix(in srgb, var(--background-100) 25%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.3),
-    color-mix(in srgb, var(--background-100) 50%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.48),
-    color-mix(in srgb, var(--background-100) 73%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.65),
-    color-mix(in srgb, var(--background-100) 90%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.82),
-    var(--background-100)
+    color-mix(in srgb, var(--page) 8%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.15),
+    color-mix(in srgb, var(--page) 25%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.3),
+    color-mix(in srgb, var(--page) 50%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.48),
+    color-mix(in srgb, var(--page) 73%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.65),
+    color-mix(in srgb, var(--page) 90%, transparent) calc(var(--fade-from) + (100% - var(--fade-from)) * 0.82),
+    var(--page)
   );
 }
 .wiki-hero.has-art .wiki-hero-pin::before {
@@ -539,9 +539,9 @@
   background: radial-gradient(
     ellipse 68% 80% at 52% 34%,
     transparent 22%,
-    color-mix(in srgb, var(--background-100) 40%, transparent) 50%,
-    color-mix(in srgb, var(--background-100) 75%, transparent) 75%,
-    color-mix(in srgb, var(--background-100) 95%, transparent)
+    color-mix(in srgb, var(--page) 40%, transparent) 50%,
+    color-mix(in srgb, var(--page) 75%, transparent) 75%,
+    color-mix(in srgb, var(--page) 95%, transparent)
   );
 }
 /* Desktop: a face low in its picture can't reach the band while the
@@ -569,7 +569,7 @@
   margin-top: 24px;
 }
 .wiki-hero.has-art ~ main .section-head {
-  text-shadow: 0 1px 8px var(--background-100);
+  text-shadow: 0 1px 8px var(--page);
 }
 .wiki-hero.has-art ~ main :is(.card, .metrics:not(.plain)) {
   background: color-mix(in srgb, var(--background-100) 65%, transparent);
@@ -652,9 +652,9 @@
     rgba(0, 0, 0, 0.2),
     transparent 22%,
     transparent 40%,
-    color-mix(in srgb, var(--background-100) 65%, transparent) 64%,
-    color-mix(in srgb, var(--background-100) 88%, transparent) 82%,
-    var(--background-100)
+    color-mix(in srgb, var(--page) 65%, transparent) 64%,
+    color-mix(in srgb, var(--page) 88%, transparent) 82%,
+    var(--page)
   );
 }
 .wiki-hero.tall::before {

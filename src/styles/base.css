@@ -20,6 +20,15 @@
   --z-toast: 1200;
   --background-100: #0a0a0a;
   --background-200: #000000;
+  /* Surfaces: the page behind everything, the header band, selected tabs, segmented
+     controls and table heads. Dark: one tone throughout; light steps them (see below). */
+  --page: var(--background-100);
+  --header-bg: var(--background-100);
+  --header-ring: var(--ring);
+  --sel-bg: var(--gray-alpha-200);
+  --sel-ring: 0 0 0 0 transparent;
+  --toggle-bg: var(--background-200);
+  --th-bg: var(--background-200);
   --gray-100: #1a1a1a;
   --gray-200: #1f1f1f;
   --gray-300: #292929;
@@ -97,61 +106,99 @@
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --background-100: #ffffff;
-  --background-200: #fafafa;
-  --gray-100: #f2f2f2;
-  --gray-200: #ebebeb;
-  --gray-300: #e6e6e6;
-  --gray-400: #ebebeb;
-  --gray-500: #c9c9c9;
-  --gray-600: #808080;
-  --gray-700: #666666;
-  --gray-900: #4d4d4d;
-  --gray-1000: #171717;
-  --gray-alpha-100: rgba(0, 0, 0, 0.04);
-  --gray-alpha-200: rgba(0, 0, 0, 0.065);
-  --gray-alpha-300: rgba(0, 0, 0, 0.085);
-  --gray-alpha-400: rgba(0, 0, 0, 0.08);
-  --gray-alpha-600: rgba(0, 0, 0, 0.28);
+  /* Warm paper: warm off-white surfaces, brown-black text, brown-tinted shadows. */
+  /* Two light tones: the page (deeper) and cards and panels (lightest, --background-100); the
+     header is a dark band (below). Selected things sit as cream on the page; inset things
+     (segmented tracks, table heads) are a step darker. */
+  --page: #e6dfd0;
+  --background-100: #f8f4ec;
+  --background-200: #efe9dd;
+  --sel-bg: var(--background-100);
+  --sel-ring: 0 0 0 1px var(--ring), 0 1px 2px rgba(60, 40, 10, 0.08);
+  --toggle-bg: #e2dacd;
+  --th-bg: #ebe4d6;
+  --gray-100: #ebe4d8;
+  --gray-200: #e2dacd;
+  --gray-300: #dbd3c5;
+  --gray-400: #e2dacd;
+  --gray-500: #c2b9aa;
+  --gray-600: #655d52;
+  --gray-700: #5f584e;
+  --gray-900: #4a443c;
+  --gray-1000: #2a2621;
+  --gray-alpha-100: rgba(70, 50, 20, 0.05);
+  --gray-alpha-200: rgba(70, 50, 20, 0.075);
+  --gray-alpha-300: rgba(70, 50, 20, 0.1);
+  --gray-alpha-400: rgba(70, 50, 20, 0.095);
+  --gray-alpha-600: rgba(50, 35, 10, 0.3);
   --focus: hsla(212, 100%, 48%, 1);
-  --link: #0072f5;
-  --blue: #0068d6;
-  --blue-bg: #ebf5ff;
-  --milestone: #0072f5;
-  --ring: rgba(0, 0, 0, 0.08);
+  --link: #005bc4;
+  --blue: #0058bd;
+  --blue-bg: #e3e9ee;
+  --milestone: #0064d8;
+  --ring: rgba(70, 50, 20, 0.12);
   --shadow-border: 0 0 0 1px var(--ring);
-  --shadow-card: 0 0 0 1px var(--ring), 0 2px 2px rgba(0, 0, 0, 0.04), 0 8px 8px -8px rgba(0, 0, 0, 0.04), 0 0 0 1px #fafafa;
-  --shadow-card-hover: 0 0 0 1px rgba(0, 0, 0, 0.14), 0 2px 2px rgba(0, 0, 0, 0.06), 0 8px 16px -8px rgba(0, 0, 0, 0.1), 0 0 0 1px #fafafa;
-  --shadow-menu: 0 0 0 1px var(--ring), 0 8px 24px rgba(0, 0, 0, 0.08);
-  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 0 0 1px var(--ring), 0 2px 2px rgba(60, 40, 10, 0.05), 0 8px 8px -8px rgba(60, 40, 10, 0.06), 0 0 0 1px var(--background-200);
+  --shadow-card-hover: 0 0 0 1px rgba(70, 50, 20, 0.2), 0 2px 2px rgba(60, 40, 10, 0.07), 0 8px 16px -8px rgba(60, 40, 10, 0.12), 0 0 0 1px var(--background-200);
+  --shadow-menu: 0 0 0 1px var(--ring), 0 8px 24px rgba(60, 40, 10, 0.1);
+  --shadow-pop: 0 12px 32px rgba(60, 40, 10, 0.14);
   --skeleton-shine: var(--gray-100);
   --badge-backing: color-mix(in srgb, var(--background-100) 85%, transparent);
   --white-icon-filter: brightness(0.3);
 
   --purple: #8e4ec6;
-  --purple-text: #7d3db5;
+  --purple-text: #7438a8;
   --purple-bg: rgba(142, 78, 198, 0.1);
   --teal: #0d9488;
-  --teal-text: #0b7f75;
+  --teal-text: #086860;
   --teal-bg: rgba(13, 148, 136, 0.1);
-  --green: #18794e;
+  --green: #166b45;
   --green-bg: rgba(41, 124, 59, 0.1);
-  --amber: #a35200;
+  --amber: #954a00;
   --amber-bg: rgba(255, 178, 36, 0.18);
-  --orange: #bd4b00;
-  --red: #cd2b31;
-  --red-solid: #cd2b31;
+  --orange: #ad4400;
+  --red: #b5242a;
+  --red-solid: #b5242a;
   --oroberyl: #d2381f;
   --chartered: #9a8a07;
   --basic-permit: #2a72b8;
   --origeometry: #a06d05;
   --arsenal-ticket: #4a6a96;
   --red-bg: rgba(229, 72, 77, 0.1);
-  --muted: #a8a8a8;
-  --r6: #e85d1e;
-  --r5: #c98d00;
-  --r4: #7c55f0;
-  --r3: #3f7fe0;
+  --muted: #a39b8e;
+  --r6: #cc5018;
+  --r5: #a87400;
+  --r4: #704ee0;
+  --r3: #3570cc;
+}
+/* Light theme's header is a dark warm-brown band framing the light page (keep the colour in sync with
+   `theme-color` in index.html and `applyTheme` in app.ts): it redefines the grays inside itself, so its
+   logo, tabs and buttons read as in the dark theme. */
+:root[data-theme='light'] .header {
+  --header-bg: #2a241d;
+  --header-ring: rgba(255, 245, 225, 0.12);
+  --background-100: #2a241d;
+  --background-200: #231e18;
+  --gray-100: #352e26;
+  --gray-200: #3d352c;
+  --gray-1000: #f3ede2;
+  --gray-900: #c4bbab;
+  --gray-700: #a89f8f;
+  --gray-600: #a89f8f;
+  --gray-alpha-100: rgba(255, 245, 225, 0.07);
+  --gray-alpha-200: rgba(255, 245, 225, 0.12);
+  --gray-alpha-300: rgba(255, 245, 225, 0.16);
+  --gray-alpha-400: rgba(255, 245, 225, 0.15);
+  --gray-alpha-600: rgba(255, 245, 225, 0.34);
+  --ring: rgba(255, 245, 225, 0.16);
+  --sel-bg: rgba(255, 245, 225, 0.12);
+  --sel-ring: 0 0 0 0 transparent;
+  --green: #4cc38a;
+  --amber: #ffb224;
+  --red: #ff6369;
+  --red-solid: #e5484d;
+  --link: #52a8ff;
+  --focus: #52a8ff;
 }
 
 /* ---------- Base --------------------------------------------------------- */
@@ -165,7 +212,7 @@ html {
 }
 body {
   margin: 0;
-  background: var(--background-100);
+  background: var(--page);
   color: var(--gray-1000);
   font: 400 14px/20px var(--font-sans);
   font-feature-settings: 'liga' 1, 'tnum' 1;
@@ -186,6 +233,11 @@ input,
 select {
   font: inherit;
   color: inherit;
+}
+/* No browser border (2px outset) under a button's own ring: rings are `box-shadow: var(--shadow-border)`,
+   a button that wants a real border sets one. */
+button {
+  border: 0;
 }
 img {
   display: block;

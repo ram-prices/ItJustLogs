@@ -18,7 +18,7 @@ import { fitBannerCards, installHomeWidgets } from './pages/homeWidgets';
 import { installParallax } from './parallax';
 import { installHeroFade } from './heroFade';
 import { syncVideoBackground } from './videoBackground';
-import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, sixShimmerCascade, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
+import { bannerBodyFor, bannerPage, installCardGlow, resetCardEntrance, listPage, setAllExpanded, setExpanded, sixShimmerCarry, sixShimmerCascade, sixShimmerSnapshot, toggleBannerFilter, toggleLuck, toggleSixStrip } from './pages/kind';
 import { bannerHref, bannerSlugs, infoHref, installWikiControls, loadingOrFailed, previewsLoading, shortLinkMap, slugsOf, statusPage, wikiFile } from './pages/info';
 import { canonicalPoolId } from '../domain/banners';
 import { finalStrikeSort, operatorInfoPage, operatorInfoTitle } from './pages/operator';
@@ -448,8 +448,10 @@ function watchHero(): void {
 
 function applyTheme(): void {
   const t = state.settings.theme;
-  document.documentElement.dataset.theme =
-    t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
+  const theme = t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
+  document.documentElement.dataset.theme = theme;
+  // The browser's toolbar takes the header's colour (base.css; index.html sets it before first paint).
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#2a241d' : '#0a0a0a');
   document.documentElement.dataset.motion = state.settings.motion === false ? 'off' : 'on';
 }
 
@@ -712,6 +714,7 @@ function draw(): void {
   root().classList.add('redrawn');
   clearTimeout(redrawnTimer);
   redrawnTimer = setTimeout(() => root().classList.remove('redrawn'), 200);
+  const sixWas = key === lastKey ? sixShimmerSnapshot() : null;
   render(root(), html`${header(route)}${page(route)}${footer()}`);
   if (played) carryEntrances(root(), played);
   keepEntrancesSampled();
@@ -747,6 +750,8 @@ function draw(): void {
   tintSixStrip();
   // The 6★ strip's shimmer ripples diagonally: set each winner's delay from its position.
   sixShimmerCascade();
+  // A redraw of the same page: each sweep carries on from where it was instead of starting over.
+  if (sixWas) sixShimmerCarry(sixWas);
   tintHeroes();
   syncVideoBackground();
   fitBannerCards();

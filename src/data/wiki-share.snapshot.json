@@ -1295,6 +1295,21 @@
      "description": "**SKILL DESCRIPTION:** Kay kitbashes a combi-bonker that she swings multiple times before throwing it to cause an explosion that deals ⟦nature|Nature DMG⟧ and applies ⟦key|Nature Infliction⟧ on enemies within the area of effect, recovers some SP, and leaves behind multiple ⟦key|Picnic Snacks⟧. When the controlled operator touches a ⟦key|Picnic Snack⟧ and picks it up, Kay grants HP treatment to the said operator and recovers some SP. The attribute of Agility increases the amount of HP treatment."
     }
    ]
+  },
+  "chr_0039_mimino": {
+   "name": "Mimino",
+   "rarity": 5,
+   "class": "Supporter",
+   "element": "Physical",
+   "weapon": "Handcannon",
+   "faction": "United Workers' Syndicates of Talos II",
+   "tags": [
+    "Protect",
+    "Vulnerable",
+    "Amp"
+   ],
+   "page": "https://endfield.wiki.gg/wiki/Mimino",
+   "skills": []
   }
  },
  "weapons": {

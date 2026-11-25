@@ -1575,17 +1575,22 @@ a.ladder-row:focus-visible {
   height: 100%;
   object-fit: cover;
 }
+/* The official card art standing in for missing full art: its face sits about halfway down. */
+.char-card-art img.card-art,
+.char-pic-img.card-art {
+  object-position: 50% 45%;
+}
 /* Full art is the whole figure on a transparent background: zoomed to the face and upper body,
    each operator's face (--fx, --fy in image widths, homeWidgets.ts FULL_ART_FACE) centred,
    a little above the middle, at any card width or height (cqw: the picture's width). */
-.char-card-art:has(> img.full-art:not(.stitched)) {
+.char-card-art:has(> img.full-art:not(.stitched, .card-art)) {
   position: relative;
   container-type: inline-size;
 }
-.style-background .char-card-art:has(> img.full-art:not(.stitched)) {
+.style-background .char-card-art:has(> img.full-art:not(.stitched, .card-art)) {
   position: absolute;
 }
-.char-card-art img.full-art:not(.stitched) {
+.char-card-art img.full-art:not(.stitched, .card-art) {
   --zoom: 2.6;
   position: absolute;
   left: calc(50% - var(--fx) * var(--zoom) * 100cqw);
@@ -1595,7 +1600,7 @@ a.ladder-row:focus-visible {
   height: auto;
   object-fit: contain;
 }
-.style-banner .char-card-art img.full-art:not(.stitched) {
+.style-banner .char-card-art img.full-art:not(.stitched, .card-art) {
   clip-path: none;
 }
 /* Profile picture: round, at the top left beside the name. */

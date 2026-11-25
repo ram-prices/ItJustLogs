@@ -310,12 +310,17 @@ export function credit(a: WikiAttribution, page?: string): Html {
 /**
  * The footer for an operator whose numbers the wiki has no set for yet: read
  * from the game's own tables (the EndfieldData dump) by ef-assets'
- * scripts/operator-from-game.py, in wiki/operators-game.json.
+ * scripts/operator-from-game.py, in wiki/operators-game.json. `wiki`: the
+ * entry also shows text from the operator's wiki page (profile, tags), which
+ * CC BY-SA asks to credit too.
  */
-export function gameCredit(): Html {
+export function gameCredit(wiki?: { attribution: WikiAttribution; page?: string }): Html {
+  const game = external('https://git.escartem.moe/Endfield/EndfieldData', 'EndfieldData');
   return html`<p class="wiki-credit copy-13">
     ${icon('menu_book')}
-    <span>Data from the game's tables (${external('https://git.escartem.moe/Endfield/EndfieldData', 'EndfieldData')}).</span>
+    <span>${wiki
+      ? html`Data from the game's tables (${game}) and ${external(wiki.page ?? wiki.attribution.url, wiki.attribution.source)}, ${external(wiki.attribution.licenseUrl, wiki.attribution.license)}. Snapshot of ${wiki.attribution.fetched}.`
+      : html`Data from the game's tables (${game}).`}</span>
   </p>`;
 }
 
@@ -541,8 +546,17 @@ export interface LadderInfo {
 }
 
 /** Potentials: the Potential ladder (`ladderBox`), or what's missing to show it. */
-export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, ladder?: LadderInfo): Html {
+export function ownedSection(kind: Kind, name: string, a: Analysis | null, owned: Owned | undefined, ladder?: LadderInfo, free = false): Html {
   const head = html`<div class="section-head"><h2 class="heading-20">Potentials</h2></div>`;
+  // Never on a banner (event gifts: Purrchena, Mimino): pull history can't hold
+  // a copy, so point at Settings → Extra copies instead of the import.
+  if (free && !owned?.copies) {
+    return html`<section class="section">${head}
+      <div class="card">${emptyState('redeem', `${name} isn't on any banner.`, {
+        action: html`<a class="btn secondary sm" href="/settings">${icon('add')}Extra copies</a>`,
+      })}</div>
+    </section>`;
+  }
   if (!a && !owned?.copies) {
     return html`<section class="section">${head}
       <div class="card">${emptyState('inbox', `Import your pull history to see how many copies of ${name} you have and their Potential.`, {
