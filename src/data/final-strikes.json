@@ -175,6 +175,11 @@
    "hits": 3,
    "seconds": 3.87,
    "sp": 23
+  },
+  "chr_0040_sweetpie": {
+   "hits": 5,
+   "seconds": 3.83,
+   "sp": 20
   }
  }
 }

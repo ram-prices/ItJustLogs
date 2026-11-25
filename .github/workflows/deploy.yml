@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: ram-prices/ef-assets
-          ref: 750c42381b488e5b0427301935281d3ba9339472 # ef-assets main, 2026-11-23
+          ref: 4c0c2d6a8574737debb0dcce670f3a0dd0bee9ca # ef-assets main, 2026-11-25 (Kay, Sweet Deal)
           path: ef-assets
           sparse-checkout: |
             combat

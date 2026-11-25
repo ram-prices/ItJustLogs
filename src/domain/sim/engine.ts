@@ -1150,6 +1150,9 @@ export class World {
       }
       case 'RandomAction':
         return this.execBlock(a.sequenceActionData ?? a.actions ?? a.action, ctx);
+      // A delay buff's actions (DelayTriggerAction), run when it triggers.
+      case 'ExecuteDelayTriggerBuffActions':
+        return this.execBlock(a.actions, ctx);
       // Hits that tick over a window, at most so many times per target: with one target and no movement, once each.
       case 'ChannelingAction':
       case 'ChannelingActionV2':
@@ -1159,13 +1162,18 @@ export class World {
         const list = (a.actionOnTick ?? a.actionInAura ?? a.actionOnExecuting)?.actionData;
         // An aura reaches the whole fight here: allies or enemies (by its filter: relative to its source, or a side
         // named outright, Good = the team: Liino's stance ATK Boost), each given its buffs and actions; not its owner
-        // if it excludes it.
+        // if it excludes it (a summon's: its spawner). A pickup, an aura whose actions are for the controlled operator
+        // touching it, leaves out only the summon itself: Kay's dropped Weapons and Picnic Snacks are hers to touch too
+        // (wiki: "when the controlled operator touches it"). Taking excludeOwner as the summon alone everywhere would
+        // give Tangtang her own Whirlpool buff (Skydrummer +31.5k, Alleikhreos +21.7k): left to the owner.
         const f = a.targetFilter ?? {};
         const side = (ctx.source.owner ?? ctx.source).side;
         const teamSide = f.autoSetTargetFaction === false && f.targetFactionType ? f.targetFactionType === 'Good' : /Ally|Self|Friend/.test(f.factionTarget ?? '') === (side === 'team');
+        const pickup = t === 'AuraAction' && (list ?? []).some((x: Data) => /CheckMainCharacterCondition/.test(x?.$type ?? ''));
+        const excluded = pickup ? ctx.owner : (ctx.owner.owner ?? ctx.owner);
         const inAura =
           t === 'AuraAction'
-            ? (teamSide ? this.team : [this.enemy]).filter((e) => !a.excludeOwner || e !== (ctx.owner.owner ?? ctx.owner))
+            ? (teamSide ? this.team : [this.enemy]).filter((e) => !a.excludeOwner || e !== excluded)
             : a.targetSettings
               ? this.targets(a.targetSettings, ctx)
               : [ctx.target ?? this.enemy];
@@ -1270,7 +1278,10 @@ export class World {
       // Skill kinds come from ids here ("Hunter Pursuit", chr_0033_camille_combo_skill_2, counts as a combo already).
       case 'ChangeSkillType':
         return;
-      // CreateBuffAttachingSkill: the same, tied to the cast (Yvonne's talent DMG bonus, some weapons).
+      // CreateBuffAttachingSkill: the same, tied to the cast (Yvonne's talent DMG bonus, some weapons). DelayTriggerAction
+      // gives its delay buff as CreateBuffAction would (with the cast's target groups: passTargetGroupsToBuff); the buff's
+      // OnBuffTrigger, after its triggerInterval, runs ExecuteDelayTriggerBuffActions (Kay's combo throws its Weapon so).
+      case 'DelayTriggerAction':
       case 'CreateBuffAttachingSkill':
       case 'CreateBuffAction': {
         const count = Math.max(1, Math.round(this.val(a.count, ctx.bb)));
@@ -1278,7 +1289,9 @@ export class World {
           for (const spec of a.buffs ?? []) {
             const id = spec.readIdFromBlackboard ? null : spec.buffId;
             if (!id) continue;
-            const assigned = new Map<string, number>();
+            // A delay buff runs its skill's actions later, with that skill's values (the combo's atk_scale, atb, usp
+            // reach the Weapon it throws).
+            const assigned = new Map<string, number>(t === 'DelayTriggerAction' ? ctx.bb : []);
             if (spec.assignBlackboard)
               for (const it of spec.assignItems ?? []) assigned.set(it.targetKey, it.useDirectValue ? Number(it.numericValue) : (ctx.bb.get(it.inputValueKey) ?? 0));
             for (let i = 0; i < count; i++) {
@@ -2324,6 +2337,8 @@ export class World {
       if (was < k * this.foe.poise && n >= k * this.foe.poise && n < this.foe.poise) {
         if (this.foe.nodeBuff && this.buffOf.has(this.foe.nodeBuff)) this.addBuff(target, this.foe.nodeBuff, attacker ?? target, new Map());
         this.comboEvent({ kind: 'stagger', target });
+        // Its buffs hear the node break (Kay's talent watches for it: buff_chr_0040_sweetpie_passive_talent2_fx).
+        this.abilityEvent(target, 'OnPoiseKnotBreak', null);
         if (this.foe.nodeStagger) n += this.foe.nodeStagger;
         // Marked as the Recording view marks it (the meter passing its node).
         this.mechanics.push({ frame: this.frame, label: 'Stagger node' });
@@ -2953,8 +2968,11 @@ export class World {
     // Each operator's own passives (not those a talent attaches), then its weapon's and gear sets'.
     for (const op of this.team) {
       const b = this.bundleOf(op);
+      // A passive in one of the operator's skill groups is the operator's own even if named for a talent (Kay's
+      // passive_talent2, in her ultimate's group, drops the Picnic Waffle her talent asks for).
+      const grouped = new Set(Object.values(b?.skillGroups ?? {}).flat());
       for (const [id, s] of Object.entries(b?.skills ?? {}))
-        if ((s as Data).castType === 'Passive' && id.startsWith(`${op.id}_`) && !/_talent/.test(id) && !attached.has(id)) this.cast(id, op, op, this.enemy);
+        if ((s as Data).castType === 'Passive' && id.startsWith(`${op.id}_`) && (!/_talent/.test(id) || grouped.has(id)) && !attached.has(id)) this.cast(id, op, op, this.enemy);
       for (const id of b?.passives ?? []) this.cast(id, op, op, this.enemy);
     }
     for (const op of this.team) {
@@ -3851,6 +3869,10 @@ export const COMBO_TRIGGERS: Record<string, (ev: ComboEvent, w: World, op: Entit
   chr_0035_liino: (ev, _w, op) =>
     (ev.kind === 'status' || ev.kind === 'statusConsumed') && ARTS_REACTIONS.includes(ev.status) && op.buffs.some((b) => b.id === 'buff_chr_0035_liino_normalskill_music_tag'),
   // Typhoeus (max Signs) isn't modelled yet.
+  // Kay: while she has ≥ 1 Weapon (buff_chr_0040_sweetpie_weapon_count's stacks), Nature Infliction applied or Arts
+  // Burst damage dealt.
+  chr_0040_sweetpie: (ev, _w, op) =>
+    ((ev.kind === 'inflict' && ev.element === 'Natural') || ev.kind === 'burst') && (op.buffs.find((b) => b.id === 'buff_chr_0040_sweetpie_weapon_count')?.stacks ?? 0) >= 1,
 };
 
 /** A custom event's name: written in, or a value (Liino's liino_comboskill_end). */

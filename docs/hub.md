@@ -58,9 +58,9 @@ matter most to a hub.
 - Build gotcha: the CSS minifier empties `border-image: none`. Use `border-image-source: none` and test Firefox on a build.
 - The owner often steers workers directly: read a report's final message before relaying.
 - Owner-only checks also include a Drive upload over 5 MB (parked).
-- Rule tests (`src/domain/sim/rules.test.ts` and `rules2.test.ts`, harness `testkit.ts`): to add an operator, a
-  worker writes its table (id, name, setups, rules from the `rules` builders, each naming its source) and adds it to
-  `OPERATORS` (rules2: a section's list passed to `runTables`).
+- Rule tests (`src/domain/sim/rules.test.ts`, `rules2.test.ts`, `rules3.test.ts` for 1.7 on; harness `testkit.ts`):
+  to add an operator, a worker writes its table (id, name, setups, rules from the `rules` builders, each naming its
+  source) and adds it to `OPERATORS` (rules2/rules3: the list passed to `runTables`).
   A failing row is a finding for the owner: it's marked `finding` (an expected failure), never made to pass.
 - Brief a worker with SendMessage to an idle worker, or `start_session` fresh (Opus 5.5 medium,
   `use_worktree: false`, `permission_mode: auto`, `wake_when_done: true`). Read the final message

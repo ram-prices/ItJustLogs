@@ -26,16 +26,17 @@ export const asset = (path: string): Promise<any> => {
   return cache.get(path)!;
 };
 
-/** The combat data the sim needs for operators alone (no weapons). */
-export async function simData(ops: string[]): Promise<SimData> {
+/** The combat data the sim needs for operators alone (and the weapons a setup names). */
+export async function simData(ops: string[], weapons: string[] = []): Promise<SimData> {
   const [gear, settings, ...bundles] = await Promise.all([
     asset('combat/gear.json'),
     asset('combat/settings.json'),
     ...ops.map((op) => asset(`combat/ops/${op}.json`)),
+    ...weapons.map((w) => asset(`combat/weapons/${w}.json`)),
   ]);
   return {
     ops: Object.fromEntries(ops.map((op, i) => [op, bundles[i]])),
-    weapons: {},
+    weapons: Object.fromEntries(weapons.map((w, i) => [w, bundles[ops.length + i]])),
     gear,
     settings: settings.settings,
   };
@@ -217,6 +218,8 @@ export interface Setup {
   sp?: number;
   /** Teammates after the operator (ids; no gear, never pressed): what the operator gives the team. */
   team?: string[];
+  /** The operator's weapon (its id; every skill at its cap, P0), else none. */
+  weapon?: string;
   script?: Step[];
 }
 
@@ -304,6 +307,7 @@ export class Probe {
       op: id,
       potential: setup.potential ?? 0,
       gear: [],
+      ...(setup.weapon ? { weapon: { id: setup.weapon, potential: 0 } } : {}),
       ...(setup.level ? { level: setup.level } : {}),
       ...(r || setup.ranks
         ? {
@@ -655,8 +659,9 @@ export function runTables(operators: OperatorRules[], t: { describe: any; before
       const probes = new Map<string, Probe>();
       beforeAll(async () => {
         const mates = [...new Set(Object.values(op.setups ?? {}).flatMap((s) => s.team ?? []))];
+        const weapons = [...new Set(Object.values(op.setups ?? {}).flatMap((s) => (s.weapon ? [s.weapon] : [])))];
         const [data, wiki, bundle] = await Promise.all([
-          simData([op.id, ...mates]),
+          simData([op.id, ...mates], weapons),
           asset('wiki/operators.json').then((w) => w.operators[op.id] as WikiOp),
           asset(`combat/ops/${op.id}.json`),
         ]);

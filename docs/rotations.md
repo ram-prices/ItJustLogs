@@ -687,11 +687,12 @@ Two more (2026-10-31), the owner's call, no replay moved (Skydrummer 3,588,467, 
 Findings left (15 rows): group E (Arclight's third slash, Perlica's Cycle Protocol, Rossi's combo SEQ 1, Purrchena's
 hold), Endministrator P1 (game code), Avywenna's lances (6), Camille's Vesperwings, Liino's Starry Boost.
 
-### Tracked sim-vs-data gaps (the 15 expected-fail rows)
+### Tracked sim-vs-data gaps (the 19 expected-fail rows)
 
-The `finding(...)` rows in rules2.test.ts, run with `it.fails`: each is a known gap between the sim and the data. The
-suite must keep exactly 15 expected failures; one turning red means the engine now matches the data (drop its
-`finding` and say so). By operator (rank in brackets where a row runs at both):
+The `finding(...)` rows in rules2.test.ts and rules3.test.ts, run with `it.fails`: each is a known gap between the sim
+and the data. The suite must keep exactly 19 expected failures (15 in rules2, 4 in rules3: Kay, below); one turning red
+means the engine now matches the data (drop its `finding` and say so). By operator (rank in brackets where a row runs at
+both):
 - Endministrator m and f (2): Ultimate SP at P1. Data 50 SP when the crystals are consumed, sim 0: the P1 buff's
   atb_return is read by no skill or buff in the data (the game's code gives it).
 - Perlica (1): Cycle Protocol, her combo on a Vulnerable enemy chains once more. Data 2 hits, sim 1: talent2 is set on
@@ -709,6 +710,67 @@ suite must keep exactly 15 expected failures; one turning red means the engine n
   timeline; check against footage.
 - Liino (1): Starry Boost, battle skill after her combo returns 10 SP. Sim 0: global_buff_liino_combo_atb_return
   (CreateGlobalBuffAction) isn't in ef-assets.
+- Kay (4, rules3.test.ts): basic attack SEQ 3 [1, 12] (wiki 0.28/0.60 = display_atk_scale, 4 × atk_scale; the timeline
+  launches one projectile of atk_scale, the projectile's hit count isn't readable). Sweet Deal's ATK buff from a Final
+  Strike (the engine marks every SP gain "Skill", `World.lastAtb`; the data's atbSourceType says NormalAttack), and its
+  Arts DMG buff from her combo's forced Nature Burst (OnCharBeforeOutputSpellBurst is raised only for a Burst from
+  stacking an infliction; whether the game raises it for a forced one is unclear).
+
+## Kay (chr_0040_sweetpie, 1.7) and Sweet Deal
+
+Rule tests: `src/domain/sim/rules3.test.ts` (batch 3, 80 rows, 4 findings above). Sources: ef-assets
+`combat/ops/chr_0040_sweetpie.json` (skills, buffs, `patch`, `talents`; ef-assets 4c0c2d6, from the 1.7 dump) and
+`wiki/operators.json`. Numbers at rank 1 / rank 12.
+
+Her SP, every source:
+- Final Strike (attack5): 20 SP (patch attack5 `atb`, every rank), controlled operator only (CheckMainCharacterCondition);
+  attacks 1, 2, 4 and the dive carry Atb actions with `atb` 0 (attack 3 none). A Finisher gives the enemy's Finisher SP (GainBreakingAttackAtb).
+- Battle skill "Really Heavy Bash": costs 100, returns none (no Atb action); like every battle skill it gives each
+  teammate 6.5 Ultimate Energy (buff_common_obtain_ultimate_sp).
+- Combo "Really Kwik Smash": one Weapon thrown (combo_skill jumps by distance to one of three variants; no positions:
+  the nearest, frame 414; a DelayTriggerAction buff launches it at 427 + 0.23 s, about 0.7 s after the press). Its hit
+  (combo_skill_projhit*) gives 10 SP (ranks 1–8), 11 (9–11), 12 (12) (patch combo_skill `atb`, atbSourceType Skill;
+  P5 × 1.3: 15.6) and Kay 5 Ultimate Energy (`usp`), and forces a Nature Burst. The Weapon count doesn't gate the SP:
+  it gates the combo's trigger (wiki: "while Kay has ≥ 1 Weapon", in COMBO_TRIGGERS) and the Weapon dropping.
+- Ultimate: 24 / 27 (ranks 9–11) / 30 SP at frame 138, the explosion (patch ultimate_skill `atb`), then three Picnic
+  Snacks (three LaunchProjectiles → ult_skill_weapon_leave*_abilityrange): 10 SP each (`atb_food`, every rank; the
+  entity skill's own default 15 is overridden by the ultimate's value it is handed) and a heal, when the controlled
+  operator touches one.
+- Talent "Have a Waffle!" (talent_2_1 Elite 2: cd 30 s, talent_2_2 Elite 3: 20 s): the enemy Staggered (OnPoiseZero)
+  or passing a Stagger node (OnPoiseKnotBreak) drops a Picnic Waffle, a Picnic Snack (10 SP) at most once per cd
+  (passive_talent2_2's timed marker; passive_talent2, in her ultimate's skill group, launches it).
+- Sweet Deal adds no SP: after SP from the wielder's skill (CheckObtainAtbType Gain/Skill) the team gets ATK +x% for
+  30 s (3 stacks, own timers, 0.1 s apart); its third skill is Ultimate Gain Efficiency (UltimateSpGainScalar).
+- All of it is capped by the stage's SP maximum and scaled by its SP rules (Glaiver File −50%) as any gain (`obtain`).
+
+Weapons and Hot Edgy Naives: she starts with 3 Weapons (passive_default: 3 × buff_chr_0040_sweetpie_weapon_count,
+Enhance, max 3). A combo's hit drops one if she holds any (weapon_count_sub, checked first, is created by nothing):
+its entity (weapon_leave_abilityrange, 300 s) is salvaged when the controlled operator touches it, by her battle skill
+(frames 3, 9, 15: up to three, nearest first) or, at 300 s, returns without a stack (weapon_leave_passive). A salvage
+by touch or bash gives +1 Weapon, +1 Hot Edgy Naives (weapon_recycle_buff, max 3; P1 adds one on entering battle) and
+the team "Bottomless Arsenal" (+1.5% Arts DMG and +1.5% more Nature, 15 s, 3 stacks; P1 +2% and +10 s). The bash hits
+atk_scale_1 (0.27/0.60) at frame 6 and atk_scale + Naives × atk_scale_per_weapon (1.07/2.40 + n × 0.44/1.00; P3 ×1.2
+per stack) at 48, consumes every Naive, and on 3 forces Combustion for 5 s.
+
+Assumption (no positions; the owner's call, 2026-11-25: keep it, best-case play): a dropped Weapon, a Picnic Snack and a Waffle are touched
+by the controlled operator as soon as their entity's aura starts (frame 9). So Weapons come back at once (the bash finds
+none to salvage: its damage is the same, the Naives coming from the touches), and each ultimate gives 30 + 30 SP. In
+the game the Weapon lands 8–12 m from the target and the snacks 3–6 m from Kay, so some are left behind.
+
+Engine changes for her (2026-11-25), each Kay-only in the data, so no replay moved (Skydrummer 3,651,940, Alleikhreos
+4,617,392, Last Rite 4,071,541 before and after):
+- DelayTriggerAction gives its delay buff as CreateBuffAction does, carrying the skill's blackboard; the buff's
+  OnBuffTrigger runs ExecuteDelayTriggerBuffActions (`act`).
+- An AuraAction whose actions check for the controlled operator (a pickup) leaves out only the summon running it, not
+  its spawner (`pickup` in `act`). excludeOwner as "the summon itself" everywhere is likely the game's meaning, but it
+  gives Tangtang her own Whirlpool buff (Skydrummer +31.5k, Alleikhreos +21.7k; her combo frees her at 39 frames, not
+  41), so it stays Kay-only (the owner's call, 2026-11-25) until the 1.7 combat-data review looks at it, together with
+  the "SP from a skill" label (Kay's finding 2, which also touches Akekuri, Pogranichnik, five weapons and a gear set).
+- Passive skills in an operator's skill groups are cast at the start even when named for a talent (`start`:
+  passive_talent2).
+- Crossing a Stagger node raises OnPoiseKnotBreak on the enemy (`poise`).
+- COMBO_TRIGGERS has Kay's (wiki text).
+The rule-test harness takes a `weapon` in a setup (`Setup.weapon`, `simData(ops, weapons)`).
 
 ## State at the 2026-10-25 handoff
 
