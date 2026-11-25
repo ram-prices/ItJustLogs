@@ -181,8 +181,8 @@ export async function cropAvatar(file: Blob, tall = false, start?: AvatarEdit, n
       const p = pc.getContext('2d')!;
       const css = getComputedStyle(document.documentElement);
       const grad = p.createLinearGradient((CIRCLE.x0 * k) - b.x0, layer.height - 2 * R * k - b.y0, (CIRCLE.x1 * k) - b.x0, layer.height - b.y0);
-      grad.addColorStop(0, css.getPropertyValue('--op').trim() || '#8e4ec6');
-      grad.addColorStop(1, css.getPropertyValue('--ars').trim() || '#12a594');
+      grad.addColorStop(0, css.getPropertyValue('--purple').trim() || '#8e4ec6');
+      grad.addColorStop(1, css.getPropertyValue('--teal').trim() || '#12a594');
       p.fillStyle = grad;
       p.beginPath();
       p.arc((S / 2) * k - b.x0, MID * k - b.y0, R * k, 0, Math.PI * 2);

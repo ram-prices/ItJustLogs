@@ -839,7 +839,7 @@ input.sim-run-value-edit {
   background: var(--gray-900);
 }
 .sim-press.combo {
-  background: var(--op);
+  background: var(--purple);
 }
 .sim-press.ultimate {
   background: var(--amber);

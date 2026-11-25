@@ -171,9 +171,9 @@
 .notch.gem {
   background: var(--notch-gem);
 }
-/* The levels Potential gives (the weapon page's own skill), in the operators' purple. */
+/* The levels Potential gives (the weapon page's own skill), in purple. */
 .notch.pot {
-  background: var(--op-text);
+  background: var(--purple-text);
 }
 .notch.shut {
   background: none;

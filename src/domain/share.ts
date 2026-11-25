@@ -353,8 +353,8 @@ export function weaponEmbed(w: ShareWeapon, p: Preview): ComponentEmbed {
 // Banners and events (Home's schedule): /banners/<name>, /events/<name>
 // ---------------------------------------------------------------------------
 
-/** Side bar: Headhunting purple, Arsenal teal (--op, --ars), events amber (--amber). */
-const scheduleColor = (i: ScheduleItem): string => (isScheduleBanner(i) ? (isWeaponBanner(i.kind) ? '#12a594' : '#8e4ec6') : '#ffb224');
+/** Side bar: Headhunting teal, Arsenal purple (--op, --ars), events amber (--amber). */
+const scheduleColor = (i: ScheduleItem): string => (isScheduleBanner(i) ? (isWeaponBanner(i.kind) ? '#8e4ec6' : '#12a594') : '#ffb224');
 const scheduleLabel = (i: ScheduleItem): string => (isScheduleBanner(i) ? KIND_LABEL[i.kind] : i.type);
 const rateUpsOf = (i: ScheduleItem): string[] => (isScheduleBanner(i) ? i.rateUps : []);
 

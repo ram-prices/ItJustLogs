@@ -7,7 +7,7 @@ is one that was missed then.
 ## Before
 
 - **The ef-assets "needs attention" issue.** update-schedule and update-wiki
-  commit straight to main and rebuild the CDN branches themselves (in 1.7 the
+  commit straight to main themselves (Cloudflare Pages deploys it) (in 1.7 the
   wiki data was five weeks stale because their pull requests went unmerged).
   What they can't make, or a run that failed, goes into the one open issue
   "ef-assets: needs attention", assigned to and mentioning ram-prices, each

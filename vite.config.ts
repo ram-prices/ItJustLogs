@@ -346,7 +346,8 @@ function pageCopies(): Plugin {
  * - web-static.hg-cdn.com: event art the official schedule links to (schedule.json `art`).
  * - accounts.google.com/gsi/, www.googleapis.com, oauth2.googleapis.com: Google
  *   sign-in and Drive sync (drive.ts); Google's documented GIS policy plus token revoke.
- * - fonts.googleapis.com, fonts.gstatic.com: Jost, Geist Mono and Material Symbols.
+ * - fonts.googleapis.com, fonts.gstatic.com: Jost, Geist Mono and Material Symbols; also
+ *   fetched (connect-src) to inline them into copied banner card pictures (ui/cardImage.ts).
  * - blob: and data: are the player's own files (pictures, videos, backups), and
  *   Tesseract's worker is a blob: script.
  */
@@ -368,7 +369,7 @@ function contentSecurityPolicy(): Plugin {
           "default-src 'self'",
           `script-src 'self' ${hashes.join(' ')} ${jsdelivr} https://accounts.google.com/gsi/client 'wasm-unsafe-eval'`,
           "worker-src 'self' blob:",
-          `connect-src 'self' ${assets} ${raw} ${jsdelivr} https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com blob: data:`,
+          `connect-src 'self' ${assets} ${raw} ${jsdelivr} https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com https://fonts.googleapis.com https://fonts.gstatic.com blob: data:`,
           `img-src 'self' data: blob: ${assets} ${raw} https://web-static.hg-cdn.com`,
           `media-src 'self' blob: ${assets} ${raw}`,
           "font-src 'self' https://fonts.gstatic.com",

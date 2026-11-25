@@ -53,59 +53,6 @@
   color: var(--gray-1000);
   font-variant-numeric: tabular-nums;
 }
-.sched-card .progress {
-  margin-top: 8px;
-}
-/* Labels the time bar, so it doesn't read as a pity bar. */
-.sched-through {
-  margin-top: 4px;
-  font: 400 11px/14px var(--font-sans);
-  color: var(--gray-700);
-  text-align: right;
-}
-.sched-card .progress > i {
-  background: var(--op);
-}
-.sched-card.weap .progress > i {
-  background: var(--ars);
-}
-/* Your pity on this banner, linking to its card. */
-.sched-mine {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  /* At the card's bottom, level across a row of cards. */
-  margin-top: auto;
-  padding-top: 12px;
-  font: 500 11px/16px var(--font-sans);
-  text-decoration: none;
-}
-.sched-mine b {
-  font: 600 15px/20px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-}
-.sched-mine i {
-  font: 400 11px/16px var(--font-sans);
-  color: var(--gray-700);
-  margin-left: -3px;
-}
-.sched-mine .hourglass {
-  display: inline-grid;
-  opacity: 0.85;
-}
-.sched-mine-pulls {
-  margin-left: auto;
-  color: var(--gray-900);
-  text-transform: uppercase;
-}
-.sched-mine > .icon {
-  font-size: 16px;
-  color: var(--gray-700);
-}
-.sched-mine:hover .sched-mine-pulls,
-.sched-mine:hover > .icon {
-  color: var(--gray-1000);
-}
 
 /* Coming up: compact rows. */
 /* Rows reach the card's edges, so an event row's art does too; the ends keep the card's inner space. */
@@ -269,10 +216,10 @@ a.sched-next:hover {
 }
 .sched-next-meta .rateup-icon {
   font-size: 13px;
-  color: var(--ars);
+  color: var(--op);
 }
 .sched-next.weap .sched-next-meta .rateup-icon {
-  color: var(--op);
+  color: var(--ars);
 }
 .sched-next-when {
   display: flex;

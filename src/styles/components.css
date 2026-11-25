@@ -75,7 +75,7 @@
   object-fit: cover;
   /* A picture framed to rise above the circle is taller: its circle part is at the bottom. */
   object-position: center bottom;
-  background: linear-gradient(135deg, var(--op), var(--ars));
+  background: linear-gradient(135deg, var(--purple), var(--teal));
   flex-shrink: 0;
 }
 .avatar.lg {
@@ -494,12 +494,12 @@ main {
   --badge-bg: var(--red-bg);
 }
 .badge.purple {
-  color: var(--op-text);
-  --badge-bg: var(--op-bg);
+  color: var(--purple-text);
+  --badge-bg: var(--purple-bg);
 }
 .badge.teal {
-  color: var(--ars-text);
-  --badge-bg: var(--ars-bg);
+  color: var(--teal-text);
+  --badge-bg: var(--teal-bg);
 }
 .badge.blue {
   color: var(--blue);

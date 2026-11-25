@@ -234,7 +234,6 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
   const sixes = a.sixStars.filter((x) => x.kind === kind).sort((x, y) => y.ts - x.ts || y.seq - x.seq);
   if (!sixes.length) return html``;
   const tokens = tokensOf(a, kind);
-  const rewards = !tokens.length ? '' : kind === 'char' ? ` · ${tokens.length} Token${tokens.length > 1 ? 's' : ''}` : ` · ${tokens.length} rate-up cop${tokens.length > 1 ? 'ies' : 'y'}`;
   const copies = copiesByPull(a, kind);
   // Weapons from one set of ten (same banner, same set) together.
   const setKey = (x: AnalyzedPull) => (x.kind === 'weap' && x.bannerPull != null ? `${x.poolId}:${setOf(x.bannerPull)}` : null);
@@ -264,7 +263,6 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
     <div class="section-head">
       <h2 class="heading-20">${withStars('6★ history')}</h2>
       <div class="row">
-        <span class="label-13 secondary">${sixes.length} total${rewards} · newest first</span>
         <button class="btn tertiary sm six-toggle" data-action="six-strip" aria-expanded="${String(open)}">${open ? 'Show less' : 'Show all'}</button>
       </div>
     </div>

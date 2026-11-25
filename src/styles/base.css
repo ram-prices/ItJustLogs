@@ -3,7 +3,7 @@
 /* ==========================================================================
    ItJustLogs — built on Vercel's Geist design language.
    Typography leads; surfaces are monochrome with hairline borders; colour is
-   reserved for meaning (operators purple, arsenals teal, status, rarity).
+   reserved for meaning (operators teal, arsenals purple, status, rarity).
    Naming follows Geist: heading-*, copy-*, label-*, gray-*, gray-alpha-*.
    ========================================================================== */
 
@@ -55,12 +55,20 @@
   --white-icon-filter: none;
 
   /* Meaning */
-  --op: #8e4ec6;
-  --op-text: #bf7af0;
-  --op-bg: rgba(142, 78, 198, 0.16);
-  --ars: #12a594;
-  --ars-text: #0ac5b3;
-  --ars-bg: rgba(18, 165, 148, 0.16);
+  --purple: #8e4ec6;
+  --purple-text: #bf7af0;
+  --purple-bg: rgba(142, 78, 198, 0.16);
+  --teal: #12a594;
+  --teal-text: #0ac5b3;
+  --teal-bg: rgba(18, 165, 148, 0.16);
+  /* Operators teal, weapons/arsenals purple, everywhere a colour stands for
+     the kind (the light theme only redefines the raw colours above). */
+  --op: var(--teal);
+  --op-text: var(--teal-text);
+  --op-bg: var(--teal-bg);
+  --ars: var(--purple);
+  --ars-text: var(--purple-text);
+  --ars-bg: var(--purple-bg);
   --green: #4cc38a;
   --green-bg: rgba(70, 167, 88, 0.16);
   --amber: #ffb224;
@@ -120,12 +128,12 @@
   --badge-backing: color-mix(in srgb, var(--background-100) 85%, transparent);
   --white-icon-filter: brightness(0.3);
 
-  --op: #8e4ec6;
-  --op-text: #7d3db5;
-  --op-bg: rgba(142, 78, 198, 0.1);
-  --ars: #0d9488;
-  --ars-text: #0b7f75;
-  --ars-bg: rgba(13, 148, 136, 0.1);
+  --purple: #8e4ec6;
+  --purple-text: #7d3db5;
+  --purple-bg: rgba(142, 78, 198, 0.1);
+  --teal: #0d9488;
+  --teal-text: #0b7f75;
+  --teal-bg: rgba(13, 148, 136, 0.1);
   --green: #18794e;
   --green-bg: rgba(41, 124, 59, 0.1);
   --amber: #a35200;

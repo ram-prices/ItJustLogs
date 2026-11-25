@@ -47,8 +47,7 @@ out) and `docs/testing.md`.
   at `assets.itjustlogs.dev` (deployed from `main` on every push; free plan: 20,000 files, 25 MiB
   each; ef-assets is about 2,200 files), with raw.githubusercontent as the fallback (see CLAUDE.md).
   Cache rules are ef-assets' `_headers`. The old jsDelivr `cdn`, `cdn-full` and `cdn-potential`
-  branches and their `scripts/cdn-branches.sh` workflow stay until the site change is deployed and
-  live, then go (open item). Its workflows commit straight to `main` (no pull request branches).
+  branches and their `scripts/cdn-branches.sh` workflow were removed from ef-assets on 2026-11-25. Its workflows commit straight to `main` (no pull request branches).
 - **Contingency Contract.** One stage per season, Test Criteria worth 1–3 points. Data: ef-assets
   `cc/index.json`, `cc/seasons/<id>.json`, schema and share-code spec in `cc/README.md`. Site:
   `src/domain/contracts.ts`, `src/ui/pages/contracts.ts`, `src/styles/contracts.css`, `docs/tabs.md`.

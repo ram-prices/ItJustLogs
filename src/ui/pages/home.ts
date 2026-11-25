@@ -24,9 +24,9 @@ import { tip, tipNote, tipRow } from '../charts';
 import { copyCardImage, prepareCardImage, type PreparedImage } from '../cardImage';
 import { widgetGrid } from './homeWidgets';
 import { toast } from '../common';
-import { backgroundSource, badge, heat, icon, layeredArt } from '../components';
+import { backgroundSource, badge, icon, layeredArt } from '../components';
 import { fmtInt, html, type Html } from '../html';
-import { hourglass, rateUpChip, rateUpIcon, rateUpIdsOf, rateUpNames, rateUpOwned, rateUpPotential } from './kind';
+import { rateUpChip, rateUpIcon, rateUpIdsOf, rateUpNames, rateUpOwned, rateUpPotential } from './kind';
 import { bannerHref, wikiFile } from './info';
 import { eventTags } from './event';
 
@@ -104,11 +104,9 @@ const linkOf = (item: ScheduleItem): string => links?.map.get(item) ?? '';
 // ---------------------------------------------------------------------------
 
 function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | null): Html {
-  const start = timeOn(b.start, server)!;
   const end = timeOn(b.end, server);
   const src = artOf(b);
   const mine = summaryFor(b, a);
-  const elapsed = end ? Math.min(1, (now - start) / (end - start)) : null;
   return html`<article class="card sched-card${isWeaponBanner(b.kind) ? ' weap' : ''}" data-link="${linkOf(b)}" data-card-image="${b.name}">
     <div class="banner-art">
       ${src ? ((b.poolId && src === bannerArtUrl(b.poolId) ? layeredArt(b.poolId, src) : null) ?? html`<img src="${src}" alt="" loading="lazy" decoding="async" data-fallback />`) : ''}
@@ -124,16 +122,6 @@ function liveCard(b: ScheduleBanner, now: number, server: Server, a: Analysis | 
           ? html`<span>Ends in <b>${span(end - now)}</b></span><span class="tertiary">${when(end)}</span>`
           : html`<span>Ends <b>TBA</b></span>`}
       </div>
-      ${elapsed == null
-        ? ''
-        : html`<div class="progress" title="How much of the banner's run has passed"><i style="width:${elapsed * 100}%"></i></div>
-            <div class="sched-through">${Math.round(elapsed * 100)}% through</div>`}
-      ${mine
-        ? html`<a class="sched-mine" href="${pagePath(b)}" style="color:${mine.pity.done ? 'var(--gray-700)' : heat(mine.pity.value, mine.pity.max)}">
-            ${hourglass(mine.pity.done ? 1 : mine.pity.value / mine.pity.max)}<b>${mine.pity.done ? 'Done' : mine.pity.value}</b>${mine.pity.done ? '' : html`<i>/${mine.pity.max}</i>`}
-            <span class="sched-mine-pulls">${fmtInt(mine.paidPulls)} pulls</span>${icon('chevron_right')}
-          </a>`
-        : ''}
     </div>
   </article>`;
 }

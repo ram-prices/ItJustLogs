@@ -1300,11 +1300,11 @@ code {
   font-size: 17px;
 }
 .pull-tag.rateup .icon {
-  color: var(--ars);
+  color: var(--op);
   font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
 }
 .pull-tag.rateup.weap .icon {
-  color: var(--op);
+  color: var(--ars);
 }
 .pull-tag.new .icon {
   color: var(--amber);

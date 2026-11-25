@@ -24,21 +24,187 @@ import { holdFocus } from './dialog';
 const skip = (node: Node) => !(node instanceof Element && node.matches('.ctx-menu, .toast, [data-action="expand-card"]'));
 
 /**
+ * The picture is an SVG image, which sees none of the page's stylesheets: the
+ * web fonts (Jost, Geist Mono, Material Symbols) must travel inside it as
+ * data: URLs, or text falls back to a generic font and icons show their
+ * ligature names. html-to-image can't do that itself here: the Google Fonts
+ * stylesheets are cross-origin (their rules can't be read), and its fallback
+ * fetches every font it finds. So: the @font-face rules of every stylesheet
+ * (fetched once when unreadable), kept only for the families the card uses
+ * and the unicode-ranges its text needs, each font file fetched once a visit.
+ * Needs fonts.googleapis.com and fonts.gstatic.com in the CSP's connect-src.
+ */
+const sheetText = new Map<string, Promise<string>>();
+const fontData = new Map<string, Promise<string>>();
+
+function fetchOnce(cache: Map<string, Promise<string>>, url: string, read: (r: Response) => Promise<string>): Promise<string> {
+  let p = cache.get(url);
+  if (!p) {
+    p = fetch(url).then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${url}`);
+      return read(r);
+    });
+    p.catch(() => cache.delete(url)); // try again next time
+    cache.set(url, p);
+  }
+  return p;
+}
+
+const asDataUrl = (r: Response) =>
+  r.blob().then(
+    (b) =>
+      new Promise<string>((ok, fail) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(fr.result as string);
+        fr.onerror = () => fail(fr.error);
+        fr.readAsDataURL(b);
+      }),
+  );
+
+/** Every @font-face rule on the page, as text, with the URL its own url()s are relative to. */
+async function fontFaces(): Promise<{ css: string; base: string }[]> {
+  const out: { css: string; base: string }[] = [];
+  const pending: Promise<void>[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    const base = sheet.href ?? location.href;
+    let rules: CSSRuleList | null = null;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      // cross-origin: read the file itself
+    }
+    if (rules) {
+      for (const r of Array.from(rules)) if (r instanceof CSSFontFaceRule) out.push({ css: r.cssText, base });
+    } else if (sheet.href) {
+      pending.push(
+        fetchOnce(sheetText, sheet.href, (r) => r.text()).then(
+          (text) => {
+            for (const css of text.replace(/\/\*[\s\S]*?\*\//g, '').match(/@font-face\s*\{[^}]*\}/g) ?? []) out.push({ css, base });
+          },
+          () => {},
+        ),
+      );
+    }
+  }
+  await Promise.all(pending);
+  return out;
+}
+
+const firstFamily = (css: string) => /font-family:\s*([^;}]+)/.exec(css)?.[1].trim().replace(/^["']|["']$/g, '') ?? '';
+
+/** Whether any of the code points falls in a unicode-range (no range: every one). */
+function needed(css: string, codes: Set<number>): boolean {
+  const range = /unicode-range:\s*([^;}]+)/.exec(css)?.[1];
+  if (!range) return true;
+  const spans = range.split(',').map((s) => {
+    const [a, b] = s.trim().replace(/^U\+/i, '').split('-');
+    if (a.includes('?')) return [parseInt(a.replace(/\?/g, '0'), 16), parseInt(a.replace(/\?/g, 'F'), 16)];
+    return [parseInt(a, 16), parseInt(b ?? a, 16)];
+  });
+  for (const c of codes) if (spans.some(([lo, hi]) => c >= lo && c <= hi)) return true;
+  return false;
+}
+
+/** The @font-face CSS the card needs, its fonts inlined. */
+async function fontEmbedCss(el: HTMLElement): Promise<string> {
+  const families = new Set<string>();
+  for (const n of [el, ...Array.from(el.querySelectorAll('*'))]) {
+    for (const f of getComputedStyle(n).fontFamily.split(',')) families.add(f.trim().replace(/^["']|["']$/g, ''));
+  }
+  const codes = new Set<number>();
+  for (const ch of el.textContent ?? '') codes.add(ch.codePointAt(0)!);
+  for (const ch of 'abcdefghijklmnopqrstuvwxyz0123456789_') codes.add(ch.codePointAt(0)!); // icon ligatures
+  const faces = (await fontFaces()).filter(({ css }) => families.has(firstFamily(css)) && needed(css, codes));
+  const inlined = await Promise.all(
+    faces.map(async ({ css, base }) => {
+      let text = css;
+      for (const [whole, raw] of css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) {
+        if (raw.startsWith('data:')) continue;
+        try {
+          text = text.replace(whole, `url("${await fetchOnce(fontData, new URL(raw, base).href, asDataUrl)}")`);
+        } catch {
+          return ''; // that font stays out; the rest still draw
+        }
+      }
+      return text;
+    }),
+  );
+  return inlined.filter(Boolean).join('\n');
+}
+
+/**
+ * html-to-image copies each element's computed style onto its copy, except
+ * inside an <svg>, which it copies whole: fills, strokes and text styles set by
+ * classes or CSS variables would be lost (black boxes, black text). So for the
+ * drawing those are written onto the SVG's own elements, and put back after.
+ */
+const SVG_PROPS = [
+  'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-dasharray', 'stroke-dashoffset',
+  'stroke-linecap', 'stroke-linejoin', 'opacity', 'visibility', 'display', 'color', 'stop-color', 'stop-opacity',
+  'font-family', 'font-size', 'font-weight', 'font-style', 'font-variation-settings', 'letter-spacing', 'text-anchor',
+  'dominant-baseline', 'transform', 'transform-origin', 'transform-box', 'mix-blend-mode', 'filter',
+] as const;
+
+function inlineSvgStyles(el: HTMLElement): () => void {
+  const saved: [Element, string | null][] = [];
+  for (const node of Array.from(el.querySelectorAll('svg *'))) {
+    if (!(node instanceof SVGElement)) continue;
+    const cs = getComputedStyle(node);
+    const values = SVG_PROPS.map((p) => [p, cs.getPropertyValue(p)] as const);
+    saved.push([node, node.getAttribute('style')]);
+    for (const [p, v] of values) if (v) node.style.setProperty(p, v);
+  }
+  return () => {
+    for (const [node, style] of saved) {
+      if (style === null) node.removeAttribute('style');
+      else node.setAttribute('style', style);
+    }
+  };
+}
+
+/**
+ * A closed banner card is a fixed height on the page, with its pull list
+ * scrolling inside; when the list is shorter, the rest is empty card. The
+ * picture stops at the list's end instead (a longer list is cut where the
+ * page cuts it). An open card leaves out the Collapse button's room.
+ */
+function contentHeight(el: HTMLElement): number | undefined {
+  const scroll = el.querySelector<HTMLElement>('.banner-scroll');
+  if (!scroll) return undefined;
+  if (el.classList.contains('expanded')) {
+    const button = el.querySelector<HTMLElement>('[data-action="expand-card"]')?.offsetHeight ?? 0;
+    return button ? el.offsetHeight - button : undefined;
+  }
+  const box = scroll.getBoundingClientRect();
+  let bottom = box.top + parseFloat(getComputedStyle(scroll).paddingTop);
+  for (const child of Array.from(scroll.children)) {
+    bottom = Math.max(bottom, child.getBoundingClientRect().bottom + parseFloat(getComputedStyle(child).marginBottom));
+  }
+  bottom += parseFloat(getComputedStyle(scroll).paddingBottom);
+  const spare = Math.floor(box.bottom - bottom);
+  return spare > 0 ? el.offsetHeight - spare : undefined;
+}
+
+/**
  * The card as a PNG: at rest (no hover glow or lift) and with square corners,
  * which `.capturing` sets while it's drawn.
  */
 async function render(el: HTMLElement): Promise<Blob> {
-  const { toBlob } = await import('html-to-image');
+  const [{ toBlob }, fonts] = await Promise.all([import('html-to-image'), fontEmbedCss(el).catch(() => '')]);
   el.classList.add('capturing');
+  const restore = inlineSvgStyles(el);
   try {
     const blob = await toBlob(el, {
       pixelRatio: Math.max(2, devicePixelRatio),
       backgroundColor: getComputedStyle(document.body).backgroundColor,
       filter: skip,
+      height: contentHeight(el),
+      fontEmbedCSS: fonts,
     });
     if (!blob) throw new Error("Couldn't draw the card.");
     return blob;
   } finally {
+    restore();
     el.classList.remove('capturing');
   }
 }
