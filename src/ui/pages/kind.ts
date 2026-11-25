@@ -29,8 +29,8 @@ const LUCK_COLOR: Record<LuckTier, string> = {
 const luckWord = (t: LuckTier): Html => html`<span class="luck-word" style="color:${LUCK_COLOR[t]}">${LUCK_LABEL[t]}</span>`;
 
 /** Corner marks on a 6★ tile: a "new" sparkle (top left) and a rate-up chevron (top right). Both sit on a dark badge so they read over the art. */
-const sixFlags = (isNew: boolean, isRateUp: boolean): Html =>
-  html`${isNew ? html`<span class="six-flag new" role="img" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isRateUp ? html`<span class="six-flag rateup" role="img" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}`;
+const sixFlags = (isNew: boolean, isRateUp: boolean, isWeap = false): Html =>
+  html`${isNew ? html`<span class="six-flag new" role="img" aria-label="New">${icon('auto_awesome', true)}</span>` : ''}${isRateUp ? html`<span class="six-flag rateup${isWeap ? ' weap' : ''}" role="img" aria-label="Rate-up">${icon('stat_2')}</span>` : ''}`;
 
 
 /** Basic Headhunting always leads; everything else is most recent first. */
@@ -288,7 +288,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         // corners (on a shared set, each weapon's own — the chevron on its rate-up,
         // a star on each new copy).
         const isNew = g.some((x) => x.isNew);
-        const flags = sixFlags(isNew, !!up);
+        const flags = sixFlags(isNew, !!up, p.kind === 'weap');
         const style = known ? `--six-tint:${known}` : '';
         const tintAttrs = html`${tintUrl ? html`data-six-tint="${tintUrl}" data-six-tint-kind="${p.kind === 'weap' ? 'weap' : byOperator ? 'op' : 'art'}"` : ''}${tintUrl && style ? ' ' : ''}${style ? html`style="${style}"` : ''}`;
         const cls = `six-item${up ? ' rateup' : ''}${win ? ' win' : ''}`;
@@ -305,7 +305,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
           })
           .join(', ');
         return html`<div class="${cls} shared" data-tip="${g.map(title).join('')}" ${tintAttrs}>
-          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}${sixFlags(x.isNew, x.isRateUp)}</a>`)}</span></span>
+          <span class="six-heads" style="--ring: linear-gradient(90deg, ${ring})"><span class="six-heads-in">${g.map((x) => html`<a class="six-art" href="${infoHref(x.kind, x.itemId)}" aria-label="${x.name} info">${itemImg(x.kind, x.itemId, 'six-portrait')}${pot(copies.get(x))}${sixFlags(x.isNew, x.isRateUp, x.kind === 'weap')}</a>`)}</span></span>
           ${pity}
         </div>`;
       })}

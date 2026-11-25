@@ -1332,11 +1332,11 @@ code {
   font-size: 17px;
 }
 .pull-tag.rateup .icon {
-  color: var(--op);
+  color: var(--ars);
   font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;
 }
 .pull-tag.rateup.weap .icon {
-  color: var(--ars);
+  color: var(--op);
 }
 .pull-tag.new .icon {
   color: var(--amber);
@@ -1522,12 +1522,15 @@ code {
   left: 3px;
   color: var(--amber);
 }
-/* The chevron is solid white in a heavier weight (like the other rate-up
-   marks), so it pops over any background; the banner's colour stays on the
-   tile's ring. */
+/* The chevron takes the rate-up's own colour (operators teal, weapons
+   purple) in a heavier weight, so it pops over any background; the banner's
+   colour stays on the tile's ring. */
 .six-flag.rateup {
   right: 3px;
-  color: #fff;
+  color: var(--ars);
+}
+.six-flag.rateup.weap {
+  color: var(--op);
 }
 .six-flag.rateup .icon {
   font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20;

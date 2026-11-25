@@ -33,7 +33,7 @@ is one that was missed then.
 
 | Banner | Site loads | Made by |
 |---|---|---|
-| Chartered / RE-Factor Headhunting | `banners/game/<pool>.webp` + `banners/game/layers/<pool>-back/-op.webp`, and `"gameArt": true` on the pool in banners.json (automatic: `site-art.mjs` sets it once all three are there and the `-op` layer is over 10 KB, except pools on its `HOLD` list) | `operator-banner.py` (locally, needs the dump) |
+| Chartered / RE-Factor Headhunting | `banners/game/<pool>.webp` + `banners/game/layers/<pool>-back/-op.webp`, and `"gameArt": true` plus its `"gameArtV"` fingerprint on the pool in banners.json (automatic: `site-art.mjs` sets them once all three are there and the `-op` layer is over 10 KB, except pools on its `HOLD` list) | `operator-banner.py` (locally, needs the dump) |
 | Arsenal / RE-Factor Issue | `banners/<pool>.webp` (a copy of `issues/<weapon>.webp`, automatic) + `banners/layers/<pool>.webp` | `issue-banner.py`, then `issue-layers.py` (the schedule workflow runs it) |
 | Any pool without the above | `banners/<pool>.webp` | copy of `headhunting/<operator>.webp` (automatic) |
 
@@ -65,12 +65,54 @@ leaves story/ alone until the community dump has every mission). Then here:
 - After pushing art made locally, run `node scripts/site-art.mjs` and commit
   banners.json with it (or let the next workflow run do it); the cdn-branches
   workflow publishes on every push to main. By hand: `scripts/cdn-branches.sh`, Git Bash. New files
-  appear at once; a **changed** file can take up to 12 hours even after a purge,
-  so get art right before its first push, or give a fix a new file name.
-  Game-screen banner art needn't wait: site-art.mjs writes a `gameArtV`
-  fingerprint of its three files into banners.json and the site puts it in their
-  URLs (`?v=`), so fixed art gets a new address at once and no browser keeps the
-  old copy (in 1.7 browsers kept Kay's empty -op layer for a week). Never hold a
-  banner back for the CDN; check what it serves, purge, and finish.
+  appear at once; a changed one needs the steps in "Stale pictures" below.
 - Check the live pages, not just the files: Home's open banners, each new
-  banner page, each new operator/weapon database page.
+  banner page, each new operator/weapon database page. Look at each card in a
+  screenshot: a Headhunting card showing only its backdrop (no operator in
+  front) means its `-op` layer is missing, empty or a stale cached copy, even
+  when every file check passed (Kay, 1.7).
+
+## Stale pictures (a fixed file that still shows the old one)
+
+Two caches sit between ef-assets and a visitor, and they need different fixes:
+
+1. **jsDelivr's CDN** keeps a changed file at the same `@cdn` path up to 12 hours.
+   Purging (`https://purge.jsdelivr.net/gh/ram-prices/ef-assets@<branch>/<path>`)
+   usually clears it within minutes.
+2. **Each visitor's browser** keeps a jsDelivr file for a week, and nothing on our
+   side can clear it. Only a **new URL** works. In 1.7 browsers that had loaded
+   Kay's first, empty `-op` layer kept showing a backdrop-only card after the
+   CDN served the fixed file.
+
+What has a new URL on its own:
+- **Game-screen Headhunting art** (`banners/game/<pool>.webp` and both layers):
+  `site-art.mjs` writes a `gameArtV` fingerprint (SHA-1 of the three files) next
+  to each `gameArt` flag in banners.json, and the site adds it as `?v=` to the
+  three URLs (`bannerArtUrl`, `operatorLayerUrls`). Changed art gets a new
+  address as soon as site-art.mjs runs (both workflows run it, or by hand) and
+  banners.json is pushed. No deploy needed.
+- **Operator cards** (`operators/bust-3/`): a new folder name whenever the art
+  changes (`operator-cards.py`).
+
+Everything else (`banners/<pool>.webp`, Issue layers in `banners/layers/`,
+`operators/`, `events/`, icons) keeps its URL: get it right before the first
+push. To replace one, give it a new file name and update what points at it, or
+add a fingerprint the same way as `gameArtV`.
+
+Finding which cache is stale: compare the clone's file size with
+`Invoke-WebRequest https://cdn.jsdelivr.net/gh/ram-prices/ef-assets@cdn/<path>`
+(`RawContentLength`) and with the browser (open the image URL in the browser panel:
+a blank picture at the right size is a cached empty copy). Bytes right on the CDN
+but wrong in the browser: the URL has to change.
+
+Never hold a banner back to wait for a cache (Kay's flag was once parked "until
+jsDelivr catches up", the owner's correction): check what the CDN serves now,
+purge or change the URL, and check the live card.
+
+Related gotchas from the same day:
+- raw.githubusercontent serves a just-pushed file stale for up to ~5 minutes. Copy
+  `src/data/*.snapshot.json` from the ef-assets clone instead of downloading it
+  right after a push.
+- The OpenChamber browser panel can capture a blank page when a tab is reloaded
+  while it's still loading (twice in a row, right after a deploy). Open a fresh tab
+  before deciding the site is broken.

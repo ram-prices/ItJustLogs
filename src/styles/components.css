@@ -1070,22 +1070,3 @@ select.input {
 .code.steps-code {
   margin-top: 20px;
 }
-
-/* The entrance diagnostic's readout (app.ts debugNote; only with ?debug). */
-.debug-entrance {
-  position: fixed;
-  top: 8px;
-  left: 8px;
-  z-index: var(--z-toast);
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: var(--radius-md, 8px);
-  background: #000;
-  color: #7cf29c;
-  font: 400 12px/16px var(--font-mono);
-  pointer-events: none;
-  white-space: pre;
-}
-.debug-no-cv .banner-list > .banner {
-  content-visibility: visible;
-}

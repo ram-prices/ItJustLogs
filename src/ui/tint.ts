@@ -6,11 +6,21 @@
  * URL so re-renders paint the glow immediately.
  */
 import { whenNear } from './near';
+import { itemIconUrl } from '../domain/banners';
 
 /** Shown until the art has loaded (or if the colour can't be read). */
 export const DEFAULT_TINT = 'rgba(255, 255, 255, 0.1)';
 
 const cache = new Map<string, string>();
+
+// Manual tints for operators whose icon's dominant hue is a small accent
+// rather than their main colour (Zhuang Fangyi's red hair ties read over her
+// teal hair). Keyed by operator id, resolved to the icon URL the tint
+// functions use; pre-seeded into the cache so it wins over sampling.
+const MANUAL_TINT: Record<string, string> = {
+  chr_0030_zhuangfy: 'rgb(120, 195, 150)',
+};
+for (const [id, tint] of Object.entries(MANUAL_TINT)) cache.set(itemIconUrl('char', id), tint);
 
 export const tintFor = (url: string): string => cache.get(url) ?? DEFAULT_TINT;
 

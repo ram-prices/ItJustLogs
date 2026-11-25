@@ -269,10 +269,10 @@ a.sched-next:hover {
 }
 .sched-next-meta .rateup-icon {
   font-size: 13px;
-  color: var(--op);
+  color: var(--ars);
 }
 .sched-next.weap .sched-next-meta .rateup-icon {
-  color: var(--ars);
+  color: var(--op);
 }
 .sched-next-when {
   display: flex;

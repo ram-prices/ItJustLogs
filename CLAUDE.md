@@ -135,7 +135,9 @@ ef-assets' workflows report problems in its "ef-assets: needs attention" issue.
 - ef-assets pictures (portraits, gear, banner art and layers, item icons,
   schedule art via `cdnUrl`, backgrounds) load from jsDelivr
   (`EF_ASSETS_CDN`: browsers keep them a week; a changed file reaches the CDN
-  within 12 hours, or purge `https://purge.jsdelivr.net/gh/ram-prices/ef-assets@<branch>/<path>`).
+  within 12 hours, or purge `https://purge.jsdelivr.net/gh/ram-prices/ef-assets@<branch>/<path>`;
+  a browser's copy only goes with a new URL, see "Stale pictures" in `docs/new-version.md`;
+  game-screen banner art gets one by itself through banners.json's `gameArtV`).
   jsDelivr refuses refs over 50 MB, so they come from ef-assets branches under it, not main:
   `cdn`, `cdn-full` and `cdn-potential`, rebuilt from main by its `scripts/cdn-branches.sh`
   (fails over 45 MB; a new branch also needs `cdnBase` in banners.ts). The rest:

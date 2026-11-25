@@ -607,72 +607,6 @@ function carryEntrances(scope: Element, played: Played): void {
  * and done once, when the cards have landed. What the player does (a click, a key, typing, Back)
  * still redraws at once, and so does opening another page.
  */
-/**
- * The entrance diagnostic: open any page with ?debug (it stays on for the browser tab; ?debug=off
- * ends it) and a small readout in the corner lists, since the page opened, every rebuild of the page
- * and why it wasn't held, the first cards' animation events, and any frame where a card moved
- * backwards. Made so a screen recording carries what the browser did; nothing runs without ?debug.
- */
-const debugOn = ((): boolean => {
-  try {
-    const q = new URLSearchParams(location.search).get('debug');
-    if (q === 'off') sessionStorage.removeItem('ijl.debug');
-    else if (q !== null) sessionStorage.setItem('ijl.debug', '1');
-    return sessionStorage.getItem('ijl.debug') === '1';
-  } catch {
-    return false;
-  }
-})();
-let debugT0 = performance.now();
-const debugLines: string[] = [];
-function debugNote(text: string): void {
-  if (!debugOn) return;
-  debugLines.push(`+${Math.round(performance.now() - debugT0)} ${text}`);
-  let box = document.getElementById('debugEntrance');
-  if (!box) {
-    box = document.createElement('pre');
-    box.id = 'debugEntrance';
-    box.className = 'debug-entrance';
-    document.body.append(box);
-  }
-  box.textContent = debugLines.slice(-26).join('\n');
-}
-const debugAnimations = (): string => {
-  const all = document.getAnimations().filter((a) => a instanceof CSSAnimation && a.animationName === 'card-in');
-  return `${all.length} card-in: ${all.slice(0, 3).map((a) => `${a.playState}${a.pending ? '/pending' : ''}@${Math.round(Number(a.currentTime))}`).join(' ')}`;
-};
-const debugCard = (el: EventTarget | null): number =>
-  el instanceof Element && el.matches('.banner-list > .banner') ? [...el.parentElement!.children].indexOf(el) : -1;
-function debugOpen(): void {
-  if (!debugOn) return;
-  debugT0 = performance.now();
-  debugLines.length = 0;
-  debugNote(`${__BUILD__}${document.documentElement.classList.contains('debug-no-cv') ? ' | no content-visibility' : ''} | page opened`);
-  // Where the first three cards are each frame (main thread): a step backwards is reported.
-  const last: number[] = [];
-  const t0 = debugT0;
-  const tick = (): void => {
-    if (t0 !== debugT0 || performance.now() - t0 > 1600) return;
-    [...document.querySelectorAll('.banner-list > .banner')].slice(0, 3).forEach((card, i) => {
-      const y = new DOMMatrixReadOnly(getComputedStyle(card).transform).m42;
-      if (last[i] !== undefined && y - last[i] > 1) debugNote(`card ${i + 1} back ${last[i].toFixed(1)} -> ${y.toFixed(1)} px`);
-      last[i] = y;
-    });
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
-if (debugOn)
-  for (const type of ['animationstart', 'animationend', 'animationcancel'])
-    document.addEventListener(
-      type,
-      (e) => {
-        const i = debugCard(e.target);
-        if (i >= 0 && i < 3 && (e as AnimationEvent).animationName === 'card-in') debugNote(`card ${i + 1} ${type.slice(9)}`);
-      },
-      true,
-    );
-
 let userTurn = false;
 function watchUserTurns(): void {
   for (const type of ['click', 'input', 'change', 'keydown', 'drop', 'submit', 'popstate'])
@@ -731,7 +665,6 @@ function holdForEntrance(): boolean {
       if (!heldRedraw) return;
       heldRedraw = false;
       clearTimeout(cap);
-      debugNote('held redraw runs now');
       draw();
     };
     // The cap is for an animation that never reports its end (a hidden tab, a browser quirk).
@@ -748,11 +681,8 @@ function draw(): void {
   const key = `${route.page}/${route.info ? 'info/' : ''}${route.id ?? ''}${route.focus ?? ''}${route.shortState ? `?${route.short}` : ''}`;
   // The same page, nobody asked, and its cards are still sliding in: later (holdForEntrance).
   if (key === lastKey && !userTurn && holdForEntrance()) {
-    debugNote('redraw held');
     return;
   }
-  if (key !== lastKey) debugOpen();
-  else debugNote(`REBUILD (${userTurn ? 'input' : `no card sliding; ${debugAnimations()}`})`);
   // Redraws (data refreshes, settings) rebuild the page; keep its inner scrollers and focus where they were.
   const scrolls = innerScrolls();
   const focused = focusMark(root());
