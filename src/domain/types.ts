@@ -39,5 +39,10 @@ export interface BannerDbEntry {
   type?: string;
   /** ef-assets has game-screen art for this pool (banners/game/ and its layers), set by its site-art.mjs. */
   gameArt?: boolean;
+  /**
+   * A fingerprint of that art's three files (site-art.mjs), added to their URLs so a changed picture gets a new
+   * address: browsers keep a jsDelivr file a week, and in 1.7 they kept an empty operator layer.
+   */
+  gameArtV?: string;
 }
 export type BannerDb = Record<string, BannerDbEntry>;

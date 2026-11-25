@@ -67,6 +67,12 @@ describe('banner ids', () => {
       expect(operatorLayerUrls('special_9_0_1')?.op).toMatch(/\/banners\/game\/layers\/special_9_0_1-op\.webp$/);
       expect(bannerArtUrl('special_9_0_2')).toMatch(/\/banners\/special_9_0_2\.webp$/);
       expect(operatorLayerUrls('special_9_0_2')).toBeNull();
+      // A fingerprint (gameArtV) gives the files a new address whenever the art changes; a malformed one is ignored.
+      setGameArtPools({ special_9_0_1: { gameArt: true, gameArtV: '0a1b2c3d' }, special_9_0_3: { gameArt: true, gameArtV: '"><x' } });
+      expect(bannerArtUrl('special_9_0_1')).toMatch(/\/banners\/game\/special_9_0_1\.webp\?v=0a1b2c3d$/);
+      expect(operatorLayerUrls('special_9_0_1')).toMatchObject({ back: expect.stringMatching(/-back\.webp\?v=0a1b2c3d$/), op: expect.stringMatching(/-op\.webp\?v=0a1b2c3d$/) });
+      expect(operatorLayerUrls('special_9_0_3')?.op).toMatch(/-op\.webp$/);
+      setGameArtPools({ special_9_0_1: { gameArt: true }, special_9_0_2: {}, special_1_0_1: {} });
       // Unflagged in a db that has flags: no game art, even for a pool on the fallback list.
       expect(bannerArtUrl('special_1_0_1')).toMatch(/\/banners\/special_1_0_1\.webp$/);
       // A db without any flag (an old cached copy) keeps the fallback list.

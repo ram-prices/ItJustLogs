@@ -17,6 +17,17 @@ is one that was missed then.
 - **Full dump, all stages.** After the tables, also run `advanced\run_jsondata.bat`
   (skills/buffs for the sim), `dumper\build_asset_index.py` and
   `map_banner_layers.py` (banner screens, icons). Stale indexes hide new art.
+  In 1.7 `run_jsondata.bat` failed (StringPool blocks of 4000 strings; its
+  `load_string_pool` expects 10000); SkillData/BuffData were decoded through a
+  wrapper that skips the check (Temp\opencode\kay-sim\decode_wrap.py) until the
+  dump's decoder is fixed.
+- **Don't wait for the wiki or the community dump.** Each new thing has a
+  local-dump path in ef-assets: operator entry `operator-from-game.py`, combat
+  data `combat.mjs` / `combat-bundle.mjs --local <dump output>` (Kay's 1.7 data;
+  regenerating everything also rewrites every existing operator, so commit only
+  the new ones unless the changes are reviewed), event dates `schedule.json` by
+  hand from TimeRangeTable, medals/archives/story below. New sim operators:
+  docs/rotations.md (Kay section, rule tests).
 
 ## The site reads these paths, not the ones the art scripts write first
 
@@ -56,5 +67,10 @@ leaves story/ alone until the community dump has every mission). Then here:
   workflow publishes on every push to main. By hand: `scripts/cdn-branches.sh`, Git Bash. New files
   appear at once; a **changed** file can take up to 12 hours even after a purge,
   so get art right before its first push, or give a fix a new file name.
+  Game-screen banner art needn't wait: site-art.mjs writes a `gameArtV`
+  fingerprint of its three files into banners.json and the site puts it in their
+  URLs (`?v=`), so fixed art gets a new address at once and no browser keeps the
+  old copy (in 1.7 browsers kept Kay's empty -op layer for a week). Never hold a
+  banner back for the CDN; check what it serves, purge, and finish.
 - Check the live pages, not just the files: Home's open banners, each new
   banner page, each new operator/weapon database page.

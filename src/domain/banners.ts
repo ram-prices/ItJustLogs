@@ -165,18 +165,28 @@ const GAME_ART_FALLBACK = [
  * and holds back any on its HOLD list. state.ts fills this from the banner db at startup and on
  * every refresh (setGameArtPools).
  */
-const GAME_ART = new Set<string>(GAME_ART_FALLBACK);
+const GAME_ART = new Map<string, string>(GAME_ART_FALLBACK.map((id) => [id, '']));
 
-/** Take the game-screen art pools from a banner db's `gameArt` flags; a db with none keeps the fallback. */
+/** `?v=<fingerprint>` for a pool's game-screen art files, '' without one. */
+const gameArtQuery = (id: string): string => {
+  const v = GAME_ART.get(id);
+  return v ? `?v=${v}` : '';
+};
+
+/** Take the game-screen art pools (and their `gameArtV` fingerprints) from a banner db's `gameArt` flags; a db with none keeps the fallback. */
 export function setGameArtPools(db: BannerDb): void {
-  const flagged = Object.keys(db).filter((id) => db[id]?.gameArt === true).map(canonicalPoolId);
+  const flagged = Object.keys(db).filter((id) => db[id]?.gameArt === true);
   GAME_ART.clear();
-  for (const id of flagged.length ? flagged : GAME_ART_FALLBACK) GAME_ART.add(id);
+  if (!flagged.length) for (const id of GAME_ART_FALLBACK) GAME_ART.set(id, '');
+  for (const id of flagged) {
+    const v = db[id].gameArtV;
+    GAME_ART.set(canonicalPoolId(id), typeof v === 'string' && /^[0-9a-f]{1,16}$/.test(v) ? v : '');
+  }
 }
 
 export function bannerArtUrl(poolId: string): string | null {
   const id = canonicalPoolId(poolId);
-  if (GAME_ART.has(id)) return `${EF_ASSETS_CDN}/banners/game/${id}.webp`;
+  if (GAME_ART.has(id)) return `${EF_ASSETS_CDN}/banners/game/${id}.webp${gameArtQuery(id)}`;
   // Constant Issues have ef-assets art (rebuilt from the weapon render); other constant pools don't.
   if (id.includes('constant') && !id.startsWith('weaponbox_constant_')) return null;
   return `${EF_ASSETS_CDN}/banners/${id.startsWith('joint_') ? 'joint_1_2_2' : id}.webp`;
@@ -204,7 +214,8 @@ export function operatorLayerUrls(poolId: string): { back: string; op: string } 
   const id = canonicalPoolId(poolId);
   if (!GAME_ART.has(id)) return null;
   const at = `${EF_ASSETS_CDN}/banners/game/layers/${id}`;
-  return { back: `${at}-back.webp`, op: `${at}-op.webp` };
+  const q = gameArtQuery(id);
+  return { back: `${at}-back.webp${q}`, op: `${at}-op.webp${q}` };
 }
 
 /**
