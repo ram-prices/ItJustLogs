@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import db from '../data/banners.snapshot.json';
 import { analyze } from './analyze';
-import { canonicalPoolId, categoryOf, patchOf } from './banners';
+import { canonicalPoolId, categoryOf, isIssuePool, issueLayerUrls, patchOf } from './banners';
 import { compareHistories, dropShadowedDuplicates, mergeHistories, missingPulls, parseHistoryJson } from './parse';
 import { weeklyTimeline, patchStats } from './patches';
 import {
@@ -71,6 +71,47 @@ describe('banner ids', () => {
     expect(patchOf('special_1_4_2').key).toBe('1.4');
     expect(patchOf('weaponbox_constant_2').key).toBe('Permanent');
     expect(patchOf('standard').key).toBe('Permanent');
+  });
+  it('makes RE-Factor reruns Chartered (Headhunting) and Arsenal Issues (weapons)', () => {
+    expect(categoryOf('char', 'rerun_chr_aglina')).toBe('chartered');
+    expect(categoryOf('char', 'Rerun_Chr_Tangtang')).toBe('chartered');
+    expect(categoryOf('weap', 'rerun_wpn_aglina')).toBe('limited');
+    expect(isIssuePool('rerun_wpn_aglina')).toBe(true);
+  });
+  it('recognises both weponbox_ and weaponbox_ Issue pools', () => {
+    for (const id of ['weponbox_1_2_2', 'weaponbox_1_2_2', 'rerun_wpn_x']) {
+      expect(isIssuePool(id)).toBe(true);
+      expect(issueLayerUrls(id)?.weapon).toMatch(/banners\/layers\/(weponbox_1_2_2|rerun_wpn_x)\.webp$/);
+      expect(categoryOf('weap', id)).toBe('limited');
+      expect(patchOf(id).key).toBe(id.startsWith('rerun') ? 'Permanent' : '1.2');
+    }
+    for (const id of ['weaponbox_constant_1', 'special_1_2_1']) expect(isIssuePool(id)).toBe(false);
+  });
+  it('takes a rerun pool’s patch from its schedule entry (start date → version)', () => {
+    const at = (t: string) => ({ americas: t, asia: t });
+    const schedule = {
+      versions: [
+        { name: 'Launch', release: at('2026-01-22T03:00:00Z'), maintenance: null, posts: [] },
+        { name: 'Second', release: at('2026-03-12T04:00:00Z'), maintenance: null, posts: [] },
+        { name: 'Third', release: at('2026-04-17T04:00:00Z'), maintenance: null, posts: [] },
+      ],
+      banners: [
+        { name: 'Rerun', kind: 'refactor', rateUps: [], poolId: 'rerun_chr_aglina', version: null, start: at('2026-03-30T17:00:00Z'), end: null, availability: null, art: null, posts: [] },
+        { name: 'Rerun Issue', kind: 'refactorIssue', rateUps: [], poolId: 'rerun_wpn_aglina', version: null, start: at('2026-04-20T17:00:00Z'), end: null, availability: null, art: null, posts: [] },
+      ],
+    } as Schedule;
+    expect(patchOf('rerun_chr_aglina', schedule)).toEqual({ key: '1.1', major: 1, minor: 1 });
+    expect(patchOf('rerun_wpn_aglina', schedule).key).toBe('1.2');
+    // Without a schedule entry, or without the schedule: as before.
+    expect(patchOf('rerun_chr_yvonne', schedule).key).toBe('Permanent');
+    expect(patchOf('rerun_chr_aglina').key).toBe('Permanent');
+    // Pools with a version in the id and standing pools ignore the schedule.
+    expect(patchOf('special_1_4_2', schedule).key).toBe('1.4');
+    expect(patchOf('standard', schedule).key).toBe('Permanent');
+    // analyze passes it through.
+    const pulls = { characters: [{ seqId: '1', gachaTs: '1774890000000', charId: 'chr_x', charName: 'X', rarity: 4, poolId: 'rerun_chr_aglina' }], weapons: [] } as unknown as PullHistory;
+    expect(analyze(pulls, bannerDb, schedule).banners[0].patch.key).toBe('1.1');
+    expect(analyze(pulls, bannerDb).banners[0].patch.key).toBe('Permanent');
   });
 });
 
@@ -149,6 +190,24 @@ describe('Arsenal sets of 10', () => {
     const six = b.pulls.find((p) => p.rarity === 6)!;
     expect(six.outcome).toBe('guaranteed');
     expect(b.guarantee).toMatchObject({ value: 8, done: true });
+  });
+
+  it('a RE-Factor Issue (rerun_wpn_) counts in sets with its own pity and the 8th-set guarantee', () => {
+    const rerunDb: BannerDb = { ...bannerDb, rerun_wpn_test: { name: 'Rerun Issue', rateUpIds: ['wpn_lance_0014'] } };
+    const weapons = [
+      // 25 pulls on a regular Issue first: weapon pity stays per banner.
+      ...Array.from({ length: 25 }, (_, i) => ({ ...weap(i + 1), poolId: 'weponbox_1_4_1' })),
+      ...Array.from({ length: 80 }, (_, i) => ({ ...weap(100 + i + 1, i === 74 ? 6 : 4, i === 74 ? 'wpn_lance_0014' : 'wpn_filler'), poolId: 'rerun_wpn_test' })),
+    ];
+    const b = analyze({ characters: [], weapons } as unknown as PullHistory, rerunDb).banners.find((x) => x.poolId === 'rerun_wpn_test')!;
+    expect(b).toMatchObject({ category: 'limited', paidPulls: 80, pity: { value: 0, max: 4 } });
+    // Pity in sets from this banner's own first set, not carried over from weponbox_1_4_1's 3 sets.
+    expect(b.pulls[9].pity).toBe(1);
+    const six = b.pulls.find((p) => p.rarity === 6)!;
+    expect(six).toMatchObject({ pity: 8, outcome: 'guaranteed' });
+    expect(b.guarantee).toMatchObject({ value: 8, max: 8, done: true });
+    // No estimated Issue rewards for a rerun: only the export's gift records count (owned.ts).
+    expect(b.rewards).toBeNull();
   });
 
   it('Constant Issues have the 8th-set guarantee too', () => {
@@ -310,8 +369,13 @@ describe('banner schedule', () => {
       expect(b.start, b.name).not.toBeNull();
       if (b.end) expect(timeOn(b.end, 'americas')!, b.name).toBeGreaterThan(timeOn(b.start, 'americas')!);
     }
-    // Banners from the news feed that have a pool line up with banners.json.
-    for (const b of schedule.banners.filter((x) => x.poolId)) expect(bannerDb[b.poolId!]?.name?.toLowerCase(), b.name).toBe(b.name.toLowerCase());
+    // Banners that have a pool line up with banners.json, looked up as the site does (lookupBanner:
+    // the game spells weapon pools both weponbox_ and weaponbox_).
+    const entryOf = (id: string) => {
+      const c = canonicalPoolId(id);
+      return bannerDb[c] ?? bannerDb[c.replace(/^weponbox_/, 'weaponbox_')];
+    };
+    for (const b of schedule.banners.filter((x) => x.poolId)) expect(entryOf(b.poolId!)?.name?.toLowerCase(), b.name).toBe(b.name.toLowerCase());
   });
 });
 
@@ -676,6 +740,39 @@ describe('character pity scopes and the Chartered guarantee', () => {
     expect(bannerOf(a, 'mystery_9_9_1')).toMatchObject({ category: 'other', name: 'Mystery Pool', startPity: 0, pity: { value: 4 }, rewards: null });
     // The Chartered count went on from 40, untouched by the unknown pool.
     expect(bannerOf(a, 'special_1_0_2')).toMatchObject({ startPity: 40, pity: { value: 41 } });
+  });
+
+  // RE-Factor reruns: the owner's ruling is that they share Chartered pity; their 120 guarantee is their own.
+  const rerunDb: BannerDb = { ...bannerDb, rerun_chr_aglina: { name: 'Aglina rerun', rateUpIds: ['chr_aglina'] } };
+
+  it('a RE-Factor rerun shares the Chartered 6★ pity count', () => {
+    const a = analyze(history([...fill('special_1_6_1', 30), ...fill('rerun_chr_aglina', 9), ['rerun_chr_aglina', 'chr_off', 6], ...fill('special_1_6_1', 5)]), rerunDb);
+    const rerun = bannerOf(a, 'rerun_chr_aglina');
+    expect(rerun).toMatchObject({ category: 'chartered', startPity: 30 });
+    expect(rerun.pulls.find((p) => p.rarity === 6)!.pity).toBe(40);
+    // Back on the Chartered banner, the count started over at the rerun's 6★.
+    expect(bannerOf(a, 'special_1_6_1').pity.value).toBe(5);
+  });
+
+  it('a rerun has its own 120 guarantee and no estimated Token track', () => {
+    // The 80 pulls on special_1_6_1 don't count toward the rerun's guarantee.
+    const a = analyze(
+      history([
+        ...fill('special_1_6_1', 79),
+        ['special_1_6_1', 'chr_off', 6],
+        ...fill('rerun_chr_aglina', 69),
+        ['rerun_chr_aglina', 'chr_off', 6],
+        ...fill('rerun_chr_aglina', 49),
+        ['rerun_chr_aglina', 'chr_aglina', 6],
+        ...fill('rerun_chr_aglina', 130),
+      ]),
+      rerunDb,
+    );
+    const rerun = bannerOf(a, 'rerun_chr_aglina');
+    expect(rerun.pulls.find((p) => p.itemId === 'chr_aglina')!.outcome).toBe('guaranteed');
+    expect(rerun.guarantee).toMatchObject({ value: 120, max: 120, done: true });
+    expect(rerun.paidPulls).toBe(250);
+    expect(rerun.rewards).toBeNull();
   });
 
   it('a rate-up on pull 120 after a lost 6★ is guaranteed; a second one on the banner is won', () => {

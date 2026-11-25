@@ -3,6 +3,7 @@ import {
   categoryOf,
   canonicalPoolId,
   isRateUpItem,
+  isRerunPool,
   lookupBanner,
   patchOf,
   type BannerInfo,
@@ -20,6 +21,7 @@ import {
   kthCopyPmf,
   type PityProfile,
 } from './pity';
+import type { Schedule } from './schedule';
 import type { BannerDb, Category, Kind, Outcome, Pull, PullHistory } from './types';
 
 export interface AnalyzedPull extends Pull {
@@ -142,7 +144,7 @@ function profileFor(category: Category): PityProfile | null {
 }
 
 /**
- * 6★ pity is shared by every Chartered banner; other character pools keep their own (each Joint and
+ * 6★ pity is shared by every Chartered banner (RE-Factor reruns included); other character pools keep their own (each Joint and
  * each unrecognised 'other' pool separately). Weapons are per banner.
  */
 function pityScope(kind: Kind, category: Category, poolId: string): string {
@@ -194,7 +196,8 @@ function weaponRewards(sets: number): RewardTrack {
   };
 }
 
-export function analyze(history: PullHistory, db: BannerDb): Analysis {
+/** `schedule`, when given, places pools without a version in their id (RE-Factor reruns) in a patch (`patchOf`). */
+export function analyze(history: PullHistory, db: BannerDb, schedule?: Schedule | null): Analysis {
   const { char, weap } = toPulls(history);
   const banners = new Map<string, BannerSummary>();
   const sixStars: AnalyzedPull[] = [];
@@ -222,7 +225,7 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
           kind,
           category,
           name: p.poolName || db[poolId]?.name || CATEGORY_LABEL[category],
-          patch: patchOf(poolId),
+          patch: patchOf(poolId, schedule),
           info: info && info.rateUpIds.length ? info : null,
           pulls: [],
           paidPulls: 0,
@@ -324,8 +327,11 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
           max: CHARTERED_GUARANTEE,
           done: won,
         };
-        // Each Token is a copy of the rate-up.
-        b.rewards = fixedRewards('Token', 240, b.paidPulls, true);
+        // Each Token is a copy of the rate-up. RE-Factor reruns share Chartered pity and keep their own
+        // 120 guarantee (above), but nothing confirms the 240-pull Token (or the Dossier) schedule
+        // applies to them, so they get no estimated reward track: only the Tokens the export lists
+        // (`gifts`, which owned.ts counts) are counted for a rerun.
+        if (!isRerunPool(b.poolId)) b.rewards = fixedRewards('Token', 240, b.paidPulls, true);
       } else if (b.category === 'joint') {
         // A Joint Selector picks one of the banner's rate-ups.
         b.rewards = fixedRewards('Selector', 120, b.paidPulls, true);
@@ -338,7 +344,8 @@ export function analyze(history: PullHistory, db: BannerDb): Analysis {
             done: won,
           };
         }
-        b.rewards = weaponRewards(setOf(b.paidPulls));
+        // RE-Factor Issues likewise: no estimated reward track, only the export's gift records count.
+        if (!isRerunPool(b.poolId)) b.rewards = weaponRewards(setOf(b.paidPulls));
       }
       const prev = latestByCategory.get(b.category);
       if (!prev || b.lastTs >= prev.lastTs) latestByCategory.set(b.category, b);

@@ -113,7 +113,7 @@ export async function restoreCopy(copy: PullHistory): Promise<{ chars: number; w
 
 function recompute(): void {
   const h = state.history;
-  state.analysis = h && (h.characters.length || h.weapons.length) ? analyze(h, state.db) : null;
+  state.analysis = h && (h.characters.length || h.weapons.length) ? analyze(h, state.db, state.schedule) : null;
 }
 
 /** Loads saved history from IndexedDB. Call once before the first render. */
@@ -185,6 +185,8 @@ export function setBannerDb(db: BannerDb): void {
 
 export function setSchedule(schedule: Schedule): void {
   state.schedule = schedule;
+  // Rerun pools take their patch from the schedule (analyze → patchOf).
+  recompute();
   emit();
 }
 

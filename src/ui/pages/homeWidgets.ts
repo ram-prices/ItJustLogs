@@ -75,7 +75,7 @@ const FACTS: [string, string][] = [
 /** An operator's stitched banner art: the text-free art of their newest rate-up banner (ef-assets banners/), the fallback for full art. */
 function bannerArtOf(op: string): string | null {
   const pools = Object.entries(state.db)
-    .filter(([id, e]) => !id.startsWith('weponbox') && (e.rateUpIds ?? []).includes(op))
+    .filter(([id, e]) => !/^(?:wea?ponbox|rerun_wpn)_/.test(id) && (e.rateUpIds ?? []).includes(op))
     .map(([id]) => id)
     .sort()
     .reverse();

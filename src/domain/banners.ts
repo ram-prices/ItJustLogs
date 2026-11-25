@@ -1,3 +1,4 @@
+import type { Schedule } from './schedule.ts';
 import type { BannerDb, BannerDbEntry, Category, Kind } from './types.ts';
 
 export const EF_ASSETS = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
@@ -42,8 +43,17 @@ export function lookupBanner(db: BannerDb, poolId: string): BannerInfo | null {
 /** A pool's number within its patch: special_1_4_2 → 2; 0 without one. */
 const poolNumber = (poolId: string): number => Number(canonicalPoolId(poolId).match(/_\d+_\d+_(\d+)$/)?.[1] ?? 0);
 
-/** Chartered Headhunting pools: special_<major>_<minor>_<n> (banners.json). Only these share Chartered pity. */
-const CHARTERED_POOL = /^special_\d+_\d+(?:_\d+)?$/;
+/**
+ * Chartered Headhunting pools: special_<major>_<minor>_<n> (banners.json), and RE-Factor reruns
+ * (rerun_chr_<name>), which the game counts as Chartered: they share its 6★ pity. Only these do.
+ */
+const CHARTERED_POOL = /^(?:special_\d+_\d+(?:_\d+)?|rerun_chr_[a-z0-9_]+)$/;
+
+/** RE-Factor rerun pools: rerun_chr_<name> (Headhunting), rerun_wpn_<name> (Issue). */
+export const isRerunPool = (poolId: string): boolean => /^rerun_(?:chr|wpn)_/.test(canonicalPoolId(poolId));
+
+/** Arsenal Issue pools with a rate-up: weponbox_ (the game's spelling), weaponbox_ (a few exports) and rerun_wpn_. */
+export const isIssuePool = (poolId: string): boolean => /^(?:wea?ponbox_(?!constant)|rerun_wpn_)/.test(poolId.trim().toLowerCase());
 
 /**
  * A character pool that is none of the known kinds (an exporter that left the
@@ -78,13 +88,28 @@ export interface PatchRef {
 
 export const PERMANENT_PATCH: PatchRef = { key: 'Permanent', major: -1, minor: -1 };
 
-/** Pool ids encode their patch: special_1_4_2 → 1.4, weponbox_1_0_1 → 1.0. Constant/standard pools have none. */
-export function patchOf(poolId: string): PatchRef {
-  const m = canonicalPoolId(poolId).match(/_(\d+)_(\d+)(?:_\d+)?$/);
-  if (!m || poolId.includes('constant')) return PERMANENT_PATCH;
+/**
+ * Pool ids encode their patch: special_1_4_2 → 1.4, weponbox_1_0_1 → 1.0. Constant/standard pools have none.
+ * A pool id without a version (RE-Factor reruns: rerun_chr_yvonne, rerun_wpn_*) takes it from its
+ * `schedule` entry when there is one: the last version released (Americas time) by the banner's start,
+ * counted like income.ts (Launch is 1.0, then one minor per release). Without either it's Permanent.
+ */
+export function patchOf(poolId: string, schedule?: Schedule | null): PatchRef {
+  const id = canonicalPoolId(poolId);
+  if (id.includes('constant')) return PERMANENT_PATCH;
+  const m = id.match(/_(\d+)_(\d+)(?:_\d+)?$/);
+  if (!m) return schedule ? schedulePatch(id, schedule) : PERMANENT_PATCH;
   const major = Number(m[1]);
   const minor = Number(m[2]);
   return { key: `${major}.${minor}`, major, minor };
+}
+
+function schedulePatch(id: string, schedule: Schedule): PatchRef {
+  const entry = schedule.banners.find((b) => b.poolId && canonicalPoolId(b.poolId) === id);
+  const start = entry?.start ? Date.parse(entry.start.americas) : NaN;
+  if (Number.isNaN(start)) return PERMANENT_PATCH;
+  const released = schedule.versions.filter((v) => v.release && Date.parse(v.release.americas) <= start);
+  return released.length ? { key: `1.${released.length - 1}`, major: 1, minor: released.length - 1 } : PERMANENT_PATCH;
 }
 
 export function comparePatches(a: PatchRef, b: PatchRef): number {
@@ -150,7 +175,8 @@ export function bannerArtUrl(poolId: string): string | null {
  */
 export function issueLayerUrls(poolId: string): { back: string; weapon: string; front: string } | null {
   const id = canonicalPoolId(poolId);
-  if (!id.startsWith('weponbox_') && !id.startsWith('weaponbox_constant_')) return null;
+  // RE-Factor Issues (rerun_wpn_) too: until ef-assets has their layers, the flat art stands in (components.ts issueArt).
+  if (!isIssuePool(id) && !id.startsWith('weaponbox_constant_')) return null;
   const at = `${EF_ASSETS_CDN}/banners/layers/`;
   return { back: `${at}issue-back.webp`, weapon: `${at}${id}.webp`, front: `${at}issue-front.webp` };
 }

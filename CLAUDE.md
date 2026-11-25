@@ -93,7 +93,9 @@ ef-assets (the data repo) may be pushed directly, as `ram-prices` / `celestriad@
 - Chartered Headhunting 6★ pity is shared across all Chartered banners; the
   120-pull rate-up guarantee is per banner. Basic, New Horizons and each Joint
   pool keep their own pity. Any other character pool (unknown or missing id) is
-  `'other'`: its own pity, no guarantee, no rewards. Weapon pity and the 80-pull guarantee are per banner.
+  `'other'`: its own pity, no guarantee, no rewards. RE-Factor reruns (`rerun_chr_*`) are Chartered (shared pity,
+  own 120 guarantee) and `rerun_wpn_*` are Arsenal Issues, but neither gets estimated rewards (only listed gifts);
+  their patch comes from the schedule (`patchOf`). Pools are spelled `weponbox_` and `weaponbox_`: match both. Weapon pity and the 80-pull guarantee are per banner.
   A free rate-up 6★ on a Chartered banner counts as a copy but never touches pity or the 120 guarantee
   (a later paid rate-up at 120 is still `guaranteed`; luck counts paid copies only, `paidCopy`). Some
   banners gave a Token at 120 without consuming pity; not modelled (1.4+ exports list those Tokens as gift records).

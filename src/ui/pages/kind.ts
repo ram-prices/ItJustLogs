@@ -280,7 +280,7 @@ export function sixStrip(kind: Kind, a: Analysis): Html {
         // Chartered banners (one rate-up) glow in the operator's colour; Joint ones in their art's.
         // A shared box takes its rate-up's.
         const up = g.find((x) => x.isRateUp);
-        const byOperator = p.kind === 'char' && p.poolId.startsWith('special_');
+        const byOperator = p.kind === 'char' && /^(?:special|rerun_chr)_/.test(p.poolId);
         const tintUrl = up ? (up.kind === 'weap' ? itemIconUrl('weap', up.itemId) : byOperator ? itemIconUrl('char', up.itemId) : bannerArtUrl(up.poolId)) : null;
         const known = tintUrl ? sixTintFor(tintUrl) : null;
         const title = (x: AnalyzedPull) => tip(x.name, [tipRow('Banner', x.bannerName), tipRow('Date', fmtDate(x.ts, true))]);

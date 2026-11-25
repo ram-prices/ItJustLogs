@@ -1,3 +1,4 @@
+import { isIssuePool } from '../../../domain/banners';
 import { artificeOf, artificeState, artificeTops, GEAR_SLOTS, TUNING_MAX, tuningOf, weaponBaseRanks, weaponBounds, weaponRankCaps, weaponSkillLevels, type Loadout } from '../../../domain/loadout';
 import { statArtifice } from '../../../domain/sim/build';
 import { CHECKED, enemyById, FOODS, type SimBuild, type SimMember } from '../../../domain/sim/team';
@@ -102,15 +103,16 @@ export function signatureWeapons(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [pool, b] of Object.entries(db)) {
     if (!pool.startsWith('special_')) continue;
-    const weapon = db[`weponbox_${pool.slice('special_'.length)}`]?.rateUpIds?.find((id) => id.startsWith('wpn_'));
+    const n = pool.slice('special_'.length);
+    const weapon = (db[`weponbox_${n}`] ?? db[`weaponbox_${n}`])?.rateUpIds?.find((id) => id.startsWith('wpn_'));
     if (weapon) for (const op of b.rateUpIds ?? []) if (op.startsWith('chr_')) out[op] = weapon;
   }
   return out;
 }
 
-/** Weapons only Arsenal Issues give: their rate-ups (weponbox_ pools; weaponbox_constant_ is the standard pool). */
+/** Weapons only Arsenal Issues give: their rate-ups (weponbox_/weaponbox_/rerun_wpn_ pools; weaponbox_constant_ is the standard pool). */
 export const limitedWeapons = (): string[] =>
-  [...new Set(Object.entries(cachedBannerDb()).flatMap(([pool, b]) => (pool.startsWith('weponbox_') ? (b.rateUpIds ?? []).filter((id) => id.startsWith('wpn_')) : [])))].sort();
+  [...new Set(Object.entries(cachedBannerDb()).flatMap(([pool, b]) => (isIssuePool(pool) ? (b.rateUpIds ?? []).filter((id) => id.startsWith('wpn_')) : [])))].sort();
 
 /**
  * The operators to pick from, one per name: the Endministrator's two appearances (chr_0002_endminm,

@@ -1,5 +1,5 @@
 import type { AnalyzedPull, Analysis, BannerSummary } from './analyze';
-import { canonicalPoolId, comparePatches, patchOf, type PatchRef } from './banners';
+import { canonicalPoolId, comparePatches, isIssuePool, patchOf, type PatchRef } from './banners';
 import { isWeaponBanner, timeOn, type Schedule } from './schedule';
 import type { BannerDb } from './types';
 
@@ -49,9 +49,9 @@ export function patchStats(analysis: Analysis, db: BannerDb, schedule?: Schedule
 
   for (const [rawId, entry] of Object.entries(db)) {
     const poolId = canonicalPoolId(rawId);
-    const patch = patchOf(poolId);
+    const patch = patchOf(poolId, schedule);
     if (patch.major === -1) continue;
-    const kind = poolId.startsWith('weponbox_') ? 'weap' : 'char';
+    const kind = isIssuePool(poolId) ? 'weap' : 'char';
     if (seen.has(`${kind}:${poolId}`)) continue;
     // Joint operations share one roster entry; only list joint pools the player actually saw.
     if (poolId.startsWith('joint_')) continue;
