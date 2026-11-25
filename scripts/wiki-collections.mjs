@@ -8,13 +8,21 @@
  * never loads pictures from the wiki. A picture ef-assets has no copy of yet
  * is left out rather than linked to the wiki.
  *
- *   node scripts/wiki-collections.mjs
+ * Medals and archives the wiki doesn't list yet come from the game files
+ * (`source: "game"`, merged in by ef-assets), with their pictures the same way.
+ *
+ *   node scripts/wiki-collections.mjs   (EF_ASSETS_DIR=<ef-assets clone> to read a local clone)
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const EF_ASSETS = 'https://raw.githubusercontent.com/ram-prices/ef-assets/main';
 
+/** EF_ASSETS_DIR: read the files from a local ef-assets clone (its root) instead; pictures still link to GitHub. */
+const DIR = process.env.EF_ASSETS_DIR;
+
 async function json(path) {
+  if (DIR) return JSON.parse(readFileSync(join(DIR, path), 'utf8'));
   const r = await fetch(`${EF_ASSETS}/${path}`, { cache: 'no-store' });
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();

@@ -4,7 +4,7 @@
   "url": "https://endfield.wiki.gg",
   "license": "CC BY-SA 4.0",
   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-  "fetched": "2026-10-21"
+  "fetched": "2026-11-25"
  },
  "medals": [
   {
@@ -415,6 +415,44 @@
    }
   },
   {
+   "id": "i-dream-of-honey-waffles",
+   "name": "\"I Dream of Honey Waffles\"",
+   "category": "Chapter",
+   "group": "Exploration Mission",
+   "desc": "You and Kay journeyed through a wondrous world of shrooms, honey waffles, and a healthy dollop of fantasy. Do not worry, and do not doubt. This is one true adventure.",
+   "cond": "Complete side mission [I Dream of Honey Waffles]",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-quest-sweetpie-lv02.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "a-good-marriage-needs-good-kohl",
+   "name": "\"A Good Marriage Needs Good Kohl\"",
+   "category": "Chapter",
+   "group": "Exploration Mission",
+   "desc": "And with this, the groom and shroom... Is this even right? Can't we just call her the bride? Anyways, they lived happily ever after.",
+   "cond": "Complete side mission [The Day After]",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-quest-sm2l11m1-lv02.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "back-to-the-rustics",
+   "name": "\"Back to the Rustics\"",
+   "category": "Chapter",
+   "group": "Exploration Mission",
+   "desc": "Once the blade's ridge can hold several new twigs and sing like the beasts, we'll finally learn the true character of our intent.",
+   "cond": "Complete side mission Back to the Rustics",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-back-to-the-rustics.webp"
+   }
+  },
+  {
    "id": "combined-arms",
    "name": "Combined Arms",
    "category": "Technical",
@@ -784,6 +822,19 @@
    }
   },
   {
+   "id": "fungal-bounciness",
+   "name": "\"Fungal Bounciness\"",
+   "category": "Technical",
+   "group": "Combat Technique",
+   "desc": "You seem to have experienced true fungal bounciness. It is quite wondrous, like playing on a trampoline.",
+   "cond": "Let the controlled operator get lifted ≥ 4 times from 1 round of the Shroomkrusher Sporeknuckles' continuous quake attack",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-bat-mushro-blowoff-lv02.webp"
+   },
+   "source": "game"
+  },
+  {
    "id": "material-gathering",
    "name": "Material Gathering",
    "category": "Technical",
@@ -944,6 +995,22 @@
    }
   },
   {
+   "id": "despotic-brutality",
+   "name": "\"Despotic Brutality\"",
+   "category": "Technical",
+   "group": "Protocol Space",
+   "desc": "You have crushed the heavily armed despots and exposed their brutality upon the silverscreen.",
+   "cond": "In [Umbral Monument], complete all \"Despot Weaponized\" Difficulty Ⅲ stages",
+   "reforge": [],
+   "trim": "In [Umbral Monument], complete all \"Despot Weaponized\" Difficulty Ⅵ stages",
+   "from": "2026-12-02",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-bat-hard-9-lv02.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-bat-hard-9-lv02-plating.webp"
+   },
+   "source": "game"
+  },
+  {
    "id": "valley-anchorer",
    "name": "Valley Anchorer",
    "category": "Regional",
@@ -1085,6 +1152,32 @@
     "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments.webp",
     "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-re-congregated-fragments-trimmed.webp"
    }
+  },
+  {
+   "id": "shroom-world-crate-master",
+   "name": "Shroom World Crate Master",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "You have opened most storage crates in Wuling. They are worth tons of honey waffles.",
+   "cond": "In the Old Dam, open 47 crates",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-adv-wuling-box-5-lv01.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "dam-treader",
+   "name": "Dam Treader",
+   "category": "Regional",
+   "group": "Wuling",
+   "desc": "Actually, you might know more about this dam than its original designers.",
+   "cond": "In the Old Dam, use Waffle Strike or operator attacks to interact with special shrooms (including: Power-Feeding Mushrooms, Rainbow Mushrooms, Mushroom Vines, and Delulu Walls) 20 times",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-adv-wuling-sweetpie-lv01.webp"
+   },
+   "source": "game"
   },
   {
    "id": "regional-wuling-crate-master",
@@ -1879,6 +1972,21 @@
    }
   },
   {
+   "id": "our-lives-rebuilt",
+   "name": "\"Our Lives Rebuilt\"",
+   "category": "Construction",
+   "group": "AIC Factory",
+   "desc": "Remember the past. Welcome the future.",
+   "cond": "In Wuling, progress Exclusion Zone Rebuilding to Phase 4 (Routine Maintenance)",
+   "reforge": [],
+   "trim": "Complete 5 Routine Maintenance supplies",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-fac-wonder-build-lv02.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-fac-wonder-build-lv02-plating.webp"
+   },
+   "source": "game"
+  },
+  {
    "id": "nexus-upgrader",
    "name": "Nexus Upgrader",
    "category": "Construction",
@@ -2178,10 +2286,92 @@
    "cond": "From a single Trial, earn a high score of ≥ 500K",
    "reforge": [],
    "trim": "In &#91;Arena of Games&#93;, complete 15 Arena Tasks",
+   "end": "2026/11/19",
    "images": {
     "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-dataplate-counter.webp",
     "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-dataplate-counter-trimmed.webp"
    }
+  },
+  {
+   "id": "indigo-cleansed",
+   "name": "\"Indigo Cleansed\"",
+   "category": "Event",
+   "group": "Time-Limited",
+   "desc": "The gift has been tainted by a corrupting hue of indigo. But as long as you are with us, the fire of re-ignition shall never die.",
+   "cond": "In &#91;Contingency Contract: Indigo Experimental Operation&#93;, successfully complete a challenge with ≥ 20 Total Test Criteria",
+   "reforge": [],
+   "trim": "In &#91;Contingency Contract: Indigo Experimental Operation&#93;, successfully complete a challenge with ≥ 30 Total Test Criteria",
+   "end": "2026/11/25",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-indigo-cleansed.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-indigo-cleansed-trimmed.webp"
+   }
+  },
+  {
+   "id": "best-arena-of-talos-ii",
+   "name": "\"BEST! ARENA OF TALOS-II!\"",
+   "category": "Event",
+   "group": "Time-Limited",
+   "desc": "In Wuling, a great arena that could truly ignite the warriors' passion for battle has reached its perfect conclusion! Have faith in us! Another great arena is in the works!",
+   "cond": "In [RISE! MEGA ARENA!], complete all stages on Normal mode",
+   "reforge": [],
+   "trim": "In [RISE! MEGA ARENA!], complete these stages within 200s:\n· [Yuanyuan! Open for Biz! MAXED!]\n· [Fight! Wuling Ablaze! MAXED!]",
+   "from": "2026-12-16",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-takestwo-2-lv02.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-takestwo-2-lv02-plating.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "witchcraft-21",
+   "name": "\"Witchcraft 21\"",
+   "category": "Event",
+   "group": "Time-Limited",
+   "desc": "You seem to be getting pretty good with the witchcraft pastime introduced by \"Lucky Carrot\".",
+   "cond": "Earn ≥ 21 points without busting",
+   "reforge": [],
+   "trim": "Earn ≥ 30 points without busting",
+   "end": "2027/01/07",
+   "from": "2026-12-16",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-blackjack-1-lv02.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-blackjack-1-lv02-plating.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "joker-s-warlord-power",
+   "name": "\"Joker's Warlord Power\"",
+   "category": "Event",
+   "group": "Time-Limited",
+   "desc": "And with that mighty explosion, the despotic Warlord finally fell... However, his legend continues to spread across all sorts of card tables.",
+   "cond": "Play 1 Black Joker card",
+   "reforge": [],
+   "trim": "Play 1 Red Joker card",
+   "end": "2027/01/07",
+   "from": "2026-12-23",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-doudizhu-1-lv02.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-doudizhu-1-lv02-plating.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "shroom-city",
+   "name": "\"Shroom City\"",
+   "category": "Event",
+   "group": "Permanent",
+   "desc": "One by one you illuminated the fragmented Protocol Space. The City of Shrooms has opened its gates for you (and no, you are not hallucinating this time).",
+   "cond": "In [Delver of the Cryptic], complete all \"Esoteric Mycology\" Protocol Spaces",
+   "reforge": [],
+   "trim": "In [Delver of the Cryptic], perfectly complete all \"Esoteric Mycology\" Protocol Spaces",
+   "from": "2026-12-27",
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-wuling-challenge-dung-04-lv02.webp",
+    "trim": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-event-wuling-challenge-dung-04-lv02-plating.webp"
+   },
+   "source": "game"
   },
   {
    "id": "auditors-trapped",
@@ -2403,6 +2593,34 @@
    "images": {
     "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/medal-most-dashing-lung.webp"
    }
+  },
+  {
+   "id": "come-slither-out-of-the-pipes",
+   "name": "\"Come, Slither Out of the Pipes\"",
+   "category": "Wondrous",
+   "group": null,
+   "desc": "UWST tunnel and pipeline repair crews often run into nidwyrms. Baiting them out would be a great idea.",
+   "cond": "",
+   "secret": "When the Shroomkrusher Nidwyrm is hiding, use honey waffles to lure it out of the ground",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-hide-mushbug-attract-lv02.webp"
+   },
+   "source": "game"
+  },
+  {
+   "id": "professional-safe-house",
+   "name": "\"Professional Safe House\"",
+   "category": "Wondrous",
+   "group": null,
+   "desc": "A professional operator always has her safe house prepped before her operation. Never underestimate Kay's professionalism ... or lack thereof.",
+   "cond": "",
+   "secret": "In the Old Dam, reach the Secret Base",
+   "reforge": [],
+   "images": {
+    "base": "https://raw.githubusercontent.com/ram-prices/ef-assets/main/collections/medals/game-achv-hide-secretbase-v1d7-lv01.webp"
+   },
+   "source": "game"
   }
  ]
 }

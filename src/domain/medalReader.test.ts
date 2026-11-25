@@ -56,3 +56,10 @@ describe('medal reader', () => {
     expect(r[1]).toMatchObject({ date: null, unsure: false });
   });
 });
+
+describe('medals from the game files (not on the wiki yet)', () => {
+  it('knows 1.7 medals by name', () => {
+    expect(matchName('"I Dream of Honey Waffles"', names)?.id).toBe(idOf('"I Dream of Honey Waffles"'));
+    expect(matchName('Dam Treader', names)?.id).toBe(idOf('Dam Treader'));
+  });
+});

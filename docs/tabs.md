@@ -11,7 +11,10 @@ Read when working on one of these tabs or their screen readers.
   pictures from its `collections/` (`scripts/collection-pictures.py`), copied
   into `src/data/medals.snapshot.json` and `findings.snapshot.json`
   (lazy-loaded chunks) by our `scripts/wiki-collections.mjs`; no picture
-  loads from the wiki. The
+  loads from the wiki. Entries the wiki doesn't list yet come from the game
+  files (ef-assets `scripts/collections-game.py`, `source: "game"`: no wiki
+  link, credited to Gryphline; a medal's `from` is when the game starts
+  showing it, `end` reads "Ends" until it passes). The
   player's progress is settings (`medals`: date, Reforging tier, Trimmed;
   `findings`: ids), so it syncs and exports. "Read from video or
   screenshots" (`ui/medalReader.ts`) reads the Medal Album in the browser:
@@ -41,7 +44,10 @@ Read when working on one of these tabs or their screen readers.
   their own missions from index.json `activities`): every mission's dialogue from the game's own
   text, read from ef-assets `story/` (`scripts/story.mjs` there, weekly: the
   EndfieldData community dump at git.escartem.moe, a datamine of the game's
-  tables; the text is Gryphline's, credited as such, not CC BY-SA).
+  tables, or `--local` the owner's dump after a game update; the text is
+  Gryphline's, credited as such, not CC BY-SA). Operator stories the wiki
+  doesn't list yet (episodes `chr_<n>_ep1`, missions `c<n>m*`) go at the end
+  of Narrative Events.
   `index.json` groups missions as the wiki's Mission/Main and Mission/Side
   pages order them; sections the wiki doesn't index yet are `unlisted`
   (folded away: maybe unreleased). Each mission file has its scenes with the

@@ -26,6 +26,10 @@ is one that was missed then.
 | Arsenal / RE-Factor Issue | `banners/<pool>.webp` (a copy of `issues/<weapon>.webp`, automatic) + `banners/layers/<pool>.webp` | `issue-banner.py`, then `issue-layers.py` (the schedule workflow runs it) |
 | Any pool without the above | `banners/<pool>.webp` | copy of `headhunting/<operator>.webp` (automatic) |
 
+Operator portraits in Database → Operators (`operators/bust-3/<id>.webp`) always come from the official
+page https://endfield.gryphline.com/en-us/operator (`operator-cards.py`; the owner's rule), never another
+source. A new operator appears there some days after release: re-run it then (the weekly wiki workflow does).
+
 `headhunting/` and `issues/` alone show nothing: `bannerArtUrl` always returns a
 `banners/...` path. `site-art.mjs` (run by both workflows) copies a banner's
 schedule `art` there when the pool file is missing. Also needed per new operator/weapon: `operators/<id>.webp`,
@@ -35,6 +39,15 @@ schedule `art` there when the pool file is missing. Also needed per new operator
 Layouts change between versions (1.7 moved the operator to
 `CenterNode/MainRoleLayer`): look at every new layer file, not just the flat one.
 An `-op` layer of a few KB is empty.
+
+## Medals, archives and story
+
+The wiki and the community dump lag a version by weeks. From the local dump, in ef-assets:
+`python scripts/collections-game.py <dump output>`, `node scripts/wiki-collections.mjs --merge-only`
+(medals and archives the wiki lacks, kept through weekly runs, replaced by the wiki's entry under the
+same id once it lists them) and `node scripts/story.mjs --local <dump output>` (the weekly remote run
+leaves story/ alone until the community dump has every mission). Then here:
+`EF_ASSETS_DIR=<clone> node scripts/wiki-collections.mjs` for the snapshots.
 
 ## After
 

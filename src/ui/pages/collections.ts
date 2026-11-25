@@ -199,7 +199,8 @@ function medalRow(m: Medal, p: MedalProgress | undefined): Html {
         ${m.secret ? html`<div><dt>Secret</dt><dd><details><summary>Show</summary>${m.secret}</details></dd></div>` : ''}
         ${m.reforge.map((r, i) => html`<div><dt>${TIER[i + 2]}</dt><dd>${r.cond}</dd></div>`)}
         ${m.trim ? html`<div><dt>Trimmed</dt><dd>${m.trim}</dd></div>` : ''}
-        ${m.end ? html`<div class="tertiary"><dt>Ended</dt><dd>${m.end}</dd></div>` : ''}
+        ${m.from ? html`<div class="tertiary"><dt>From</dt><dd>${m.from.replace(/-/g, '/')}</dd></div>` : ''}
+        ${m.end ? html`<div class="tertiary"><dt>${m.end.replace(/\//g, '-') < today() ? 'Ended' : 'Ends'}</dt><dd>${m.end}</dd></div>` : ''}
       </dl>
     </div>
     <div class="medal-mine">
@@ -217,6 +218,13 @@ function medalRow(m: Medal, p: MedalProgress | undefined): Html {
     </div>
   </div>`;
 }
+
+/** Today as YYYY-MM-DD, in the visitor's time zone. */
+const today = (): string => new Date().toLocaleDateString('sv-SE');
+
+/** Entries the wiki doesn't list yet come from the game files: their text is Gryphline's, not the wiki's. */
+const gameCredit = (some: boolean): Html =>
+  some ? html`<p class="wiki-credit copy-13">${icon('menu_book')}<span>Entries not on the wiki yet: from the game files, game text © Gryphline.</span></p>` : html``;
 
 /** Line breaks in the wiki's text. */
 const lines = (s: string): Html => html`${s.split('\n').map((l, i) => html`${i ? html`<br />` : ''}${l}`)}`;
@@ -266,6 +274,7 @@ export function achievementsPage(redraw: () => void): Html {
         </div>
       </div>
       ${credit(data.attribution, 'https://endfield.wiki.gg/wiki/Path_of_Glory')}
+      ${gameCredit(all.some((m) => m.source === 'game'))}
     </main>`;
 }
 
@@ -339,6 +348,7 @@ export function archivesPage(redraw: () => void): Html {
         </div>
       </div>
       ${credit(data.attribution, 'https://endfield.wiki.gg/wiki/Intel_Archives')}
+      ${gameCredit(all.some((f) => f.source === 'game'))}
     </main>`;
 }
 
@@ -366,11 +376,11 @@ function openFinding(id: string): void {
       </div>
       <div class="finding-dialog-body">
         ${f.image ? html`<img class="finding-picture" src="${f.image}" alt="" decoding="async" />` : ''}
-        ${f.text ? html`<div class="copy-14 finding-text">${f.text.split(/\n{2,}/).map((p) => html`<p>${lines(p)}</p>`)}</div>` : html`<p class="copy-14 secondary">No text on the wiki yet.</p>`}
+        ${f.text ? html`<div class="copy-14 finding-text">${f.text.split(/\n{2,}/).map((p) => html`<p>${lines(p)}</p>`)}</div>` : f.source === 'game' ? '' : html`<p class="copy-14 secondary">No text on the wiki yet.</p>`}
       </div>
       <div class="finding-dialog-foot">
         <button type="button" class="have-toggle" data-action="finding-toggle" data-value="${f.id}" aria-pressed="${String(got)}">${icon(got ? 'check_circle' : 'add')}${got ? 'Collected' : 'Mark collected'}</button>
-        <a class="copy-13" href="https://endfield.wiki.gg/wiki/${encodeURIComponent(f.name.replace(/ /g, '_'))}" target="_blank" rel="noopener">Wiki page</a>
+        ${f.source === 'game' ? '' : html`<a class="copy-13" href="https://endfield.wiki.gg/wiki/${encodeURIComponent(f.name.replace(/ /g, '_'))}" target="_blank" rel="noopener">Wiki page</a>`}
       </div>`,
   );
   document.body.append(dlg);

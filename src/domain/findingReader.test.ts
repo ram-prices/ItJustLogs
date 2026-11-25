@@ -85,3 +85,13 @@ describe('finding reader', () => {
     ).toEqual({ Manuscripts: 279, 'E-Files': 87 });
   });
 });
+
+describe('archives from the game files (not on the wiki yet)', () => {
+  it('knows 1.7 tiles by how their names start', () => {
+    const tiles = tilesFrom([
+      { text: "Kay's", x0: 20, x1: 70, y0: 300, y1: 320 },
+      { text: 'Battle...', x0: 78, x1: 170, y0: 300, y1: 320 },
+    ]);
+    expect(candidates(tiles[0], list).map(nameAt)).toEqual(["Kay's Battle Plan"]);
+  });
+});

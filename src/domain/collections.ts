@@ -22,8 +22,12 @@ export interface Medal {
   reforge: { desc: string; cond: string }[];
   /** Trimming condition (a holographic look), if the medal can be trimmed. */
   trim?: string;
-  /** When it stopped being obtainable (time-limited events). */
+  /** When it stops or stopped being obtainable (time-limited events), YYYY/MM/DD. */
   end?: string;
+  /** When the game starts showing it, if that's still ahead (YYYY-MM-DD; medals from the game files only). */
+  from?: string;
+  /** "game": from the game files (ef-assets scripts/collections-game.py), not on the wiki yet. */
+  source?: 'game';
   images: { base?: string; r2?: string; r3?: string; trim?: string };
 }
 
@@ -49,6 +53,8 @@ export interface Finding {
   /** The archive's thumbnail, and a larger picture from its page. */
   icon?: string;
   image?: string;
+  /** "game": from the game files (ef-assets scripts/collections-game.py), not on the wiki yet. */
+  source?: 'game';
 }
 
 export interface FindingFile {
